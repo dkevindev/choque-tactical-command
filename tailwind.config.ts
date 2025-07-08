@@ -52,6 +52,11 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				/* Military tactical colors */
+				'tactical-dark': 'hsl(var(--tactical-dark))',
+				'tactical-medium': 'hsl(var(--tactical-medium))',
+				'tactical-light': 'hsl(var(--tactical-light))',
+				'tactical-text': 'hsl(var(--tactical-text))',
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
@@ -62,6 +67,14 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				}
+			},
+			fontFamily: {
+				'military': ['Roboto Condensed', 'Oswald', 'Arial Black', 'sans-serif'],
+			},
+			boxShadow: {
+				'tactical': 'var(--shadow-tactical)',
+				'tactical-inset': 'var(--shadow-inset)',
+				'tactical-glow': 'var(--glow-tactical)',
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
