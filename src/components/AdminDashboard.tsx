@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import TacticalSidebar from '@/components/TacticalSidebar';
+import ViaturaTable from '@/components/ViaturaTable';
+import PolicialTable from '@/components/PolicialTable';
 import { 
   Shield, 
   Users, 
@@ -26,6 +28,8 @@ const AdminDashboard = () => {
         return <FrotaContent />;
       case 'policial':
         return <PolicialContent />;
+      case 'documentos':
+        return <DocumentosContent />;
       default:
         return <DashboardOverview />;
     }
@@ -121,6 +125,18 @@ const DashboardOverview = () => {
         <Card className="bg-card border-border shadow-tactical">
           <CardHeader>
             <CardTitle className="text-foreground flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              FROTA - VIATURAS
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ViaturaTable />
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-card border-border shadow-tactical">
+          <CardHeader>
+            <CardTitle className="text-foreground flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
               ALERTAS RECENTES
             </CardTitle>
@@ -144,34 +160,34 @@ const DashboardOverview = () => {
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="bg-card border-border shadow-tactical">
-          <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              ATIVIDADES RECENTES
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                { action: 'Cadastro de novo equipamento', user: 'Sgt. Silva', time: '15:45' },
-                { action: 'Atualização de dados - Policial', user: 'Cb. Santos', time: '14:20' },
-                { action: 'Relatório de manutenção enviado', user: 'Ten. Oliveira', time: '13:30' }
-              ].map((activity, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 bg-muted rounded">
-                  <CheckCircle className="h-4 w-4 text-primary" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">{activity.action}</p>
-                    <p className="text-xs text-muted-foreground">por {activity.user}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{activity.time}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
+      
+      <Card className="bg-card border-border shadow-tactical mt-6">
+        <CardHeader>
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            ATIVIDADES RECENTES
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[
+              { action: 'Cadastro de novo equipamento', user: 'Sgt. Silva', time: '15:45' },
+              { action: 'Atualização de dados - Policial', user: 'Cb. Santos', time: '14:20' },
+              { action: 'Relatório de manutenção enviado', user: 'Ten. Oliveira', time: '13:30' }
+            ].map((activity, index) => (
+              <div key={index} className="flex items-center gap-3 p-3 bg-muted rounded">
+                <CheckCircle className="h-4 w-4 text-primary" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">{activity.action}</p>
+                  <p className="text-xs text-muted-foreground">por {activity.user}</p>
+                </div>
+                <span className="text-xs text-muted-foreground">{activity.time}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
@@ -221,8 +237,19 @@ const PolicialContent = () => (
       <CardTitle className="text-foreground">GESTÃO DE PESSOAL</CardTitle>
     </CardHeader>
     <CardContent>
+      <PolicialTable />
+    </CardContent>
+  </Card>
+);
+
+const DocumentosContent = () => (
+  <Card className="bg-card border-border shadow-tactical">
+    <CardHeader>
+      <CardTitle className="text-foreground">GESTÃO DE DOCUMENTOS</CardTitle>
+    </CardHeader>
+    <CardContent>
       <p className="text-muted-foreground">
-        Módulo de controle de efetivo em desenvolvimento...
+        Módulo de documentos em desenvolvimento...
       </p>
     </CardContent>
   </Card>

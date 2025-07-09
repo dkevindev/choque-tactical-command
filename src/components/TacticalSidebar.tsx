@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  FileText
 } from 'lucide-react';
 
 interface TacticalSidebarProps {
@@ -29,6 +30,7 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
     { id: 'belico', label: 'BÉLICO', icon: Target, badge: '2.1K' },
     { id: 'frota', label: 'FROTA', icon: Truck, badge: '89' },
     { id: 'policial', label: 'POLICIAL', icon: Users, badge: '1.2K' },
+    { id: 'documentos', label: 'DOCUMENTOS', icon: FileText, badge: null },
   ];
 
   const userMenuItems = [
@@ -50,7 +52,7 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
               </div>
               <div>
                 <h2 className="text-sidebar-foreground font-bold text-lg tracking-wide">
-                  CPCHOQUE
+                  CAVALARIA
                 </h2>
                 <p className="text-xs text-muted-foreground">
                   {isAdmin ? 'ADMIN' : 'POLICIAL'}
