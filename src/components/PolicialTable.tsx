@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Eye, MapPin, Plus, Edit, Target, Shield } from 'lucide-react';
+import { Search, Eye, Plus, Edit, Target, Shield } from 'lucide-react';
 
 interface Cautela {
   id: string;
@@ -88,10 +88,6 @@ const PolicialTable = () => {
     }
   };
 
-  const handleLocalizar = (policial: Policial) => {
-    // Simular localização
-    alert(`Localizando ${policial.posto} ${policial.nome}...\nÚltima posição conhecida: Setor Alpha`);
-  };
 
   return (
     <div className="space-y-4">
@@ -136,14 +132,6 @@ const PolicialTable = () => {
               </TableCell>
               <TableCell>
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleLocalizar(policial)}
-                  >
-                    <MapPin className="h-4 w-4 mr-1" />
-                    Localizar
-                  </Button>
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button

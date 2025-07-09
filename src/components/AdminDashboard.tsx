@@ -121,46 +121,17 @@ const DashboardOverview = () => {
         ))}
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-card border-border shadow-tactical">
-          <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
-              <Truck className="h-5 w-5" />
-              FROTA - VIATURAS
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ViaturaTable />
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-card border-border shadow-tactical">
-          <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              ALERTAS RECENTES
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                { type: 'CRÍTICO', message: 'Manutenção viatura VTR-001 vencida', time: '14:30' },
-                { type: 'ATENÇÃO', message: 'Estoque de munição baixo - Lote 45', time: '13:15' },
-                { type: 'INFO', message: 'Relatório mensal gerado com sucesso', time: '12:00' }
-              ].map((alert, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 bg-muted rounded border-l-4 border-destructive">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <div className="flex-1">
-                    <Badge variant="outline" className="mb-1">{alert.type}</Badge>
-                    <p className="text-sm text-foreground">{alert.message}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{alert.time}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="bg-card border-border shadow-tactical">
+        <CardHeader>
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <Truck className="h-5 w-5" />
+            FROTA - VIATURAS
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ViaturaTable />
+        </CardContent>
+      </Card>
       
       <Card className="bg-card border-border shadow-tactical mt-6">
         <CardHeader>
