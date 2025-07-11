@@ -39,10 +39,10 @@ const Login = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-foreground tracking-wide">
-            CPCHOQUE
+            CAVALARIA - CPCHOQUE
           </CardTitle>
           <p className="text-muted-foreground text-sm font-medium">
-            SISTEMA TÁTICO OPERACIONAL
+            SISTEMA ADMINSTRATIVO P4
           </p>
         </CardHeader>
         
@@ -90,7 +90,7 @@ const Login = () => {
           
           <div className="mt-6 text-center">
             <p className="text-xs text-muted-foreground">
-              Sistema restrito • CPCHOQUE PM-SP
+              SISTEMA RESTRITO - CAVALARIA - CPCHOQUE
             </p>
           </div>
         </CardContent>

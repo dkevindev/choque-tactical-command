@@ -1,11 +1,10 @@
-import { useState, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Send, Mic, MicOff, Bot, User, Home } from 'lucide-react';
-import cpchoqueLogo from '@/assets/cpchoque-logo.png';
+import { useState, useEffect, useRef } from 'react';
+import type { BotResponse, Viatura } from '@/bot/types';
+import { responder } from '@/bot/responder';
+import ViaturaModal from '@/bot/ViaturaModal';
+import { Mic, MicOff, Send } from 'lucide-react';
+
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 interface Message {
   id: string;
@@ -23,213 +22,281 @@ const CAVBot = () => {
       timestamp: new Date()
     }
   ]);
+  const [selectedViatura, setSelectedViatura] = useState<Viatura | null>(null);
   const [inputText, setInputText] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const navigate = useNavigate();
+
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition
+  } = useSpeechRecognition();
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
+  // Scroll automático ao receber mensagens
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, [messages]);
 
-  const handleSendMessage = () => {
-    if (!inputText.trim()) return;
+  // Atualiza inputText sempre que o transcript mudar (mas só se for diferente do valor atual)
+  useEffect(() => {
+    if (transcript && transcript !== inputText) {
+      setInputText(transcript);
+    }
+  }, [transcript]);
+
+  const handleSendMessage = async (textParam?: string) => {
+    const textToSend = textParam ?? inputText;
+    if (!textToSend.trim()) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText,
+      text: textToSend,
       sender: 'user',
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
+    resetTranscript();
 
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse = generateBotResponse(inputText);
+    const botResponse: BotResponse = await responder(textToSend);
+
+    if (botResponse.type === 'text') {
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: botResponse,
+        text: botResponse.text,
         sender: 'bot',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, botMessage]);
-      scrollToBottom();
-    }, 1000);
-
-    scrollToBottom();
-  };
-
-  const generateBotResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase();
-    
-    if (input.includes('nada consta') || input.includes('documento')) {
-      return 'Para gerar um documento "nada consta", preciso da matrícula do policial. Por favor, informe a matrícula para prosseguir com a geração do documento.';
-    }
-    
-    if (input.includes('arma') || input.includes('série') || input.includes('armamento')) {
-      return 'Para localizar uma arma pelo número de série, preciso do número completo. Por favor, informe o número de série da arma que deseja localizar.';
-    }
-    
-    if (input.includes('viatura') || input.includes('veículo')) {
-      return 'Posso ajudá-lo com informações sobre a frota. Atualmente temos 89 viaturas ativas. Precisa de informações específicas sobre alguma viatura?';
-    }
-    
-    if (input.includes('policial') || input.includes('efetivo')) {
-      return 'Temos 1.247 policiais no efetivo ativo. Posso buscar informações específicas de algum policial se você informar a matrícula.';
-    }
-    
-    if (input.includes('relatório') || input.includes('dashboard')) {
-      return 'Posso gerar relatórios sobre patrimônio, armamentos, frota ou efetivo. Qual tipo de relatório você precisa?';
-    }
-    
-    return 'Entendi sua solicitação. Posso ajudá-lo com:\n\n• Gerar documentos "nada consta"\n• Localizar armamentos por número de série\n• Informações sobre viaturas e frota\n• Dados do efetivo policial\n• Relatórios gerenciais\n\nComo posso ser mais específico em sua consulta?';
-  };
-
-  const handleVoiceRecording = () => {
-    setIsRecording(!isRecording);
-    // Aqui seria implementada a funcionalidade de gravação de voz
-    if (!isRecording) {
-      // Simular transcrição após alguns segundos
-      setTimeout(() => {
-        setIsRecording(false);
-        setInputText('Transcrição da mensagem de voz...');
-      }, 3000);
+    } else if (botResponse.type === 'show_viatura_modal') {
+      setSelectedViatura(botResponse.viatura);
     }
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const toggleRecording = () => {
+    if (!browserSupportsSpeechRecognition) {
+      alert('Reconhecimento de voz não suportado neste navegador.');
+      return;
+    }
+    if (listening) {
+      SpeechRecognition.stopListening();
+    } else {
+      // continuous: false para pausar automaticamente após falar
+      SpeechRecognition.startListening({ continuous: false, language: 'pt-BR' });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background font-military">
-      <div className="absolute inset-0 bg-gradient-to-br from-tactical-dark via-background to-tactical-medium opacity-90"></div>
-      
-      <div className="relative z-10 flex flex-col h-screen">
-        {/* Header */}
-        <div className="p-4 border-b border-border bg-card/50 backdrop-blur-sm">
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-tactical-medium rounded-full p-2 border border-tactical-light">
-                <img 
-                  src={cpchoqueLogo} 
-                  alt="CAVALARIA Logo" 
-                  className="w-full h-full object-contain filter brightness-200"
-                />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground tracking-wide">
-                  CAVBOT
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Assistente Virtual CAVALARIA
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-primary/20 text-primary">
-                <div className="w-2 h-2 bg-primary rounded-full animate-pulse mr-2"></div>
-                ONLINE
-              </Badge>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/')}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <Home className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-        </div>
+    <>
+      <div className="chat-container">
+        <header className="chat-header">
+          <h1>CAVBOT - Assistente da Cavalaria</h1>
+        </header>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="max-w-4xl mx-auto space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {message.sender === 'bot' && (
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
-                    <Bot className="h-4 w-4 text-primary-foreground" />
-                  </div>
-                )}
-                
-                <div className={`max-w-md ${message.sender === 'user' ? 'order-2' : ''}`}>
-                  <div
-                    className={`p-3 rounded-lg ${
-                      message.sender === 'user'
-                        ? 'bg-primary text-primary-foreground ml-auto'
-                        : 'bg-card border border-border'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1 px-1">
-                    {formatTime(message.timestamp)}
-                  </p>
-                </div>
-
-                {message.sender === 'user' && (
-                  <div className="w-8 h-8 bg-tactical-medium rounded-full flex items-center justify-center flex-shrink-0 order-3">
-                    <User className="h-4 w-4 text-tactical-text" />
-                  </div>
-                )}
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-
-        {/* Input */}
-        <div className="p-4 border-t border-border bg-card/50 backdrop-blur-sm">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex gap-2">
-              <div className="flex-1 flex gap-2">
-                <Input
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Digite sua mensagem..."
-                  className="bg-input border-border text-foreground"
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleVoiceRecording}
-                  className={`${
-                    isRecording 
-                      ? 'bg-destructive text-destructive-foreground animate-pulse' 
-                      : 'bg-secondary text-secondary-foreground'
-                  }`}
-                >
-                  {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                </Button>
-              </div>
-              <Button 
-                onClick={handleSendMessage}
-                disabled={!inputText.trim()}
-                className="bg-primary hover:bg-tactical-light text-primary-foreground"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+        <main className="chat-messages">
+          {messages.map(msg => (
+            <div
+              key={msg.id}
+              className={`message ${msg.sender === 'user' ? 'user-message' : 'bot-message'}`}
+            >
+              <p>{msg.text}</p>
+              <span className="timestamp">{msg.timestamp.toLocaleTimeString('pt-BR')}</span>
             </div>
-            
-            {isRecording && (
-              <div className="mt-2 text-center">
-                <Badge variant="destructive" className="animate-pulse">
-                  🎤 Gravando... Toque novamente para parar
-                </Badge>
-              </div>
-            )}
-          </div>
-        </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </main>
+
+        <footer className="chat-input-area">
+          <button
+            type="button"
+            className={`mic-button ${listening ? 'recording' : ''}`}
+            onClick={toggleRecording}
+            title={listening ? 'Parar gravação' : 'Gravar mensagem de voz'}
+          >
+            {listening ? <MicOff size={24} /> : <Mic size={24} />}
+          </button>
+
+          <input
+            type="text"
+            placeholder="Digite sua mensagem..."
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+            // Linha 'disabled={listening}' removida daqui
+            autoComplete="off"
+          />
+
+          <button
+            type="button"
+            onClick={() => handleSendMessage()}
+            disabled={!inputText.trim() || listening}
+            className="send-button"
+            aria-label="Enviar mensagem"
+          >
+            <Send size={24} />
+          </button>
+        </footer>
       </div>
-    </div>
+
+      {selectedViatura && (
+        <ViaturaModal
+          viatura={selectedViatura}
+          onClose={() => setSelectedViatura(null)}
+        />
+      )}
+
+      <style>{`
+        .chat-container {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          max-width: 600px;
+          margin: 0 auto;
+          background: #1f2937;
+          color: #f9fafb;
+          font-family: 'Roboto', sans-serif;
+          border-radius: 10px;
+          overflow: hidden;
+          box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+
+        .chat-header {
+          padding: 1rem;
+          background: #111827;
+          font-weight: 700;
+          font-size: 1.25rem;
+          text-align: center;
+          border-bottom: 1px solid #374151;
+        }
+
+        .chat-messages {
+          flex: 1;
+          padding: 1rem;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          scrollbar-width: thin;
+          scrollbar-color: #4b5563 transparent;
+        }
+        .chat-messages::-webkit-scrollbar {
+          width: 8px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+          background-color: #4b5563;
+          border-radius: 4px;
+        }
+
+        .message {
+          max-width: 80%;
+          padding: 0.75rem 1rem;
+          border-radius: 20px;
+          position: relative;
+          word-wrap: break-word;
+          font-size: 1rem;
+        }
+        .user-message {
+          align-self: flex-end;
+          background: #3b82f6;
+          color: white;
+          border-bottom-right-radius: 0;
+        }
+        .bot-message {
+          align-self: flex-start;
+          background: #374151;
+          border: 1px solid #4b5563;
+          color: #d1d5db;
+          border-bottom-left-radius: 0;
+        }
+
+        .timestamp {
+          font-size: 0.7rem;
+          color: #9ca3af;
+          margin-top: 2px;
+          user-select: none;
+        }
+
+        .chat-input-area {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1rem;
+          background: #111827;
+          border-top: 1px solid #374151;
+        }
+
+        input[type="text"] {
+          flex: 1;
+          padding: 0.6rem 1rem;
+          font-size: 1rem;
+          border-radius: 9999px;
+          border: none;
+          outline: none;
+          background: #374151;
+          color: #f9fafb;
+          transition: background-color 0.3s;
+        }
+        input[type="text"]:focus {
+          background: #4b5563;
+        }
+
+        button {
+          border: none;
+          background: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.25rem;
+          color: #60a5fa;
+          transition: color 0.3s;
+          border-radius: 50%;
+        }
+        button:hover:not(:disabled) {
+          color: #2563eb;
+        }
+        button:disabled {
+          color: #9ca3af;
+          cursor: not-allowed;
+        }
+
+        .mic-button.recording {
+          color: #dc2626;
+          animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+
+        .send-button {
+          background: #3b82f6;
+          padding: 0.5rem;
+          border-radius: 50%;
+          color: white;
+          box-shadow: 0 2px 8px rgb(59 130 246 / 0.5);
+        }
+        .send-button:hover:not(:disabled) {
+          background: #2563eb;
+          box-shadow: 0 4px 12px rgb(37 99 235 / 0.75);
+        }
+
+        @media (max-width: 600px) {
+          .chat-container {
+            max-width: 100vw;
+            border-radius: 0;
+          }
+
+          .message {
+            max-width: 90%;
+            font-size: 1.1rem;
+          }
+        }
+      `}</style>
+    </>
   );
 };
 

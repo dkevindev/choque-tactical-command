@@ -4,16 +4,18 @@ import { Badge } from '@/components/ui/badge';
 import TacticalSidebar from '@/components/TacticalSidebar';
 import ViaturaTable from '@/components/ViaturaTable';
 import PolicialTable from '@/components/PolicialTable';
-import { 
-  Shield, 
-  Users, 
-  Truck, 
+import {
+  Shield,
+  Users,
+  Truck,
   Target,
   AlertTriangle,
   CheckCircle,
   Clock,
   TrendingUp
 } from 'lucide-react';
+import FrotaPage from '@/components/FrotaPage';
+import DocumentosPage from './DocumentosPaga';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -38,7 +40,7 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-background flex font-military">
       <TacticalSidebar activeSection={activeSection} onSectionChange={setActiveSection} isAdmin={true} />
-      
+
       <main className="flex-1 p-6 overflow-auto">
         <div className="max-w-7xl mx-auto">
           <header className="mb-8">
@@ -49,7 +51,7 @@ const AdminDashboard = () => {
               Comando de Policiamento de Choque - Sistema de Gestão
             </p>
           </header>
-          
+
           {renderContent()}
         </div>
       </main>
@@ -59,31 +61,31 @@ const AdminDashboard = () => {
 
 const DashboardOverview = () => {
   const stats = [
-    { 
-      title: 'EFETIVO ATIVO', 
-      value: '1,247', 
-      icon: Users, 
+    {
+      title: 'EFETIVO ATIVO',
+      value: '1,247',
+      icon: Users,
       status: 'operational',
       description: 'Policiais em serviço'
     },
-    { 
-      title: 'VIATURAS ATIVAS', 
-      value: '89', 
-      icon: Truck, 
+    {
+      title: 'VIATURAS ATIVAS',
+      value: '89',
+      icon: Truck,
       status: 'operational',
       description: 'Frota operacional'
     },
-    { 
-      title: 'ARMAMENTOS', 
-      value: '2,156', 
-      icon: Target, 
+    {
+      title: 'ARMAMENTOS',
+      value: '2,156',
+      icon: Target,
       status: 'warning',
       description: 'Itens bélicos registrados'
     },
-    { 
-      title: 'EQUIPAMENTOS', 
-      value: '3,421', 
-      icon: Shield, 
+    {
+      title: 'EQUIPAMENTOS',
+      value: '3,421',
+      icon: Shield,
       status: 'operational',
       description: 'Patrimônio total'
     }
@@ -120,19 +122,19 @@ const DashboardOverview = () => {
           </Card>
         ))}
       </div>
-      
+
       <Card className="bg-card border-border shadow-tactical">
         <CardHeader>
           <CardTitle className="text-foreground flex items-center gap-2">
             <Truck className="h-5 w-5" />
-            FROTA - VIATURAS
+            FROTA - VIATURAS COM ALERTAS
           </CardTitle>
         </CardHeader>
         <CardContent>
           <ViaturaTable />
         </CardContent>
       </Card>
-      
+
       <Card className="bg-card border-border shadow-tactical mt-6">
         <CardHeader>
           <CardTitle className="text-foreground flex items-center gap-2">
@@ -190,16 +192,7 @@ const BelicoContent = () => (
 );
 
 const FrotaContent = () => (
-  <Card className="bg-card border-border shadow-tactical">
-    <CardHeader>
-      <CardTitle className="text-foreground">GESTÃO DE FROTA</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-muted-foreground">
-        Módulo de controle de viaturas em desenvolvimento...
-      </p>
-    </CardContent>
-  </Card>
+  <FrotaPage />
 );
 
 const PolicialContent = () => (
@@ -214,16 +207,7 @@ const PolicialContent = () => (
 );
 
 const DocumentosContent = () => (
-  <Card className="bg-card border-border shadow-tactical">
-    <CardHeader>
-      <CardTitle className="text-foreground">GESTÃO DE DOCUMENTOS</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-muted-foreground">
-        Módulo de documentos em desenvolvimento...
-      </p>
-    </CardContent>
-  </Card>
+  <DocumentosPage />
 );
 
 export default AdminDashboard;
