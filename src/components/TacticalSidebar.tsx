@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   ChevronRight,
-  FileText
+  FileText,
+  AlertCircle
 } from 'lucide-react';
 
 interface TacticalSidebarProps {
@@ -37,6 +38,7 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
   const userMenuItems = [
     { id: 'dashboard', label: 'INFORMAÇÕES', icon: Home, badge: null },
     { id: 'reserva', label: 'RESERVA DE ARMAMENTO', icon: Target, badge: null },
+    { id: 'avarias', label: 'AVARIAS', icon: AlertCircle, badge: null },
   ];
 
   const menuItems = isAdmin ? adminMenuItems : userMenuItems;

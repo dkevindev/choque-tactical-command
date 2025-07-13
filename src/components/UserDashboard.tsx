@@ -18,11 +18,13 @@ import {
   Package,
   Signature,
   CheckSquare,
-  ArrowDown
+  ArrowDown,
+  Menu
 } from 'lucide-react';
 
 const UserDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const renderContent = () => {
     switch (activeSection) {
@@ -36,83 +38,124 @@ const UserDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex font-military">
-      <TacticalSidebar activeSection={activeSection} onSectionChange={setActiveSection} isAdmin={false} />
+    <div className="min-h-screen bg-background font-military">
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       
-      <main className="flex-1 p-6 overflow-auto">
-        <div className="max-w-5xl mx-auto">
-           <header className="mb-8">
-             <h1 className="text-3xl font-bold text-foreground tracking-wide">
-               PAINEL DO POLICIAL
-             </h1>
-             <p className="text-muted-foreground mt-2">
-               Informações pessoais e operacionais
-             </p>
-           </header>
-           
-           {renderContent()}
-         </div>
-       </main>
-     </div>
-   );
- };
+      <div className="flex">
+        {/* Mobile Sidebar */}
+        <div className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:relative md:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          <TacticalSidebar 
+            activeSection={activeSection} 
+            onSectionChange={(section) => {
+              setActiveSection(section);
+              setSidebarOpen(false);
+            }} 
+            isAdmin={false} 
+          />
+        </div>
+        
+        <main className="flex-1 min-h-screen">
+          {/* Mobile Header */}
+          <div className="md:hidden bg-background border-b border-border p-4 flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="text-foreground"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <h1 className="text-lg font-bold text-foreground">PAINEL POLICIAL</h1>
+            <div className="w-10" />
+          </div>
+          
+          <div className="p-3 md:p-6 overflow-auto">
+            <div className="max-w-5xl mx-auto">
+              {/* Desktop Header */}
+              <header className="mb-4 md:mb-8 hidden md:block">
+                <h1 className="text-3xl font-bold text-foreground tracking-wide">
+                  PAINEL DO POLICIAL
+                </h1>
+                <p className="text-muted-foreground mt-2">
+                  Informações pessoais e operacionais
+                </p>
+              </header>
+              
+              {renderContent()}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
 
- const DashboardContent = () => {
+const DashboardContent = () => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
       {/* Perfil do Policial */}
       <Card className="lg:col-span-2 bg-card border-border shadow-tactical">
-        <CardHeader>
-          <CardTitle className="text-foreground flex items-center gap-2">
-            <User className="h-5 w-5" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-foreground flex items-center gap-2 text-sm md:text-base">
+            <User className="h-4 w-4 md:h-5 md:w-5" />
             DADOS PESSOAIS
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-start gap-6">
-            <div className="w-24 h-24 bg-tactical-medium rounded-full flex items-center justify-center">
-              <User className="h-12 w-12 text-tactical-text" />
+          <div className="flex items-start gap-3 md:gap-6">
+            <div className="w-12 h-12 md:w-16 md:h-16 bg-tactical-medium rounded-full flex items-center justify-center flex-shrink-0">
+              <User className="h-6 w-6 md:h-8 md:w-8 text-tactical-text" />
             </div>
-            <div className="flex-1 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="grid grid-cols-1 gap-3 md:gap-4">
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Nome Completo
                   </label>
-                  <p className="text-foreground font-medium">
+                  <p className="text-sm md:text-base text-foreground font-medium truncate">
                     CABO JOÃO DA SILVA SANTOS
                   </p>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Matrícula
-                  </label>
-                  <p className="text-foreground font-medium">
-                    PM-123456-SP
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Posto/Graduação
-                  </label>
-                  <p className="text-foreground font-medium">
-                    CABO PM
-                  </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Matrícula
+                    </label>
+                    <p className="text-sm md:text-base text-foreground font-medium">
+                      PM-123456-SP
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Posto/Graduação
+                    </label>
+                    <p className="text-sm md:text-base text-foreground font-medium">
+                      CABO PM
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Unidade
                   </label>
-                  <p className="text-foreground font-medium">
+                  <p className="text-sm md:text-base text-foreground font-medium">
                     CPCHOQUE - 1ª CIA
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2 mt-4">
-                <Badge variant="default" className="bg-primary">
+              <div className="flex gap-2 mt-3">
+                <Badge variant="default" className="bg-primary text-xs">
                   ATIVO
                 </Badge>
-                <Badge variant="outline">
+                <Badge variant="outline" className="text-xs">
                   OPERACIONAL
                 </Badge>
               </div>
@@ -123,46 +166,46 @@ const UserDashboard = () => {
 
       {/* Material Cautelado */}
       <Card className="bg-card border-border shadow-tactical">
-        <CardHeader>
-          <CardTitle className="text-foreground flex items-center gap-2">
-            <Package className="h-5 w-5" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-foreground flex items-center gap-2 text-sm md:text-base">
+            <Package className="h-4 w-4 md:h-5 md:w-5" />
             MATERIAL CAUTELADO
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-muted rounded">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-foreground">
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between p-2 md:p-3 bg-muted rounded">
+              <div className="flex items-center gap-2 min-w-0">
+                <Package className="h-3 w-3 md:h-4 md:w-4 text-primary flex-shrink-0" />
+                <span className="text-xs md:text-sm font-medium text-foreground truncate">
                   PISTOLA .40
                 </span>
               </div>
-              <Badge variant="default">001</Badge>
+              <Badge variant="default" className="text-xs">001</Badge>
             </div>
             
-            <div className="flex items-center justify-between p-3 bg-muted rounded">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-foreground">
+            <div className="flex items-center justify-between p-2 md:p-3 bg-muted rounded">
+              <div className="flex items-center gap-2 min-w-0">
+                <Package className="h-3 w-3 md:h-4 md:w-4 text-primary flex-shrink-0" />
+                <span className="text-xs md:text-sm font-medium text-foreground truncate">
                   MUNIÇÃO .40
                 </span>
               </div>
-              <Badge variant="outline">45 UN</Badge>
+              <Badge variant="outline" className="text-xs">45 UN</Badge>
             </div>
             
-            <div className="flex items-center justify-between p-3 bg-muted rounded">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-foreground">
+            <div className="flex items-center justify-between p-2 md:p-3 bg-muted rounded">
+              <div className="flex items-center gap-2 min-w-0">
+                <Package className="h-3 w-3 md:h-4 md:w-4 text-primary flex-shrink-0" />
+                <span className="text-xs md:text-sm font-medium text-foreground truncate">
                   COLETE BALÍSTICO
                 </span>
               </div>
-              <Badge variant="default">001</Badge>
+              <Badge variant="default" className="text-xs">001</Badge>
             </div>
           </div>
           
-          <div className="text-xs text-muted-foreground text-center border-t pt-3">
+          <div className="text-xs text-muted-foreground text-center border-t pt-2">
             Total de itens: 3
           </div>
         </CardContent>
@@ -170,14 +213,14 @@ const UserDashboard = () => {
 
       {/* Agenda */}
       <Card className="bg-card border-border shadow-tactical">
-        <CardHeader>
-          <CardTitle className="text-foreground flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-foreground flex items-center gap-2 text-sm md:text-base">
+            <Calendar className="h-4 w-4 md:h-5 md:w-5" />
             PRÓXIMAS ATIVIDADES
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {[
               { 
                 title: 'Treinamento Tático', 
@@ -198,10 +241,10 @@ const UserDashboard = () => {
                 type: 'meeting' 
               }
             ].map((activity, index) => (
-              <div key={index} className="flex items-center gap-3 p-2 bg-muted rounded">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
+              <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
+                <Clock className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs md:text-sm font-medium text-foreground truncate">
                     {activity.title}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -216,14 +259,14 @@ const UserDashboard = () => {
 
       {/* Comunicados */}
       <Card className="bg-card border-border shadow-tactical">
-        <CardHeader>
-          <CardTitle className="text-foreground flex items-center gap-2">
-            <AlertCircle className="h-5 w-5" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-foreground flex items-center gap-2 text-sm md:text-base">
+            <AlertCircle className="h-4 w-4 md:h-5 md:w-5" />
             COMUNICADOS
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {[
               { 
                 title: 'Nova Diretriz Operacional', 
@@ -241,14 +284,14 @@ const UserDashboard = () => {
                 read: true 
               }
             ].map((notice, index) => (
-              <div key={index} className="flex items-center gap-3 p-2 bg-muted rounded">
+              <div key={index} className="flex items-start gap-2 p-2 bg-muted rounded">
                 {notice.read ? (
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-primary flex-shrink-0 mt-0.5" />
                 ) : (
-                  <FileText className="h-4 w-4 text-destructive" />
+                  <FileText className="h-3 w-3 md:h-4 md:w-4 text-destructive flex-shrink-0 mt-0.5" />
                 )}
-                <div className="flex-1">
-                  <p className={`text-sm ${notice.read ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs md:text-sm ${notice.read ? 'text-muted-foreground' : 'text-foreground font-medium'} line-clamp-2`}>
                     {notice.title}
                   </p>
                   <Badge 
