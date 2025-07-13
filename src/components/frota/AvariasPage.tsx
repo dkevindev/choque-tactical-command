@@ -19,14 +19,18 @@ import {
 } from '@/components/ui/dialog';
 import {
   AlertTriangle,
-  Upload,
+  Link as LinkIcon,
   X,
   Plus,
   Camera,
   MapPin,
   Calendar,
-  User
+  User,
+  Save
 } from 'lucide-react';
+import { db } from '@/firebase';
+import { collection, addDoc, updateDoc, doc, getDocs, onSnapshot } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 interface Avaria {
   id: string;
@@ -64,9 +68,11 @@ const AvariasPage = () => {
     responsavel: ''
   });
   const [modalAberto, setModalAberto] = useState(false);
+  const [modalLinkAberto, setModalLinkAberto] = useState(false);
+  const [linkImagem, setLinkImagem] = useState('');
   const [posicaoTemporaria, setPosicaoTemporaria] = useState<{x: number, y: number} | null>(null);
   const imagemRef = useRef<HTMLImageElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   // Mock data para demonstração
   const viaturasMock = [
@@ -76,36 +82,102 @@ const AvariasPage = () => {
   ];
 
   useEffect(() => {
-    // Inicializar dados mock
-    const dadosMock: ViaturaAvarias[] = viaturasMock.map(v => ({
-      placaViatura: v.placa,
-      modeloViatura: v.modelo,
-      cadastroViatura: v.cadastro,
-      avarias: []
-    }));
-    setAvariasData(dadosMock);
+    // Carregar dados do Firebase
+    carregarDadosFirebase();
   }, []);
 
-  const handleImagemUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && viaturaAtual) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageUrl = e.target?.result as string;
+  const carregarDadosFirebase = async () => {
+    try {
+      const viaturas = collection(db, 'viaturas');
+      const snapshot = await getDocs(viaturas);
+      
+      const dadosCarregados: ViaturaAvarias[] = [];
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        dadosCarregados.push({
+          placaViatura: data.placa || doc.id,
+          modeloViatura: data.modelo || '',
+          cadastroViatura: data.cadastro || '',
+          imagemFrontal: data.imagemFrontal || '',
+          imagemTraseira: data.imagemTraseira || '',
+          imagemLadoEsquerdo: data.imagemLadoEsquerdo || '',
+          imagemLadoDireito: data.imagemLadoDireito || '',
+          avarias: data.avarias || []
+        });
+      });
+
+      if (dadosCarregados.length === 0) {
+        // Se não houver dados, criar dados mock
+        const dadosMock: ViaturaAvarias[] = viaturasMock.map(v => ({
+          placaViatura: v.placa,
+          modeloViatura: v.modelo,
+          cadastroViatura: v.cadastro,
+          avarias: []
+        }));
+        setAvariasData(dadosMock);
         
-        // Atualizar a viatura com a nova imagem no ângulo ativo
-        setAvariasData(prev => 
-          prev.map(v => 
-            v.placaViatura === viaturaAtual
-              ? { 
-                  ...v, 
-                  [`imagem${anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)}`]: imageUrl 
-                }
-              : v
-          )
-        );
-      };
-      reader.readAsDataURL(file);
+        // Salvar dados mock no Firebase
+        for (const viatura of dadosMock) {
+          await addDoc(viaturas, viatura);
+        }
+      } else {
+        setAvariasData(dadosCarregados);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar dados do Firebase",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const salvarLinkImagem = async () => {
+    if (!linkImagem || !viaturaAtual) return;
+
+    try {
+      // Atualizar a viatura com a nova imagem no ângulo ativo
+      const novaViaturaData = avariasData.map(v => 
+        v.placaViatura === viaturaAtual
+          ? { 
+              ...v, 
+              [`imagem${anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)}`]: linkImagem 
+            }
+          : v
+      );
+      
+      setAvariasData(novaViaturaData);
+      
+      // Salvar no Firebase
+      const viaturas = collection(db, 'viaturas');
+      const snapshot = await getDocs(viaturas);
+      
+      snapshot.forEach(async (documento) => {
+        const data = documento.data();
+        if (data.placa === viaturaAtual || documento.id === viaturaAtual) {
+          const viaturaRef = doc(db, 'viaturas', documento.id);
+          await updateDoc(viaturaRef, {
+            [`imagem${anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)}`]: linkImagem
+          });
+        }
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "Link da imagem salvo com sucesso!",
+      });
+
+      setLinkImagem('');
+      setModalLinkAberto(false);
+    } catch (error) {
+      console.error('Erro ao salvar link:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar link da imagem",
+        variant: "destructive",
+      });
     }
   };
 
@@ -124,40 +196,71 @@ const AvariasPage = () => {
     alert(`Avaria: ${avaria.tipo}\nDescrição: ${avaria.descricao}\nGravidade: ${avaria.gravidade}\nStatus: ${avaria.status}`);
   };
 
-  const salvarAvaria = () => {
+  const salvarAvaria = async () => {
     if (!posicaoTemporaria || !viaturaAtual || !novaAvaria.tipo) return;
 
-    const avaria: Avaria = {
-      id: Date.now().toString(),
-      x: posicaoTemporaria.x,
-      y: posicaoTemporaria.y,
-      tipo: novaAvaria.tipo,
-      descricao: novaAvaria.descricao,
-      data: new Date().toISOString().split('T')[0],
-      gravidade: novaAvaria.gravidade,
-      status: 'PENDENTE',
-      responsavel: novaAvaria.responsavel || 'Sistema',
-      angulo: anguloAtivo
-    };
+    try {
+      const avaria: Avaria = {
+        id: Date.now().toString(),
+        x: posicaoTemporaria.x,
+        y: posicaoTemporaria.y,
+        tipo: novaAvaria.tipo,
+        descricao: novaAvaria.descricao,
+        data: new Date().toISOString().split('T')[0],
+        gravidade: novaAvaria.gravidade,
+        status: 'PENDENTE',
+        responsavel: novaAvaria.responsavel || 'Admin',
+        angulo: anguloAtivo
+      };
 
-    setAvariasData(prev => 
-      prev.map(v => 
+      const novaViaturaData = avariasData.map(v => 
         v.placaViatura === viaturaAtual
           ? { ...v, avarias: [...v.avarias, avaria] }
           : v
-      )
-    );
+      );
 
-    // Reset
-    setNovaAvaria({
-      tipo: '',
-      descricao: '',
-      gravidade: 'LEVE',
-      responsavel: ''
-    });
-    setPosicaoTemporaria(null);
-    setModalAberto(false);
-    setMarcandoAvaria(false);
+      setAvariasData(novaViaturaData);
+
+      // Salvar no Firebase
+      const viaturas = collection(db, 'viaturas');
+      const snapshot = await getDocs(viaturas);
+      
+      snapshot.forEach(async (documento) => {
+        const data = documento.data();
+        if (data.placa === viaturaAtual || documento.id === viaturaAtual) {
+          const viaturaRef = doc(db, 'viaturas', documento.id);
+          const viaturaAtualizada = novaViaturaData.find(v => v.placaViatura === viaturaAtual);
+          if (viaturaAtualizada) {
+            await updateDoc(viaturaRef, {
+              avarias: viaturaAtualizada.avarias
+            });
+          }
+        }
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "Avaria registrada com sucesso!",
+      });
+
+      // Reset
+      setNovaAvaria({
+        tipo: '',
+        descricao: '',
+        gravidade: 'LEVE',
+        responsavel: ''
+      });
+      setPosicaoTemporaria(null);
+      setModalAberto(false);
+      setMarcandoAvaria(false);
+    } catch (error) {
+      console.error('Erro ao salvar avaria:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar avaria",
+        variant: "destructive",
+      });
+    }
   };
 
   const removerAvaria = (idAvaria: string) => {
@@ -276,20 +379,20 @@ const AvariasPage = () => {
                           </Badge>
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setAnguloAtivo(angulo.key);
-                              fileInputRef.current?.click();
-                            }}
-                            className="w-full text-xs"
-                          >
-                            <Upload className="h-3 w-3 mr-1" />
-                            Upload
-                          </Button>
+                       <CardContent>
+                         <div className="space-y-2">
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => {
+                               setAnguloAtivo(angulo.key);
+                               setModalLinkAberto(true);
+                             }}
+                             className="w-full text-xs"
+                           >
+                             <LinkIcon className="h-3 w-3 mr-1" />
+                             Adicionar Link
+                           </Button>
                           
                           <div className="relative border border-dashed border-border rounded-lg min-h-[200px] flex items-center justify-center bg-muted/20">
                             {imagem ? (
@@ -366,13 +469,47 @@ const AvariasPage = () => {
                 })}
               </div>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImagemUpload}
-                className="hidden"
-              />
+              {/* Modal para adicionar link da imagem */}
+              <Dialog open={modalLinkAberto} onOpenChange={setModalLinkAberto}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Adicionar Link da Imagem - {anguloAtivo}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">URL da Imagem</label>
+                      <Input
+                        value={linkImagem}
+                        onChange={(e) => setLinkImagem(e.target.value)}
+                        placeholder="https://exemplo.com/imagem.jpg"
+                        className="mt-1"
+                      />
+                    </div>
+                    {linkImagem && (
+                      <div>
+                        <label className="text-sm font-medium">Prévia:</label>
+                        <img 
+                          src={linkImagem} 
+                          alt="Prévia" 
+                          className="w-full max-h-40 object-contain border rounded mt-1"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="flex gap-3">
+                      <Button variant="outline" onClick={() => setModalLinkAberto(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={salvarLinkImagem} disabled={!linkImagem}>
+                        <Save className="h-4 w-4 mr-2" />
+                        Salvar
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               {marcandoAvaria && (
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
