@@ -16,6 +16,7 @@ import {
   Eye
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import ModalDetalhesViatura from '@/components/ModalDetalhesViatura';
 
 interface Viatura {
   id: string;
@@ -43,6 +44,8 @@ const FrotaDashboard = () => {
   const [gastosMes, setGastosMes] = useState<any[]>([]);
   const [gastos12Meses, setGastos12Meses] = useState<any[]>([]);
   const [selectedViatura, setSelectedViatura] = useState<string | null>(null);
+  const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
+  const [viaturaDetalhes, setViaturaDetalhes] = useState<Viatura | null>(null);
   const [configSaldos, setConfigSaldos] = useState({
     limiteMes: 5000,
     limite12Meses: 50000
@@ -149,6 +152,11 @@ const FrotaDashboard = () => {
 
   const handleViaturaClick = (viaturaId: string) => {
     setSelectedViatura(selectedViatura === viaturaId ? null : viaturaId);
+  };
+
+  const handleVerDetalhes = (viatura: Viatura) => {
+    setViaturaDetalhes(viatura);
+    setModalDetalhesAberto(true);
   };
 
   const getOrdensViatura = (placa: string) => {
@@ -296,7 +304,7 @@ const FrotaDashboard = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold text-sm">{viatura.MODELO}</h3>
+                          <h3 className="font-semibold text-sm">{viatura.id}</h3>
                           <p className="text-xs text-muted-foreground">{viatura.PLACA}</p>
                         </div>
                         <Badge variant={statusInfo.variant} className="text-xs">
@@ -324,7 +332,15 @@ const FrotaDashboard = () => {
                       </div>
 
                       <div className="pt-2 border-t">
-                        <Button variant="outline" size="sm" className="w-full text-xs">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleVerDetalhes(viatura);
+                          }}
+                        >
                           <Eye className="h-3 w-3 mr-1" />
                           Ver Detalhes
                         </Button>
@@ -338,43 +354,12 @@ const FrotaDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Detalhes da Viatura Selecionada */}
-      {selectedViatura && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              Detalhes - {viaturas.find(v => v.id === selectedViatura)?.MODELO}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="ordens" className="w-full">
-              <TabsList>
-                <TabsTrigger value="ordens">Ordens de Serviço</TabsTrigger>
-                <TabsTrigger value="avarias">Avarias</TabsTrigger>
-                <TabsTrigger value="historico">Histórico</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="ordens" className="mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Funcionalidade de ordens de serviço será implementada na próxima etapa...
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="avarias" className="mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Sistema de avarias com marcação visual será implementado na próxima etapa...
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="historico" className="mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Histórico detalhado será implementado na próxima etapa...
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
+      {/* Modal de Detalhes da Viatura */}
+      <ModalDetalhesViatura
+        isOpen={modalDetalhesAberto}
+        onClose={() => setModalDetalhesAberto(false)}
+        viatura={viaturaDetalhes}
+      />
     </div>
   );
 };

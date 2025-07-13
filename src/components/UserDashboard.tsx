@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import TacticalSidebar from '@/components/TacticalSidebar';
+import UserViaturaAvarias from '@/components/UserViaturaAvarias';
 import { 
   User, 
   Calendar,
@@ -27,6 +28,8 @@ const UserDashboard = () => {
     switch (activeSection) {
       case 'reserva':
         return <ReservaArmamento />;
+      case 'avarias':
+        return <UserViaturaAvarias />;
       default:
         return <DashboardContent />;
     }

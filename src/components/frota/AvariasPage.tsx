@@ -16,7 +16,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   AlertTriangle,
@@ -39,19 +38,24 @@ interface Avaria {
   gravidade: 'LEVE' | 'MODERADA' | 'GRAVE';
   status: 'PENDENTE' | 'EM_REPARO' | 'RESOLVIDA';
   responsavel: string;
+  angulo: 'frontal' | 'traseira' | 'esquerdo' | 'direito';
 }
 
 interface ViaturaAvarias {
   placaViatura: string;
   modeloViatura: string;
-  imagemUrl?: string;
+  cadastroViatura: string;
+  imagemFrontal?: string;
+  imagemTraseira?: string;
+  imagemLadoEsquerdo?: string;
+  imagemLadoDireito?: string;
   avarias: Avaria[];
 }
 
 const AvariasPage = () => {
   const [viaturaAtual, setViaturaAtual] = useState<string>('');
   const [avariasData, setAvariasData] = useState<ViaturaAvarias[]>([]);
-  const [imagemCarregada, setImagemCarregada] = useState<string | null>(null);
+  const [anguloAtivo, setAnguloAtivo] = useState<'frontal' | 'traseira' | 'esquerdo' | 'direito'>('frontal');
   const [marcandoAvaria, setMarcandoAvaria] = useState(false);
   const [novaAvaria, setNovaAvaria] = useState({
     tipo: '',
@@ -66,9 +70,9 @@ const AvariasPage = () => {
 
   // Mock data para demonstração
   const viaturasMock = [
-    { placa: 'OII6398', modelo: 'TOYOTA HILUX SRV' },
-    { placa: 'ABC1234', modelo: 'MITSUBISHI L200' },
-    { placa: 'XYZ9876', modelo: 'FORD RANGER' }
+    { placa: 'OII6398', modelo: 'TOYOTA HILUX SRV', cadastro: 'CAV 13' },
+    { placa: 'ABC1234', modelo: 'MITSUBISHI L200', cadastro: 'CAV 07' },
+    { placa: 'XYZ9876', modelo: 'FORD RANGER', cadastro: 'CAV 21' }
   ];
 
   useEffect(() => {
@@ -76,6 +80,7 @@ const AvariasPage = () => {
     const dadosMock: ViaturaAvarias[] = viaturasMock.map(v => ({
       placaViatura: v.placa,
       modeloViatura: v.modelo,
+      cadastroViatura: v.cadastro,
       avarias: []
     }));
     setAvariasData(dadosMock);
@@ -83,10 +88,22 @@ const AvariasPage = () => {
 
   const handleImagemUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
+    if (file && viaturaAtual) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImagemCarregada(e.target?.result as string);
+        const imageUrl = e.target?.result as string;
+        
+        // Atualizar a viatura com a nova imagem no ângulo ativo
+        setAvariasData(prev => 
+          prev.map(v => 
+            v.placaViatura === viaturaAtual
+              ? { 
+                  ...v, 
+                  [`imagem${anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)}`]: imageUrl 
+                }
+              : v
+          )
+        );
       };
       reader.readAsDataURL(file);
     }
@@ -103,6 +120,10 @@ const AvariasPage = () => {
     setModalAberto(true);
   };
 
+  const handleAvariaClick = (avaria: Avaria) => {
+    alert(`Avaria: ${avaria.tipo}\nDescrição: ${avaria.descricao}\nGravidade: ${avaria.gravidade}\nStatus: ${avaria.status}`);
+  };
+
   const salvarAvaria = () => {
     if (!posicaoTemporaria || !viaturaAtual || !novaAvaria.tipo) return;
 
@@ -115,7 +136,8 @@ const AvariasPage = () => {
       data: new Date().toISOString().split('T')[0],
       gravidade: novaAvaria.gravidade,
       status: 'PENDENTE',
-      responsavel: novaAvaria.responsavel || 'Sistema'
+      responsavel: novaAvaria.responsavel || 'Sistema',
+      angulo: anguloAtivo
     };
 
     setAvariasData(prev => 
@@ -152,6 +174,24 @@ const AvariasPage = () => {
     return avariasData.find(v => v.placaViatura === viaturaAtual);
   };
 
+  const getImagemAtual = () => {
+    const viatura = getViaturaAtualData();
+    if (!viatura) return null;
+    
+    switch (anguloAtivo) {
+      case 'frontal': return viatura.imagemFrontal;
+      case 'traseira': return viatura.imagemTraseira;
+      case 'esquerdo': return viatura.imagemLadoEsquerdo;
+      case 'direito': return viatura.imagemLadoDireito;
+      default: return null;
+    }
+  };
+
+  const getAvariasAnguloAtual = () => {
+    const viatura = getViaturaAtualData();
+    return viatura?.avarias.filter(a => a.angulo === anguloAtivo) || [];
+  };
+
   const getCorAvaria = (gravidade: string) => {
     switch (gravidade) {
       case 'LEVE': return 'bg-yellow-500';
@@ -171,6 +211,8 @@ const AvariasPage = () => {
   };
 
   const viaturaData = getViaturaAtualData();
+  const imagemAtual = getImagemAtual();
+  const avariasAnguloAtual = getAvariasAnguloAtual();
 
   return (
     <div className="space-y-6">
@@ -178,7 +220,7 @@ const AvariasPage = () => {
         <CardHeader>
           <CardTitle className="text-foreground flex items-center gap-2">
             <AlertTriangle className="h-5 w-5" />
-            REGISTRO DE AVARIAS
+            REGISTRO DE AVARIAS - ADMINISTRADOR
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -194,7 +236,7 @@ const AvariasPage = () => {
               <SelectContent>
                 {viaturasMock.map((viatura) => (
                   <SelectItem key={viatura.placa} value={viatura.placa}>
-                    {viatura.placa} - {viatura.modelo}
+                    {viatura.cadastro} - {viatura.placa}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -206,6 +248,26 @@ const AvariasPage = () => {
               {/* Área da Imagem */}
               <div className="lg:col-span-2">
                 <div className="space-y-4">
+                  {/* Seletor de Ângulo */}
+                  <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg">
+                    <span className="text-sm font-medium text-foreground mr-2">Ângulo:</span>
+                    {[
+                      { key: 'frontal' as const, label: 'Frente' },
+                      { key: 'traseira' as const, label: 'Trás' },
+                      { key: 'esquerdo' as const, label: 'Lado Esquerdo' },
+                      { key: 'direito' as const, label: 'Lado Direito' }
+                    ].map((angulo) => (
+                      <Button
+                        key={angulo.key}
+                        variant={anguloAtivo === angulo.key ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setAnguloAtivo(angulo.key)}
+                      >
+                        {angulo.label}
+                      </Button>
+                    ))}
+                  </div>
+
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
@@ -213,13 +275,13 @@ const AvariasPage = () => {
                       className="flex items-center gap-2"
                     >
                       <Upload className="h-4 w-4" />
-                      Carregar Foto
+                      Carregar Foto - {anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)}
                     </Button>
                     
                     <Button
                       variant={marcandoAvaria ? "destructive" : "default"}
                       onClick={() => setMarcandoAvaria(!marcandoAvaria)}
-                      disabled={!imagemCarregada}
+                      disabled={!imagemAtual}
                       className="flex items-center gap-2"
                     >
                       {marcandoAvaria ? (
@@ -245,20 +307,20 @@ const AvariasPage = () => {
                   />
 
                   <div className="relative border-2 border-dashed border-border rounded-lg min-h-[400px] flex items-center justify-center bg-muted/20">
-                    {imagemCarregada ? (
+                    {imagemAtual ? (
                       <div className="relative w-full h-full">
                         <img
                           ref={imagemRef}
-                          src={imagemCarregada}
-                          alt="Viatura"
+                          src={imagemAtual}
+                          alt={`Viatura - ${anguloAtivo}`}
                           className={`w-full h-full object-contain rounded-lg ${
                             marcandoAvaria ? 'cursor-crosshair' : 'cursor-default'
                           }`}
                           onClick={handleImagemClick}
                         />
                         
-                        {/* Marcadores de Avarias */}
-                        {viaturaData?.avarias.map((avaria) => (
+                        {/* Marcadores de Avarias do ângulo atual */}
+                        {avariasAnguloAtual.map((avaria) => (
                           <div
                             key={avaria.id}
                             className={`absolute w-4 h-4 rounded-full border-2 border-white shadow-lg cursor-pointer ${getCorAvaria(avaria.gravidade)}`}
@@ -270,7 +332,7 @@ const AvariasPage = () => {
                             title={`${avaria.tipo} - ${avaria.gravidade}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              // Aqui poderia abrir detalhes da avaria
+                              handleAvariaClick(avaria);
                             }}
                           >
                             <div className="w-full h-full rounded-full animate-pulse" />
@@ -293,12 +355,12 @@ const AvariasPage = () => {
                       <div className="text-center text-muted-foreground">
                         <Camera className="h-12 w-12 mx-auto mb-4 opacity-50" />
                         <p>Clique em "Carregar Foto" para adicionar a imagem da viatura</p>
-                        <p className="text-sm mt-2">Formatos suportados: JPG, PNG, GIF</p>
+                        <p className="text-sm mt-2">Ângulo: {anguloAtivo}</p>
                       </div>
                     )}
                   </div>
 
-                  {marcandoAvaria && imagemCarregada && (
+                  {marcandoAvaria && imagemAtual && (
                     <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                       <div className="flex items-center gap-2 text-blue-800">
                         <MapPin className="h-4 w-4" />
@@ -315,11 +377,11 @@ const AvariasPage = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
-                  Avarias Registradas ({viaturaData?.avarias.length || 0})
+                  Avarias - {anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)} ({avariasAnguloAtual.length})
                 </h3>
 
                 <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                  {viaturaData?.avarias.map((avaria) => (
+                  {avariasAnguloAtual.map((avaria) => (
                     <Card key={avaria.id} className="p-4">
                       <div className="space-y-2">
                         <div className="flex justify-between items-start">
@@ -364,10 +426,10 @@ const AvariasPage = () => {
                     </Card>
                   ))}
 
-                  {(!viaturaData?.avarias.length) && (
+                  {(!avariasAnguloAtual.length) && (
                     <div className="text-center py-8 text-muted-foreground">
                       <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>Nenhuma avaria registrada</p>
+                      <p>Nenhuma avaria registrada neste ângulo</p>
                       <p className="text-sm">Carregue uma foto e clique em "Marcar Avaria"</p>
                     </div>
                   )}
