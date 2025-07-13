@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import FrotaPage from '@/components/FrotaPage';
 import DocumentosPage from './DocumentosPaga';
+import OrdemServicoPage from '@/components/OrdemServicoPage'; // <--- Adicione esta linha
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -32,6 +33,8 @@ const AdminDashboard = () => {
         return <PolicialContent />;
       case 'documentos':
         return <DocumentosContent />;
+      case 'ordens-servico': // <--- Adicione este novo case
+        return <OrdemServicoPage />; // <--- Renderiza o novo componente
       default:
         return <DashboardOverview />;
     }

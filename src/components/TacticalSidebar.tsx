@@ -31,6 +31,7 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
     { id: 'frota', label: 'FROTA', icon: Truck, badge: '89' },
     { id: 'policial', label: 'POLICIAL', icon: Users, badge: '1.2K' },
     { id: 'documentos', label: 'DOCUMENTOS', icon: FileText, badge: null },
+    { id: 'ordens-servico', label: 'OS\'s', icon: FileText, badge: null },
   ];
 
   const userMenuItems = [
