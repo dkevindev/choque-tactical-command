@@ -25,6 +25,8 @@ import {
   User,
   X
 } from 'lucide-react';
+import { db } from '@/firebase';
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 interface Avaria {
@@ -55,6 +57,7 @@ interface ViaturaAvarias {
 const UserViaturaAvarias = () => {
   const [viaturaAtual, setViaturaAtual] = useState<string>('');
   const [avariasData, setAvariasData] = useState<ViaturaAvarias[]>([]);
+  const [viaturasFrota, setViaturasFrota] = useState<any[]>([]);
   const [anguloAtivo, setAnguloAtivo] = useState<'frontal' | 'traseira' | 'esquerdo' | 'direito'>('frontal');
   const [marcandoAvaria, setMarcandoAvaria] = useState(false);
   const [novaAvaria, setNovaAvaria] = useState({
@@ -67,28 +70,56 @@ const UserViaturaAvarias = () => {
   const imagemRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
 
-  // Mock data - em produção virá do Firebase
-  const viaturasMock = [
-    { placa: 'OII6398', modelo: 'TOYOTA HILUX SRV', cadastro: 'CAV 13' },
-    { placa: 'ABC1234', modelo: 'MITSUBISHI L200', cadastro: 'CAV 07' },
-    { placa: 'XYZ9876', modelo: 'FORD RANGER', cadastro: 'CAV 21' }
-  ];
-
   useEffect(() => {
-    // Inicializar dados mock com fotos já existentes
-    const dadosMock: ViaturaAvarias[] = viaturasMock.map(v => ({
-      placaViatura: v.placa,
-      modeloViatura: v.modelo,
-      cadastroViatura: v.cadastro,
-      // Simular que já existem fotos carregadas pelos administradores
-      imagemFrontal: '/placeholder-car-front.jpg',
-      imagemTraseira: '/placeholder-car-back.jpg',
-      imagemLadoEsquerdo: '/placeholder-car-left.jpg',
-      imagemLadoDireito: '/placeholder-car-right.jpg',
-      avarias: []
-    }));
-    setAvariasData(dadosMock);
+    carregarViaturasFrota();
   }, []);
+
+  const carregarViaturasFrota = async () => {
+    try {
+      const frotaRef = collection(db, 'frota');
+      const snapshot = await getDocs(frotaRef);
+      
+      const viaturas: any[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        viaturas.push({
+          id: doc.id,
+          cadastro: data.CADASTRO,
+          placa: data.PLACA,
+          modelo: data.MODELO,
+          imagemFrontal: data.imagemFrontal || '',
+          imagemTraseira: data.imagemTraseira || '',
+          imagemLadoEsquerdo: data.imagemLadoEsquerdo || '',
+          imagemLadoDireito: data.imagemLadoDireito || '',
+          avarias: data.avarias || []
+        });
+      });
+      
+      setViaturasFrota(viaturas);
+      
+      // Converter para formato de avarias
+      const dadosAvarias: ViaturaAvarias[] = viaturas.map(v => ({
+        placaViatura: v.placa,
+        modeloViatura: v.modelo,
+        cadastroViatura: v.cadastro,
+        imagemFrontal: v.imagemFrontal,
+        imagemTraseira: v.imagemTraseira,
+        imagemLadoEsquerdo: v.imagemLadoEsquerdo,
+        imagemLadoDireito: v.imagemLadoDireito,
+        avarias: v.avarias
+      }));
+      
+      setAvariasData(dadosAvarias);
+      console.log('Viaturas carregadas no usuário:', viaturas);
+    } catch (error) {
+      console.error('Erro ao carregar viaturas:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar viaturas do banco de dados",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleImagemClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!marcandoAvaria || !imagemRef.current) return;
@@ -107,48 +138,78 @@ const UserViaturaAvarias = () => {
     alert(detalhe);
   };
 
-  const salvarAvaria = () => {
+  const salvarAvaria = async () => {
     if (!posicaoTemporaria || !viaturaAtual || !novaAvaria.tipo) return;
 
-    const policialNome = 'CABO JOÃO DA SILVA'; // Em produção, vem do contexto do usuário logado
+    try {
+      const viaturaEncontrada = viaturasFrota.find(v => v.placa === viaturaAtual);
+      if (!viaturaEncontrada) return;
 
-    const avaria: Avaria = {
-      id: Date.now().toString(),
-      x: posicaoTemporaria.x,
-      y: posicaoTemporaria.y,
-      tipo: novaAvaria.tipo,
-      descricao: novaAvaria.descricao,
-      data: new Date().toISOString().split('T')[0],
-      gravidade: novaAvaria.gravidade,
-      status: 'PENDENTE',
-      responsavel: policialNome,
-      angulo: anguloAtivo,
-      reportadoPorPolicial: true
-    };
+      const policialNome = 'CABO JOÃO DA SILVA'; // Em produção, vem do contexto do usuário logado
 
-    setAvariasData(prev => 
-      prev.map(v => 
-        v.placaViatura === viaturaAtual
-          ? { ...v, avarias: [...v.avarias, avaria] }
-          : v
-      )
-    );
+      const avaria: Avaria = {
+        id: Date.now().toString(),
+        x: posicaoTemporaria.x,
+        y: posicaoTemporaria.y,
+        tipo: novaAvaria.tipo,
+        descricao: novaAvaria.descricao,
+        data: new Date().toISOString().split('T')[0],
+        gravidade: novaAvaria.gravidade,
+        status: 'PENDENTE',
+        responsavel: policialNome,
+        angulo: anguloAtivo,
+        reportadoPorPolicial: true
+      };
 
-    // Notificar administradores
-    toast({
-      title: "Avaria Registrada",
-      description: `Nova avaria registrada pelo policial ${policialNome} na viatura ${viaturaAtual}`,
-    });
+      // Atualizar avarias da viatura
+      const avariasAtualizadas = [...(viaturaEncontrada.avarias || []), avaria];
 
-    // Reset
-    setNovaAvaria({
-      tipo: '',
-      descricao: '',
-      gravidade: 'LEVE',
-    });
-    setPosicaoTemporaria(null);
-    setModalAberto(false);
-    setMarcandoAvaria(false);
+      // Salvar no Firebase (coleção frota)
+      const viaturaRef = doc(db, 'frota', viaturaEncontrada.id);
+      await updateDoc(viaturaRef, {
+        avarias: avariasAtualizadas
+      });
+
+      // Atualizar estado local
+      setViaturasFrota(prev => 
+        prev.map(v => 
+          v.id === viaturaEncontrada.id 
+            ? { ...v, avarias: avariasAtualizadas }
+            : v
+        )
+      );
+
+      setAvariasData(prev => 
+        prev.map(v => 
+          v.placaViatura === viaturaAtual
+            ? { ...v, avarias: avariasAtualizadas }
+            : v
+        )
+      );
+
+      // Notificar administradores
+      toast({
+        title: "Avaria Registrada",
+        description: `Nova avaria registrada pelo policial ${policialNome} na viatura ${viaturaAtual}`,
+      });
+
+      // Reset
+      setNovaAvaria({
+        tipo: '',
+        descricao: '',
+        gravidade: 'LEVE',
+      });
+      setPosicaoTemporaria(null);
+      setModalAberto(false);
+      setMarcandoAvaria(false);
+    } catch (error) {
+      console.error('Erro ao salvar avaria:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar avaria",
+        variant: "destructive",
+      });
+    }
   };
 
   const getViaturaAtualData = () => {
@@ -215,7 +276,7 @@ const UserViaturaAvarias = () => {
                 <SelectValue placeholder="Escolha uma viatura..." />
               </SelectTrigger>
               <SelectContent>
-                {viaturasMock.map((viatura) => (
+                {viaturasFrota.map((viatura) => (
                   <SelectItem key={viatura.placa} value={viatura.placa}>
                     {viatura.cadastro} - {viatura.placa}
                   </SelectItem>
