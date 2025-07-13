@@ -244,150 +244,165 @@ const AvariasPage = () => {
           </div>
 
           {viaturaAtual && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Área da Imagem */}
-              <div className="lg:col-span-2">
-                <div className="space-y-4">
-                  {/* Seletor de Ângulo */}
-                  <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg">
-                    <span className="text-sm font-medium text-foreground mr-2">Ângulo:</span>
-                    {[
-                      { key: 'frontal' as const, label: 'Frente' },
-                      { key: 'traseira' as const, label: 'Trás' },
-                      { key: 'esquerdo' as const, label: 'Lado Esquerdo' },
-                      { key: 'direito' as const, label: 'Lado Direito' }
-                    ].map((angulo) => (
-                      <Button
-                        key={angulo.key}
-                        variant={anguloAtivo === angulo.key ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setAnguloAtivo(angulo.key)}
-                      >
-                        {angulo.label}
-                      </Button>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-2"
-                    >
-                      <Upload className="h-4 w-4" />
-                      Carregar Foto - {anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)}
-                    </Button>
-                    
-                    <Button
-                      variant={marcandoAvaria ? "destructive" : "default"}
-                      onClick={() => setMarcandoAvaria(!marcandoAvaria)}
-                      disabled={!imagemAtual}
-                      className="flex items-center gap-2"
-                    >
-                      {marcandoAvaria ? (
-                        <>
-                          <X className="h-4 w-4" />
-                          Cancelar
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4" />
-                          Marcar Avaria
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImagemUpload}
-                    className="hidden"
-                  />
-
-                  <div className="relative border-2 border-dashed border-border rounded-lg min-h-[400px] flex items-center justify-center bg-muted/20">
-                    {imagemAtual ? (
-                      <div className="relative w-full h-full">
-                        <img
-                          ref={imagemRef}
-                          src={imagemAtual}
-                          alt={`Viatura - ${anguloAtivo}`}
-                          className={`w-full h-full object-contain rounded-lg ${
-                            marcandoAvaria ? 'cursor-crosshair' : 'cursor-default'
-                          }`}
-                          onClick={handleImagemClick}
-                        />
-                        
-                        {/* Marcadores de Avarias do ângulo atual */}
-                        {avariasAnguloAtual.map((avaria) => (
-                          <div
-                            key={avaria.id}
-                            className={`absolute w-4 h-4 rounded-full border-2 border-white shadow-lg cursor-pointer ${getCorAvaria(avaria.gravidade)}`}
-                            style={{
-                              left: `${avaria.x}%`,
-                              top: `${avaria.y}%`,
-                              transform: 'translate(-50%, -50%)'
+            <div className="space-y-6">
+              {/* Mostrar todas as 4 fotos */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { key: 'frontal' as const, label: 'Frente' },
+                  { key: 'traseira' as const, label: 'Trás' },
+                  { key: 'esquerdo' as const, label: 'Lado Esquerdo' },
+                  { key: 'direito' as const, label: 'Lado Direito' }
+                ].map((angulo) => {
+                  const viaturaData = getViaturaAtualData();
+                  const imagem = viaturaData ? (() => {
+                    switch (angulo.key) {
+                      case 'frontal': return viaturaData.imagemFrontal;
+                      case 'traseira': return viaturaData.imagemTraseira;
+                      case 'esquerdo': return viaturaData.imagemLadoEsquerdo;
+                      case 'direito': return viaturaData.imagemLadoDireito;
+                      default: return null;
+                    }
+                  })() : null;
+                  
+                  const avariasAngulo = viaturaData?.avarias.filter(a => a.angulo === angulo.key) || [];
+                  
+                  return (
+                    <Card key={angulo.key} className="relative">
+                      <CardHeader>
+                        <CardTitle className="text-sm flex justify-between items-center">
+                          {angulo.label}
+                          <Badge variant="outline" className="text-xs">
+                            {avariasAngulo.length} avarias
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setAnguloAtivo(angulo.key);
+                              fileInputRef.current?.click();
                             }}
-                            title={`${avaria.tipo} - ${avaria.gravidade}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAvariaClick(avaria);
-                            }}
+                            className="w-full text-xs"
                           >
-                            <div className="w-full h-full rounded-full animate-pulse" />
+                            <Upload className="h-3 w-3 mr-1" />
+                            Upload
+                          </Button>
+                          
+                          <div className="relative border border-dashed border-border rounded-lg min-h-[200px] flex items-center justify-center bg-muted/20">
+                            {imagem ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  ref={angulo.key === anguloAtivo ? imagemRef : undefined}
+                                  src={imagem}
+                                  alt={`Viatura - ${angulo.label}`}
+                                  className={`w-full h-full object-contain rounded-lg ${
+                                    marcandoAvaria && angulo.key === anguloAtivo ? 'cursor-crosshair' : 'cursor-default'
+                                  }`}
+                                  onClick={(e) => {
+                                    setAnguloAtivo(angulo.key);
+                                    if (marcandoAvaria) {
+                                      handleImagemClick(e);
+                                    }
+                                  }}
+                                />
+                                
+                                {/* Marcadores de Avarias */}
+                                {avariasAngulo.map((avaria) => (
+                                  <div
+                                    key={avaria.id}
+                                    className={`absolute w-3 h-3 rounded-full border border-white shadow-lg cursor-pointer ${getCorAvaria(avaria.gravidade)}`}
+                                    style={{
+                                      left: `${avaria.x}%`,
+                                      top: `${avaria.y}%`,
+                                      transform: 'translate(-50%, -50%)'
+                                    }}
+                                    title={`${avaria.tipo} - ${avaria.gravidade}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAvariaClick(avaria);
+                                    }}
+                                  >
+                                    <div className="w-full h-full rounded-full animate-pulse" />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center text-muted-foreground">
+                                <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p className="text-xs">Clique para carregar foto</p>
+                              </div>
+                            )}
                           </div>
-                        ))}
-
-                        {/* Marcador temporário */}
-                        {posicaoTemporaria && (
-                          <div
-                            className="absolute w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-lg animate-bounce"
-                            style={{
-                              left: `${posicaoTemporaria.x}%`,
-                              top: `${posicaoTemporaria.y}%`,
-                              transform: 'translate(-50%, -50%)'
+                          
+                          <Button
+                            variant={marcandoAvaria && angulo.key === anguloAtivo ? "destructive" : "default"}
+                            size="sm"
+                            onClick={() => {
+                              setAnguloAtivo(angulo.key);
+                              setMarcandoAvaria(!marcandoAvaria || angulo.key !== anguloAtivo);
                             }}
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center text-muted-foreground">
-                        <Camera className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>Clique em "Carregar Foto" para adicionar a imagem da viatura</p>
-                        <p className="text-sm mt-2">Ângulo: {anguloAtivo}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {marcandoAvaria && imagemAtual && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center gap-2 text-blue-800">
-                        <MapPin className="h-4 w-4" />
-                        <span className="text-sm font-medium">
-                          Modo de marcação ativo - Clique na imagem para marcar uma avaria
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                            disabled={!imagem}
+                            className="w-full text-xs"
+                          >
+                            {marcandoAvaria && angulo.key === anguloAtivo ? (
+                              <>
+                                <X className="h-3 w-3 mr-1" />
+                                Cancelar
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-3 w-3 mr-1" />
+                                Marcar
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
 
-              {/* Lista de Avarias */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImagemUpload}
+                className="hidden"
+              />
+
+              {marcandoAvaria && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-blue-800">
+                    <MapPin className="h-4 w-4" />
+                    <span className="text-sm font-medium">
+                      Modo de marcação ativo - Clique na imagem para marcar uma avaria no ângulo {anguloAtivo}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de Avarias de todos os ângulos */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
-                  Avarias - {anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)} ({avariasAnguloAtual.length})
+                  Todas as Avarias ({viaturaData?.avarias.length || 0})
                 </h3>
 
-                <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                  {avariasAnguloAtual.map((avaria) => (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {viaturaData?.avarias.map((avaria) => (
                     <Card key={avaria.id} className="p-4">
                       <div className="space-y-2">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-2">
                             <div className={`w-3 h-3 rounded-full ${getCorAvaria(avaria.gravidade)}`} />
                             <span className="font-medium text-sm">{avaria.tipo}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {avaria.angulo}
+                            </Badge>
                           </div>
                           <Button
                             variant="ghost"
@@ -424,13 +439,13 @@ const AvariasPage = () => {
                         </div>
                       </div>
                     </Card>
-                  ))}
+                  )) || []}
 
-                  {(!avariasAnguloAtual.length) && (
+                  {(!viaturaData?.avarias.length) && (
                     <div className="text-center py-8 text-muted-foreground">
                       <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>Nenhuma avaria registrada neste ângulo</p>
-                      <p className="text-sm">Carregue uma foto e clique em "Marcar Avaria"</p>
+                      <p>Nenhuma avaria registrada</p>
+                      <p className="text-sm">Carregue fotos e clique em "Marcar" para registrar avarias</p>
                     </div>
                   )}
                 </div>

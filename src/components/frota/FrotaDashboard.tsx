@@ -243,7 +243,30 @@ const FrotaDashboard = () => {
               Gastos por Viatura - Mês Atual
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="flex gap-4 items-center">
+              <label className="text-sm font-medium">Selecionar Viatura:</label>
+              <select 
+                className="text-sm border rounded px-2 py-1"
+                onChange={(e) => {
+                  const placa = e.target.value;
+                  const viaturaSelecionada = viaturas.find(v => v.PLACA === placa);
+                  if (viaturaSelecionada) {
+                    const gastoViatura = gastosMes.find(g => g.placa === placa);
+                    if (gastoViatura) {
+                      setGastosMes([gastoViatura]);
+                    }
+                  } else {
+                    processarGastos();
+                  }
+                }}
+              >
+                <option value="">Todas as Viaturas</option>
+                {viaturas.map(v => (
+                  <option key={v.PLACA} value={v.PLACA}>{v.id} - {v.PLACA}</option>
+                ))}
+              </select>
+            </div>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={gastosMes}>
                 <CartesianGrid strokeDasharray="3 3" />

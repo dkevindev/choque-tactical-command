@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import {
   Car,
   Wrench,
@@ -108,6 +109,56 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     }, 0);
   };
 
+  // Configurações de saldo (você pode implementar um sistema de configuração depois)
+  const limiteMes = 5000;
+  const limite12Meses = 50000;
+
+  // Calcular gastos para gráficos de pizza
+  const calcularGraficoPizza = () => {
+    const agora = new Date();
+    const mesAtual = agora.getMonth();
+    const anoAtual = agora.getFullYear();
+    
+    // Gastos do mês atual
+    const gastoMesAtual = ordensServico
+      .filter(os => {
+        const dataOS = new Date(os.dataOS);
+        return dataOS.getMonth() === mesAtual && dataOS.getFullYear() === anoAtual;
+      })
+      .reduce((total, os) => {
+        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, ''));
+        return total + valor;
+      }, 0);
+
+    // Gastos dos últimos 12 meses
+    const gasto12Meses = ordensServico
+      .filter(os => {
+        const dataOS = new Date(os.dataOS);
+        const doze_meses_atras = new Date(anoAtual, mesAtual - 12, 1);
+        return dataOS >= doze_meses_atras;
+      })
+      .reduce((total, os) => {
+        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, ''));
+        return total + valor;
+      }, 0);
+
+    const saldoDisponivelMes = Math.max(0, limiteMes - gastoMesAtual);
+    const saldoDisponivel12Meses = Math.max(0, limite12Meses - gasto12Meses);
+
+    return {
+      mes: [
+        { name: 'Usado', value: gastoMesAtual, fill: '#ef4444' },
+        { name: 'Disponível', value: saldoDisponivelMes, fill: '#22c55e' }
+      ],
+      doze_meses: [
+        { name: 'Usado', value: gasto12Meses, fill: '#ef4444' },
+        { name: 'Disponível', value: saldoDisponivel12Meses, fill: '#22c55e' }
+      ]
+    };
+  };
+
+  const dadosGraficos = calcularGraficoPizza();
+
   if (!viatura) return null;
 
   const ordensGerais = ordensServico;
@@ -125,6 +176,67 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Gráficos de Pizza do Saldo */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Saldo Mês Atual
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={dadosGraficos.mes}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={80}
+                      dataKey="value"
+                    >
+                      {dadosGraficos.mes.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString()}`} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Saldo Últimos 12 Meses
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={dadosGraficos.doze_meses}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={80}
+                      dataKey="value"
+                    >
+                      {dadosGraficos.doze_meses.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString()}`} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Informações da Viatura */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>

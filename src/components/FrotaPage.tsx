@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Car, Activity, Wrench, AlertTriangle } from 'lucide-react';
+import { Car, Activity, AlertTriangle } from 'lucide-react';
 import FrotaDashboard from './frota/FrotaDashboard';
 import KmSaldoPage from './frota/KmSaldoPage';
-import OrdensServicoPage from './frota/OrdensServicoPage';
 import AvariasPage from './frota/AvariasPage';
 
 const FrotaPage = () => {
@@ -17,7 +16,7 @@ const FrotaPage = () => {
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Dashboard
@@ -25,10 +24,6 @@ const FrotaPage = () => {
             <TabsTrigger value="km-saldo" className="flex items-center gap-2">
               <Car className="h-4 w-4" />
               KM/Saldo
-            </TabsTrigger>
-            <TabsTrigger value="ordens-servico" className="flex items-center gap-2">
-              <Wrench className="h-4 w-4" />
-              Ordens de Serviço
             </TabsTrigger>
             <TabsTrigger value="avarias" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
@@ -42,10 +37,6 @@ const FrotaPage = () => {
 
           <TabsContent value="km-saldo">
             <KmSaldoPage />
-          </TabsContent>
-
-          <TabsContent value="ordens-servico">
-            <OrdensServicoPage />
           </TabsContent>
 
           <TabsContent value="avarias">
