@@ -70,6 +70,8 @@ const AvariasPage = () => {
   });
   const [modalAberto, setModalAberto] = useState(false);
   const [modalLinkAberto, setModalLinkAberto] = useState(false);
+  const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
+  const [avariaDetalhes, setAvariaDetalhes] = useState<Avaria | null>(null);
   const [linkImagem, setLinkImagem] = useState('');
   const [posicaoTemporaria, setPosicaoTemporaria] = useState<{x: number, y: number} | null>(null);
   const imagemRef = useRef<HTMLImageElement>(null);
@@ -188,7 +190,8 @@ const AvariasPage = () => {
   };
 
   const handleAvariaClick = (avaria: Avaria) => {
-    alert(`Avaria: ${avaria.tipo}\nDescrição: ${avaria.descricao}\nGravidade: ${avaria.gravidade}\nStatus: ${avaria.status}`);
+    setAvariaDetalhes(avaria);
+    setModalDetalhesAberto(true);
   };
 
   const salvarAvaria = async () => {
@@ -663,6 +666,74 @@ const AvariasPage = () => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para Detalhes da Avaria */}
+      <Dialog open={modalDetalhesAberto} onOpenChange={setModalDetalhesAberto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Detalhes da Avaria</DialogTitle>
+          </DialogHeader>
+          {avariaDetalhes && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Tipo</label>
+                  <p className="text-sm font-semibold">{avariaDetalhes.tipo}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Gravidade</label>
+                  <Badge variant="outline" className={`text-xs ${getCorAvaria(avariaDetalhes.gravidade)}`}>
+                    {avariaDetalhes.gravidade}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Status</label>
+                  <Badge variant={getCorStatus(avariaDetalhes.status)} className="text-xs">
+                    {avariaDetalhes.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Ângulo</label>
+                  <p className="text-sm">{avariaDetalhes.angulo}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Descrição</label>
+                <p className="text-sm bg-muted p-3 rounded-lg">
+                  {avariaDetalhes.descricao || 'Sem descrição fornecida'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Responsável</label>
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm">{avariaDetalhes.responsavel}</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Data</label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm">{new Date(avariaDetalhes.data).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setModalDetalhesAberto(false)}>
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
