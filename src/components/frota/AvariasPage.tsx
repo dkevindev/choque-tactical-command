@@ -59,6 +59,7 @@ interface ViaturaAvarias {
 const AvariasPage = () => {
   const [viaturaAtual, setViaturaAtual] = useState<string>('');
   const [avariasData, setAvariasData] = useState<ViaturaAvarias[]>([]);
+  const [viaturasFrota, setViaturasFrota] = useState<any[]>([]);
   const [anguloAtivo, setAnguloAtivo] = useState<'frontal' | 'traseira' | 'esquerdo' | 'direito'>('frontal');
   const [marcandoAvaria, setMarcandoAvaria] = useState(false);
   const [novaAvaria, setNovaAvaria] = useState({
@@ -74,31 +75,23 @@ const AvariasPage = () => {
   const imagemRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
 
-  // Mock data para demonstração
-  const viaturasMock = [
-    { placa: 'OII6398', modelo: 'TOYOTA HILUX SRV', cadastro: 'CAV 13' },
-    { placa: 'ABC1234', modelo: 'MITSUBISHI L200', cadastro: 'CAV 07' },
-    { placa: 'XYZ9876', modelo: 'FORD RANGER', cadastro: 'CAV 21' }
-  ];
-
   useEffect(() => {
-    // Carregar dados do Firebase
-    carregarDadosFirebase();
+    carregarViaturasFrota();
   }, []);
 
-  const carregarDadosFirebase = async () => {
+  const carregarViaturasFrota = async () => {
     try {
-      const viaturas = collection(db, 'viaturas');
-      const snapshot = await getDocs(viaturas);
+      const frotaRef = collection(db, 'frota');
+      const snapshot = await getDocs(frotaRef);
       
-      const dadosCarregados: ViaturaAvarias[] = [];
-      
+      const viaturas: any[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
-        dadosCarregados.push({
-          placaViatura: data.placa || doc.id,
-          modeloViatura: data.modelo || '',
-          cadastroViatura: data.cadastro || '',
+        viaturas.push({
+          id: doc.id,
+          cadastro: data.cadastro,
+          placa: data.placa,
+          modelo: data.modelo,
           imagemFrontal: data.imagemFrontal || '',
           imagemTraseira: data.imagemTraseira || '',
           imagemLadoEsquerdo: data.imagemLadoEsquerdo || '',
@@ -106,29 +99,27 @@ const AvariasPage = () => {
           avarias: data.avarias || []
         });
       });
-
-      if (dadosCarregados.length === 0) {
-        // Se não houver dados, criar dados mock
-        const dadosMock: ViaturaAvarias[] = viaturasMock.map(v => ({
-          placaViatura: v.placa,
-          modeloViatura: v.modelo,
-          cadastroViatura: v.cadastro,
-          avarias: []
-        }));
-        setAvariasData(dadosMock);
-        
-        // Salvar dados mock no Firebase
-        for (const viatura of dadosMock) {
-          await addDoc(viaturas, viatura);
-        }
-      } else {
-        setAvariasData(dadosCarregados);
-      }
+      
+      setViaturasFrota(viaturas);
+      
+      // Converter para formato de avarias
+      const dadosAvarias: ViaturaAvarias[] = viaturas.map(v => ({
+        placaViatura: v.placa,
+        modeloViatura: v.modelo,
+        cadastroViatura: v.cadastro,
+        imagemFrontal: v.imagemFrontal,
+        imagemTraseira: v.imagemTraseira,
+        imagemLadoEsquerdo: v.imagemLadoEsquerdo,
+        imagemLadoDireito: v.imagemLadoDireito,
+        avarias: v.avarias
+      }));
+      
+      setAvariasData(dadosAvarias);
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error('Erro ao carregar viaturas:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar dados do Firebase",
+        description: "Erro ao carregar viaturas do banco de dados",
         variant: "destructive",
       });
     }
@@ -138,31 +129,34 @@ const AvariasPage = () => {
     if (!linkImagem || !viaturaAtual) return;
 
     try {
-      // Atualizar a viatura com a nova imagem no ângulo ativo
-      const novaViaturaData = avariasData.map(v => 
-        v.placaViatura === viaturaAtual
-          ? { 
-              ...v, 
-              [`imagem${anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)}`]: linkImagem 
-            }
-          : v
-      );
+      const viaturaEncontrada = viaturasFrota.find(v => v.placa === viaturaAtual);
+      if (!viaturaEncontrada) return;
+
+      // Determinar o campo da imagem baseado no ângulo
+      const campoImagem = `imagem${anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)}`;
       
-      setAvariasData(novaViaturaData);
-      
-      // Salvar no Firebase
-      const viaturas = collection(db, 'viaturas');
-      const snapshot = await getDocs(viaturas);
-      
-      snapshot.forEach(async (documento) => {
-        const data = documento.data();
-        if (data.placa === viaturaAtual || documento.id === viaturaAtual) {
-          const viaturaRef = doc(db, 'viaturas', documento.id);
-          await updateDoc(viaturaRef, {
-            [`imagem${anguloAtivo.charAt(0).toUpperCase() + anguloAtivo.slice(1)}`]: linkImagem
-          });
-        }
+      // Atualizar no Firebase Firestore (coleção frota)
+      const viaturaRef = doc(db, 'frota', viaturaEncontrada.id);
+      await updateDoc(viaturaRef, {
+        [campoImagem]: linkImagem
       });
+
+      // Atualizar estado local
+      setViaturasFrota(prev => 
+        prev.map(v => 
+          v.id === viaturaEncontrada.id 
+            ? { ...v, [campoImagem]: linkImagem }
+            : v
+        )
+      );
+
+      setAvariasData(prev => 
+        prev.map(v => 
+          v.placaViatura === viaturaAtual
+            ? { ...v, [campoImagem]: linkImagem }
+            : v
+        )
+      );
 
       toast({
         title: "Sucesso",
@@ -200,6 +194,9 @@ const AvariasPage = () => {
     if (!posicaoTemporaria || !viaturaAtual || !novaAvaria.tipo) return;
 
     try {
+      const viaturaEncontrada = viaturasFrota.find(v => v.placa === viaturaAtual);
+      if (!viaturaEncontrada) return;
+
       const avaria: Avaria = {
         id: Date.now().toString(),
         x: posicaoTemporaria.x,
@@ -213,30 +210,31 @@ const AvariasPage = () => {
         angulo: anguloAtivo
       };
 
-      const novaViaturaData = avariasData.map(v => 
-        v.placaViatura === viaturaAtual
-          ? { ...v, avarias: [...v.avarias, avaria] }
-          : v
+      // Atualizar avarias da viatura
+      const avariasAtualizadas = [...(viaturaEncontrada.avarias || []), avaria];
+
+      // Salvar no Firebase (coleção frota)
+      const viaturaRef = doc(db, 'frota', viaturaEncontrada.id);
+      await updateDoc(viaturaRef, {
+        avarias: avariasAtualizadas
+      });
+
+      // Atualizar estado local
+      setViaturasFrota(prev => 
+        prev.map(v => 
+          v.id === viaturaEncontrada.id 
+            ? { ...v, avarias: avariasAtualizadas }
+            : v
+        )
       );
 
-      setAvariasData(novaViaturaData);
-
-      // Salvar no Firebase
-      const viaturas = collection(db, 'viaturas');
-      const snapshot = await getDocs(viaturas);
-      
-      snapshot.forEach(async (documento) => {
-        const data = documento.data();
-        if (data.placa === viaturaAtual || documento.id === viaturaAtual) {
-          const viaturaRef = doc(db, 'viaturas', documento.id);
-          const viaturaAtualizada = novaViaturaData.find(v => v.placaViatura === viaturaAtual);
-          if (viaturaAtualizada) {
-            await updateDoc(viaturaRef, {
-              avarias: viaturaAtualizada.avarias
-            });
-          }
-        }
-      });
+      setAvariasData(prev => 
+        prev.map(v => 
+          v.placaViatura === viaturaAtual
+            ? { ...v, avarias: avariasAtualizadas }
+            : v
+        )
+      );
 
       toast({
         title: "Sucesso",
@@ -337,7 +335,7 @@ const AvariasPage = () => {
                 <SelectValue placeholder="Escolha uma viatura..." />
               </SelectTrigger>
               <SelectContent>
-                {viaturasMock.map((viatura) => (
+                {viaturasFrota.map((viatura) => (
                   <SelectItem key={viatura.placa} value={viatura.placa}>
                     {viatura.cadastro} - {viatura.placa}
                   </SelectItem>
