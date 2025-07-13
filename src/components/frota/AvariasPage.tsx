@@ -89,9 +89,9 @@ const AvariasPage = () => {
         const data = doc.data();
         viaturas.push({
           id: doc.id,
-          cadastro: data.cadastro,
-          placa: data.placa,
-          modelo: data.modelo,
+          cadastro: data.CADASTRO,
+          placa: data.PLACA,
+          modelo: data.MODELO,
           imagemFrontal: data.imagemFrontal || '',
           imagemTraseira: data.imagemTraseira || '',
           imagemLadoEsquerdo: data.imagemLadoEsquerdo || '',
@@ -115,6 +115,7 @@ const AvariasPage = () => {
       }));
       
       setAvariasData(dadosAvarias);
+      console.log('Viaturas carregadas:', viaturas);
     } catch (error) {
       console.error('Erro ao carregar viaturas:', error);
       toast({
