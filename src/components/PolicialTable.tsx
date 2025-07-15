@@ -73,18 +73,24 @@ const PolicialTable = () => {
 
   const getPostGradOrder = (postGrad: string) => {
     const hierarchy = {
-      'TEN CEL': 1,
-      'CAP': 2,
-      '1º TEN': 3,
-      '2º TEN': 4,
-      'SUBTEN': 5,
-      '1º SGT': 6,
-      '2º SGT': 7,
-      '3º SGT': 8,
-      'CB': 9,
-      'SD': 10
+      'CEL': 1,
+      'TEN CEL': 2,
+      'CAP': 3,
+      '1º TEN': 4,
+      '2º TEN': 5,
+      'SUBTEN': 6,
+      '1º SGT': 7,
+      '2º SGT': 8,
+      '3º SGT': 9,
+      'CB': 10,
+      'SD': 11
     };
     return hierarchy[postGrad as keyof typeof hierarchy] || 999;
+  };
+
+  const hasCmtRpmont = (policial: Policial) => {
+    const funcao = policial.FUNÇÃO || '';
+    return funcao.includes('CMT RPMONT');
   };
 
   const shouldCapComeFirst = (policial: Policial) => {
@@ -98,6 +104,13 @@ const PolicialTable = () => {
     (policial['Post/Grad'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (policial.NUMERAL?.toString() || '').includes(searchTerm)
   ).sort((a, b) => {
+    // Primeiro: quem tem CMT RPMONT sempre no topo
+    const aHasCmtRpmont = hasCmtRpmont(a);
+    const bHasCmtRpmont = hasCmtRpmont(b);
+    
+    if (aHasCmtRpmont && !bHasCmtRpmont) return -1;
+    if (!aHasCmtRpmont && bHasCmtRpmont) return 1;
+    
     const aPost = a['Post/Grad'] || '';
     const bPost = b['Post/Grad'] || '';
     
@@ -105,7 +118,7 @@ const PolicialTable = () => {
     const bOrder = getPostGradOrder(bPost);
     
     // Se ambos são CAP, aplicar critério especial
-    if (aOrder === 2 && bOrder === 2) {
+    if (aOrder === 3 && bOrder === 3) {
       const aIsPriority = shouldCapComeFirst(a);
       const bIsPriority = shouldCapComeFirst(b);
       
@@ -122,7 +135,7 @@ const PolicialTable = () => {
     }
     
     // Se mesmo post e a partir de 1º SGT, usar numeral como desempate
-    if (aOrder >= 6) {
+    if (aOrder >= 7) {
       return (a.NUMERAL || 0) - (b.NUMERAL || 0);
     }
     
