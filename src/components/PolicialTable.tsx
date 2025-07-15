@@ -1,93 +1,106 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Eye, Plus, Edit, Target, Shield } from 'lucide-react';
-
-interface Cautela {
-  id: string;
-  item: string;
-  tipo: 'arma' | 'equipamento';
-  numero: string;
-  dataRetirada: string;
-}
+import { Search, Eye, User, Phone, MapPin, Calendar, CreditCard, Mail, Building, FileText } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/firebase';
 
 interface Policial {
   id: string;
-  matricula: string;
-  nome: string;
-  posto: string;
-  unidade: string;
-  telefone: string;
-  status: 'ativo' | 'licenca' | 'afastado';
-  cautelas: Cautela[];
+  AGÊNCIA?: number;
+  BANCO?: string;
+  Bairro?: string;
+  CONTA?: string;
+  CPF?: string;
+  'DATA ATUAL'?: number;
+  'E-MAIL'?: string;
+  Endereço?: string;
+  FUNÇÃO?: string;
+  IDADE?: number;
+  'MUDANÇA COMPORTAMENTO'?: string;
+  Matrícula?: string;
+  'MÊS ANIVERSARIO'?: number;
+  NASCIMENTO?: number;
+  NOME?: string;
+  'NOME DE GUERRA'?: string;
+  'NOME DE GUERRA1'?: string;
+  NUMERAL?: number;
+  ORD?: number;
+  'PREVISAO FÉRIAS - AQUISITIVO 2024'?: string;
+  'Post/Grad'?: string;
+  SITUAÇÃO?: string;
+  'ULTIMA PROMOÇÃO'?: number;
+  UNIDADE?: string;
+  __EMPTY?: number;
+  inclusão?: number;
+  telefone?: string;
 }
 
 const PolicialTable = () => {
-  const [policiais] = useState<Policial[]>([
-    {
-      id: '1',
-      matricula: '123456',
-      nome: 'João Silva Santos',
-      posto: 'Soldado',
-      unidade: '1ª CIA',
-      telefone: '(11) 99999-9999',
-      status: 'ativo',
-      cautelas: [
-        { id: '1', item: 'Pistola .40', tipo: 'arma', numero: 'AR001234', dataRetirada: '2024-01-15' },
-        { id: '2', item: 'Colete Balístico', tipo: 'equipamento', numero: 'CB005678', dataRetirada: '2024-01-15' }
-      ]
-    },
-    {
-      id: '2',
-      matricula: '789012',
-      nome: 'Maria Oliveira Costa',
-      posto: 'Cabo',
-      unidade: '2ª CIA',
-      telefone: '(11) 88888-8888',
-      status: 'ativo',
-      cautelas: [
-        { id: '3', item: 'Rifle .556', tipo: 'arma', numero: 'RF002345', dataRetirada: '2024-02-10' }
-      ]
-    },
-    {
-      id: '3',
-      matricula: '345678',
-      nome: 'Pedro Souza Lima',
-      posto: 'Sargento',
-      unidade: '1ª CIA',
-      telefone: '(11) 77777-7777',
-      status: 'licenca',
-      cautelas: []
-    }
-  ]);
-
+  const [policiais, setPoliciais] = useState<Policial[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPolicial, setSelectedPolicial] = useState<Policial | null>(null);
-  const [showCautelaDialog, setShowCautelaDialog] = useState(false);
+
+  useEffect(() => {
+    const loadPoliciais = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'policiais'));
+        const policiaisData: Policial[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          policiaisData.push({
+            id: doc.id,
+            ...doc.data()
+          } as Policial);
+        });
+        
+        setPoliciais(policiaisData);
+        console.log('Policiais carregados:', policiaisData);
+      } catch (error) {
+        console.error('Erro ao carregar policiais:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPoliciais();
+  }, []);
 
   const filteredPoliciais = policiais.filter(policial =>
-    policial.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    policial.matricula.includes(searchTerm) ||
-    policial.posto.toLowerCase().includes(searchTerm.toLowerCase())
+    (policial.NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (policial.Matrícula || '').includes(searchTerm) ||
+    (policial['Post/Grad'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (policial.NUMERAL?.toString() || '').includes(searchTerm)
   );
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ativo':
-        return <Badge variant="default">ATIVO</Badge>;
-      case 'licenca':
-        return <Badge variant="secondary">LICENÇA</Badge>;
-      case 'afastado':
-        return <Badge variant="destructive">AFASTADO</Badge>;
-      default:
-        return <Badge variant="outline">INDEFINIDO</Badge>;
+  const getStatusBadge = (situacao: string) => {
+    const status = situacao?.toLowerCase() || '';
+    if (status.includes('operando') || status.includes('ativo')) {
+      return <Badge variant="default">ATIVO</Badge>;
+    } else if (status.includes('licen') || status.includes('férias')) {
+      return <Badge variant="secondary">LICENÇA</Badge>;
+    } else if (status.includes('afastado')) {
+      return <Badge variant="destructive">AFASTADO</Badge>;
     }
+    return <Badge variant="outline">{situacao || 'N/A'}</Badge>;
   };
 
+  const formatDate = (dateValue: number | undefined) => {
+    if (!dateValue) return 'N/A';
+    // Converter data Excel para JavaScript (1900-01-01 = 1)
+    const excelEpoch = new Date(1900, 0, 1);
+    const jsDate = new Date(excelEpoch.getTime() + (dateValue - 2) * 24 * 60 * 60 * 1000);
+    return jsDate.toLocaleDateString('pt-BR');
+  };
+
+  if (loading) {
+    return <div className="p-4">Carregando policiais...</div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -96,7 +109,7 @@ const PolicialTable = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome, matrícula ou posto..."
+            placeholder="Buscar por nome, matrícula, posto ou numeral..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -109,27 +122,23 @@ const PolicialTable = () => {
         <TableHeader>
           <TableRow>
             <TableHead>MATRÍCULA</TableHead>
+            <TableHead>NUMERAL</TableHead>
             <TableHead>NOME</TableHead>
             <TableHead>POSTO</TableHead>
             <TableHead>UNIDADE</TableHead>
-            <TableHead>STATUS</TableHead>
-            <TableHead>CAUTELAS</TableHead>
+            <TableHead>SITUAÇÃO</TableHead>
             <TableHead>AÇÕES</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredPoliciais.map((policial) => (
             <TableRow key={policial.id}>
-              <TableCell className="font-medium">{policial.matricula}</TableCell>
-              <TableCell>{policial.nome}</TableCell>
-              <TableCell>{policial.posto}</TableCell>
-              <TableCell>{policial.unidade}</TableCell>
-              <TableCell>{getStatusBadge(policial.status)}</TableCell>
-              <TableCell>
-                <Badge variant="outline">
-                  {policial.cautelas.length} itens
-                </Badge>
-              </TableCell>
+              <TableCell className="font-medium">{policial.Matrícula || 'N/A'}</TableCell>
+              <TableCell className="font-medium">{policial.NUMERAL || 'N/A'}</TableCell>
+              <TableCell>{policial.NOME || 'N/A'}</TableCell>
+              <TableCell>{policial['Post/Grad'] || 'N/A'}</TableCell>
+              <TableCell>{policial.UNIDADE || 'N/A'}</TableCell>
+              <TableCell>{getStatusBadge(policial.SITUAÇÃO || '')}</TableCell>
               <TableCell>
                 <div className="flex gap-2">
                   <Dialog>
@@ -143,96 +152,164 @@ const PolicialTable = () => {
                         Exibir
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-4xl">
+                    <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
                       <DialogHeader>
-                        <DialogTitle>Informações do Policial</DialogTitle>
+                        <DialogTitle>Informações Completas do Policial</DialogTitle>
                       </DialogHeader>
                       {selectedPolicial && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           {/* Dados Pessoais */}
                           <Card>
                             <CardHeader>
                               <CardTitle className="text-lg flex items-center gap-2">
-                                <Shield className="h-5 w-5" />
+                                <User className="h-5 w-5" />
                                 Dados Pessoais
                               </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
                               <div>
-                                <span className="font-semibold">Matrícula:</span>
-                                <p>{selectedPolicial.matricula}</p>
-                              </div>
-                              <div>
                                 <span className="font-semibold">Nome:</span>
-                                <p>{selectedPolicial.nome}</p>
+                                <p>{selectedPolicial.NOME || 'N/A'}</p>
                               </div>
                               <div>
-                                <span className="font-semibold">Posto:</span>
-                                <p>{selectedPolicial.posto}</p>
+                                <span className="font-semibold">Nome de Guerra:</span>
+                                <p>{selectedPolicial['NOME DE GUERRA'] || 'N/A'}</p>
                               </div>
                               <div>
-                                <span className="font-semibold">Unidade:</span>
-                                <p>{selectedPolicial.unidade}</p>
+                                <span className="font-semibold">Nome de Guerra 1:</span>
+                                <p>{selectedPolicial['NOME DE GUERRA1'] || 'N/A'}</p>
                               </div>
                               <div>
-                                <span className="font-semibold">Telefone:</span>
-                                <p>{selectedPolicial.telefone}</p>
+                                <span className="font-semibold">CPF:</span>
+                                <p>{selectedPolicial.CPF || 'N/A'}</p>
                               </div>
                               <div>
-                                <span className="font-semibold">Status:</span>
-                                <div className="mt-1">{getStatusBadge(selectedPolicial.status)}</div>
+                                <span className="font-semibold">Idade:</span>
+                                <p>{selectedPolicial.IDADE || 'N/A'} anos</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Nascimento:</span>
+                                <p>{formatDate(selectedPolicial.NASCIMENTO)}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Mês Aniversário:</span>
+                                <p>{selectedPolicial['MÊS ANIVERSARIO'] || 'N/A'}</p>
                               </div>
                             </CardContent>
                           </Card>
 
-                          {/* Cautelas */}
+                          {/* Dados Profissionais */}
                           <Card>
                             <CardHeader>
                               <CardTitle className="text-lg flex items-center gap-2">
-                                <Target className="h-5 w-5" />
-                                Cautelas
-                                <Button
-                                  size="sm"
-                                  onClick={() => setShowCautelaDialog(true)}
-                                  className="ml-auto"
-                                >
-                                  <Plus className="h-4 w-4 mr-1" />
-                                  Nova Cautela
-                                </Button>
+                                <Building className="h-5 w-5" />
+                                Dados Profissionais
                               </CardTitle>
                             </CardHeader>
-                            <CardContent>
-                              {selectedPolicial.cautelas.length > 0 ? (
-                                <div className="space-y-3">
-                                  {selectedPolicial.cautelas.map((cautela) => (
-                                    <div key={cautela.id} className="p-3 bg-muted rounded border">
-                                      <div className="flex justify-between items-start">
-                                        <div>
-                                          <p className="font-medium">{cautela.item}</p>
-                                          <p className="text-sm text-muted-foreground">
-                                            Nº: {cautela.numero}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground">
-                                            Retirada: {new Date(cautela.dataRetirada).toLocaleDateString('pt-BR')}
-                                          </p>
-                                        </div>
-                                        <div className="flex gap-1">
-                                          <Badge variant={cautela.tipo === 'arma' ? 'destructive' : 'secondary'}>
-                                            {cautela.tipo.toUpperCase()}
-                                          </Badge>
-                                          <Button variant="ghost" size="sm">
-                                            <Edit className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-muted-foreground text-center py-4">
-                                  Nenhuma cautela registrada
-                                </p>
-                              )}
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-semibold">Matrícula:</span>
+                                <p>{selectedPolicial.Matrícula || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Numeral:</span>
+                                <p>{selectedPolicial.NUMERAL || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Posto/Graduação:</span>
+                                <p>{selectedPolicial['Post/Grad'] || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Função:</span>
+                                <p>{selectedPolicial.FUNÇÃO || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Unidade:</span>
+                                <p>{selectedPolicial.UNIDADE || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Situação:</span>
+                                <div className="mt-1">{getStatusBadge(selectedPolicial.SITUAÇÃO || '')}</div>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Inclusão:</span>
+                                <p>{formatDate(selectedPolicial.inclusão)}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Última Promoção:</span>
+                                <p>{formatDate(selectedPolicial['ULTIMA PROMOÇÃO'])}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Previsão Férias 2024:</span>
+                                <p>{selectedPolicial['PREVISAO FÉRIAS - AQUISITIVO 2024'] || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Mudança Comportamento:</span>
+                                <p>{selectedPolicial['MUDANÇA COMPORTAMENTO'] || 'N/A'}</p>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Dados de Contato e Bancários */}
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-lg flex items-center gap-2">
+                                <Phone className="h-5 w-5" />
+                                Contato e Dados Bancários
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <span className="font-semibold flex items-center gap-1">
+                                  <Phone className="h-4 w-4" />
+                                  Telefone:
+                                </span>
+                                <p>{selectedPolicial.telefone || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold flex items-center gap-1">
+                                  <Mail className="h-4 w-4" />
+                                  E-mail:
+                                </span>
+                                <p>{selectedPolicial['E-MAIL'] || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold flex items-center gap-1">
+                                  <MapPin className="h-4 w-4" />
+                                  Endereço:
+                                </span>
+                                <p>{selectedPolicial.Endereço || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Bairro:</span>
+                                <p>{selectedPolicial.Bairro || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold flex items-center gap-1">
+                                  <CreditCard className="h-4 w-4" />
+                                  Banco:
+                                </span>
+                                <p>{selectedPolicial.BANCO || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Agência:</span>
+                                <p>{selectedPolicial.AGÊNCIA || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Conta:</span>
+                                <p>{selectedPolicial.CONTA || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  Data Atual:
+                                </span>
+                                <p>{formatDate(selectedPolicial['DATA ATUAL'])}</p>
+                              </div>
+                              <div>
+                                <span className="font-semibold">Ordem:</span>
+                                <p>{selectedPolicial.ORD || 'N/A'}</p>
+                              </div>
                             </CardContent>
                           </Card>
                         </div>
@@ -246,39 +323,11 @@ const PolicialTable = () => {
         </TableBody>
       </Table>
 
-      {/* Dialog para Nova Cautela */}
-      <Dialog open={showCautelaDialog} onOpenChange={setShowCautelaDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Nova Cautela</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Tipo de Item:</label>
-              <select className="w-full mt-1 p-2 border rounded">
-                <option value="arma">Arma</option>
-                <option value="equipamento">Equipamento</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Descrição do Item:</label>
-              <Input placeholder="Ex: Pistola .40, Colete Balístico..." />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Número de Série:</label>
-              <Input placeholder="Número de identificação do item" />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowCautelaDialog(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={() => setShowCautelaDialog(false)}>
-                Adicionar Cautela
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {filteredPoliciais.length === 0 && !loading && (
+        <div className="text-center py-8 text-muted-foreground">
+          {searchTerm ? 'Nenhum policial encontrado com os critérios de busca.' : 'Nenhum policial cadastrado.'}
+        </div>
+      )}
     </div>
   );
 };
