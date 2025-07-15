@@ -125,11 +125,15 @@ const GestaoAcesso = () => {
     carregarPoliciais();
   }, [toast]);
 
-  const filteredPoliciais = policiais.filter(policial => 
-    policial.NOME.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    policial['Post/Grad'].toLowerCase().includes(searchTerm.toLowerCase()) ||
-    policial.Matrícula.toString().includes(searchTerm)
-  );
+  const filteredPoliciais = policiais.filter(policial => {
+    if (!policial.NOME || !policial['Post/Grad'] || !policial.Matrícula) {
+      return false;
+    }
+    
+    return policial.NOME.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           policial['Post/Grad'].toLowerCase().includes(searchTerm.toLowerCase()) ||
+           policial.Matrícula.toString().includes(searchTerm);
+  });
 
   const handleAcessoToggle = async (sistema: string, valor: boolean) => {
     if (!selectedPolicial) return;
