@@ -59,7 +59,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
       const matchesSearch = !searchTerm || 
         policial.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        policial.Matrícula?.toLowerCase().includes(searchTerm.toLowerCase());
+        String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesSituacao = filterSituacao === 'ALL_SITUATIONS' || !filterSituacao || policial.SITUAÇÃO === filterSituacao;
       const matchesPostGrad = filterPostGrad === 'ALL_GRADUATIONS' || !filterPostGrad || policial['Post/Grad'] === filterPostGrad;
