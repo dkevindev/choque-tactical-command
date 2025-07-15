@@ -18,6 +18,7 @@ import FrotaPage from '@/components/FrotaPage';
 import DocumentosPage from './DocumentosPaga';
 import OrdemServicoPage from '@/components/OrdemServicoPage';
 import GestaoAcesso from '@/components/GestaoAcesso';
+import GestãoPessoas from '@/components/GestãoPessoas';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
