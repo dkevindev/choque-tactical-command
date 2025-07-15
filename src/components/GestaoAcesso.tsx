@@ -93,22 +93,28 @@ const GestaoAcesso = () => {
         
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          policiaisData.push({
-            id: doc.id,
-            NOME: data.NOME,
-            'Post/Grad': data['Post/Grad'],
-            Matrícula: data.Matrícula,
-            FUNÇÃO: data.FUNÇÃO,
-            NUMERAL: data.NUMERAL,
-            primeiroAcesso: data.primeiroAcesso !== false, // Default true se não existir
-            senha: data.senha,
-            acessos: data.acessos || {
-              reservaArmamento: false,
-              guardaQuartel: false,
-              gestaoLogistica: false,
-              cavbot: false
-            }
-          });
+          
+          // Verificar se os dados essenciais existem
+          if (data.NOME && data['Post/Grad'] && data.Matrícula) {
+            policiaisData.push({
+              id: doc.id,
+              NOME: data.NOME,
+              'Post/Grad': data['Post/Grad'],
+              Matrícula: data.Matrícula,
+              FUNÇÃO: data.FUNÇÃO || 'Não definida',
+              NUMERAL: data.NUMERAL,
+              primeiroAcesso: data.primeiroAcesso !== false, // Default true se não existir
+              senha: data.senha,
+              acessos: data.acessos || {
+                reservaArmamento: false,
+                guardaQuartel: false,
+                gestaoLogistica: false,
+                cavbot: false
+              }
+            });
+          } else {
+            console.warn('Dados incompletos para policial:', doc.id, data);
+          }
         });
         
         setPoliciais(policiaisData);
