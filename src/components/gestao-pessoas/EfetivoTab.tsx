@@ -30,8 +30,8 @@ interface EfetivoTabProps {
 
 const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterSituacao, setFilterSituacao] = useState('');
-  const [filterPostGrad, setFilterPostGrad] = useState('');
+  const [filterSituacao, setFilterSituacao] = useState('ALL_SITUATIONS');
+  const [filterPostGrad, setFilterPostGrad] = useState('ALL_GRADUATIONS');
   const [editingPolicial, setEditingPolicial] = useState<Policial | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -61,8 +61,8 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
         policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         policial.Matrícula?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesSituacao = !filterSituacao || policial.SITUAÇÃO === filterSituacao;
-      const matchesPostGrad = !filterPostGrad || policial['Post/Grad'] === filterPostGrad;
+      const matchesSituacao = filterSituacao === 'ALL_SITUATIONS' || !filterSituacao || policial.SITUAÇÃO === filterSituacao;
+      const matchesPostGrad = filterPostGrad === 'ALL_GRADUATIONS' || !filterPostGrad || policial['Post/Grad'] === filterPostGrad;
       
       return matchesSearch && matchesSituacao && matchesPostGrad;
     })
@@ -138,7 +138,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
                   <SelectValue placeholder="Todas as situações" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as situações</SelectItem>
+                  <SelectItem value="ALL_SITUATIONS">Todas as situações</SelectItem>
                   {situacoes.map(situacao => (
                     <SelectItem key={situacao} value={situacao}>
                       {situacao}
@@ -155,7 +155,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
                   <SelectValue placeholder="Todas as graduações" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as graduações</SelectItem>
+                  <SelectItem value="ALL_GRADUATIONS">Todas as graduações</SelectItem>
                   {postGrads.map(postGrad => (
                     <SelectItem key={postGrad} value={postGrad}>
                       {postGrad}
@@ -170,8 +170,8 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
                 variant="outline" 
                 onClick={() => {
                   setSearchTerm('');
-                  setFilterSituacao('');
-                  setFilterPostGrad('');
+                  setFilterSituacao('ALL_SITUATIONS');
+                  setFilterPostGrad('ALL_GRADUATIONS');
                 }}
                 className="w-full"
               >
