@@ -145,15 +145,30 @@ const LoginSistema = ({ sistema, onClose }: LoginSistemaProps) => {
 
   const verificarCredenciais = async (mat: string, pass: string): Promise<Policial | null> => {
     try {
-      // Buscar policial no Firebase por matrícula
-      const querySnapshot = await getDocs(
+      console.log('Tentando login com matrícula:', mat, 'e senha:', pass);
+      
+      // Buscar policial no Firebase por matrícula (tentar como número e string)
+      let querySnapshot = await getDocs(
         query(collection(db, 'policiais'), where('Matrícula', '==', parseInt(mat)))
       );
       
-      if (querySnapshot.empty) return null;
+      // Se não encontrou como número, tentar como string
+      if (querySnapshot.empty) {
+        console.log('Não encontrou como número, tentando como string');
+        querySnapshot = await getDocs(
+          query(collection(db, 'policiais'), where('Matrícula', '==', mat))
+        );
+      }
+      
+      if (querySnapshot.empty) {
+        console.log('Policial não encontrado no Firebase');
+        return null;
+      }
 
       const doc = querySnapshot.docs[0];
       const data = doc.data();
+      console.log('Dados do policial encontrado:', data);
+      
       const policial: Policial = {
         id: doc.id,
         NOME: data.NOME,
@@ -166,16 +181,21 @@ const LoginSistema = ({ sistema, onClose }: LoginSistemaProps) => {
 
       // Se é primeiro acesso ou não tem senha definida, senha deve ser a matrícula
       if (data.primeiroAcesso !== false || !data.senha) {
+        console.log('Primeiro acesso - comparando senha:', pass, 'com matrícula:', mat);
         if (pass === mat) {
+          console.log('Login de primeiro acesso válido');
           return policial;
         }
       } else {
+        console.log('Não é primeiro acesso - comparando senha:', pass, 'com senha salva:', data.senha);
         // Se não é primeiro acesso, verificar senha cadastrada
         if (data.senha === pass) {
+          console.log('Login com senha válido');
           return policial;
         }
       }
 
+      console.log('Credenciais inválidas');
       return null;
     } catch (error) {
       console.error('Erro ao verificar credenciais:', error);
@@ -196,10 +216,17 @@ const LoginSistema = ({ sistema, onClose }: LoginSistemaProps) => {
 
   const atualizarSenha = async (mat: string, novaSenha: string) => {
     try {
-      // Buscar policial no Firebase por matrícula
-      const querySnapshot = await getDocs(
+      // Buscar policial no Firebase por matrícula (tentar como número e string)
+      let querySnapshot = await getDocs(
         query(collection(db, 'policiais'), where('Matrícula', '==', parseInt(mat)))
       );
+      
+      // Se não encontrou como número, tentar como string
+      if (querySnapshot.empty) {
+        querySnapshot = await getDocs(
+          query(collection(db, 'policiais'), where('Matrícula', '==', mat))
+        );
+      }
       
       if (querySnapshot.empty) throw new Error('Policial não encontrado');
 
