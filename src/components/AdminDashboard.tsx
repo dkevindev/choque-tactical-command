@@ -34,6 +34,8 @@ const AdminDashboard = () => {
         return <PolicialContent />;
       case 'gestao':
         return <GestaoContent />;
+      case 'gestao-pessoas':
+        return <GestãoPessoas />;
       case 'documentos':
         return <DocumentosContent />;
       case 'ordens-servico': // <--- Adicione este novo case
