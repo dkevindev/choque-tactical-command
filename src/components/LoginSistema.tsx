@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
+import { db } from '@/firebase';
 
 interface Sistema {
   id: string;
@@ -29,6 +31,21 @@ interface Sistema {
   cor: string;
   rota: string;
   acessoKey: string;
+}
+
+interface Policial {
+  id: string;
+  NOME: string;
+  'Post/Grad': string;
+  Matrícula: number;
+  primeiroAcesso?: boolean;
+  senha?: string;
+  acessos?: {
+    reservaArmamento?: boolean;
+    guardaQuartel?: boolean;
+    gestaoLogistica?: boolean;
+    cavbot?: boolean;
+  };
 }
 
 interface LoginSistemaProps {
@@ -73,7 +90,7 @@ const LoginSistema = ({ sistema, onClose }: LoginSistemaProps) => {
       }
 
       // Verificar se é primeiro acesso
-      if (policial.primeiroAcesso) {
+      if (policial.primeiroAcesso !== false || !policial.senha) {
         setPrimeiroAcesso(true);
         setLoading(false);
         return;
@@ -126,79 +143,88 @@ const LoginSistema = ({ sistema, onClose }: LoginSistemaProps) => {
     }
   };
 
-  const verificarCredenciais = async (mat: string, pass: string) => {
-    // Simular verificação no Firebase
-    const mockPoliciais = [
-      {
-        id: '1',
-        matricula: '12345',
-        nome: 'João Silva',
-        postGrad: 'CAP',
-        primeiroAcesso: true,
-        acessos: {
-          reservaArmamento: false,
-          guardaQuartel: false,
-          gestaoLogistica: true,
-          cavbot: false
+  const verificarCredenciais = async (mat: string, pass: string): Promise<Policial | null> => {
+    try {
+      // Buscar policial no Firebase por matrícula
+      const querySnapshot = await getDocs(
+        query(collection(db, 'policiais'), where('Matrícula', '==', parseInt(mat)))
+      );
+      
+      if (querySnapshot.empty) return null;
+
+      const doc = querySnapshot.docs[0];
+      const data = doc.data();
+      const policial: Policial = {
+        id: doc.id,
+        NOME: data.NOME,
+        'Post/Grad': data['Post/Grad'],
+        Matrícula: data.Matrícula,
+        primeiroAcesso: data.primeiroAcesso !== false,
+        senha: data.senha,
+        acessos: data.acessos
+      };
+
+      // Se é primeiro acesso ou não tem senha definida, senha deve ser a matrícula
+      if (data.primeiroAcesso !== false || !data.senha) {
+        if (pass === mat) {
+          return policial;
         }
-      },
-      {
-        id: '2',
-        matricula: '67890',
-        nome: 'Maria Santos',
-        postGrad: '1º SGT',
-        senha: 'senha123',
-        primeiroAcesso: false,
-        acessos: {
-          reservaArmamento: true,
-          guardaQuartel: false,
-          gestaoLogistica: false,
-          cavbot: true
+      } else {
+        // Se não é primeiro acesso, verificar senha cadastrada
+        if (data.senha === pass) {
+          return policial;
         }
       }
-    ];
 
-    const policial = mockPoliciais.find(p => p.matricula === mat);
-    if (!policial) return null;
-
-    // Se é primeiro acesso, senha deve ser a matrícula
-    if (policial.primeiroAcesso && pass === mat) {
-      return policial;
+      return null;
+    } catch (error) {
+      console.error('Erro ao verificar credenciais:', error);
+      return null;
     }
-
-    // Se não é primeiro acesso, verificar senha cadastrada
-    if (!policial.primeiroAcesso && policial.senha === pass) {
-      return policial;
-    }
-
-    return null;
   };
 
-  const verificarAcessoSistema = (policial: any, sistemaKey: string) => {
+  const verificarAcessoSistema = (policial: Policial, sistemaKey: string) => {
     // Acesso policial é sempre liberado
     if (sistemaKey === 'acessoPolicial') return true;
     
     // Gestão e logística = admin
-    if (sistemaKey === 'gestaoLogistica') return policial.acessos.gestaoLogistica;
+    if (sistemaKey === 'gestaoLogistica') return policial.acessos?.gestaoLogistica || false;
     
-    // Outros sistemas
-    return policial.acessos[sistemaKey] || false;
+    // Outros sistemas - verificar se acessos existe
+    return policial.acessos?.[sistemaKey as keyof typeof policial.acessos] || false;
   };
 
   const atualizarSenha = async (mat: string, novaSenha: string) => {
-    // Simular atualização no Firebase
-    console.log('Atualizando senha para matrícula:', mat);
-    // Aqui seria a implementação real do Firebase
-    return new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      // Buscar policial no Firebase por matrícula
+      const querySnapshot = await getDocs(
+        query(collection(db, 'policiais'), where('Matrícula', '==', parseInt(mat)))
+      );
+      
+      if (querySnapshot.empty) throw new Error('Policial não encontrado');
+
+      const docRef = querySnapshot.docs[0].ref;
+      
+      // Atualizar senha e marcar como não sendo mais primeiro acesso
+      await updateDoc(docRef, {
+        senha: novaSenha,
+        primeiroAcesso: false
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar senha:', error);
+      throw error;
+    }
   };
 
-  const realizarLogin = (policial: any) => {
+  const realizarLogin = (policial: Policial) => {
     // Salvar dados do usuário no localStorage ou context
     localStorage.setItem('user', JSON.stringify(policial));
     
     toast({
       title: "Login realizado com sucesso",
-      description: `Bem-vindo, ${policial.nome}!`,
+      description: `Bem-vindo, ${policial.NOME}!`,
     });
 
     // Navegar para a rota apropriada

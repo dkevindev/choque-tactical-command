@@ -18,6 +18,8 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/firebase';
 
 interface Policial {
   id: string;
@@ -83,44 +85,35 @@ const GestaoAcesso = () => {
   ];
 
   useEffect(() => {
-    // Carregar dados dos policiais do banco
+    // Carregar dados dos policiais do Firebase
     const carregarPoliciais = async () => {
       try {
-        // Simular carregamento - substituir por Firebase
-        const mockPoliciais: Policial[] = [
-          {
-            id: '1',
-            NOME: 'João Silva',
-            'Post/Grad': 'CAP',
-            Matrícula: 12345,
-            FUNÇÃO: 'CMT ESQ A',
-            primeiroAcesso: true,
-            acessos: {
+        const querySnapshot = await getDocs(collection(db, 'policiais'));
+        const policiaisData: Policial[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          policiaisData.push({
+            id: doc.id,
+            NOME: data.NOME,
+            'Post/Grad': data['Post/Grad'],
+            Matrícula: data.Matrícula,
+            FUNÇÃO: data.FUNÇÃO,
+            NUMERAL: data.NUMERAL,
+            primeiroAcesso: data.primeiroAcesso !== false, // Default true se não existir
+            senha: data.senha,
+            acessos: data.acessos || {
               reservaArmamento: false,
               guardaQuartel: false,
               gestaoLogistica: false,
               cavbot: false
             }
-          },
-          {
-            id: '2',
-            NOME: 'Maria Santos',
-            'Post/Grad': '1º SGT',
-            Matrícula: 67890,
-            NUMERAL: 123,
-            FUNÇÃO: 'ADJUNTO ESQ B',
-            primeiroAcesso: false,
-            senha: 'senha123',
-            acessos: {
-              reservaArmamento: true,
-              guardaQuartel: false,
-              gestaoLogistica: false,
-              cavbot: true
-            }
-          }
-        ];
-        setPoliciais(mockPoliciais);
+          });
+        });
+        
+        setPoliciais(policiaisData);
       } catch (error) {
+        console.error('Erro ao carregar policiais:', error);
         toast({
           title: "Erro",
           description: "Erro ao carregar dados dos policiais",
@@ -138,53 +131,86 @@ const GestaoAcesso = () => {
     policial.Matrícula.toString().includes(searchTerm)
   );
 
-  const handleAcessoToggle = (sistema: string, valor: boolean) => {
+  const handleAcessoToggle = async (sistema: string, valor: boolean) => {
     if (!selectedPolicial) return;
 
-    const updatedPoliciais = policiais.map(p => 
-      p.id === selectedPolicial.id 
-        ? { 
-            ...p, 
-            acessos: { 
-              ...p.acessos, 
-              [sistema]: valor 
-            } 
-          }
-        : p
-    );
+    try {
+      // Atualizar no Firebase
+      const policialRef = doc(db, 'policiais', selectedPolicial.id);
+      await updateDoc(policialRef, {
+        [`acessos.${sistema}`]: valor
+      });
 
-    setPoliciais(updatedPoliciais);
-    setSelectedPolicial(prev => prev ? {
-      ...prev,
-      acessos: { ...prev.acessos, [sistema]: valor }
-    } : null);
+      // Atualizar estado local
+      const updatedPoliciais = policiais.map(p => 
+        p.id === selectedPolicial.id 
+          ? { 
+              ...p, 
+              acessos: { 
+                ...p.acessos, 
+                [sistema]: valor 
+              } 
+            }
+          : p
+      );
 
-    toast({
-      title: "Acesso Atualizado",
-      description: `Acesso ao ${sistemas.find(s => s.id === sistema)?.nome} ${valor ? 'liberado' : 'removido'} para ${selectedPolicial.NOME}`,
-    });
+      setPoliciais(updatedPoliciais);
+      setSelectedPolicial(prev => prev ? {
+        ...prev,
+        acessos: { ...prev.acessos, [sistema]: valor }
+      } : null);
+
+      toast({
+        title: "Acesso Atualizado",
+        description: `Acesso ao ${sistemas.find(s => s.id === sistema)?.nome} ${valor ? 'liberado' : 'removido'} para ${selectedPolicial.NOME}`,
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar acesso:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar permissão",
+        variant: "destructive"
+      });
+    }
   };
 
-  const resetarSenha = () => {
+  const resetarSenha = async () => {
     if (!selectedPolicial) return;
 
-    const updatedPoliciais = policiais.map(p => 
-      p.id === selectedPolicial.id 
-        ? { ...p, senha: undefined, primeiroAcesso: true }
-        : p
-    );
+    try {
+      // Atualizar no Firebase
+      const policialRef = doc(db, 'policiais', selectedPolicial.id);
+      await updateDoc(policialRef, {
+        senha: null,
+        primeiroAcesso: true
+      });
 
-    setPoliciais(updatedPoliciais);
-    setSelectedPolicial(prev => prev ? {
-      ...prev,
-      senha: undefined,
-      primeiroAcesso: true
-    } : null);
+      // Atualizar estado local
+      const updatedPoliciais = policiais.map(p => 
+        p.id === selectedPolicial.id 
+          ? { ...p, senha: undefined, primeiroAcesso: true }
+          : p
+      );
 
-    toast({
-      title: "Senha Resetada",
-      description: `Senha resetada para ${selectedPolicial.NOME}. Próximo login será com a matrícula.`,
-    });
+      setPoliciais(updatedPoliciais);
+      setSelectedPolicial(prev => prev ? {
+        ...prev,
+        senha: undefined,
+        primeiroAcesso: true
+      } : null);
+
+      toast({
+        title: "Senha Resetada",
+        description: `Senha resetada para ${selectedPolicial.NOME}. Próximo login será com a matrícula.`,
+      });
+    } catch (error) {
+      console.error('Erro ao resetar senha:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao resetar senha",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
