@@ -22,7 +22,7 @@ interface Policial {
   FUNÇÃO?: string;
   IDADE?: number;
   'MUDANÇA COMPORTAMENTO'?: string;
-  Matrícula?: string;
+  Matrícula?: string | number;
   'MÊS ANIVERSARIO'?: number;
   NASCIMENTO?: number;
   NOME?: string;
@@ -73,7 +73,7 @@ const PolicialTable = () => {
 
   const filteredPoliciais = policiais.filter(policial =>
     (policial.NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (policial.Matrícula || '').includes(searchTerm) ||
+    (policial.Matrícula?.toString() || '').includes(searchTerm) ||
     (policial['Post/Grad'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (policial.NUMERAL?.toString() || '').includes(searchTerm)
   );
