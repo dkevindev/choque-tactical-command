@@ -18,7 +18,6 @@ import FrotaPage from '@/components/FrotaPage';
 import DocumentosPage from './DocumentosPaga';
 import OrdemServicoPage from '@/components/OrdemServicoPage';
 import GestaoAcesso from '@/components/GestaoAcesso';
-import GestãoPessoas from '@/components/GestãoPessoas';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -35,8 +34,6 @@ const AdminDashboard = () => {
         return <PolicialContent />;
       case 'gestao':
         return <GestaoContent />;
-      case 'gestao-pessoas':
-        return <GestãoPessoas />;
       case 'documentos':
         return <DocumentosContent />;
       case 'ordens-servico': // <--- Adicione este novo case

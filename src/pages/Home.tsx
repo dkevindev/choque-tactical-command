@@ -42,6 +42,16 @@ const Home = () => {
       requiresLogin: true
     },
     {
+      id: 'gestao-pessoas',
+      title: 'GESTÃO DE PESSOAS',
+      description: 'Sistema de gestão de efetivo',
+      icon: Users,
+      route: '/gestao-pessoas',
+      acessoKey: 'gestaoPessoas',
+      cor: 'bg-blue-600',
+      requiresLogin: false
+    },
+    {
       id: 'acesso-policial',
       title: 'ACESSO POLICIAL',
       description: 'Portal do policial',

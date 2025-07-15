@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { GripVertical, Users } from 'lucide-react';
+import { GripVertical, Users, Search, Filter } from 'lucide-react';
 import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +18,7 @@ interface Policial {
   'FUNÇÃO': string;
   Unidade: string;
   funcaoOrigem?: string;
+  Matrícula?: string;
 }
 
 interface FuncaoTabProps {
@@ -55,16 +58,28 @@ const FUNCOES_DISPONIVEIS = [
 
 const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFunction, setSelectedFunction] = useState('');
   const { toast } = useToast();
 
-  // Organizar policiais por função
+  // Filtrar policiais por busca
+  const filteredPoliciais = useMemo(() => {
+    if (!searchTerm) return policiais;
+    return policiais.filter(policial => 
+      policial.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      policial.Matrícula?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [policiais, searchTerm]);
+
+  // Organizar policiais por função (usando policiais filtrados)
   const policiaisPorFuncao = FUNCOES_DISPONIVEIS.reduce((acc, funcao) => {
-    acc[funcao] = policiais.filter(p => p['FUNÇÃO'] === funcao);
+    acc[funcao] = filteredPoliciais.filter(p => p['FUNÇÃO'] === funcao);
     return acc;
   }, {} as Record<string, Policial[]>);
 
-  // Policiais sem função definida ou com função não listada
-  const policiaisSemFuncao = policiais.filter(p => 
+  // Policiais sem função definida ou com função não listada (usando policiais filtrados)
+  const policiaisSemFuncao = filteredPoliciais.filter(p => 
     !p['FUNÇÃO'] || !FUNCOES_DISPONIVEIS.includes(p['FUNÇÃO'])
   );
 
@@ -117,21 +132,28 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`p-3 bg-white border rounded-lg shadow-sm mb-2 flex items-center gap-2 ${
-            snapshot.isDragging ? 'shadow-lg' : ''
+          className={`p-3 border rounded-lg shadow-sm mb-2 flex items-center gap-2 transition-all duration-200 ${
+            snapshot.isDragging 
+              ? 'shadow-lg bg-blue-50 border-blue-300' 
+              : 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200'
           }`}
         >
-          <GripVertical className="h-4 w-4 text-gray-400" />
+          <GripVertical className="h-4 w-4 text-blue-600" />
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="default" className="text-xs bg-blue-600 text-white">
                 {policial['Post/Grad']}
               </Badge>
-              <span className="font-medium text-sm">{policial.NOME}</span>
+              <span className="font-medium text-sm text-blue-900">{policial.NOME}</span>
             </div>
-            <div className="text-xs text-muted-foreground mt-1">
+            <div className="text-xs text-blue-700 mt-1">
               {policial.SITUAÇÃO}
             </div>
+            {policial.Matrícula && (
+              <div className="text-xs text-blue-600 mt-1">
+                Mat: {policial.Matrícula}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -157,16 +179,55 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
               A alteração será salva automaticamente no Firebase.
             </p>
           </div>
+
+          {/* Filtros de Busca */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <Label htmlFor="search-policial">Buscar Policial</Label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="search-policial"
+                  placeholder="Nome, graduação ou matrícula..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="filter-function">Filtrar por Função</Label>
+              <div className="relative">
+                <Filter className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="filter-function"
+                  placeholder="Ex: VIATURA, OFICIAL..."
+                  value={selectedFunction}
+                  onChange={(e) => setSelectedFunction(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+          </div>
+
+          {searchTerm && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800">
+                <strong>Resultado da busca:</strong> {filteredPoliciais.length} policial(is) encontrado(s)
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {/* Policiais sem função definida */}
-          <Card className="border-orange-200">
+          <Card className="border-2 border-orange-300 bg-orange-50">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-orange-800">
-                Sem Função Definida ({policiaisSemFuncao.length})
+              <CardTitle className="text-sm text-orange-800 font-bold">
+                ⚠️ Sem Função Definida ({policiaisSemFuncao.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -175,8 +236,10 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`min-h-[100px] p-2 rounded-lg ${
-                      snapshot.isDraggingOver ? 'bg-orange-100' : 'bg-orange-50'
+                    className={`min-h-[120px] p-3 rounded-lg border-2 border-dashed transition-all duration-200 ${
+                      snapshot.isDraggingOver 
+                        ? 'bg-orange-200 border-orange-400' 
+                        : 'bg-orange-100 border-orange-300'
                     }`}
                   >
                     {policiaisSemFuncao.map((policial, index) => (
@@ -184,7 +247,7 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
                     ))}
                     {provided.placeholder}
                     {policiaisSemFuncao.length === 0 && (
-                      <div className="text-center text-muted-foreground text-sm py-8">
+                      <div className="text-center text-orange-600 text-sm py-8 font-medium">
                         Nenhum policial sem função
                       </div>
                     )}
@@ -195,10 +258,15 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
           </Card>
 
           {/* Funções organizadas */}
-          {FUNCOES_DISPONIVEIS.map(funcao => (
-            <Card key={funcao}>
+          {FUNCOES_DISPONIVEIS
+            .filter(funcao => 
+              !selectedFunction || 
+              funcao.toLowerCase().includes(selectedFunction.toLowerCase())
+            )
+            .map(funcao => (
+            <Card key={funcao} className="border-2 border-blue-200 bg-blue-50">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">
+                <CardTitle className="text-sm text-blue-800 font-bold">
                   {funcao} ({policiaisPorFuncao[funcao]?.length || 0})
                 </CardTitle>
               </CardHeader>
@@ -208,8 +276,10 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`min-h-[100px] p-2 rounded-lg ${
-                        snapshot.isDraggingOver ? 'bg-blue-100' : 'bg-gray-50'
+                      className={`min-h-[120px] p-3 rounded-lg border-2 border-dashed transition-all duration-200 ${
+                        snapshot.isDraggingOver 
+                          ? 'bg-blue-200 border-blue-400' 
+                          : 'bg-blue-100 border-blue-300'
                       }`}
                     >
                       {policiaisPorFuncao[funcao]?.map((policial, index) => (
@@ -217,7 +287,7 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
                       ))}
                       {provided.placeholder}
                       {(!policiaisPorFuncao[funcao] || policiaisPorFuncao[funcao].length === 0) && (
-                        <div className="text-center text-muted-foreground text-sm py-8">
+                        <div className="text-center text-blue-600 text-sm py-8 font-medium">
                           Arraste policiais aqui
                         </div>
                       )}
@@ -240,11 +310,11 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
             {FUNCOES_DISPONIVEIS
               .filter(funcao => policiaisPorFuncao[funcao]?.length > 0)
               .map(funcao => (
-                <div key={funcao} className="text-center p-3 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold text-primary">
+                <div key={funcao} className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                  <div className="text-2xl font-bold text-blue-700">
                     {policiaisPorFuncao[funcao]?.length || 0}
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
+                  <div className="text-xs text-blue-600 mt-1 font-medium">
                     {funcao.length > 20 ? `${funcao.substring(0, 17)}...` : funcao}
                   </div>
                 </div>

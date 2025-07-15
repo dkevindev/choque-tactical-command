@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import LoginGestao from "./components/LoginGestao";
+import GestãoPessoas from "./components/GestãoPessoas";
 import CAVBot from "./components/CAVBot";
 import AdminDashboard from "./components/AdminDashboard";
 import UserDashboard from "./components/UserDashboard";
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/login-gestao" element={<LoginGestao />} />
           <Route path="/login-policial" element={<LoginGestao />} />
           <Route path="/cavbot" element={<CAVBot />} />
+          <Route path="/gestao-pessoas" element={<GestãoPessoas />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/user-dashboard" element={<UserDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
