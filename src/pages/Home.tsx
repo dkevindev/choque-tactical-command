@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, MessageSquare, Truck, Target, Users, FileText } from 'lucide-react';
+import { Shield, MessageSquare, Truck, Target, Users, FileText, Bot } from 'lucide-react';
 import cpchoqueLogo from '@/assets/cpchoque-logo.png';
+import LoginSistema from '@/components/LoginSistema';
 
 const Home = () => {
   const navigate = useNavigate();
+  const [sistemaLogin, setSistemaLogin] = useState<any>(null);
 
   const systems = [
     {
@@ -13,37 +16,68 @@ const Home = () => {
       title: 'RESERVA DE ARMAMENTO',
       description: 'Controle e reserva de armamentos',
       icon: Target,
-      route: '/reserva-armamento'
+      route: '/reserva-armamento',
+      acessoKey: 'reservaArmamento',
+      cor: 'bg-red-500',
+      requiresLogin: true
     },
     {
       id: 'guarda-quartel',
       title: 'GUARDA DO QUARTEL',
       description: 'Sistema de controle da guarda',
       icon: Shield,
-      route: '/guarda-quartel'
+      route: '/guarda-quartel',
+      acessoKey: 'guardaQuartel',
+      cor: 'bg-blue-500',
+      requiresLogin: true
     },
     {
       id: 'gestao-logistica',
       title: 'GESTÃO E LOGÍSTICA',
       description: 'Sistema administrativo completo',
-      icon: FileText,
-      route: '/login-gestao'
+      icon: Truck,
+      route: '/admin-dashboard',
+      acessoKey: 'gestaoLogistica',
+      cor: 'bg-green-500',
+      requiresLogin: true
     },
     {
       id: 'acesso-policial',
       title: 'ACESSO POLICIAL',
       description: 'Portal do policial',
       icon: Users,
-      route: '/login-policial'
+      route: '/user-dashboard',
+      acessoKey: 'acessoPolicial',
+      cor: 'bg-primary',
+      requiresLogin: true
     },
     {
       id: 'cavbot',
       title: 'CAVBOT',
       description: 'Assistente virtual inteligente',
-      icon: MessageSquare,
-      route: '/cavbot'
+      icon: Bot,
+      route: '/cavbot',
+      acessoKey: 'cavbot',
+      cor: 'bg-purple-500',
+      requiresLogin: false
     }
   ];
+
+  const handleSystemAccess = (system: any) => {
+    if (system.requiresLogin) {
+      setSistemaLogin({
+        id: system.acessoKey,
+        nome: system.title,
+        descricao: system.description,
+        icon: system.icon,
+        cor: system.cor,
+        rota: system.route,
+        acessoKey: system.acessoKey
+      });
+    } else {
+      navigate(system.route);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 font-military">
@@ -75,7 +109,7 @@ const Home = () => {
             <Card 
               key={system.id} 
               className="bg-card border-border shadow-tactical hover:shadow-tactical-glow transition-all duration-300 cursor-pointer"
-              onClick={() => navigate(system.route)}
+              onClick={() => handleSystemAccess(system)}
             >
               <CardHeader className="text-center pb-4">
                 <div className="flex justify-center mb-4">
@@ -95,7 +129,7 @@ const Home = () => {
                   className="w-full bg-primary hover:bg-tactical-light text-primary-foreground font-bold py-3 shadow-tactical transition-all duration-200"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(system.route);
+                    handleSystemAccess(system);
                   }}
                 >
                   ACESSAR
@@ -104,6 +138,14 @@ const Home = () => {
             </Card>
           ))}
         </div>
+
+        {/* Login Modal */}
+        {sistemaLogin && (
+          <LoginSistema 
+            sistema={sistemaLogin} 
+            onClose={() => setSistemaLogin(null)} 
+          />
+        )}
 
         {/* Footer */}
         <div className="text-center mt-12">
