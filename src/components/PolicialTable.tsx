@@ -71,12 +71,63 @@ const PolicialTable = () => {
     loadPoliciais();
   }, []);
 
+  const getPostGradOrder = (postGrad: string) => {
+    const hierarchy = {
+      'TEN CEL': 1,
+      'CAP': 2,
+      '1º TEN': 3,
+      '2º TEN': 4,
+      'SUBTEN': 5,
+      '1º SGT': 6,
+      '2º SGT': 7,
+      '3º SGT': 8,
+      'CB': 9,
+      'SD': 10
+    };
+    return hierarchy[postGrad as keyof typeof hierarchy] || 999;
+  };
+
+  const shouldCapComeFirst = (policial: Policial) => {
+    const funcao = policial.FUNÇÃO || '';
+    return funcao.includes('RESP SUBCOMANDO RPMONT') || funcao.includes('CMT');
+  };
+
   const filteredPoliciais = policiais.filter(policial =>
     (policial.NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (policial.Matrícula?.toString() || '').includes(searchTerm) ||
     (policial['Post/Grad'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (policial.NUMERAL?.toString() || '').includes(searchTerm)
-  );
+  ).sort((a, b) => {
+    const aPost = a['Post/Grad'] || '';
+    const bPost = b['Post/Grad'] || '';
+    
+    const aOrder = getPostGradOrder(aPost);
+    const bOrder = getPostGradOrder(bPost);
+    
+    // Se ambos são CAP, aplicar critério especial
+    if (aOrder === 2 && bOrder === 2) {
+      const aIsPriority = shouldCapComeFirst(a);
+      const bIsPriority = shouldCapComeFirst(b);
+      
+      if (aIsPriority && !bIsPriority) return -1;
+      if (!aIsPriority && bIsPriority) return 1;
+      
+      // Se ambos são prioritários ou ambos não são, usar numeral como desempate
+      return (a.NUMERAL || 0) - (b.NUMERAL || 0);
+    }
+    
+    // Se posts diferentes, usar hierarquia
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+    
+    // Se mesmo post e a partir de 1º SGT, usar numeral como desempate
+    if (aOrder >= 6) {
+      return (a.NUMERAL || 0) - (b.NUMERAL || 0);
+    }
+    
+    return 0;
+  });
 
   const getStatusBadge = (situacao: string) => {
     const status = situacao?.toLowerCase() || '';
