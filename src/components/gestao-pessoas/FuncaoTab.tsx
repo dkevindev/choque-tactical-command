@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { GripVertical, Users, Search, Filter } from 'lucide-react';
+import { GripVertical, Users, Search, Filter, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Policial {
   id: string;
@@ -60,6 +61,8 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFunction, setSelectedFunction] = useState('');
+  const [showEmptyFunctions, setShowEmptyFunctions] = useState(false);
+  const [collapsedFunctions, setCollapsedFunctions] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   // Filtrar policiais por busca
@@ -82,6 +85,20 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
   const policiaisSemFuncao = filteredPoliciais.filter(p => 
     !p['FUNÇÃO'] || !FUNCOES_DISPONIVEIS.includes(p['FUNÇÃO'])
   );
+
+  // Funções para exibir (apenas com policiais ou se mostrar vazias estiver habilitado)
+  const funcoesParaExibir = FUNCOES_DISPONIVEIS.filter(funcao => {
+    const temPoliciais = policiaisPorFuncao[funcao]?.length > 0;
+    const matchesFilter = !selectedFunction || funcao.toLowerCase().includes(selectedFunction.toLowerCase());
+    return matchesFilter && (temPoliciais || showEmptyFunctions);
+  });
+
+  const toggleFunctionCollapse = (funcao: string) => {
+    setCollapsedFunctions(prev => ({
+      ...prev,
+      [funcao]: !prev[funcao]
+    }));
+  };
 
   const handleDragEnd = async (result: any) => {
     const { destination, source, draggableId } = result;
@@ -181,7 +198,7 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
           </div>
 
           {/* Filtros de Busca */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div>
               <Label htmlFor="search-policial">Buscar Policial</Label>
               <div className="relative">
@@ -209,6 +226,19 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
                 />
               </div>
             </div>
+
+            <div>
+              <Label>Opções de Visualização</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEmptyFunctions(!showEmptyFunctions)}
+                className="w-full"
+              >
+                {showEmptyFunctions ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                {showEmptyFunctions ? 'Ocultar' : 'Mostrar'} Funções Vazias
+              </Button>
+            </div>
           </div>
 
           {searchTerm && (
@@ -222,81 +252,98 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
       </Card>
 
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="space-y-4">
           {/* Policiais sem função definida */}
-          <Card className="border-2 border-orange-300 bg-orange-50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-orange-800 font-bold">
-                ⚠️ Sem Função Definida ({policiaisSemFuncao.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Droppable droppableId="SEM_FUNCAO">
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={`min-h-[120px] p-3 rounded-lg border-2 border-dashed transition-all duration-200 ${
-                      snapshot.isDraggingOver 
-                        ? 'bg-orange-200 border-orange-400' 
-                        : 'bg-orange-100 border-orange-300'
-                    }`}
-                  >
-                    {policiaisSemFuncao.map((policial, index) => (
-                      <PolicialCard key={policial.id} policial={policial} index={index} />
-                    ))}
-                    {provided.placeholder}
-                    {policiaisSemFuncao.length === 0 && (
-                      <div className="text-center text-orange-600 text-sm py-8 font-medium">
-                        Nenhum policial sem função
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Droppable>
-            </CardContent>
-          </Card>
-
-          {/* Funções organizadas */}
-          {FUNCOES_DISPONIVEIS
-            .filter(funcao => 
-              !selectedFunction || 
-              funcao.toLowerCase().includes(selectedFunction.toLowerCase())
-            )
-            .map(funcao => (
-            <Card key={funcao} className="border-2 border-blue-200 bg-blue-50">
+          {policiaisSemFuncao.length > 0 && (
+            <Card className="border-2 border-orange-300 bg-orange-50">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm text-blue-800 font-bold">
-                  {funcao} ({policiaisPorFuncao[funcao]?.length || 0})
+                <CardTitle className="text-sm text-orange-800 font-bold">
+                  ⚠️ Sem Função Definida ({policiaisSemFuncao.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Droppable droppableId={funcao}>
+                <Droppable droppableId="SEM_FUNCAO">
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={`min-h-[120px] p-3 rounded-lg border-2 border-dashed transition-all duration-200 ${
                         snapshot.isDraggingOver 
-                          ? 'bg-blue-200 border-blue-400' 
-                          : 'bg-blue-100 border-blue-300'
+                          ? 'bg-orange-200 border-orange-400' 
+                          : 'bg-orange-100 border-orange-300'
                       }`}
                     >
-                      {policiaisPorFuncao[funcao]?.map((policial, index) => (
+                      {policiaisSemFuncao.map((policial, index) => (
                         <PolicialCard key={policial.id} policial={policial} index={index} />
                       ))}
                       {provided.placeholder}
-                      {(!policiaisPorFuncao[funcao] || policiaisPorFuncao[funcao].length === 0) && (
-                        <div className="text-center text-blue-600 text-sm py-8 font-medium">
-                          Arraste policiais aqui
-                        </div>
-                      )}
                     </div>
                   )}
                 </Droppable>
               </CardContent>
             </Card>
-          ))}
+          )}
+
+          {/* Funções organizadas - Layout vertical compacto */}
+          <div className="space-y-3">
+            {funcoesParaExibir.map(funcao => (
+              <Collapsible
+                key={funcao}
+                open={!collapsedFunctions[funcao]}
+                onOpenChange={() => toggleFunctionCollapse(funcao)}
+              >
+                <Card className="border-2 border-blue-200 bg-blue-50">
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="pb-3 cursor-pointer hover:bg-blue-100 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm text-blue-800 font-bold">
+                          {funcao} ({policiaisPorFuncao[funcao]?.length || 0})
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {policiaisPorFuncao[funcao]?.length || 0} policiais
+                          </Badge>
+                          {collapsedFunctions[funcao] ? (
+                            <ChevronDown className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <ChevronUp className="h-4 w-4 text-blue-600" />
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent>
+                    <CardContent>
+                      <Droppable droppableId={funcao}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={`min-h-[80px] p-3 rounded-lg border-2 border-dashed transition-all duration-200 ${
+                              snapshot.isDraggingOver 
+                                ? 'bg-blue-200 border-blue-400' 
+                                : 'bg-blue-100 border-blue-300'
+                            }`}
+                          >
+                            {policiaisPorFuncao[funcao]?.map((policial, index) => (
+                              <PolicialCard key={policial.id} policial={policial} index={index} />
+                            ))}
+                            {provided.placeholder}
+                            {(!policiaisPorFuncao[funcao] || policiaisPorFuncao[funcao].length === 0) && (
+                              <div className="text-center text-blue-600 text-sm py-4 font-medium">
+                                Arraste policiais aqui
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </Droppable>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            ))}
+          </div>
         </div>
       </DragDropContext>
 
