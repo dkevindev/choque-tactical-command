@@ -68,7 +68,7 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
     return policiais.filter(policial => 
       policial.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      policial.Matrícula?.toLowerCase().includes(searchTerm.toLowerCase())
+      String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [policiais, searchTerm]);
 
