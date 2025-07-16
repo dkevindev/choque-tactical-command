@@ -64,7 +64,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
   
   // Estados para filtros
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterSituacao, setFilterSituacao] = useState('');
+  const [filterSituacao, setFilterSituacao] = useState('all');
   
   const { toast } = useToast();
 

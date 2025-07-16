@@ -40,7 +40,7 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
   
   // Estados para filtros
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterSituacao, setFilterSituacao] = useState('');
+  const [filterSituacao, setFilterSituacao] = useState('all');
   
   const { toast } = useToast();
 
