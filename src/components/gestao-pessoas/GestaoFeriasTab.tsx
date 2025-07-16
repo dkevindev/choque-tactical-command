@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, CalendarDays, Users } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar, CalendarDays, Users, Search, Filter } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { doc, updateDoc, collection, writeBatch } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -18,6 +19,7 @@ interface Policial {
   SITUAÇÃO: string;
   'FUNÇÃO': string;
   Unidade: string;
+  Matrícula?: string;
   inicioFerias?: string;
   fimFerias?: string;
   funcaoOrigem?: string;
@@ -35,19 +37,54 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
   const [fimFerias, setFimFerias] = useState('');
   const [publicacaoFerias, setPublicacaoFerias] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Estados para filtros
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterSituacao, setFilterSituacao] = useState('');
+  
   const { toast } = useToast();
 
   // Policiais que NÃO estão de férias
-  const policiaisDisponiveis = policiais.filter(p => 
-    !p.SITUAÇÃO?.toLowerCase().includes('férias') && 
-    !p.SITUAÇÃO?.toLowerCase().includes('ferias')
-  );
+  const policiaisDisponiveis = useMemo(() => {
+    return policiais.filter(p => 
+      !p.SITUAÇÃO?.toLowerCase().includes('férias') && 
+      !p.SITUAÇÃO?.toLowerCase().includes('ferias')
+    );
+  }, [policiais]);
 
   // Policiais que estão de férias
-  const policiaisFerias = policiais.filter(p => 
-    p.SITUAÇÃO?.toLowerCase().includes('férias') || 
-    p.SITUAÇÃO?.toLowerCase().includes('ferias')
-  );
+  const policiaisFerias = useMemo(() => {
+    return policiais.filter(p => 
+      p.SITUAÇÃO?.toLowerCase().includes('férias') || 
+      p.SITUAÇÃO?.toLowerCase().includes('ferias')
+    );
+  }, [policiais]);
+
+  // Policiais filtrados para disponíveis
+  const policiaisDisponiveisFiltrados = useMemo(() => {
+    return policiaisDisponiveis.filter(policial => {
+      const matchesSearch = !searchTerm || 
+        policial.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesSituacao = !filterSituacao || policial.SITUAÇÃO === filterSituacao;
+      
+      return matchesSearch && matchesSituacao;
+    });
+  }, [policiaisDisponiveis, searchTerm, filterSituacao]);
+
+  // Policiais filtrados para férias
+  const policiaisFeriasFiltrados = useMemo(() => {
+    return policiaisFerias.filter(policial => {
+      const matchesSearch = !searchTerm || 
+        policial.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      return matchesSearch;
+    });
+  }, [policiaisFerias, searchTerm]);
 
   const handleSelectPolicial = (policialId: string, checked: boolean) => {
     if (checked) {
@@ -154,6 +191,56 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
 
   return (
     <div className="space-y-6">
+      {/* Filtros */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filtros
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label>Buscar por Nome/Graduação/Matrícula</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Digite para buscar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Filtrar por Situação</Label>
+              <Select value={filterSituacao} onValueChange={setFilterSituacao}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as situações" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas as situações</SelectItem>
+                  <SelectItem value="MONTADO - POLICIAMENTO OSTENSIVO">Montado</SelectItem>
+                  <SelectItem value="FÉRIAS">Férias</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterSituacao('');
+                }}
+              >
+                Limpar Filtros
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Colocar de Férias */}
         <Card>
@@ -200,7 +287,7 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
 
             <div className="max-h-60 overflow-y-auto border rounded-lg p-4 space-y-2">
               <Label>Selecionar Policiais ({selectedPoliciais.length} selecionados)</Label>
-              {policiaisDisponiveis.map((policial) => (
+              {policiaisDisponiveisFiltrados.map((policial) => (
                 <div key={policial.id} className="flex items-center space-x-2">
                   <Checkbox
                     id={`policial-${policial.id}`}
@@ -214,6 +301,9 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
                   >
                     {policial['Post/Grad']} {policial.NOME}
+                    {policial.Matrícula && (
+                      <span className="text-muted-foreground ml-2">({policial.Matrícula})</span>
+                    )}
                   </label>
                 </div>
               ))}
@@ -234,7 +324,7 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Policiais de Férias ({policiaisFerias.length})
+              Policiais de Férias ({policiaisFeriasFiltrados.length})
             </CardTitle>
             <CardDescription>
               Policiais atualmente de férias
@@ -242,12 +332,12 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {policiaisFerias.length === 0 ? (
+              {policiaisFeriasFiltrados.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   Nenhum policial de férias no momento
                 </p>
               ) : (
-                policiaisFerias.map((policial) => (
+                policiaisFeriasFiltrados.map((policial) => (
                   <div key={policial.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex-1">
                       <p className="font-medium">{policial['Post/Grad']} {policial.NOME}</p>

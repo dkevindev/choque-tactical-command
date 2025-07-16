@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircle, Calendar, Users, Bell } from 'lucide-react';
-import { doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { AlertCircle, Calendar, Users, Bell, Search, Filter } from 'lucide-react';
+import { doc, updateDoc, writeBatch, collection, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, isWithinInterval, addDays } from 'date-fns';
@@ -20,9 +21,12 @@ interface Policial {
   SITUAÇÃO: string;
   'FUNÇÃO': string;
   Unidade: string;
+  Matrícula?: string;
   inicioSituacao?: string;
   fimSituacao?: string;
   observacaoSituacao?: string;
+  funcaoOrigem?: string;
+  publicacaoSituacao?: string;
 }
 
 interface SituacaoTabProps {
@@ -55,12 +59,63 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
   const [inicioSituacao, setInicioSituacao] = useState('');
   const [fimSituacao, setFimSituacao] = useState('');
   const [observacao, setObservacao] = useState('');
+  const [publicacao, setPublicacao] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showBulkDialog, setShowBulkDialog] = useState(false);
+  
+  // Estados para filtros
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterSituacao, setFilterSituacao] = useState('');
+  
   const { toast } = useToast();
 
+  // Policiais que NÃO estão em situação especial (montados)
+  const policiaisDisponiveis = useMemo(() => {
+    return policiais.filter(p => 
+      p.SITUAÇÃO === 'MONTADO - POLICIAMENTO OSTENSIVO' ||
+      !p.SITUAÇÃO ||
+      p.SITUAÇÃO === 'VIATURA'
+    );
+  }, [policiais]);
+
+  // Policiais em situação especial
+  const policiaisEmSituacao = useMemo(() => {
+    return policiais.filter(p => 
+      p.SITUAÇÃO !== 'MONTADO - POLICIAMENTO OSTENSIVO' &&
+      p.SITUAÇÃO !== 'VIATURA' &&
+      p.SITUAÇÃO
+    );
+  }, [policiais]);
+
+  // Policiais filtrados para disponíveis
+  const policiaisDisponiveisFiltrados = useMemo(() => {
+    return policiaisDisponiveis.filter(policial => {
+      const matchesSearch = !searchTerm || 
+        policial.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesSituacao = !filterSituacao || policial.SITUAÇÃO === filterSituacao;
+      
+      return matchesSearch && matchesSituacao;
+    });
+  }, [policiaisDisponiveis, searchTerm, filterSituacao]);
+
+  // Policiais filtrados para em situação
+  const policiaisEmSituacaoFiltrados = useMemo(() => {
+    return policiaisEmSituacao.filter(policial => {
+      const matchesSearch = !searchTerm || 
+        policial.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesSituacao = !filterSituacao || policial.SITUAÇÃO === filterSituacao;
+      
+      return matchesSearch && matchesSituacao;
+    });
+  }, [policiaisEmSituacao, searchTerm, filterSituacao]);
+
   // Policiais com situações que têm data de fim próxima (próximos 7 dias)
-  const alertasSituacao = policiais.filter(policial => {
+  const alertasSituacao = policiaisEmSituacao.filter(policial => {
     if (!policial.fimSituacao) return false;
     try {
       const fimData = parseISO(policial.fimSituacao);
@@ -72,41 +127,28 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
     }
   });
 
-  const handleUpdateSituacao = async (policialId: string, dadosSituacao: any) => {
-    setLoading(true);
-    try {
-      const policialRef = doc(db, 'policiais', policialId);
-      await updateDoc(policialRef, {
-        SITUAÇÃO: dadosSituacao.situacao,
-        inicioSituacao: dadosSituacao.inicio,
-        fimSituacao: dadosSituacao.fim || null,
-        observacaoSituacao: dadosSituacao.observacao || ''
-      });
-
-      const policial = policiais.find(p => p.id === policialId);
-      toast({
-        title: "Sucesso",
-        description: `Situação de ${policial?.NOME} atualizada`
-      });
-
-      onUpdate();
-    } catch (error) {
-      console.error('Erro ao atualizar situação:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar situação",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
+  const handleSelectPolicial = (policialId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedPoliciais([...selectedPoliciais, policialId]);
+    } else {
+      setSelectedPoliciais(selectedPoliciais.filter(id => id !== policialId));
     }
   };
 
-  const handleBulkUpdateSituacao = async () => {
-    if (selectedPoliciais.length === 0 || !novaSituacao) {
+  const handleColocarSituacao = async () => {
+    if (selectedPoliciais.length === 0) {
       toast({
         title: "Erro",
-        description: "Selecione policiais e uma situação",
+        description: "Selecione pelo menos um policial",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!novaSituacao || !inicioSituacao) {
+      toast({
+        title: "Erro",
+        description: "Informe a situação e data de início",
         variant: "destructive"
       });
       return;
@@ -116,21 +158,43 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
     try {
       const batch = writeBatch(db);
 
-      selectedPoliciais.forEach(policialId => {
-        const policialRef = doc(db, 'policiais', policialId);
-        batch.update(policialRef, {
-          SITUAÇÃO: novaSituacao,
-          inicioSituacao: inicioSituacao,
-          fimSituacao: fimSituacao || null,
-          observacaoSituacao: observacao || ''
-        });
-      });
+      for (const policialId of selectedPoliciais) {
+        const policial = policiais.find(p => p.id === policialId);
+        if (policial) {
+          const policialRef = doc(db, 'policiais', policialId);
+          batch.update(policialRef, {
+            SITUAÇÃO: novaSituacao,
+            inicioSituacao,
+            fimSituacao: fimSituacao || null,
+            observacaoSituacao: observacao || '',
+            publicacaoSituacao: publicacao || '',
+            funcaoOrigem: policial['FUNÇÃO'] || 'VIATURA'
+          });
+
+          // Salvar na coleção específica da situação
+          const situacaoCollectionName = `situacao_${novaSituacao.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '')}`;
+          const situacaoRef = collection(db, situacaoCollectionName);
+          await addDoc(situacaoRef, {
+            policialId,
+            nome: policial.NOME,
+            postGrad: policial['Post/Grad'],
+            situacao: novaSituacao,
+            dataEntrada: inicioSituacao,
+            dataSaida: null,
+            observacao: observacao || '',
+            publicacao: publicacao || '',
+            funcaoOrigem: policial['FUNÇÃO'] || 'VIATURA',
+            status: 'ATIVO',
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
 
       await batch.commit();
 
       toast({
         title: "Sucesso",
-        description: `Situação de ${selectedPoliciais.length} policial(is) atualizada`
+        description: `${selectedPoliciais.length} policial(is) colocado(s) em ${novaSituacao}`
       });
 
       // Reset form
@@ -139,13 +203,67 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
       setInicioSituacao('');
       setFimSituacao('');
       setObservacao('');
-      setShowBulkDialog(false);
+      setPublicacao('');
       onUpdate();
     } catch (error) {
-      console.error('Erro ao atualizar situações:', error);
+      console.error('Erro ao colocar policiais em situação:', error);
       toast({
         title: "Erro",
-        description: "Erro ao atualizar situações",
+        description: "Erro ao processar solicitação",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRetirarSituacao = async (policialId: string) => {
+    setLoading(true);
+    try {
+      const policial = policiais.find(p => p.id === policialId);
+      if (!policial) return;
+
+      const policialRef = doc(db, 'policiais', policialId);
+      await updateDoc(policialRef, {
+        SITUAÇÃO: 'MONTADO - POLICIAMENTO OSTENSIVO',
+        'FUNÇÃO': policial.funcaoOrigem || 'VIATURA',
+        inicioSituacao: null,
+        fimSituacao: null,
+        observacaoSituacao: null,
+        publicacaoSituacao: null
+      });
+
+      // Atualizar na coleção específica da situação
+      const situacaoAtual = policial.SITUAÇÃO;
+      if (situacaoAtual) {
+        const situacaoCollectionName = `situacao_${situacaoAtual.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '')}`;
+        const situacaoRef = collection(db, situacaoCollectionName);
+        await addDoc(situacaoRef, {
+          policialId,
+          nome: policial.NOME,
+          postGrad: policial['Post/Grad'],
+          situacao: situacaoAtual,
+          dataEntrada: policial.inicioSituacao || '',
+          dataSaida: new Date().toISOString().split('T')[0],
+          observacao: policial.observacaoSituacao || '',
+          publicacao: policial.publicacaoSituacao || '',
+          funcaoOrigem: policial.funcaoOrigem || 'VIATURA',
+          status: 'INATIVO',
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      toast({
+        title: "Sucesso",
+        description: `${policial.NOME} retirado da situação`
+      });
+
+      onUpdate();
+    } catch (error) {
+      console.error('Erro ao retirar policial da situação:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao processar solicitação",
         variant: "destructive"
       });
     } finally {
@@ -192,129 +310,75 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
         </Card>
       )}
 
-      {/* Atualização em Lote */}
+      {/* Filtros */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Atualizar Situação (Múltiplos Policiais)
+            <Filter className="h-5 w-5" />
+            Filtros
           </CardTitle>
-          <CardDescription>
-            Selecione vários policiais para alterar a situação de uma vez
-          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={() => setShowBulkDialog(true)}>
-            Atualizar em Lote ({selectedPoliciais.length} selecionados)
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Tabela de Policiais */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Situação Atual dos Policiais</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <input
-                    type="checkbox"
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedPoliciais(policiais.map(p => p.id));
-                      } else {
-                        setSelectedPoliciais([]);
-                      }
-                    }}
-                    checked={selectedPoliciais.length === policiais.length}
-                  />
-                </TableHead>
-                <TableHead>Post/Grad</TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>Situação Atual</TableHead>
-                <TableHead>Início</TableHead>
-                <TableHead>Fim</TableHead>
-                <TableHead>Observação</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {policiais.map(policial => (
-                <TableRow key={policial.id}>
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      checked={selectedPoliciais.includes(policial.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedPoliciais([...selectedPoliciais, policial.id]);
-                        } else {
-                          setSelectedPoliciais(selectedPoliciais.filter(id => id !== policial.id));
-                        }
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>{policial['Post/Grad']}</TableCell>
-                  <TableCell>{policial.NOME}</TableCell>
-                  <TableCell>
-                    <Badge variant={getBadgeVariant(policial.SITUAÇÃO)}>
-                      {policial.SITUAÇÃO}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {policial.inicioSituacao ? format(parseISO(policial.inicioSituacao), 'dd/MM/yyyy') : '-'}
-                  </TableCell>
-                  <TableCell>
-                    {policial.fimSituacao ? format(parseISO(policial.fimSituacao), 'dd/MM/yyyy') : '-'}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {policial.observacaoSituacao || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          Editar
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Alterar Situação</DialogTitle>
-                          <DialogDescription>
-                            {policial['Post/Grad']} {policial.NOME}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <EditSituacaoForm
-                          policial={policial}
-                          onSave={(dados) => handleUpdateSituacao(policial.id, dados)}
-                          loading={loading}
-                        />
-                      </DialogContent>
-                    </Dialog>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Dialog de Atualização em Lote */}
-      <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Atualizar Situação em Lote</DialogTitle>
-            <DialogDescription>
-              Alterar situação de {selectedPoliciais.length} policial(is) selecionado(s)
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <Label>Nova Situação</Label>
+              <Label>Buscar por Nome/Graduação/Matrícula</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Digite para buscar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Filtrar por Situação</Label>
+              <Select value={filterSituacao} onValueChange={setFilterSituacao}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as situações" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas as situações</SelectItem>
+                  <SelectItem value="MONTADO - POLICIAMENTO OSTENSIVO">Montado</SelectItem>
+                  {SITUACOES_DISPONIVEIS.map(situacao => (
+                    <SelectItem key={situacao} value={situacao}>
+                      {situacao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterSituacao('');
+                }}
+              >
+                Limpar Filtros
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Colocar em Situação */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Colocar em Situação
+            </CardTitle>
+            <CardDescription>
+              Selecione os policiais e a situação
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Situação</Label>
               <Select value={novaSituacao} onValueChange={setNovaSituacao}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma situação" />
@@ -331,16 +395,18 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Data de Início</Label>
+                <Label htmlFor="inicio">Data de Início</Label>
                 <Input
+                  id="inicio"
                   type="date"
                   value={inicioSituacao}
                   onChange={(e) => setInicioSituacao(e.target.value)}
                 />
               </div>
               <div>
-                <Label>Data de Fim (opcional)</Label>
+                <Label htmlFor="fim">Data de Fim (opcional)</Label>
                 <Input
+                  id="fim"
                   type="date"
                   value={fimSituacao}
                   onChange={(e) => setFimSituacao(e.target.value)}
@@ -349,103 +415,127 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
             </div>
 
             <div>
-              <Label>Observação (opcional)</Label>
+              <Label htmlFor="publicacao">Publicação (opcional)</Label>
               <Input
+                id="publicacao"
                 placeholder="Ex: Portaria nº 123/2024"
+                value={publicacao}
+                onChange={(e) => setPublicacao(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="observacao">Observação (opcional)</Label>
+              <Input
+                id="observacao"
+                placeholder="Observações adicionais"
                 value={observacao}
                 onChange={(e) => setObservacao(e.target.value)}
               />
             </div>
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBulkDialog(false)}>
-              Cancelar
+            <div className="max-h-60 overflow-y-auto border rounded-lg p-4 space-y-2">
+              <Label>Selecionar Policiais ({selectedPoliciais.length} selecionados)</Label>
+              {policiaisDisponiveisFiltrados.map((policial) => (
+                <div key={policial.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`policial-${policial.id}`}
+                    checked={selectedPoliciais.includes(policial.id)}
+                    onCheckedChange={(checked) => 
+                      handleSelectPolicial(policial.id, checked as boolean)
+                    }
+                  />
+                  <label
+                    htmlFor={`policial-${policial.id}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                  >
+                    {policial['Post/Grad']} {policial.NOME}
+                    {policial.Matrícula && (
+                      <span className="text-muted-foreground ml-2">({policial.Matrícula})</span>
+                    )}
+                  </label>
+                </div>
+              ))}
+            </div>
+
+            <Button 
+              onClick={handleColocarSituacao} 
+              disabled={loading || selectedPoliciais.length === 0}
+              className="w-full"
+            >
+              {loading ? "Processando..." : `Colocar ${selectedPoliciais.length} Policial(is) em Situação`}
             </Button>
-            <Button onClick={handleBulkUpdateSituacao} disabled={loading}>
-              {loading ? "Atualizando..." : "Confirmar Alteração"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+
+        {/* Policiais em Situação */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Policiais em Situação ({policiaisEmSituacaoFiltrados.length})
+            </CardTitle>
+            <CardDescription>
+              Policiais atualmente em situação especial
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {policiaisEmSituacaoFiltrados.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  Nenhum policial em situação especial no momento
+                </p>
+              ) : (
+                policiaisEmSituacaoFiltrados.map((policial) => (
+                  <div key={policial.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium">{policial['Post/Grad']} {policial.NOME}</p>
+                      <Badge variant={getBadgeVariant(policial.SITUAÇÃO)} className="mt-1">
+                        {policial.SITUAÇÃO}
+                      </Badge>
+                      <div className="flex gap-2 mt-2">
+                        {policial.inicioSituacao && (
+                          <Badge variant="outline" className="text-xs">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(policial.inicioSituacao).toLocaleDateString()} 
+                            {policial.fimSituacao && ` - ${new Date(policial.fimSituacao).toLocaleDateString()}`}
+                          </Badge>
+                        )}
+                        {policial.publicacaoSituacao && (
+                          <Badge variant="secondary" className="text-xs">
+                            {policial.publicacaoSituacao}
+                          </Badge>
+                        )}
+                      </div>
+                      {policial.observacaoSituacao && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {policial.observacaoSituacao}
+                        </p>
+                      )}
+                      {policial.funcaoOrigem && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Função original: {policial.funcaoOrigem}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRetirarSituacao(policial.id)}
+                      disabled={loading}
+                    >
+                      Retirar da Situação
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
 
-// Componente para editar situação individual
-const EditSituacaoForm: React.FC<{
-  policial: Policial;
-  onSave: (dados: any) => void;
-  loading: boolean;
-}> = ({ policial, onSave, loading }) => {
-  const [situacao, setSituacao] = useState(policial.SITUAÇÃO || '');
-  const [inicio, setInicio] = useState(policial.inicioSituacao || '');
-  const [fim, setFim] = useState(policial.fimSituacao || '');
-  const [observacao, setObservacao] = useState(policial.observacaoSituacao || '');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave({
-      situacao,
-      inicio,
-      fim,
-      observacao
-    });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label>Situação</Label>
-        <Select value={situacao} onValueChange={setSituacao}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione uma situação" />
-          </SelectTrigger>
-          <SelectContent>
-            {SITUACOES_DISPONIVEIS.map(sit => (
-              <SelectItem key={sit} value={sit}>
-                {sit}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Data de Início</Label>
-          <Input
-            type="date"
-            value={inicio}
-            onChange={(e) => setInicio(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label>Data de Fim (opcional)</Label>
-          <Input
-            type="date"
-            value={fim}
-            onChange={(e) => setFim(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label>Observação</Label>
-        <Input
-          placeholder="Ex: Portaria nº 123/2024"
-          value={observacao}
-          onChange={(e) => setObservacao(e.target.value)}
-        />
-      </div>
-
-      <DialogFooter>
-        <Button type="submit" disabled={loading}>
-          {loading ? "Salvando..." : "Salvar"}
-        </Button>
-      </DialogFooter>
-    </form>
-  );
-};
 
 export default SituacaoTab;
