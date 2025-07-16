@@ -94,7 +94,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
         policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesSituacao = !filterSituacao || policial.SITUAÇÃO === filterSituacao;
+      const matchesSituacao = filterSituacao === 'all' || !filterSituacao || policial.SITUAÇÃO === filterSituacao;
       
       return matchesSearch && matchesSituacao;
     });
@@ -108,7 +108,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
         policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesSituacao = !filterSituacao || policial.SITUAÇÃO === filterSituacao;
+      const matchesSituacao = filterSituacao === 'all' || !filterSituacao || policial.SITUAÇÃO === filterSituacao;
       
       return matchesSearch && matchesSituacao;
     });
@@ -339,7 +339,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
                   <SelectValue placeholder="Todas as situações" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as situações</SelectItem>
+                  <SelectItem value="all">Todas as situações</SelectItem>
                   <SelectItem value="MONTADO - POLICIAMENTO OSTENSIVO">Montado</SelectItem>
                   {SITUACOES_DISPONIVEIS.map(situacao => (
                     <SelectItem key={situacao} value={situacao}>
@@ -354,7 +354,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
                 variant="outline" 
                 onClick={() => {
                   setSearchTerm('');
-                  setFilterSituacao('');
+                  setFilterSituacao('all');
                 }}
               >
                 Limpar Filtros

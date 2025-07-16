@@ -68,7 +68,7 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
         policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesSituacao = !filterSituacao || policial.SITUAÇÃO === filterSituacao;
+      const matchesSituacao = filterSituacao === 'all' || !filterSituacao || policial.SITUAÇÃO === filterSituacao;
       
       return matchesSearch && matchesSituacao;
     });
@@ -220,7 +220,7 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
                   <SelectValue placeholder="Todas as situações" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as situações</SelectItem>
+                  <SelectItem value="all">Todas as situações</SelectItem>
                   <SelectItem value="MONTADO - POLICIAMENTO OSTENSIVO">Montado</SelectItem>
                   <SelectItem value="FÉRIAS">Férias</SelectItem>
                 </SelectContent>
@@ -231,7 +231,7 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
                 variant="outline" 
                 onClick={() => {
                   setSearchTerm('');
-                  setFilterSituacao('');
+                  setFilterSituacao('all');
                 }}
               >
                 Limpar Filtros
