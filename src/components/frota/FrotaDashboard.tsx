@@ -235,8 +235,15 @@ const FrotaDashboard = () => {
         .reduce((total, os) => total + (os.valorTotal || 0), 0);
 
       // Buscar cota da frota pesada
-      const gestaoSaldosSnapshot = await getDocs(collection(db, 'gestaoSaldos'));
-      const cotaFrotaPesada = gestaoSaldosSnapshot.docs.find(doc => doc.data().tipo === 'frota_pesada')?.data()?.saldoMensal || 0;
+      const gestaoSaldosSnapshot = await getDocs(collection(db, 'saldosViaturas'));
+      console.log('Documentos encontrados:', gestaoSaldosSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() })));
+      
+      const docFrotaPesada = gestaoSaldosSnapshot.docs.find(doc => doc.data().tipo === 'frota_pesada');
+      console.log('Documento frota pesada encontrado:', docFrotaPesada?.data());
+      
+      const cotaFrotaPesada = docFrotaPesada?.data()?.saldoMensal || 0;
+      console.log('Cota frota pesada:', cotaFrotaPesada);
+      console.log('Saldo usado frota pesada:', saldoUsadoFrotaPesada);
 
       // Criar/atualizar registros na coleção saldoOficina
       for (const viatura of viaturas) {
