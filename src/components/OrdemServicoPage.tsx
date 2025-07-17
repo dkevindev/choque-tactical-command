@@ -77,6 +77,7 @@ const OrdemServicoPage = () => {
   // --- Estados para Filtros ---
   const [searchViatura, setSearchViatura] = useState('');
   const [searchDefeito, setSearchDefeito] = useState('');
+  const [searchNumeroOS, setSearchNumeroOS] = useState('');
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [selectedMonthYear, setSelectedMonthYear] = useState('all');
   const monthYearOptions = useMemo(() => getMonthYearOptions(), []);
@@ -120,16 +121,21 @@ const OrdemServicoPage = () => {
       let filteredDocs = fetchedDocs;
       const lowerSearchViatura = searchViatura.trim().toLowerCase();
       const lowerSearchDefeito = searchDefeito.trim().toLowerCase();
+      const lowerSearchNumeroOS = searchNumeroOS.trim().toLowerCase();
 
-      if (lowerSearchViatura || lowerSearchDefeito) {
+      if (lowerSearchViatura || lowerSearchDefeito || lowerSearchNumeroOS) {
         filteredDocs = fetchedDocs.filter(os => {
           const viaturaData = `${os.cadastroViatura || ''} ${os.modeloViatura || ''} ${os.placaViatura || ''}`.toLowerCase();
           const observacaoData = (os.observacao || '').toLowerCase();
+          const numeroOSData = (os.numeroOS || '').toLowerCase();
 
           const viaturaMatch = lowerSearchViatura === '' || viaturaData.includes(lowerSearchViatura);
           const defeitoMatch = lowerSearchDefeito === '' || observacaoData.includes(lowerSearchDefeito);
+          const numeroOSMatch = lowerSearchNumeroOS === '' || numeroOSData.includes(lowerSearchNumeroOS);
 
-          return (lowerSearchViatura === '' || viaturaMatch) && (lowerSearchDefeito === '' || defeitoMatch);
+          return (lowerSearchViatura === '' || viaturaMatch) && 
+                 (lowerSearchDefeito === '' || defeitoMatch) && 
+                 (lowerSearchNumeroOS === '' || numeroOSMatch);
         });
       }
 
@@ -145,6 +151,7 @@ const OrdemServicoPage = () => {
       // As dependências agora são apenas os estados dos filtros
       searchViatura,
       searchDefeito,
+      searchNumeroOS,
       dateRange,
       selectedMonthYear
   ]);
@@ -152,7 +159,7 @@ const OrdemServicoPage = () => {
   // useEffect agora apenas dispara fetchOrdensServico quando os filtros mudam
   useEffect(() => {
     fetchOrdensServico();
-  }, [fetchOrdensServico, searchViatura, searchDefeito, dateRange, selectedMonthYear]);
+  }, [fetchOrdensServico, searchViatura, searchDefeito, searchNumeroOS, dateRange, selectedMonthYear]);
 
 
   const openModal = (os: OrdemServico) => {
@@ -203,10 +210,16 @@ const OrdemServicoPage = () => {
         {/* --- Filtros --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Input
+            placeholder="Buscar por Número de OS..."
+            value={searchNumeroOS}
+            onChange={(e) => setSearchNumeroOS(e.target.value)}
+            className="col-span-full md:col-span-1 lg:col-span-1"
+          />
+          <Input
             placeholder="Buscar por Viatura (cadastro, modelo, placa)..."
             value={searchViatura}
             onChange={(e) => setSearchViatura(e.target.value)}
-            className="col-span-full md:col-span-2 lg:col-span-2"
+            className="col-span-full md:col-span-1 lg:col-span-1"
           />
           <Input
             placeholder="Buscar por Defeito ou Viatura (detalhado)..."
@@ -264,6 +277,7 @@ const OrdemServicoPage = () => {
             onClick={() => {
               setSearchViatura('');
               setSearchDefeito('');
+              setSearchNumeroOS('');
               setDateRange({ from: undefined, to: undefined });
               setSelectedMonthYear('all');
               fetchOrdensServico(); // Dispara a busca com filtros limpos
