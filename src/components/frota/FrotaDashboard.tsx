@@ -260,7 +260,10 @@ const FrotaDashboard = () => {
           
           // Buscar cota individual da viatura na coleção saldosViaturas
           const cotaViatura = saldosViaturasSnapshot.docs
-            .find(doc => doc.data().placa === viatura.PLACA)?.data()?.saldoMensal || viatura.SALDO || 0;
+            .find(doc => {
+              const data = doc.data();
+              return data.placa === viatura.PLACA || data.viaturaId === viatura.PLACA;
+            })?.data()?.saldoMensal || viatura.SALDO || 0;
           
           saldoDisponivel = cotaViatura - saldoUsado;
         }
