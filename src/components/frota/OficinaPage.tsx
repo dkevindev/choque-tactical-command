@@ -69,7 +69,7 @@ const OficinaPage = () => {
 
   const fetchViaturas = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'viaturas'));
+      const querySnapshot = await getDocs(collection(db, 'frota'));
       const viaturasData: Viatura[] = [];
       querySnapshot.forEach((doc) => {
         viaturasData.push({ id: doc.id, ...doc.data() } as Viatura);
@@ -95,7 +95,7 @@ const OficinaPage = () => {
 
   const fetchViaturasNaOficina = async () => {
     try {
-      const q = query(collection(db, 'viaturas_oficina'), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, 'oficina'), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const viaturasData: ViaturaNaOficina[] = [];
       querySnapshot.forEach((doc) => {
@@ -121,7 +121,7 @@ const OficinaPage = () => {
     }
 
     try {
-      await addDoc(collection(db, 'viaturas_oficina'), {
+      await addDoc(collection(db, 'oficina'), {
         cadastro: viaturaSelecionada.CADASTRO,
         placa: viaturaSelecionada.PLACA,
         modelo: viaturaSelecionada.MODELO,
@@ -161,7 +161,7 @@ const OficinaPage = () => {
     if (!selectedViatura) return;
 
     try {
-      await updateDoc(doc(db, 'viaturas_oficina', selectedViatura.id), {
+      await updateDoc(doc(db, 'oficina', selectedViatura.id), {
         dataSaida: saidaData.dataSaida,
         observacaoServico: saidaData.observacaoServico,
         status: 'os-pendente'
