@@ -137,15 +137,34 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     }, 0);
   };
 
-  // Configurações de saldo (você pode implementar um sistema de configuração depois)
-  const limiteMes = 5000;
-  const limite12Meses = 50000;
-
-  // Calcular gastos para gráficos de pizza
+  // Calcular gráficos de pizza baseado nos saldos configurados
   const calcularGraficoPizza = () => {
     const agora = new Date();
     const mesAtual = agora.getMonth();
     const anoAtual = agora.getFullYear();
+    
+    // Buscar saldo configurado para esta viatura ou para frota pesada
+    const FROTA_PESADA = ['TA01', 'TA02', 'TA03', 'TP'];
+    const cadastroViatura = viatura?.cadastro || viatura?.id;
+    
+    let saldoMensal = 0;
+    let saldo12Meses = 0;
+    
+    if (FROTA_PESADA.includes(cadastroViatura || '')) {
+      // Para frota pesada, buscar saldo compartilhado
+      const saldoFrotaPesada = saldosHistorico.find(s => s.tipo === 'frota_pesada' && s.anoReferencia === anoAtual);
+      if (saldoFrotaPesada) {
+        saldoMensal = saldoFrotaPesada.saldoMensal || 0;
+        saldo12Meses = saldoFrotaPesada.saldo12Meses || 0;
+      }
+    } else {
+      // Para frota leve, buscar saldo individual
+      const saldoIndividual = saldosHistorico.find(s => s.viaturaId === viatura?.id && s.anoReferencia === anoAtual);
+      if (saldoIndividual) {
+        saldoMensal = saldoIndividual.saldoMensal || 0;
+        saldo12Meses = saldoIndividual.saldo12Meses || 0;
+      }
+    }
     
     // Gastos do mês atual
     const gastoMesAtual = ordensServico
@@ -170,8 +189,8 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         return total + valor;
       }, 0);
 
-    const saldoDisponivelMes = Math.max(0, limiteMes - gastoMesAtual);
-    const saldoDisponivel12Meses = Math.max(0, limite12Meses - gasto12Meses);
+    const saldoDisponivelMes = Math.max(0, saldoMensal - gastoMesAtual);
+    const saldoDisponivel12Meses = Math.max(0, saldo12Meses - gasto12Meses);
 
     return {
       mes: [
@@ -181,7 +200,13 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
       doze_meses: [
         { name: 'Usado', value: gasto12Meses, fill: '#ef4444' },
         { name: 'Disponível', value: saldoDisponivel12Meses, fill: '#22c55e' }
-      ]
+      ],
+      totais: {
+        saldoMensal,
+        saldo12Meses,
+        gastoMesAtual,
+        gasto12Meses
+      }
     };
   };
 
@@ -251,32 +276,49 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
             </Card>
           )}
 
-          {/* Gráficos de Pizza do Saldo */}
+          {/* Resumo de Saldos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
-                  Saldo Mês Atual
+                  Resumo Saldo Mensal
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Saldo Configurado:</span>
+                  <span className="font-semibold text-green-600">
+                    R$ {dadosGraficos.totais.saldoMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Gasto Este Mês:</span>
+                  <span className="font-semibold text-red-600">
+                    R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm border-t pt-2">
+                  <span>Saldo Restante:</span>
+                  <span className="font-semibold text-blue-600">
+                    R$ {(dadosGraficos.totais.saldoMensal - dadosGraficos.totais.gastoMesAtual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <ResponsiveContainer width="100%" height={150}>
                   <PieChart>
                     <Pie
                       data={dadosGraficos.mes}
                       cx="50%"
                       cy="50%"
-                      innerRadius={40}
-                      outerRadius={80}
+                      innerRadius={30}
+                      outerRadius={60}
                       dataKey="value"
                     >
                       {dadosGraficos.mes.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString()}`} />
-                    <Legend />
+                    <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -286,26 +328,43 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  Saldo Últimos 12 Meses
+                  Resumo Saldo 12 Meses
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Saldo Configurado:</span>
+                  <span className="font-semibold text-green-600">
+                    R$ {dadosGraficos.totais.saldo12Meses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Gasto 12 Meses:</span>
+                  <span className="font-semibold text-red-600">
+                    R$ {dadosGraficos.totais.gasto12Meses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm border-t pt-2">
+                  <span>Saldo Restante:</span>
+                  <span className="font-semibold text-blue-600">
+                    R$ {(dadosGraficos.totais.saldo12Meses - dadosGraficos.totais.gasto12Meses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <ResponsiveContainer width="100%" height={150}>
                   <PieChart>
                     <Pie
                       data={dadosGraficos.doze_meses}
                       cx="50%"
                       cy="50%"
-                      innerRadius={40}
-                      outerRadius={80}
+                      innerRadius={30}
+                      outerRadius={60}
                       dataKey="value"
                     >
                       {dadosGraficos.doze_meses.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString()}`} />
-                    <Legend />
+                    <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
