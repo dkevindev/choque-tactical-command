@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import TacticalSidebar from '@/components/TacticalSidebar';
@@ -21,6 +22,13 @@ import GestaoAcesso from '@/components/GestaoAcesso';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.activeSection) {
+      setActiveSection(location.state.activeSection);
+    }
+  }, [location.state]);
 
   const renderContent = () => {
     switch (activeSection) {
@@ -35,7 +43,7 @@ const AdminDashboard = () => {
       case 'gestao':
         return <GestaoContent />;
       case 'documentos':
-        return <DocumentosContent />;
+        return <DocumentosContent locationState={location.state} />;
       case 'ordens-servico': // <--- Adicione este novo case
         return <OrdemServicoPage />; // <--- Renderiza o novo componente
       default:
@@ -212,8 +220,8 @@ const PolicialContent = () => (
   </Card>
 );
 
-const DocumentosContent = () => (
-  <DocumentosPage />
+const DocumentosContent = ({ locationState }: { locationState?: any }) => (
+  <DocumentosPage locationState={locationState} />
 );
 
 const GestaoContent = () => (

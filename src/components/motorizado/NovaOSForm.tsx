@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, serverTimestamp, Timestamp, FieldValue, query, where } from 'firebase/firestore';
+import { collection, getDocs, addDoc, serverTimestamp, Timestamp, FieldValue, query, where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Viatura {
   id: string;
@@ -80,9 +81,21 @@ interface OrdemServico {
 
 interface NovaOSFormProps {
   onBack: () => void;
+  prefilledData?: {
+    cadastro?: string;
+    servico?: string;
+  };
 }
 
-const NovaOSForm = ({ onBack }: NovaOSFormProps) => {
+interface ViaturaPendente {
+  id: string;
+  cadastro: string;
+  servicoRealizar: string;
+  dataEntrada: string;
+  oficinaId: string;
+}
+
+const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   const [formData, setFormData] = useState({
     cadastro: '',
     modelo: '',
@@ -115,6 +128,9 @@ const NovaOSForm = ({ onBack }: NovaOSFormProps) => {
     funcao: null,
   });
 
+  const [viaturasPendentes, setViaturasPendentes] = useState<ViaturaPendente[]>([]);
+  const [viaturasSelecionadas, setViaturasSelecionadas] = useState<string[]>([]);
+
   const funcoesAssinatura = [
     'Comandante do RPMON',
     'Subcomandante do RPMONT',
@@ -138,7 +154,37 @@ const NovaOSForm = ({ onBack }: NovaOSFormProps) => {
       setOficinas(lista);
     };
     fetchOficinas();
-  }, []);
+
+    // Buscar viaturas com OS pendente
+    const fetchViaturasPendentes = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'oficina'));
+        const pendentes = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as any))
+          .filter(item => item.status === 'os-pendente')
+          .map(item => ({
+            id: item.id,
+            cadastro: item.cadastro,
+            servicoRealizar: item.servicoRealizar || item.observacaoServico || '',
+            dataEntrada: item.dataEntrada,
+            oficinaId: item.oficinaId
+          }));
+        setViaturasPendentes(pendentes);
+      } catch (error) {
+        console.error('Erro ao buscar viaturas pendentes:', error);
+      }
+    };
+    fetchViaturasPendentes();
+
+    // Preencher dados se fornecidos
+    if (prefilledData?.cadastro) {
+      setFormData(prev => ({
+        ...prev,
+        cadastro: prefilledData.cadastro,
+        defeito: prefilledData.servico || ''
+      }));
+    }
+  }, [prefilledData]);
 
   useEffect(() => {
     const fetchPoliciaisOficiais = async () => {
@@ -356,9 +402,25 @@ const NovaOSForm = ({ onBack }: NovaOSFormProps) => {
         ...osDataParaEnvio,
         dataCriacao: serverTimestamp(), // Adiciona o timestamp de criação
       };
-      const docRef = await addDoc(collection(db, 'ordensDeServico'), dadosParaSalvarNoFirestore); // **VERIFIQUE:** 'ordens_servico' ou 'ordensDeServico'
+      const docRef = await addDoc(collection(db, 'ordensDeServico'), dadosParaSalvarNoFirestore);
       console.log('Nova Ordem de Serviço salva com ID:', docRef.id);
       alert('Ordem de Serviço cadastrada com sucesso no Firebase!');
+
+      // Atualizar status das viaturas selecionadas para "completo"
+      if (viaturasSelecionadas.length > 0) {
+        for (const viatura of viaturasSelecionadas) {
+          const viaturaPendente = viaturasPendentes.find(v => v.cadastro === viatura);
+          if (viaturaPendente) {
+            const oficinaDocRef = doc(db, 'oficina', viaturaPendente.id);
+            await updateDoc(oficinaDocRef, {
+              status: 'completo',
+              numeroOS: formData.numeroOS,
+              dataOS: formData.dataOS
+            });
+          }
+        }
+        alert(`Status atualizado para ${viaturasSelecionadas.length} viatura(s) selecionada(s)!`);
+      }
     }
 
     // --- 2. ENVIA OS DADOS PARA A CLOUD FUNCTION PARA GERAR O DOCX ---
@@ -497,6 +559,14 @@ const NovaOSForm = ({ onBack }: NovaOSFormProps) => {
           />
 
           <Textarea
+            name="defeito"
+            placeholder="DEFEITO RELATADO"
+            value={formData.defeito}
+            onChange={handleChange}
+            className="md:col-span-2"
+          />
+
+          <Textarea
             name="observacao"
             placeholder="OBSERVAÇÃO"
             value={formData.observacao}
@@ -510,6 +580,44 @@ const NovaOSForm = ({ onBack }: NovaOSFormProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Seção de Viaturas Pendentes */}
+      {viaturasPendentes.length > 0 && (
+        <Card className="bg-muted">
+          <CardContent className="pt-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Viaturas com OS Pendente</h3>
+            <div className="space-y-2">
+              {viaturasPendentes.map((viatura) => (
+                <div key={viatura.id} className="flex items-center space-x-3 p-3 bg-background rounded border">
+                  <Checkbox
+                    id={viatura.cadastro}
+                    checked={viaturasSelecionadas.includes(viatura.cadastro)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setViaturasSelecionadas(prev => [...prev, viatura.cadastro]);
+                      } else {
+                        setViaturasSelecionadas(prev => prev.filter(v => v !== viatura.cadastro));
+                      }
+                    }}
+                  />
+                  <label htmlFor={viatura.cadastro} className="flex-1 cursor-pointer">
+                    <div className="font-medium">{viatura.cadastro}</div>
+                    <div className="text-sm text-muted-foreground">{viatura.servicoRealizar}</div>
+                    <div className="text-xs text-muted-foreground">Data entrada: {new Date(viatura.dataEntrada).toLocaleDateString()}</div>
+                  </label>
+                </div>
+              ))}
+            </div>
+            {viaturasSelecionadas.length > 0 && (
+              <div className="mt-4 p-3 bg-primary/10 rounded border">
+                <p className="text-sm font-medium">
+                  {viaturasSelecionadas.length} viatura(s) selecionada(s). O status será atualizado para "completo" após gerar a OS.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex justify-between items-center">
         <Button onClick={handleSubmit}>Gerar OS e Documento</Button> {/* Botão atualizado */}

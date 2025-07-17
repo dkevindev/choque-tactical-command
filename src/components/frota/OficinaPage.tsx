@@ -226,11 +226,12 @@ const OficinaPage = () => {
   };
 
   const handleCriarOS = (viatura: ViaturaNaOficina) => {
-    // Redirecionar para página de nova OS com dados pré-preenchidos
+    // Redirecionar para página de nova OS - seção Documentos > Motorizado
     navigate('/admin-dashboard', { 
       state: { 
-        activeSection: 'frota',
-        subSection: 'nova-os',
+        activeSection: 'documentos',
+        subSection: 'motorizado',
+        novaOS: true,
         prefilledData: {
           cadastro: viatura.cadastro,
           servico: viatura.observacaoServico || viatura.servicoRealizar
