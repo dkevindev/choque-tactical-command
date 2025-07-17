@@ -27,6 +27,7 @@ interface Viatura {
   KMOLEO: number;
   SALDO: number;
   cadastro?: string;
+  tipo?: 'leve' | 'pesada';
 }
 
 interface OrdemServico {
@@ -306,24 +307,35 @@ const FrotaDashboard = () => {
                         </Badge>
                       </div>
 
-                      <div className="space-y-1 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">KM:</span>
-                          <span className="font-medium">{viatura.KM.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Próximo Óleo:</span>
-                          <span className="font-medium">{viatura.KMOLEO.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Saldo:</span>
-                          <span className="font-medium">R$ {(viatura.SALDO / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">OS Total:</span>
-                          <span className="font-medium">{ordensViatura.length}</span>
-                        </div>
-                      </div>
+                       <div className="space-y-1 text-xs">
+                         <div className="flex justify-between">
+                           <span className="text-muted-foreground">Tipo:</span>
+                           <Badge 
+                             variant={viatura.tipo === 'pesada' ? 'destructive' : 'default'} 
+                             className="text-xs"
+                           >
+                             {viatura.tipo === 'pesada' ? 'Pesada' : 
+                              viatura.tipo === 'leve' ? 'Leve' : 
+                              'Não definido'}
+                           </Badge>
+                         </div>
+                         <div className="flex justify-between">
+                           <span className="text-muted-foreground">KM:</span>
+                           <span className="font-medium">{viatura.KM.toLocaleString()}</span>
+                         </div>
+                         <div className="flex justify-between">
+                           <span className="text-muted-foreground">Próximo Óleo:</span>
+                           <span className="font-medium">{viatura.KMOLEO.toLocaleString()}</span>
+                         </div>
+                         <div className="flex justify-between">
+                           <span className="text-muted-foreground">Saldo:</span>
+                           <span className="font-medium">R$ {(viatura.SALDO / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                         </div>
+                         <div className="flex justify-between">
+                           <span className="text-muted-foreground">OS Total:</span>
+                           <span className="font-medium">{ordensViatura.length}</span>
+                         </div>
+                       </div>
 
                       <div className="pt-2 border-t">
                         <Button 
