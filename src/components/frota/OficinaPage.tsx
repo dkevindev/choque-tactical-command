@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Calendar, FileText, AlertCircle } from 'lucide-react';
+import { Plus, Calendar, FileText, AlertCircle, Building2 } from 'lucide-react';
 import { collection, addDoc, getDocs, updateDoc, doc, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
@@ -46,6 +46,7 @@ const OficinaPage = () => {
   const [oficinas, setOficinas] = useState<Oficina[]>([]);
   const [viaturasNaOficina, setViaturasNaOficina] = useState<ViaturaNaOficina[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isOficinaCadastroOpen, setIsOficinaCadastroOpen] = useState(false);
   const [isSaidaDialogOpen, setIsSaidaDialogOpen] = useState(false);
   const [selectedViatura, setSelectedViatura] = useState<ViaturaNaOficina | null>(null);
   
@@ -54,6 +55,11 @@ const OficinaPage = () => {
     dataEntrada: '',
     servicoRealizar: '',
     oficina: ''
+  });
+
+  const [oficinaData, setOficinaData] = useState({
+    nome: '',
+    nomeFantasia: ''
   });
 
   const [saidaData, setSaidaData] = useState({
@@ -189,6 +195,36 @@ const OficinaPage = () => {
     }
   };
 
+  const handleCadastroOficina = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      await addDoc(collection(db, 'oficinas'), {
+        nome: oficinaData.nome,
+        nomeFantasia: oficinaData.nomeFantasia
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "Oficina cadastrada com sucesso!"
+      });
+
+      setOficinaData({
+        nome: '',
+        nomeFantasia: ''
+      });
+      setIsOficinaCadastroOpen(false);
+      fetchOficinas();
+    } catch (error) {
+      console.error('Erro ao cadastrar oficina:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao cadastrar oficina",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleCriarOS = (viatura: ViaturaNaOficina) => {
     // Redirecionar para página de nova OS com dados pré-preenchidos
     navigate('/admin-dashboard', { 
@@ -223,13 +259,22 @@ const OficinaPage = () => {
       <Card className="bg-card border-border shadow-tactical">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-foreground">Controle de Oficina</CardTitle>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90">
-                <Plus className="h-4 w-4 mr-2" />
-                Registrar Entrada
-              </Button>
-            </DialogTrigger>
+          <div className="flex space-x-2">
+            <Dialog open={isOficinaCadastroOpen} onOpenChange={setIsOficinaCadastroOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="bg-secondary hover:bg-secondary/90">
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Nova Oficina
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Registrar Entrada
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Registrar Viatura na Oficina</DialogTitle>
@@ -295,7 +340,8 @@ const OficinaPage = () => {
                 </div>
               </form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </CardHeader>
 
         <CardContent>
@@ -444,6 +490,45 @@ const OficinaPage = () => {
                 Cancelar
               </Button>
               <Button type="submit">Registrar Saída</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para cadastrar oficina */}
+      <Dialog open={isOficinaCadastroOpen} onOpenChange={setIsOficinaCadastroOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cadastrar Nova Oficina</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCadastroOficina} className="space-y-4">
+            <div>
+              <Label htmlFor="nome">Nome da Oficina</Label>
+              <Input
+                type="text"
+                value={oficinaData.nome}
+                onChange={(e) => setOficinaData({...oficinaData, nome: e.target.value})}
+                placeholder="Digite o nome completo da oficina..."
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="nomeFantasia">Nome Fantasia</Label>
+              <Input
+                type="text"
+                value={oficinaData.nomeFantasia}
+                onChange={(e) => setOficinaData({...oficinaData, nomeFantasia: e.target.value})}
+                placeholder="Digite o nome fantasia da oficina..."
+                required
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={() => setIsOficinaCadastroOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Cadastrar Oficina</Button>
             </div>
           </form>
         </DialogContent>
