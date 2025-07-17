@@ -12,6 +12,7 @@ interface Viatura {
   id: string;
   CADASTRO: string;
   MODELO: string;
+  tipo?: 'leve' | 'pesada';
   [key: string]: any;
 }
 
@@ -271,10 +272,14 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   }, [formData.dataOS, formData.cadastro]);
 
   const handleSelectCadastro = async (viatura: Viatura) => {
+    // Definir tipo de frota baseado no campo "tipo" da viatura
+    const tipoFrota = viatura.tipo === 'pesada' ? 'pesada' : 'leve';
+    
     setFormData(prev => ({
       ...prev,
       cadastro: viatura.CADASTRO,
       modelo: viatura.MODELO,
+      tipoFrota: tipoFrota
     }));
     setSugestoes([]);
     setShowSugestoes(false);
