@@ -60,8 +60,10 @@ interface OrdemServico {
   oficinaResponsavel: string;
   numeroOficina: string;
   numeroOS: string;
-  observacao: string;
   valorOS: string;
+  cotaMensal: string;
+  saldoDisponivel: string;
+  tipoFrota: string;
   placaViatura?: string; // Adicionado, pode ser opcional se não tiver campo no form
   assinatura?: { // Assinatura agora é um objeto aninhado
     policial: {
@@ -104,8 +106,10 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     oficina: '',
     numeroOficina: '',
     numeroOS: '',
-    observacao: '',
     valorOS: '',
+    cotaMensal: '',
+    saldoDisponivel: '',
+    tipoFrota: 'leve', // 'leve' ou 'pesada'
   });
 
   const [sugestoes, setSugestoes] = useState<Viatura[]>([]);
@@ -285,7 +289,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   ) => {
     const { name, value } = e.target;
 
-    if (name === 'valorOS') {
+    if (name === 'valorOS' || name === 'cotaMensal' || name === 'saldoDisponivel') {
       const valorFormatado = formatarParaReal(value);
       setFormData(prev => ({ ...prev, [name]: valorFormatado }));
     } else {
@@ -374,8 +378,10 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         oficinaResponsavel: formData.oficina,
         numeroOficina: formData.numeroOficina,
         numeroOS: formData.numeroOS,
-        observacao: formData.observacao,
         valorOS: formData.valorOS,
+        cotaMensal: formData.cotaMensal,
+        saldoDisponivel: formData.saldoDisponivel,
+        tipoFrota: formData.tipoFrota,
         placaViatura: 'N/D', // Ajuste conforme seu formulário ou lógica de placa
         // dataCriacao será adicionado no momento do addDoc
       };
@@ -566,13 +572,47 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
             className="md:col-span-2"
           />
 
-          <Textarea
-            name="observacao"
-            placeholder="OBSERVAÇÃO"
-            value={formData.observacao}
+          <Input
+            name="cotaMensal"
+            placeholder="COTA MENSAL (R$)"
+            value={formData.cotaMensal}
             onChange={handleChange}
-            className="md:col-span-2"
           />
+
+          <Input
+            name="saldoDisponivel"
+            placeholder="SALDO DISPONÍVEL (R$)"
+            value={formData.saldoDisponivel}
+            onChange={handleChange}
+          />
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">TIPO DE FROTA</label>
+            <div className="flex space-x-4">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="tipoFrota"
+                  value="leve"
+                  checked={formData.tipoFrota === 'leve'}
+                  onChange={handleChange}
+                  className="text-primary"
+                />
+                <span className="text-sm">Frota Leve</span>
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="tipoFrota"
+                  value="pesada"
+                  checked={formData.tipoFrota === 'pesada'}
+                  onChange={handleChange}
+                  className="text-primary"
+                />
+                <span className="text-sm">Frota Pesada</span>
+              </label>
+            </div>
+          </div>
 
           <div className="flex space-x-3 mt-1 md:col-span-2">
             <Button size="sm" onClick={() => setModalCadastrarAberto(true)}>Cadastrar Oficina</Button>
