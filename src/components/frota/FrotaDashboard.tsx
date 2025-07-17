@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where, orderBy, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -234,11 +234,14 @@ const FrotaDashboard = () => {
         .filter(os => placasPesadas.includes(os.placa))
         .reduce((total, os) => total + (os.valorTotal || 0), 0);
 
-      // Buscar cota da frota pesada
+      // Buscar cota da frota pesada e registros existentes
       const saldosViaturasSnapshot = await getDocs(collection(db, 'saldosViaturas'));
+      const saldoOficinaSnapshot = await getDocs(collection(db, 'saldoOficina'));
       
       const docFrotaPesada = saldosViaturasSnapshot.docs.find(doc => doc.data().tipo === 'frota_pesada');
       const cotaFrotaPesada = docFrotaPesada?.data()?.saldoMensal || 0;
+
+      const mesReferenciaAtual = `${mesAtual.toString().padStart(2, '0')}/${anoAtual}`;
 
       // Criar/atualizar registros na coleção saldoOficina
       for (const viatura of viaturas) {
@@ -262,17 +265,30 @@ const FrotaDashboard = () => {
           saldoDisponivel = cotaViatura - saldoUsado;
         }
 
-        // Salvar na coleção saldoOficina
-        await addDoc(collection(db, 'saldoOficina'), {
+        // Verificar se já existe um registro para esta placa no mês atual
+        const registroExistente = saldoOficinaSnapshot.docs.find(doc => {
+          const data = doc.data();
+          return data.placa === viatura.PLACA && data.mesReferencia === mesReferenciaAtual;
+        });
+
+        const dadosAtualizacao = {
           placa: viatura.PLACA,
           cadastro: viatura.cadastro || '',
           modelo: viatura.MODELO,
           tipo: viatura.tipo || 'leve',
           saldoUsado: saldoUsado,
           saldoDisponivel: saldoDisponivel,
-          mesReferencia: `${mesAtual.toString().padStart(2, '0')}/${anoAtual}`,
+          mesReferencia: mesReferenciaAtual,
           dataAtualizacao: new Date().toISOString(),
-        });
+        };
+
+        if (registroExistente) {
+          // Atualizar registro existente
+          await updateDoc(doc(db, 'saldoOficina', registroExistente.id), dadosAtualizacao);
+        } else {
+          // Criar novo registro
+          await addDoc(collection(db, 'saldoOficina'), dadosAtualizacao);
+        }
       }
 
       toast({
