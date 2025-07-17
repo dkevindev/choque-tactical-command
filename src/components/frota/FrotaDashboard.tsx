@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import ModalDetalhesViatura from '@/components/ModalDetalhesViatura';
+import GestaoSaldos from './GestaoSaldos';
 
 interface Viatura {
   id: string;
@@ -25,6 +26,7 @@ interface Viatura {
   KM: number;
   KMOLEO: number;
   SALDO: number;
+  cadastro?: string;
 }
 
 interface OrdemServico {
@@ -46,6 +48,7 @@ const FrotaDashboard = () => {
   const [selectedViatura, setSelectedViatura] = useState<string | null>(null);
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [viaturaDetalhes, setViaturaDetalhes] = useState<Viatura | null>(null);
+  const [gestaoSaldosAberto, setGestaoSaldosAberto] = useState(false);
   const [configSaldos, setConfigSaldos] = useState({
     limiteMes: 5000,
     limite12Meses: 50000
@@ -69,7 +72,37 @@ const FrotaDashboard = () => {
         id: doc.id,
         ...doc.data(),
       })) as Viatura[];
-      setViaturas(viaturasData);
+      
+      // Ordenar viaturas conforme solicitado
+      const ordenCustomizada = ['CAV11', 'CAV12', 'CAV13', 'CAV05', 'CAV06', 'TA01', 'TA02', 'TP'];
+      
+      const viaturasOrdenadas = viaturasData.sort((a, b) => {
+        const cadastroA = a.cadastro || a.id;
+        const cadastroB = b.cadastro || b.id;
+        
+        const indexA = ordenCustomizada.indexOf(cadastroA);
+        const indexB = ordenCustomizada.indexOf(cadastroB);
+        
+        // Se ambos estão na lista customizada, usar a ordem da lista
+        if (indexA !== -1 && indexB !== -1) {
+          return indexA - indexB;
+        }
+        
+        // Se apenas A está na lista, A vem primeiro
+        if (indexA !== -1 && indexB === -1) {
+          return -1;
+        }
+        
+        // Se apenas B está na lista, B vem primeiro
+        if (indexA === -1 && indexB !== -1) {
+          return 1;
+        }
+        
+        // Se nenhum está na lista, ordem alfabética
+        return cadastroA.localeCompare(cadastroB);
+      });
+      
+      setViaturas(viaturasOrdenadas);
     } catch (error) {
       console.error('Erro ao buscar viaturas:', error);
     }
@@ -171,7 +204,11 @@ const FrotaDashboard = () => {
           <h2 className="text-2xl font-bold text-foreground">Dashboard de Frota</h2>
           <p className="text-muted-foreground">Visão geral das viaturas e gastos</p>
         </div>
-        <Button variant="outline" size="sm">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => setGestaoSaldosAberto(true)}
+        >
           <Settings className="h-4 w-4 mr-2" />
           Configurar Saldos
         </Button>
@@ -263,7 +300,7 @@ const FrotaDashboard = () => {
               >
                 <option value="">Todas as Viaturas</option>
                 {viaturas.map(v => (
-                  <option key={v.PLACA} value={v.PLACA}>{v.id} - {v.PLACA}</option>
+                  <option key={v.PLACA} value={v.PLACA}>{v.cadastro || v.id} - {v.PLACA}</option>
                 ))}
               </select>
             </div>
@@ -327,7 +364,7 @@ const FrotaDashboard = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold text-sm">{viatura.id}</h3>
+                          <h3 className="font-semibold text-sm">{viatura.cadastro || viatura.id}</h3>
                           <p className="text-xs text-muted-foreground">{viatura.PLACA}</p>
                         </div>
                         <Badge variant={statusInfo.variant} className="text-xs">
@@ -382,6 +419,12 @@ const FrotaDashboard = () => {
         isOpen={modalDetalhesAberto}
         onClose={() => setModalDetalhesAberto(false)}
         viatura={viaturaDetalhes}
+      />
+
+      {/* Modal de Gestão de Saldos */}
+      <GestaoSaldos
+        isOpen={gestaoSaldosAberto}
+        onClose={() => setGestaoSaldosAberto(false)}
       />
     </div>
   );

@@ -37,6 +37,7 @@ interface Viatura {
   KM: number;
   KMOLEO: number;
   SALDO: number;
+  cadastro?: string;
 }
 
 interface OrdemServico {
@@ -59,10 +60,12 @@ interface ModalDetalhesViaturaProps {
 const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViaturaProps) => {
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saldosHistorico, setSaldosHistorico] = useState<any[]>([]);
 
   useEffect(() => {
     if (viatura && isOpen) {
       fetchOrdensServico();
+      fetchSaldosHistorico();
     }
   }, [viatura, isOpen]);
 
@@ -88,6 +91,25 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
       console.error('Erro ao buscar ordens de serviço:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSaldosHistorico = async () => {
+    if (!viatura) return;
+    
+    try {
+      const querySnapshot = await getDocs(collection(db, 'saldosViaturas'));
+      const saldosData = querySnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }) as any)
+        .filter((saldo: any) => 
+          saldo.viaturaId === viatura.id || 
+          (saldo.tipo === 'frota_pesada' && ['TA01', 'TA02', 'TA03', 'TP'].includes(viatura.cadastro || viatura.id))
+        )
+        .sort((a: any, b: any) => b.anoReferencia - a.anoReferencia);
+      
+      setSaldosHistorico(saldosData);
+    } catch (error) {
+      console.error('Erro ao buscar histórico de saldos:', error);
     }
   };
 
@@ -171,11 +193,45 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Car className="h-6 w-6" />
-            Detalhes da Viatura - {viatura.id}
+            Detalhes da Viatura - {viatura.cadastro || viatura.id}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Histórico de Saldos */}
+          {saldosHistorico.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Histórico de Saldos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {saldosHistorico.slice(0, 5).map((saldo) => (
+                    <div key={saldo.id} className="flex justify-between items-center text-sm border-b pb-2">
+                      <div>
+                        <span className="font-medium">{saldo.mesReferencia}</span>
+                        {saldo.tipo === 'frota_pesada' && (
+                          <Badge variant="secondary" className="ml-2 text-xs">Frota Pesada</Badge>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-green-600">
+                          Mensal: R$ {saldo.saldoMensal?.toLocaleString() || 0}
+                        </div>
+                        <div className="text-blue-600">
+                          Anual: R$ {saldo.saldo12Meses?.toLocaleString() || 0}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Gráficos de Pizza do Saldo */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
