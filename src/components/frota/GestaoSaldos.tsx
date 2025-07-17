@@ -37,7 +37,8 @@ interface GestaoSaldosProps {
   onClose: () => void;
 }
 
-const FROTA_PESADA = ['TA01', 'TA02', 'TA03', 'TP'];
+const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
+const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
 
 const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
   const [viaturas, setViaturas] = useState<Viatura[]>([]);
@@ -165,8 +166,12 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
     }
   };
 
-  const viaturasFroteLeve = viaturas.filter(v => !FROTA_PESADA.includes(v.cadastro || v.id));
-  const viaturasFrotePesada = viaturas.filter(v => FROTA_PESADA.includes(v.cadastro || v.id));
+  const viaturasFroteLeve = viaturas.filter(v => 
+    !FROTA_PESADA_PLACAS.includes(v.PLACA) && !FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id)
+  );
+  const viaturasFrotePesada = viaturas.filter(v => 
+    FROTA_PESADA_PLACAS.includes(v.PLACA) || FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id)
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
