@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, addDoc, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Edit, AlertTriangle } from 'lucide-react';
+import { Edit, AlertTriangle, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface Viatura {
   id: string;
@@ -28,6 +29,15 @@ interface Viatura {
   KM: number;
   KMOLEO: number;
   SALDO: number;
+  cadastro?: string;
+  tipo?: 'leve' | 'pesada';
+}
+
+interface OrdemServico {
+  id: string;
+  placa: string;
+  valorTotal: number;
+  dataOS: string;
 }
 
 const ViaturaTableFull = () => {
@@ -40,6 +50,8 @@ const ViaturaTableFull = () => {
   const [editValues, setEditValues] = useState<{
     [id: string]: { KM: number; KMOLEO: number; SALDO: number };
   }>({});
+  const [isUpdatingSaldos, setIsUpdatingSaldos] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchViaturas = async () => {
@@ -169,11 +181,103 @@ const ViaturaTableFull = () => {
     }));
   };
 
+  // Função para atualizar saldo de todas as viaturas
+  const handleAtualizarSaldos = async () => {
+    setIsUpdatingSaldos(true);
+    
+    try {
+      const agora = new Date();
+      const mesAtual = agora.getMonth() + 1;
+      const anoAtual = agora.getFullYear();
+
+      // Buscar todas as OS do mês atual
+      const osSnapshot = await getDocs(collection(db, 'ordens'));
+      const ordensMesAtual: OrdemServico[] = osSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as OrdemServico))
+        .filter(os => {
+          const dataOS = new Date(os.dataOS);
+          return dataOS.getMonth() + 1 === mesAtual && dataOS.getFullYear() === anoAtual;
+        });
+
+      // Separar viaturas por tipo
+      const viaturasPesadas = viaturas.filter(v => v.tipo === 'pesada');
+      const viaturasLeves = viaturas.filter(v => v.tipo === 'leve' || !v.tipo);
+
+      // Calcular saldo usado da frota pesada (soma de todas as OS das viaturas pesadas no mês)
+      const placasPesadas = viaturasPesadas.map(v => v.PLACA);
+      const saldoUsadoFrotaPesada = ordensMesAtual
+        .filter(os => placasPesadas.includes(os.placa))
+        .reduce((total, os) => total + (os.valorTotal || 0), 0);
+
+      // Buscar cota da frota pesada
+      const gestaoSaldosSnapshot = await getDocs(collection(db, 'gestaoSaldos'));
+      const cotaFrotaPesada = gestaoSaldosSnapshot.docs.find(doc => doc.data().tipo === 'pesada')?.data()?.cota || 0;
+
+      // Criar/atualizar registros na coleção saldoOficina
+      for (const viatura of viaturas) {
+        let saldoUsado = 0;
+        let saldoDisponivel = 0;
+
+        if (viatura.tipo === 'pesada') {
+          // Para frota pesada, usar o saldo coletivo
+          saldoUsado = saldoUsadoFrotaPesada;
+          saldoDisponivel = cotaFrotaPesada - saldoUsadoFrotaPesada;
+        } else {
+          // Para frota leve, calcular individualmente
+          saldoUsado = ordensMesAtual
+            .filter(os => os.placa === viatura.PLACA)
+            .reduce((total, os) => total + (os.valorTotal || 0), 0);
+          
+          // Buscar cota individual da viatura
+          const cotaViatura = gestaoSaldosSnapshot.docs
+            .find(doc => doc.data().placa === viatura.PLACA)?.data()?.cota || viatura.SALDO || 0;
+          
+          saldoDisponivel = cotaViatura - saldoUsado;
+        }
+
+        // Salvar na coleção saldoOficina
+        await addDoc(collection(db, 'saldoOficina'), {
+          placa: viatura.PLACA,
+          cadastro: viatura.cadastro || '',
+          modelo: viatura.MODELO,
+          tipo: viatura.tipo || 'leve',
+          saldoUsado: saldoUsado,
+          saldoDisponivel: saldoDisponivel,
+          mesReferencia: `${mesAtual.toString().padStart(2, '0')}/${anoAtual}`,
+          dataAtualizacao: new Date().toISOString(),
+        });
+      }
+
+      toast({
+        title: "Saldos atualizados",
+        description: `Saldos de ${viaturas.length} viaturas atualizados para ${mesAtual.toString().padStart(2, '0')}/${anoAtual}`,
+      });
+
+    } catch (error) {
+      console.error('Erro ao atualizar saldos:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar os saldos. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingSaldos(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end mb-2">
+      <div className="flex justify-end gap-2 mb-2">
+        <Button 
+          onClick={handleAtualizarSaldos}
+          disabled={isUpdatingSaldos}
+          variant="secondary"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isUpdatingSaldos ? 'animate-spin' : ''}`} />
+          {isUpdatingSaldos ? 'Atualizando...' : 'Atualizar Saldos'}
+        </Button>
         <Button onClick={() => (isEditingAll ? handleSaveAll() : setIsEditingAll(true))}>
-          {isEditingAll ? 'Salvar Todos' : 'Editar Todos'}
+          {isEditingAll ? 'Salvar Todos' : 'Configurar Saldo'}
         </Button>
       </div>
 
