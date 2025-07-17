@@ -393,8 +393,8 @@ const OrdemServicoPage = () => {
                 <TableHead className="w-[100px]">Nº OS</TableHead>
                 <TableHead className="w-[100px]">Data OS</TableHead>
                 <TableHead className="w-[140px]">Viatura/Placa</TableHead>
-                <TableHead className="w-[100px]">Oficina</TableHead>
-                <TableHead className="w-[200px]">Defeito</TableHead>
+                <TableHead className="w-[150px]">Oficina</TableHead>
+                <TableHead className="max-w-[200px]">Defeito</TableHead>
                 <TableHead className="w-[100px] text-right">Valor</TableHead>
                 <TableHead className="w-[80px] text-center">Ações</TableHead>
               </TableRow>
@@ -418,7 +418,7 @@ const OrdemServicoPage = () => {
                       </div>
                     </TableCell>
                     <TableCell className="truncate">{os.oficinaResponsavel || 'N/D'}</TableCell>
-                    <TableCell className="w-[200px] truncate" title={os.observacao || 'N/D'}>{os.observacao || 'N/D'}</TableCell>
+                    <TableCell className="max-w-[200px] truncate" title={os.observacao || 'N/D'}>{os.observacao || 'N/D'}</TableCell>
                     <TableCell className="text-right">{os.valorOS || 'N/D'}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
