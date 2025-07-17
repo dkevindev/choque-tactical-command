@@ -390,19 +390,21 @@ const OrdemServicoPage = () => {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted hover:bg-muted/90">
-                <TableHead className="w-[100px]">Nº OS</TableHead>
-                <TableHead className="w-[100px]">Data OS</TableHead>
-                <TableHead className="w-[140px]">Viatura/Placa</TableHead>
-                <TableHead className="w-[150px]">Oficina</TableHead>
-                <TableHead className="max-w-[200px]">Defeito</TableHead>
-                <TableHead className="w-[100px] text-right">Valor</TableHead>
-                <TableHead className="w-[80px] text-center">Ações</TableHead>
+                <TableHead className="w-[120px]">Nº OS</TableHead>
+                <TableHead>Data OS</TableHead>
+                <TableHead>Viatura</TableHead>
+                <TableHead>Placa</TableHead>
+                <TableHead>Oficina</TableHead>
+                <TableHead>Defeito Observado</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="text-center">Completo</TableHead>
+                <TableHead className="w-[100px] text-center">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {ordensServico.length === 0 && !loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                     Nenhuma Ordem de Serviço encontrada com os filtros aplicados.
                   </TableCell>
                 </TableRow>
@@ -412,20 +414,23 @@ const OrdemServicoPage = () => {
                     <TableCell className="font-medium">{os.numeroOS || 'N/D'}</TableCell>
                     <TableCell>{os.dataOS && isValid(parseISO(os.dataOS)) ? format(parseISO(os.dataOS), 'dd/MM/yyyy') : 'N/D'}</TableCell>
                     <TableCell>
-                      <div className="space-y-1">
-                        <div className="font-medium truncate">{os.cadastroViatura || 'N/D'}</div>
-                        <div className="text-xs text-muted-foreground truncate">{os.placaViatura || 'N/D'}</div>
-                      </div>
+                      {os.cadastroViatura || 'N/D'}
                     </TableCell>
-                    <TableCell className="truncate">{os.oficinaResponsavel || 'N/D'}</TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={os.observacao || 'N/D'}>{os.observacao || 'N/D'}</TableCell>
+                    <TableCell>{os.placaViatura || 'N/D'}</TableCell>
+                    <TableCell>{os.oficinaResponsavel || 'N/D'}</TableCell>
+                    <TableCell className="max-w-[250px] truncate">{os.observacao || 'N/D'}</TableCell>
                     <TableCell className="text-right">{os.valorOS || 'N/D'}</TableCell>
                     <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openModal(os)}>
+                      <Badge variant={os.COMPLETO ? 'default' : 'destructive'}>
+                        {os.COMPLETO ? 'SIM' : 'NÃO'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openModal(os)}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openDeleteModal(os)}>
+                        <Button variant="ghost" size="icon" onClick={() => openDeleteModal(os)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
