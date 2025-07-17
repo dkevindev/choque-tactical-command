@@ -134,6 +134,12 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
 
   const [viaturasPendentes, setViaturasPendentes] = useState<ViaturaPendente[]>([]);
   const [viaturasSelecionadas, setViaturasSelecionadas] = useState<string[]>([]);
+  
+  // Estados para controle dos valores originais e cálculos em tempo real
+  const [valoresOriginais, setValoresOriginais] = useState({
+    cotaMensal: 0,
+    saldoOriginal: 0
+  });
 
   const funcoesAssinatura = [
     'Comandante do RPMON',
@@ -310,6 +316,12 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
 
       const saldoDisponivel = cotaMensal - totalUtilizado;
 
+      // Armazenar valores originais para cálculos em tempo real
+      setValoresOriginais({
+        cotaMensal: cotaMensal,
+        saldoOriginal: saldoDisponivel
+      });
+
       // Atualizar os campos no formulário
       setFormData(prev => ({
         ...prev,
@@ -352,6 +364,16 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     if (name === 'valorOS') {
       const valorFormatado = formatarParaReal(value);
       setFormData(prev => ({ ...prev, [name]: valorFormatado }));
+      
+      // Calcular saldo em tempo real
+      const valorNumerico = parseFloat(value.replace(/\D/g, '')) / 100 || 0;
+      const novoSaldo = valoresOriginais.saldoOriginal - valorNumerico;
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: valorFormatado,
+        saldoDisponivel: novoSaldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -632,23 +654,24 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
             className="md:col-span-2"
           />
 
-          <Input
-            name="cotaMensal"
-            placeholder="COTA MENSAL (R$)"
-            value={formData.cotaMensal}
-            onChange={handleChange}
-            disabled
-            className="bg-muted"
-          />
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">COTA MENSAL</label>
+            <div className="p-3 bg-muted border rounded-md">
+              <span className="font-semibold text-lg">{formData.cotaMensal || 'R$ 0,00'}</span>
+            </div>
+          </div>
 
-          <Input
-            name="saldoDisponivel"
-            placeholder="SALDO DISPONÍVEL (R$)"
-            value={formData.saldoDisponivel}
-            onChange={handleChange}
-            disabled
-            className="bg-muted"
-          />
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">SALDO DISPONÍVEL</label>
+            <div className={`p-3 border rounded-md ${parseFloat(formData.saldoDisponivel?.replace(/[^\d,-]/g, '').replace(',', '.')) < 0 ? 'bg-red-100 border-red-300' : 'bg-muted'}`}>
+              <span className={`font-semibold text-lg ${parseFloat(formData.saldoDisponivel?.replace(/[^\d,-]/g, '').replace(',', '.')) < 0 ? 'text-red-600' : ''}`}>
+                {formData.saldoDisponivel || 'R$ 0,00'}
+              </span>
+              {parseFloat(formData.saldoDisponivel?.replace(/[^\d,-]/g, '').replace(',', '.')) < 0 && (
+                <p className="text-xs text-red-600 mt-1">⚠️ Saldo insuficiente</p>
+              )}
+            </div>
+          </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">TIPO DE FROTA</label>
