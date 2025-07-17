@@ -194,7 +194,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         defeito: prefilledData.servico || ''
       }));
       // Buscar saldo e cota para a viatura pré-preenchida
-      buscarSaldoECota(prefilledData.cadastro);
+      buscarSaldoECota(prefilledData.cadastro, formData.dataOS);
     }
   }, [prefilledData]);
 
@@ -263,6 +263,13 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     setSugestoesOficina(filtradas);
   }, [buscaOficina, oficinas]);
 
+  // Atualizar saldo quando a data da OS mudar
+  useEffect(() => {
+    if (formData.cadastro && formData.dataOS) {
+      buscarSaldoECota(formData.cadastro, formData.dataOS);
+    }
+  }, [formData.dataOS, formData.cadastro]);
+
   const handleSelectCadastro = async (viatura: Viatura) => {
     setFormData(prev => ({
       ...prev,
@@ -273,13 +280,13 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     setShowSugestoes(false);
 
     // Buscar saldo e cota mensal para a viatura selecionada
-    await buscarSaldoECota(viatura.CADASTRO);
+    await buscarSaldoECota(viatura.CADASTRO, formData.dataOS);
   };
 
   // Função para buscar saldo e cota mensal da viatura
-  const buscarSaldoECota = async (cadastro: string) => {
+  const buscarSaldoECota = async (cadastro: string, dataOS?: string) => {
     try {
-      console.log('Buscando saldo para cadastro:', cadastro);
+      console.log('Buscando saldo para cadastro:', cadastro, 'Data OS:', dataOS);
       
       // Buscar dados da viatura na coleção saldosviaturas
       const saldosSnapshot = await getDocs(collection(db, 'saldosviaturas'));
@@ -313,21 +320,40 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
       // Usar saldoMensal ao invés de COTA_MENSAL
       const cotaMensal = (saldoViatura as any).saldoMensal || (saldoViatura as any).COTA_MENSAL || 0;
       
-      // Calcular valores já utilizados no mês atual
-      const dataAtual = new Date();
-      const mesAtual = dataAtual.getMonth() + 1; // getMonth() retorna 0-11
-      const anoAtual = dataAtual.getFullYear();
+      // Calcular valores já utilizados no mês da data da OS (ou mês atual se não houver data)
+      const dataReferencia = dataOS ? new Date(dataOS) : new Date();
+      const mesReferencia = dataReferencia.getMonth() + 1; // getMonth() retorna 0-11
+      const anoReferencia = dataReferencia.getFullYear();
 
-      // Buscar todas as OS's da viatura no mês atual
+      // Buscar todas as OS's da viatura no mês de referência
       const osSnapshot = await getDocs(collection(db, 'ordensDeServico'));
-      const osDoMes = osSnapshot.docs
+      let osDoMes = osSnapshot.docs
         .map(doc => doc.data())
         .filter((os: any) => {
-          if (os.cadastroViatura !== cadastro) return false;
-          
           const dataOS = new Date(os.dataOS);
-          return dataOS.getMonth() + 1 === mesAtual && dataOS.getFullYear() === anoAtual;
+          return dataOS.getMonth() + 1 === mesReferencia && dataOS.getFullYear() === anoReferencia;
         });
+
+      // Se é frota pesada, buscar todas as OS's do mês, independente da viatura
+      if ((saldoViatura as any).tipo === 'frota_pesada') {
+        console.log('Buscando OS de toda a frota pesada no mês');
+        osDoMes = osSnapshot.docs
+          .map(doc => doc.data())
+          .filter((os: any) => {
+            const dataOS = new Date(os.dataOS);
+            return dataOS.getMonth() + 1 === mesReferencia && dataOS.getFullYear() === anoReferencia && os.tipoFrota === 'pesada';
+          });
+      } else {
+        // Se é viatura individual, buscar apenas as OS's desta viatura
+        osDoMes = osSnapshot.docs
+          .map(doc => doc.data())
+          .filter((os: any) => {
+            if (os.cadastroViatura !== cadastro) return false;
+            
+            const dataOS = new Date(os.dataOS);
+            return dataOS.getMonth() + 1 === mesReferencia && dataOS.getFullYear() === anoReferencia;
+          });
+      }
 
       console.log('OS do mês encontradas:', osDoMes);
 
