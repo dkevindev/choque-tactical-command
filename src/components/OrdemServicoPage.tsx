@@ -7,10 +7,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Truck, Eye } from 'lucide-react';
+import { CalendarIcon, Truck, Eye, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 // --- Firebase Imports ---
 import {
@@ -23,7 +24,9 @@ import {
   Query,
   DocumentData,
   Firestore,
-  Timestamp
+  Timestamp,
+  deleteDoc,
+  doc
 } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 
@@ -85,6 +88,13 @@ const OrdemServicoPage = () => {
   // --- Estado para o Modal de Detalhes ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OrdemServico | null>(null);
+  
+  // --- Estados para o Modal de Confirmação de Exclusão ---
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [osToDelete, setOsToDelete] = useState<OrdemServico | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { toast } = useToast();
 
   // A função fetchOrdensServico agora só aplica filtros e ordenação, sem limite
   const fetchOrdensServico = useCallback(async () => {
@@ -170,6 +180,63 @@ const OrdemServicoPage = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedOS(null);
+  };
+
+  const openDeleteModal = (os: OrdemServico) => {
+    setOsToDelete(os);
+    setIsDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setOsToDelete(null);
+    setDeletePassword('');
+    setIsDeleting(false);
+  };
+
+  const handleDeleteOS = async () => {
+    if (!osToDelete || !deletePassword.trim()) {
+      toast({
+        title: "Erro",
+        description: "Por favor, digite a senha para confirmar a exclusão.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validação simples de senha (você pode ajustar conforme necessário)
+    if (deletePassword !== 'admin123') {
+      toast({
+        title: "Erro",
+        description: "Senha incorreta.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'ordensDeServico', osToDelete.id));
+      
+      // Remove da lista local
+      setOrdensServico(prev => prev.filter(os => os.id !== osToDelete.id));
+      
+      toast({
+        title: "Sucesso",
+        description: `OS ${osToDelete.numeroOS} foi excluída com sucesso.`,
+      });
+      
+      closeDeleteModal();
+    } catch (error) {
+      console.error("Erro ao excluir OS:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir a OS. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Renderização condicional para estados de carregamento e erro iniciais
@@ -302,7 +369,7 @@ const OrdemServicoPage = () => {
                 <TableHead>Defeito Observado</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead className="text-center">Completo</TableHead>
-                <TableHead className="w-[60px] text-center">Ver</TableHead>
+                <TableHead className="w-[100px] text-center">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -330,9 +397,14 @@ const OrdemServicoPage = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button variant="ghost" size="icon" onClick={() => openModal(os)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openModal(os)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => openDeleteModal(os)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -348,6 +420,46 @@ const OrdemServicoPage = () => {
             </div>
         )}
       </CardContent>
+
+      {/* --- Modal de Confirmação de Exclusão --- */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="sm:max-w-[400px] bg-card text-foreground border-border shadow-tactical">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-destructive">Confirmar Exclusão</DialogTitle>
+            <DialogDescription>
+              Você está prestes a excluir permanentemente a OS #{osToDelete?.numeroOS || 'N/D'}.
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="delete-password" className="text-sm font-medium">
+                Digite a senha para confirmar:
+              </label>
+              <Input
+                id="delete-password"
+                type="password"
+                placeholder="Senha de administrador"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                disabled={isDeleting}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={closeDeleteModal} disabled={isDeleting}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteOS} 
+              disabled={isDeleting || !deletePassword.trim()}
+            >
+              {isDeleting ? 'Excluindo...' : 'Excluir OS'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* --- Modal de Detalhes da OS (sem alterações) --- */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
