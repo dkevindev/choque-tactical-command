@@ -110,7 +110,8 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     valorOS: '',
     cotaMensal: '',
     saldoDisponivel: '',
-    tipoFrota: 'leve', // 'leve' ou 'pesada'
+    tipoFrota: 'leve', // 'leve' ou 'pesada',
+    placa: ''
   });
 
   const [sugestoes, setSugestoes] = useState<Viatura[]>([]);
@@ -274,12 +275,14 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   const handleSelectCadastro = async (viatura: Viatura) => {
     // Definir tipo de frota baseado no campo "tipo" da viatura
     const tipoFrota = viatura.tipo === 'pesada' ? 'pesada' : 'leve';
+    const placaEncontrada = (viatura as any).PLACA || (viatura as any).placa || 'N/D'; 
     
     setFormData(prev => ({
       ...prev,
       cadastro: viatura.CADASTRO,
       modelo: viatura.MODELO,
-      tipoFrota: tipoFrota
+      tipoFrota: tipoFrota,
+      placa: placaEncontrada
     }));
     setSugestoes([]);
     setShowSugestoes(false);
@@ -539,7 +542,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         cotaMensal: formData.cotaMensal,
         saldoDisponivel: formData.saldoDisponivel,
         tipoFrota: formData.tipoFrota,
-        placaViatura: 'N/D', // Ajuste conforme seu formulário ou lógica de placa
+        placaViatura: formData.placa, // Ajuste conforme seu formulário ou lógica de placa
         // dataCriacao será adicionado no momento do addDoc
       };
 

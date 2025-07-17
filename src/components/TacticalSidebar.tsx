@@ -27,10 +27,10 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
 
   const adminMenuItems = [
     { id: 'dashboard', label: 'DASHBOARD', icon: Home, badge: null },
-    { id: 'patrimonio', label: 'PATRIMÔNIO', icon: Package, badge: '3.4K' },
-    { id: 'belico', label: 'BÉLICO', icon: Target, badge: '2.1K' },
-    { id: 'frota', label: 'FROTA', icon: Truck, badge: '89' },
-    { id: 'policial', label: 'POLICIAL', icon: Users, badge: '1.2K' },
+    { id: 'patrimonio', label: 'PATRIMÔNIO', icon: Package, badge: null },
+    { id: 'belico', label: 'BÉLICO', icon: Target, badge: null },
+    { id: 'frota', label: 'FROTA', icon: Truck, badge: null },
+    { id: 'policial', label: 'POLICIAL', icon: Users, badge: null },
     { id: 'gestao', label: 'GESTÃO', icon: Shield, badge: null },
     { id: 'gestao-pessoas', label: 'GESTÃO PESSOAS', icon: Users, badge: null },
     { id: 'documentos', label: 'DOCUMENTOS', icon: FileText, badge: null },

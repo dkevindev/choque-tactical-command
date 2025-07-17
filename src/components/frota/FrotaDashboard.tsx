@@ -28,7 +28,8 @@ interface Viatura {
   KM: number;
   KMOLEO: number;
   SALDO: number;
-  cadastro?: string;
+  CADASTRO?: string;
+  cadastro: string;
   tipo?: 'leve' | 'pesada';
 }
 
@@ -77,36 +78,31 @@ const FrotaDashboard = () => {
         id: doc.id,
         ...doc.data(),
       })) as Viatura[];
-      
+
       // Ordenar viaturas conforme solicitado
-      const ordenCustomizada = ['CAV11', 'CAV12', 'CAV13', 'CAV05', 'CAV06', 'TA01', 'TA02', 'TA03', 'TP'];
-      
+      const ordenCustomizada = ['CAV - 11', 'CAV - 12', 'CAV - 13', 'CAV - 05', 'CAV - 06', 'TA - 01', 'TA - 02', 'TA - 03', 'TP'];
+
       const viaturasOrdenadas = viaturasData.sort((a, b) => {
         const cadastroA = a.cadastro || a.id;
         const cadastroB = b.cadastro || b.id;
-        
+
         const indexA = ordenCustomizada.indexOf(cadastroA);
         const indexB = ordenCustomizada.indexOf(cadastroB);
-        
-        // Se ambos estão na lista customizada, usar a ordem da lista
+
+        // Se os dois estão na lista personalizada, usa a ordem dela
         if (indexA !== -1 && indexB !== -1) {
           return indexA - indexB;
         }
-        
-        // Se apenas A está na lista, A vem primeiro
-        if (indexA !== -1 && indexB === -1) {
-          return -1;
-        }
-        
-        // Se apenas B está na lista, B vem primeiro
-        if (indexA === -1 && indexB !== -1) {
-          return 1;
-        }
-        
-        // Se nenhum está na lista, ordem alfabética
+
+        // Se apenas A está na lista, ele vem primeiro
+        if (indexA !== -1) return -1;
+
+        // Se apenas B está na lista, ele vem primeiro
+        if (indexB !== -1) return 1;
+
+        // Se nenhum está na lista, ordena por nome (opcional)
         return cadastroA.localeCompare(cadastroB);
       });
-      
       setViaturas(viaturasOrdenadas);
     } catch (error) {
       console.error('Erro ao buscar viaturas:', error);
@@ -130,7 +126,7 @@ const FrotaDashboard = () => {
     const agora = new Date();
     const mesAtual = agora.getMonth();
     const anoAtual = agora.getFullYear();
-    
+
     // Processar gastos do mês atual
     const gastosMesAtual = ordensServico
       .filter(os => {
@@ -140,13 +136,13 @@ const FrotaDashboard = () => {
       .reduce((acc, os) => {
         const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
         const placa = os.placaViatura;
-        
+
         if (!acc[placa]) {
           acc[placa] = { placa, valor: 0, count: 0 };
         }
         acc[placa].valor += valor;
         acc[placa].count += 1;
-        
+
         return acc;
       }, {} as any);
 
@@ -157,7 +153,7 @@ const FrotaDashboard = () => {
     for (let i = 11; i >= 0; i--) {
       const data = new Date(anoAtual, mesAtual - i, 1);
       const mesLabel = data.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
-      
+
       const gastosMes = ordensServico
         .filter(os => {
           const dataOS = new Date(os.dataOS);
@@ -179,7 +175,7 @@ const FrotaDashboard = () => {
 
   const getStatusViatura = (viatura: Viatura) => {
     const kmRestante = viatura.KMOLEO - viatura.KM;
-    
+
     if (kmRestante <= 1000 || viatura.SALDO < 1000) {
       return { status: 'CRÍTICO', variant: 'destructive' as const, cor: 'border-destructive bg-destructive/5' };
     } else if (kmRestante <= 3000 || viatura.SALDO < 2000) {
@@ -204,7 +200,7 @@ const FrotaDashboard = () => {
   // Função para atualizar saldo de todas as viaturas
   const handleAtualizarSaldos = async () => {
     setIsUpdatingSaldos(true);
-    
+
     try {
       const agora = new Date();
       const mesAtual = agora.getMonth() + 1;
@@ -213,8 +209,8 @@ const FrotaDashboard = () => {
       // Buscar todas as OS do mês atual
       const osSnapshot = await getDocs(collection(db, 'ordensDeServico'));
       const ordensMesAtual = osSnapshot.docs
-        .map(doc => ({ 
-          id: doc.id, 
+        .map(doc => ({
+          id: doc.id,
           placa: doc.data().placaViatura,
           valorTotal: parseFloat(doc.data().valorOS?.replace(/[R$.,\s]/g, '') || '0') / 100,
           dataOS: doc.data().dataOS
@@ -237,7 +233,7 @@ const FrotaDashboard = () => {
       // Buscar cota da frota pesada e registros existentes
       const saldosViaturasSnapshot = await getDocs(collection(db, 'saldosViaturas'));
       const saldoOficinaSnapshot = await getDocs(collection(db, 'saldoOficina'));
-      
+
       const docFrotaPesada = saldosViaturasSnapshot.docs.find(doc => doc.data().tipo === 'frota_pesada');
       const cotaFrotaPesada = docFrotaPesada?.data()?.saldoMensal || 0;
 
@@ -257,14 +253,14 @@ const FrotaDashboard = () => {
           saldoUsado = ordensMesAtual
             .filter(os => os.placa === viatura.PLACA)
             .reduce((total, os) => total + (os.valorTotal || 0), 0);
-          
+
           // Buscar cota individual da viatura na coleção saldosViaturas
           const cotaViatura = saldosViaturasSnapshot.docs
             .find(doc => {
               const data = doc.data();
               return data.placa === viatura.PLACA || data.viaturaId === viatura.PLACA;
             })?.data()?.saldoMensal || viatura.SALDO || 0;
-          
+
           saldoDisponivel = cotaViatura - saldoUsado;
         }
 
@@ -276,7 +272,7 @@ const FrotaDashboard = () => {
 
         const dadosAtualizacao = {
           placa: viatura.PLACA,
-          cadastro: viatura.cadastro || '',
+          cadastro: viatura.CADASTRO || '',
           modelo: viatura.MODELO,
           tipo: viatura.tipo || 'leve',
           saldoUsado: saldoUsado,
@@ -320,7 +316,7 @@ const FrotaDashboard = () => {
           <p className="text-muted-foreground">Visão geral das viaturas e gastos</p>
         </div>
         <div className="flex gap-2">
-          <Button 
+          <Button
             onClick={handleAtualizarSaldos}
             disabled={isUpdatingSaldos}
             variant="secondary"
@@ -329,8 +325,8 @@ const FrotaDashboard = () => {
             <RefreshCw className={`h-4 w-4 mr-2 ${isUpdatingSaldos ? 'animate-spin' : ''}`} />
             {isUpdatingSaldos ? 'Atualizando...' : 'Atualizar Saldos'}
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => setGestaoSaldosAberto(true)}
           >
@@ -415,16 +411,15 @@ const FrotaDashboard = () => {
               return (
                 <Card
                   key={viatura.id}
-                  className={`cursor-pointer transition-all hover:shadow-md ${statusInfo.cor} ${
-                    isSelected ? 'ring-2 ring-primary' : ''
-                  }`}
+                  className={`cursor-pointer transition-all hover:shadow-md ${statusInfo.cor} ${isSelected ? 'ring-2 ring-primary' : ''
+                    }`}
                   onClick={() => handleViaturaClick(viatura.id)}
                 >
                   <CardContent className="p-4">
                     <div className="space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold text-sm">{viatura.cadastro || viatura.id}</h3>
+                          <h3 className="font-semibold text-sm">{viatura.CADASTRO || viatura.id}</h3>
                           <p className="text-xs text-muted-foreground">{viatura.PLACA}</p>
                         </div>
                         <Badge variant={statusInfo.variant} className="text-xs">
@@ -432,40 +427,40 @@ const FrotaDashboard = () => {
                         </Badge>
                       </div>
 
-                       <div className="space-y-1 text-xs">
-                         <div className="flex justify-between">
-                           <span className="text-muted-foreground">Tipo:</span>
-                           <Badge 
-                             variant={viatura.tipo === 'pesada' ? 'destructive' : 'default'} 
-                             className="text-xs"
-                           >
-                             {viatura.tipo === 'pesada' ? 'Pesada' : 
-                              viatura.tipo === 'leve' ? 'Leve' : 
-                              'Não definido'}
-                           </Badge>
-                         </div>
-                         <div className="flex justify-between">
-                           <span className="text-muted-foreground">KM:</span>
-                           <span className="font-medium">{viatura.KM.toLocaleString()}</span>
-                         </div>
-                         <div className="flex justify-between">
-                           <span className="text-muted-foreground">Próximo Óleo:</span>
-                           <span className="font-medium">{viatura.KMOLEO.toLocaleString()}</span>
-                         </div>
-                         <div className="flex justify-between">
-                           <span className="text-muted-foreground">Saldo:</span>
-                           <span className="font-medium">R$ {(viatura.SALDO / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                         </div>
-                         <div className="flex justify-between">
-                           <span className="text-muted-foreground">OS Total:</span>
-                           <span className="font-medium">{ordensViatura.length}</span>
-                         </div>
-                       </div>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Tipo:</span>
+                          <Badge
+                            variant={viatura.tipo === 'pesada' ? 'destructive' : 'default'}
+                            className="text-xs"
+                          >
+                            {viatura.tipo === 'pesada' ? 'Pesada' :
+                              viatura.tipo === 'leve' ? 'Leve' :
+                                'Não definido'}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">KM:</span>
+                          <span className="font-medium">{viatura.KM.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Próximo Óleo:</span>
+                          <span className="font-medium">{viatura.KMOLEO.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Saldo:</span>
+                          <span className="font-medium">R$ {(viatura.SALDO / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">OS Total:</span>
+                          <span className="font-medium">{ordensViatura.length}</span>
+                        </div>
+                      </div>
 
                       <div className="pt-2 border-t">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="w-full text-xs"
                           onClick={(e) => {
                             e.stopPropagation();
