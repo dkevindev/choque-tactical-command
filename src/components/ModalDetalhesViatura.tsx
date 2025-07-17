@@ -221,7 +221,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
 
   const getOrdensComFiltro = (filtro: string) => {
     return ordensServico.filter(os => 
-      os.observacao.toLowerCase().includes(filtro.toLowerCase())
+      os.observacao && os.observacao.toLowerCase().includes(filtro.toLowerCase())
     );
   };
 
@@ -729,11 +729,11 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
               </TabsTrigger>
               <TabsTrigger value="pneus" className="flex items-center gap-2">
                 <Circle className="h-4 w-4" />
-                Pneus ({ordensFiltered.filter(os => os.observacao.toLowerCase().includes('pneu')).length})
+                Pneus ({ordensFiltered.filter(os => os.observacao && os.observacao.toLowerCase().includes('pneu')).length})
               </TabsTrigger>
               <TabsTrigger value="bateria" className="flex items-center gap-2">
                 <Battery className="h-4 w-4" />
-                Bateria ({ordensFiltered.filter(os => os.observacao.toLowerCase().includes('bateria')).length})
+                Bateria ({ordensFiltered.filter(os => os.observacao && os.observacao.toLowerCase().includes('bateria')).length})
               </TabsTrigger>
             </TabsList>
 
@@ -759,12 +759,12 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <CardTitle className="flex items-center justify-between">
                     <span>Serviços de Pneus</span>
                     <Badge variant="outline" className="text-lg px-3 py-1">
-                      Total: {formatarMoeda(calcularTotalGasto(ordensFiltered.filter(os => os.observacao.toLowerCase().includes('pneu'))).toString())}
+                      Total: {formatarMoeda(calcularTotalGasto(ordensFiltered.filter(os => os.observacao && os.observacao.toLowerCase().includes('pneu'))).toString())}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <TabelaOrdensServico ordens={ordensFiltered.filter(os => os.observacao.toLowerCase().includes('pneu'))} loading={loading} />
+                  <TabelaOrdensServico ordens={ordensFiltered.filter(os => os.observacao && os.observacao.toLowerCase().includes('pneu'))} loading={loading} />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -775,12 +775,12 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <CardTitle className="flex items-center justify-between">
                     <span>Serviços de Bateria</span>
                     <Badge variant="outline" className="text-lg px-3 py-1">
-                      Total: {formatarMoeda(calcularTotalGasto(ordensFiltered.filter(os => os.observacao.toLowerCase().includes('bateria'))).toString())}
+                      Total: {formatarMoeda(calcularTotalGasto(ordensFiltered.filter(os => os.observacao && os.observacao.toLowerCase().includes('bateria'))).toString())}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <TabelaOrdensServico ordens={ordensFiltered.filter(os => os.observacao.toLowerCase().includes('bateria'))} loading={loading} />
+                  <TabelaOrdensServico ordens={ordensFiltered.filter(os => os.observacao && os.observacao.toLowerCase().includes('bateria'))} loading={loading} />
                 </CardContent>
               </Card>
             </TabsContent>
