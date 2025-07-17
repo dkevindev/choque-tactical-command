@@ -567,6 +567,10 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
       const dadosParaSalvarNoFirestore = {
         ...osDataParaEnvio,
         dataCriacao: serverTimestamp(), // Adiciona o timestamp de criação
+        appIdAssociado: 'default-app-id', // Adiciona o mesmo appId usado na consulta
+        observacao: osDataParaEnvio.defeitoRelatado, // Mapeia defeitoRelatado para observacao
+        COMPLETO: false, // Define como não completo inicialmente
+        Arquivo: '', // Campo vazio para arquivo
       };
       const docRef = await addDoc(collection(db, 'ordensDeServico'), dadosParaSalvarNoFirestore);
       console.log('Nova Ordem de Serviço salva com ID:', docRef.id);
