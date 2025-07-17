@@ -279,18 +279,39 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   // Função para buscar saldo e cota mensal da viatura
   const buscarSaldoECota = async (cadastro: string) => {
     try {
+      console.log('Buscando saldo para cadastro:', cadastro);
+      
       // Buscar dados da viatura na coleção saldosviaturas
       const saldosSnapshot = await getDocs(collection(db, 'saldosviaturas'));
-      const saldoViatura = saldosSnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .find((item: any) => item.CADASTRO === cadastro);
+      const todosOsSaldos = saldosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      console.log('Todos os saldos encontrados:', todosOsSaldos);
+      
+      // Primeiro tenta buscar por viatura individual
+      let saldoViatura = todosOsSaldos.find((item: any) => item.viaturaId === cadastro);
+      
+      // Se não encontrar como individual, busca por frota pesada
+      if (!saldoViatura) {
+        saldoViatura = todosOsSaldos.find((item: any) => item.tipo === 'frota_pesada');
+        console.log('Tentando buscar frota pesada:', saldoViatura);
+      }
+      
+      // Se ainda não encontrar, busca por CADASTRO (compatibilidade com estrutura antiga)
+      if (!saldoViatura) {
+        saldoViatura = todosOsSaldos.find((item: any) => item.CADASTRO === cadastro);
+        console.log('Tentando buscar por CADASTRO:', saldoViatura);
+      }
 
       if (!saldoViatura) {
         console.log('Saldo não encontrado para a viatura:', cadastro);
+        console.log('Tipos disponíveis:', todosOsSaldos.map((item: any) => ({ id: item.id, tipo: item.tipo, viaturaId: item.viaturaId })));
         return;
       }
 
-      const cotaMensal = (saldoViatura as any).COTA_MENSAL || 0;
+      console.log('Saldo encontrado:', saldoViatura);
+      
+      // Usar saldoMensal ao invés de COTA_MENSAL
+      const cotaMensal = (saldoViatura as any).saldoMensal || (saldoViatura as any).COTA_MENSAL || 0;
       
       // Calcular valores já utilizados no mês atual
       const dataAtual = new Date();
@@ -308,11 +329,16 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
           return dataOS.getMonth() + 1 === mesAtual && dataOS.getFullYear() === anoAtual;
         });
 
+      console.log('OS do mês encontradas:', osDoMes);
+
       // Somar valores já utilizados
       const totalUtilizado = osDoMes.reduce((total: number, os: any) => {
         const valor = parseFloat(os.valorOS?.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
         return total + valor;
       }, 0);
+
+      console.log('Total utilizado:', totalUtilizado);
+      console.log('Cota mensal:', cotaMensal);
 
       const saldoDisponivel = cotaMensal - totalUtilizado;
 
@@ -326,8 +352,15 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
       setFormData(prev => ({
         ...prev,
         cotaMensal: cotaMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-        saldoDisponivel: saldoDisponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        saldoDisponivel: saldoDisponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        tipoFrota: (saldoViatura as any).tipo === 'frota_pesada' ? 'pesada' : 'leve'
       }));
+
+      console.log('Valores atualizados no formulário:', {
+        cotaMensal: cotaMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        saldoDisponivel: saldoDisponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        tipoFrota: (saldoViatura as any).tipo === 'frota_pesada' ? 'pesada' : 'leve'
+      });
 
     } catch (error) {
       console.error('Erro ao buscar saldo e cota:', error);
