@@ -293,105 +293,116 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     try {
       console.log('Buscando saldo para cadastro:', cadastro, 'Data OS:', dataOS);
       
-      // Buscar dados da viatura na coleção saldosviaturas
-      const saldosSnapshot = await getDocs(collection(db, 'saldosviaturas'));
-      const todosOsSaldos = saldosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Primeiro buscar dados da viatura na coleção frota para obter tipo e placa
+      const frotaSnapshot = await getDocs(collection(db, 'frota'));
+      const viatura = frotaSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .find((v: any) => v.CADASTRO === cadastro || v.cadastro === cadastro);
       
-      console.log('Todos os saldos encontrados:', todosOsSaldos);
-      
-      // Primeiro tenta buscar por viatura individual
-      let saldoViatura = todosOsSaldos.find((item: any) => item.viaturaId === cadastro);
-      
-      // Se não encontrar como individual, busca por frota pesada
-      if (!saldoViatura) {
-        saldoViatura = todosOsSaldos.find((item: any) => item.tipo === 'frota_pesada');
-        console.log('Tentando buscar frota pesada:', saldoViatura);
-      }
-      
-      // Se ainda não encontrar, busca por CADASTRO (compatibilidade com estrutura antiga)
-      if (!saldoViatura) {
-        saldoViatura = todosOsSaldos.find((item: any) => item.CADASTRO === cadastro);
-        console.log('Tentando buscar por CADASTRO:', saldoViatura);
-      }
-
-      if (!saldoViatura) {
-        console.log('Saldo não encontrado para a viatura:', cadastro);
-        console.log('Tipos disponíveis:', todosOsSaldos.map((item: any) => ({ id: item.id, tipo: item.tipo, viaturaId: item.viaturaId })));
+      if (!viatura) {
+        console.log('Viatura não encontrada na coleção frota');
         return;
       }
 
-      console.log('Saldo encontrado:', saldoViatura);
-      
-      // Usar saldoMensal ao invés de COTA_MENSAL
-      const cotaMensal = (saldoViatura as any).saldoMensal || (saldoViatura as any).COTA_MENSAL || 0;
-      
-      // Calcular valores já utilizados no mês da data da OS (ou mês atual se não houver data)
-      const dataReferencia = dataOS ? new Date(dataOS) : new Date();
-      const mesReferencia = dataReferencia.getMonth() + 1; // getMonth() retorna 0-11
-      const anoReferencia = dataReferencia.getFullYear();
+      console.log('Viatura encontrada:', viatura);
+      const placaViatura = (viatura as any).PLACA || (viatura as any).placa;
+      const tipoViatura = (viatura as any).tipo || 'leve';
 
-      // Buscar todas as OS's da viatura no mês de referência
-      const osSnapshot = await getDocs(collection(db, 'ordensDeServico'));
-      let osDoMes = osSnapshot.docs
-        .map(doc => doc.data())
-        .filter((os: any) => {
-          const dataOS = new Date(os.dataOS);
-          return dataOS.getMonth() + 1 === mesReferencia && dataOS.getFullYear() === anoReferencia;
+      // Calcular mês e ano de referência
+      const dataReferencia = dataOS ? new Date(dataOS) : new Date();
+      const mesReferencia = `${(dataReferencia.getMonth() + 1).toString().padStart(2, '0')}/${dataReferencia.getFullYear()}`;
+
+      // Buscar saldo atualizado na coleção saldoOficina
+      const saldoOficinaSnapshot = await getDocs(collection(db, 'saldoOficina'));
+      const saldoOficina = saldoOficinaSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .find((item: any) => 
+          (item.placa === placaViatura || item.cadastro === cadastro) && 
+          item.mesReferencia === mesReferencia
+        );
+
+      if (saldoOficina) {
+        console.log('Saldo encontrado na saldoOficina:', saldoOficina);
+        
+        // Buscar cota na coleção saldosViaturas
+        const saldosViaturasSnapshot = await getDocs(collection(db, 'saldosViaturas'));
+        
+        let cotaMensal = 0;
+        if (tipoViatura === 'pesada') {
+          // Para frota pesada, buscar na coleção por tipo
+          const saldoFrotaPesada = saldosViaturasSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .find((item: any) => item.tipo === 'frota_pesada');
+          cotaMensal = (saldoFrotaPesada as any)?.saldoMensal || 0;
+        } else {
+          // Para frota leve, buscar por placa ou viaturaId
+          const saldoViatura = saldosViaturasSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .find((item: any) => 
+              item.placa === placaViatura || 
+              item.viaturaId === placaViatura ||
+              item.viaturaId === cadastro
+            );
+          cotaMensal = (saldoViatura as any)?.saldoMensal || (viatura as any).SALDO || 0;
+        }
+
+        // Armazenar valores originais para cálculos em tempo real
+        setValoresOriginais({
+          cotaMensal: cotaMensal,
+          saldoOriginal: (saldoOficina as any).saldoDisponivel || 0
         });
 
-      // Se é frota pesada, buscar todas as OS's do mês, independente da viatura
-      if ((saldoViatura as any).tipo === 'frota_pesada') {
-        console.log('Buscando OS de toda a frota pesada no mês');
-        osDoMes = osSnapshot.docs
-          .map(doc => doc.data())
-          .filter((os: any) => {
-            const dataOS = new Date(os.dataOS);
-            return dataOS.getMonth() + 1 === mesReferencia && dataOS.getFullYear() === anoReferencia && os.tipoFrota === 'pesada';
-          });
+        // Atualizar os campos no formulário
+        setFormData(prev => ({
+          ...prev,
+          cotaMensal: cotaMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          saldoDisponivel: ((saldoOficina as any).saldoDisponivel || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          tipoFrota: tipoViatura
+        }));
+
+        console.log('Valores atualizados no formulário:', {
+          cotaMensal: cotaMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          saldoDisponivel: ((saldoOficina as any).saldoDisponivel || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          tipoFrota: tipoViatura
+        });
+
       } else {
-        // Se é viatura individual, buscar apenas as OS's desta viatura
-        osDoMes = osSnapshot.docs
-          .map(doc => doc.data())
-          .filter((os: any) => {
-            if (os.cadastroViatura !== cadastro) return false;
-            
-            const dataOS = new Date(os.dataOS);
-            return dataOS.getMonth() + 1 === mesReferencia && dataOS.getFullYear() === anoReferencia;
+        console.log('Saldo não encontrado na saldoOficina para:', { placa: placaViatura, cadastro, mesReferencia });
+        
+        // Fallback: buscar diretamente na coleção saldosViaturas (método antigo)
+        const saldosViaturasSnapshot = await getDocs(collection(db, 'saldosViaturas'));
+        
+        let saldoViatura;
+        if (tipoViatura === 'pesada') {
+          saldoViatura = saldosViaturasSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .find((item: any) => item.tipo === 'frota_pesada');
+        } else {
+          saldoViatura = saldosViaturasSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .find((item: any) => 
+              item.placa === placaViatura || 
+              item.viaturaId === placaViatura ||
+              item.viaturaId === cadastro
+            );
+        }
+
+        if (saldoViatura) {
+          const cotaMensal = (saldoViatura as any).saldoMensal || 0;
+          
+          setValoresOriginais({
+            cotaMensal: cotaMensal,
+            saldoOriginal: cotaMensal
           });
+
+          setFormData(prev => ({
+            ...prev,
+            cotaMensal: cotaMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            saldoDisponivel: cotaMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            tipoFrota: tipoViatura
+          }));
+        }
       }
-
-      console.log('OS do mês encontradas:', osDoMes);
-
-      // Somar valores já utilizados
-      const totalUtilizado = osDoMes.reduce((total: number, os: any) => {
-        const valor = parseFloat(os.valorOS?.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
-        return total + valor;
-      }, 0);
-
-      console.log('Total utilizado:', totalUtilizado);
-      console.log('Cota mensal:', cotaMensal);
-
-      const saldoDisponivel = cotaMensal - totalUtilizado;
-
-      // Armazenar valores originais para cálculos em tempo real
-      setValoresOriginais({
-        cotaMensal: cotaMensal,
-        saldoOriginal: saldoDisponivel
-      });
-
-      // Atualizar os campos no formulário
-      setFormData(prev => ({
-        ...prev,
-        cotaMensal: cotaMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-        saldoDisponivel: saldoDisponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-        tipoFrota: (saldoViatura as any).tipo === 'frota_pesada' ? 'pesada' : 'leve'
-      }));
-
-      console.log('Valores atualizados no formulário:', {
-        cotaMensal: cotaMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-        saldoDisponivel: saldoDisponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-        tipoFrota: (saldoViatura as any).tipo === 'frota_pesada' ? 'pesada' : 'leve'
-      });
 
     } catch (error) {
       console.error('Erro ao buscar saldo e cota:', error);
@@ -739,29 +750,13 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">TIPO DE FROTA</label>
-            <div className="flex space-x-4">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="tipoFrota"
-                  value="leve"
-                  checked={formData.tipoFrota === 'leve'}
-                  onChange={handleChange}
-                  className="text-primary"
-                />
-                <span className="text-sm">Frota Leve</span>
-              </label>
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="tipoFrota"
-                  value="pesada"
-                  checked={formData.tipoFrota === 'pesada'}
-                  onChange={handleChange}
-                  className="text-primary"
-                />
-                <span className="text-sm">Frota Pesada</span>
-              </label>
+            <div className="p-3 bg-muted border rounded-md">
+              <span className="font-semibold text-lg capitalize">
+                {formData.tipoFrota === 'pesada' ? 'Frota Pesada' : 'Frota Leve'}
+              </span>
+              <p className="text-xs text-muted-foreground mt-1">
+                Definido automaticamente pela viatura
+              </p>
             </div>
           </div>
 
