@@ -187,6 +187,8 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         cadastro: prefilledData.cadastro,
         defeito: prefilledData.servico || ''
       }));
+      // Buscar saldo e cota para a viatura pré-preenchida
+      buscarSaldoECota(prefilledData.cadastro);
     }
   }, [prefilledData]);
 
@@ -255,16 +257,69 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     setSugestoesOficina(filtradas);
   }, [buscaOficina, oficinas]);
 
-  const handleSelectCadastro = (viatura: Viatura) => {
+  const handleSelectCadastro = async (viatura: Viatura) => {
     setFormData(prev => ({
       ...prev,
       cadastro: viatura.CADASTRO,
       modelo: viatura.MODELO,
-      // Se houver campo de placa na Viatura, adicione aqui:
-      // placaViatura: viatura.PLACA || '', // Exemplo
     }));
     setSugestoes([]);
     setShowSugestoes(false);
+
+    // Buscar saldo e cota mensal para a viatura selecionada
+    await buscarSaldoECota(viatura.CADASTRO);
+  };
+
+  // Função para buscar saldo e cota mensal da viatura
+  const buscarSaldoECota = async (cadastro: string) => {
+    try {
+      // Buscar dados da viatura na coleção saldosviaturas
+      const saldosSnapshot = await getDocs(collection(db, 'saldosviaturas'));
+      const saldoViatura = saldosSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .find((item: any) => item.CADASTRO === cadastro);
+
+      if (!saldoViatura) {
+        console.log('Saldo não encontrado para a viatura:', cadastro);
+        return;
+      }
+
+      const cotaMensal = (saldoViatura as any).COTA_MENSAL || 0;
+      
+      // Calcular valores já utilizados no mês atual
+      const dataAtual = new Date();
+      const mesAtual = dataAtual.getMonth() + 1; // getMonth() retorna 0-11
+      const anoAtual = dataAtual.getFullYear();
+
+      // Buscar todas as OS's da viatura no mês atual
+      const osSnapshot = await getDocs(collection(db, 'ordensDeServico'));
+      const osDoMes = osSnapshot.docs
+        .map(doc => doc.data())
+        .filter((os: any) => {
+          if (os.cadastroViatura !== cadastro) return false;
+          
+          const dataOS = new Date(os.dataOS);
+          return dataOS.getMonth() + 1 === mesAtual && dataOS.getFullYear() === anoAtual;
+        });
+
+      // Somar valores já utilizados
+      const totalUtilizado = osDoMes.reduce((total: number, os: any) => {
+        const valor = parseFloat(os.valorOS?.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+        return total + valor;
+      }, 0);
+
+      const saldoDisponivel = cotaMensal - totalUtilizado;
+
+      // Atualizar os campos no formulário
+      setFormData(prev => ({
+        ...prev,
+        cotaMensal: cotaMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        saldoDisponivel: saldoDisponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      }));
+
+    } catch (error) {
+      console.error('Erro ao buscar saldo e cota:', error);
+    }
   };
 
   const handleSelectOficina = (nomeOficial: string) => {
@@ -289,7 +344,12 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   ) => {
     const { name, value } = e.target;
 
-    if (name === 'valorOS' || name === 'cotaMensal' || name === 'saldoDisponivel') {
+    // Não permitir edição manual dos campos calculados automaticamente
+    if (name === 'cotaMensal' || name === 'saldoDisponivel') {
+      return; // Impede a edição desses campos
+    }
+
+    if (name === 'valorOS') {
       const valorFormatado = formatarParaReal(value);
       setFormData(prev => ({ ...prev, [name]: valorFormatado }));
     } else {
@@ -577,6 +637,8 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
             placeholder="COTA MENSAL (R$)"
             value={formData.cotaMensal}
             onChange={handleChange}
+            disabled
+            className="bg-muted"
           />
 
           <Input
@@ -584,6 +646,8 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
             placeholder="SALDO DISPONÍVEL (R$)"
             value={formData.saldoDisponivel}
             onChange={handleChange}
+            disabled
+            className="bg-muted"
           />
 
           <div className="space-y-2">
