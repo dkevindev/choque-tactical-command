@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import {
   Dialog,
@@ -11,6 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Table,
   TableBody,
@@ -20,15 +25,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import {
   Car,
   Wrench,
-  Calendar,
+  Calendar as CalendarIcon,
   DollarSign,
   Fuel,
   Battery,
   Circle,
-  Settings
+  Edit,
+  Save,
+  X,
+  Filter,
+  Eye
 } from 'lucide-react';
 
 interface Viatura {
@@ -60,15 +72,34 @@ interface ModalDetalhesViaturaProps {
 
 const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViaturaProps) => {
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([]);
+  const [ordensFiltered, setOrdensFiltered] = useState<OrdemServico[]>([]);
   const [loading, setLoading] = useState(false);
   const [saldosHistorico, setSaldosHistorico] = useState<any[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ cadastro: '', modelo: '', placa: '' });
+  const [showCadastroModal, setShowCadastroModal] = useState(false);
+  const [filtroMes, setFiltroMes] = useState<string>('');
+  const [filtroAno, setFiltroAno] = useState<string>('');
+  const [dataInicio, setDataInicio] = useState<Date | undefined>();
+  const [dataFim, setDataFim] = useState<Date | undefined>();
+  const [dataEspecifica, setDataEspecifica] = useState<Date | undefined>();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (viatura && isOpen) {
       fetchOrdensServico();
       fetchSaldosHistorico();
+      setEditData({
+        cadastro: viatura.cadastro || '',
+        modelo: viatura.MODELO || '',
+        placa: viatura.PLACA || ''
+      });
     }
   }, [viatura, isOpen]);
+
+  useEffect(() => {
+    aplicarFiltros();
+  }, [ordensServico, filtroMes, filtroAno, dataInicio, dataFim, dataEspecifica]);
 
   const fetchOrdensServico = async () => {
     if (!viatura) return;
@@ -116,6 +147,76 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     } catch (error) {
       console.error('Erro ao buscar histórico de saldos:', error);
     }
+  };
+
+  const aplicarFiltros = () => {
+    let ordemsFiltradas = [...ordensServico];
+
+    if (filtroMes) {
+      ordemsFiltradas = ordemsFiltradas.filter(os => {
+        const dataOS = new Date(os.dataOS);
+        return dataOS.getMonth() === parseInt(filtroMes);
+      });
+    }
+
+    if (filtroAno) {
+      ordemsFiltradas = ordemsFiltradas.filter(os => {
+        const dataOS = new Date(os.dataOS);
+        return dataOS.getFullYear() === parseInt(filtroAno);
+      });
+    }
+
+    if (dataInicio && dataFim) {
+      ordemsFiltradas = ordemsFiltradas.filter(os => {
+        const dataOS = new Date(os.dataOS);
+        return dataOS >= dataInicio && dataOS <= dataFim;
+      });
+    }
+
+    if (dataEspecifica) {
+      ordemsFiltradas = ordemsFiltradas.filter(os => {
+        const dataOS = new Date(os.dataOS);
+        return dataOS.toDateString() === dataEspecifica.toDateString();
+      });
+    }
+
+    setOrdensFiltered(ordemsFiltradas);
+  };
+
+  const handleEditViatura = async () => {
+    if (!viatura) return;
+    
+    try {
+      const docRef = doc(db, 'frota', viatura.id);
+      await updateDoc(docRef, {
+        cadastro: editData.cadastro,
+        MODELO: editData.modelo,
+        PLACA: editData.placa
+      });
+      
+      toast({
+        title: "Viatura atualizada",
+        description: "Os dados da viatura foram atualizados com sucesso.",
+      });
+      
+      setIsEditing(false);
+      // Aqui você poderia atualizar a viatura no estado pai se necessário
+    } catch (error) {
+      console.error('Erro ao atualizar viatura:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar os dados da viatura.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const limparFiltros = () => {
+    setFiltroMes('');
+    setFiltroAno('');
+    setDataInicio(undefined);
+    setDataFim(undefined);
+    setDataEspecifica(undefined);
   };
 
   const getOrdensComFiltro = (filtro: string) => {
@@ -228,23 +329,10 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <Car className="h-6 w-6" />
-              Detalhes da Viatura - {viatura.cadastro || viatura.id}
-            </DialogTitle>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                // Aqui você pode abrir o modal de gestão de saldos específico para esta viatura
-                console.log('Abrir gestão de saldos para:', viatura.id);
-              }}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Configurar Saldos
-            </Button>
-          </div>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Car className="h-6 w-6" />
+            Detalhes da Viatura - {viatura.cadastro || viatura.id}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -333,7 +421,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
+                  <CalendarIcon className="h-4 w-4" />
                   Resumo Saldo 12 Meses
                 </CardTitle>
               </CardHeader>
@@ -378,14 +466,59 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
           </div>
 
           {/* Informações da Viatura */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Car className="h-6 w-6 text-primary" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Modelo</p>
-                    <p className="font-semibold">{viatura.MODELO}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Car className="h-6 w-6 text-primary" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Modelo</p>
+                      {isEditing ? (
+                        <Input
+                          value={editData.modelo}
+                          onChange={(e) => setEditData(prev => ({ ...prev, modelo: e.target.value }))}
+                          className="h-6 text-sm font-semibold"
+                        />
+                      ) : (
+                        <p className="font-semibold">{viatura.MODELO}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditing(!isEditing)}
+                  >
+                    {isEditing ? <X className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Eye className="h-6 w-6 text-purple-500" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Cadastro</p>
+                      {isEditing ? (
+                        <Input
+                          value={editData.cadastro}
+                          onChange={(e) => setEditData(prev => ({ ...prev, cadastro: e.target.value }))}
+                          className="h-6 text-sm font-semibold"
+                        />
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          className="p-0 h-auto font-semibold hover:bg-transparent"
+                          onClick={() => setShowCadastroModal(true)}
+                        >
+                          {viatura.cadastro || 'N/A'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -417,31 +550,190 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
 
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="h-6 w-6 text-green-500" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Saldo</p>
-                    <p className="font-semibold">R$ {(viatura.SALDO / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="h-6 w-6 text-green-500" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Placa</p>
+                      {isEditing ? (
+                        <Input
+                          value={editData.placa}
+                          onChange={(e) => setEditData(prev => ({ ...prev, placa: e.target.value }))}
+                          className="h-6 text-sm font-semibold"
+                        />
+                      ) : (
+                        <p className="font-semibold">{viatura.PLACA}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
+          {isEditing && (
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditViatura}>
+                <Save className="h-4 w-4 mr-2" />
+                Salvar Alterações
+              </Button>
+            </div>
+          )}
+
+          {/* Filtros para Ordens de Serviço */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Filter className="h-4 w-4" />
+                Filtros de Ordens de Serviço
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                  <Label htmlFor="filtro-mes">Mês</Label>
+                  <Select value={filtroMes} onValueChange={setFiltroMes}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o mês" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Janeiro</SelectItem>
+                      <SelectItem value="1">Fevereiro</SelectItem>
+                      <SelectItem value="2">Março</SelectItem>
+                      <SelectItem value="3">Abril</SelectItem>
+                      <SelectItem value="4">Maio</SelectItem>
+                      <SelectItem value="5">Junho</SelectItem>
+                      <SelectItem value="6">Julho</SelectItem>
+                      <SelectItem value="7">Agosto</SelectItem>
+                      <SelectItem value="8">Setembro</SelectItem>
+                      <SelectItem value="9">Outubro</SelectItem>
+                      <SelectItem value="10">Novembro</SelectItem>
+                      <SelectItem value="11">Dezembro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="filtro-ano">Ano</Label>
+                  <Select value={filtroAno} onValueChange={setFiltroAno}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(ano => (
+                        <SelectItem key={ano} value={ano.toString()}>{ano}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Data Início</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !dataInicio && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dataInicio ? format(dataInicio, "dd/MM/yyyy") : "Selecionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dataInicio}
+                        onSelect={setDataInicio}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div>
+                  <Label>Data Fim</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !dataFim && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dataFim ? format(dataFim, "dd/MM/yyyy") : "Selecionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dataFim}
+                        onSelect={setDataFim}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div>
+                  <Label>Data Específica</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !dataEspecifica && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dataEspecifica ? format(dataEspecifica, "dd/MM/yyyy") : "Selecionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dataEspecifica}
+                        onSelect={setDataEspecifica}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={limparFiltros}>
+                  Limpar Filtros
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Tabs com Ordens de Serviço */}
           <Tabs defaultValue="todas" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="todas" className="flex items-center gap-2">
                 <Wrench className="h-4 w-4" />
-                Todas ({ordensGerais.length})
+                Todas ({ordensFiltered.length})
               </TabsTrigger>
               <TabsTrigger value="pneus" className="flex items-center gap-2">
                 <Circle className="h-4 w-4" />
-                Pneus ({ordensPneu.length})
+                Pneus ({ordensFiltered.filter(os => os.observacao.toLowerCase().includes('pneu')).length})
               </TabsTrigger>
               <TabsTrigger value="bateria" className="flex items-center gap-2">
                 <Battery className="h-4 w-4" />
-                Bateria ({ordensBateria.length})
+                Bateria ({ordensFiltered.filter(os => os.observacao.toLowerCase().includes('bateria')).length})
               </TabsTrigger>
             </TabsList>
 
@@ -451,12 +743,12 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <CardTitle className="flex items-center justify-between">
                     <span>Ordens de Serviço</span>
                     <Badge variant="outline" className="text-lg px-3 py-1">
-                      Total: {formatarMoeda(calcularTotalGasto(ordensGerais).toString())}
+                      Total: {formatarMoeda(calcularTotalGasto(ordensFiltered).toString())}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <TabelaOrdensServico ordens={ordensGerais} loading={loading} />
+                  <TabelaOrdensServico ordens={ordensFiltered} loading={loading} />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -467,12 +759,12 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <CardTitle className="flex items-center justify-between">
                     <span>Serviços de Pneus</span>
                     <Badge variant="outline" className="text-lg px-3 py-1">
-                      Total: {formatarMoeda(calcularTotalGasto(ordensPneu).toString())}
+                      Total: {formatarMoeda(calcularTotalGasto(ordensFiltered.filter(os => os.observacao.toLowerCase().includes('pneu'))).toString())}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <TabelaOrdensServico ordens={ordensPneu} loading={loading} />
+                  <TabelaOrdensServico ordens={ordensFiltered.filter(os => os.observacao.toLowerCase().includes('pneu'))} loading={loading} />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -483,17 +775,42 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <CardTitle className="flex items-center justify-between">
                     <span>Serviços de Bateria</span>
                     <Badge variant="outline" className="text-lg px-3 py-1">
-                      Total: {formatarMoeda(calcularTotalGasto(ordensBateria).toString())}
+                      Total: {formatarMoeda(calcularTotalGasto(ordensFiltered.filter(os => os.observacao.toLowerCase().includes('bateria'))).toString())}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <TabelaOrdensServico ordens={ordensBateria} loading={loading} />
+                  <TabelaOrdensServico ordens={ordensFiltered.filter(os => os.observacao.toLowerCase().includes('bateria'))} loading={loading} />
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Modal do Cadastro */}
+        <Dialog open={showCadastroModal} onOpenChange={setShowCadastroModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Informações do Cadastro</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-6xl font-bold text-primary mb-2">
+                    {viatura?.cadastro || 'N/A'}
+                  </div>
+                  <p className="text-muted-foreground">Código de Cadastro da Viatura</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Modelo: {viatura?.MODELO}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Placa: {viatura?.PLACA}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );
