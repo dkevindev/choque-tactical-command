@@ -211,8 +211,30 @@ const OrdemServicoPage = () => {
       return;
     }
 
-    // Validação simples de senha (você pode ajustar conforme necessário)
-    if (deletePassword !== 'admin123') {
+    // Obter dados do usuário logado
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      toast({
+        title: "Erro",
+        description: "Usuário não logado. Faça login novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const usuarioLogado = JSON.parse(userData);
+    
+    // Validar senha do usuário logado
+    let senhaValida = false;
+    if (usuarioLogado.primeiroAcesso !== false || !usuarioLogado.senha) {
+      // Se é primeiro acesso, a senha deve ser a matrícula
+      senhaValida = deletePassword === usuarioLogado.Matrícula;
+    } else {
+      // Se não é primeiro acesso, verificar senha cadastrada
+      senhaValida = deletePassword === usuarioLogado.senha;
+    }
+
+    if (!senhaValida) {
       toast({
         title: "Erro",
         description: "Senha incorreta.",
