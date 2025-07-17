@@ -27,7 +27,8 @@ import {
   DollarSign,
   Fuel,
   Battery,
-  Circle
+  Circle,
+  Settings
 } from 'lucide-react';
 
 interface Viatura {
@@ -119,14 +120,19 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     );
   };
 
-  const formatarMoeda = (valor: string) => {
-    const numero = parseFloat(valor.replace(/[R$.,\s]/g, ''));
+  const formatarMoeda = (valor: string | number) => {
+    let numero: number;
+    if (typeof valor === 'string') {
+      numero = parseFloat(valor.replace(/[R$.,\s]/g, '')) / 100;
+    } else {
+      numero = valor / 100;
+    }
     return numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
   const calcularTotalGasto = (ordens: OrdemServico[]) => {
     return ordens.reduce((total, os) => {
-      const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, ''));
+      const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
       return total + valor;
     }, 0);
   };
@@ -148,7 +154,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         return dataOS.getMonth() === mesAtual && dataOS.getFullYear() === anoAtual;
       })
       .reduce((total, os) => {
-        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, ''));
+        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
         return total + valor;
       }, 0);
 
@@ -160,7 +166,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         return dataOS >= doze_meses_atras;
       })
       .reduce((total, os) => {
-        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, ''));
+        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
         return total + valor;
       }, 0);
 
@@ -191,10 +197,23 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <Car className="h-6 w-6" />
-            Detalhes da Viatura - {viatura.cadastro || viatura.id}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Car className="h-6 w-6" />
+              Detalhes da Viatura - {viatura.cadastro || viatura.id}
+            </DialogTitle>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                // Aqui você pode abrir o modal de gestão de saldos específico para esta viatura
+                console.log('Abrir gestão de saldos para:', viatura.id);
+              }}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Configurar Saldos
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -337,7 +356,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <DollarSign className="h-6 w-6 text-green-500" />
                   <div>
                     <p className="text-sm text-muted-foreground">Saldo</p>
-                    <p className="font-semibold">R$ {viatura.SALDO.toLocaleString()}</p>
+                    <p className="font-semibold">R$ {(viatura.SALDO / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                 </div>
               </CardContent>
@@ -422,7 +441,7 @@ interface TabelaOrdensServicoProps {
 
 const TabelaOrdensServico = ({ ordens, loading }: TabelaOrdensServicoProps) => {
   const formatarMoeda = (valor: string) => {
-    const numero = parseFloat(valor.replace(/[R$.,\s]/g, ''));
+    const numero = parseFloat(valor.replace(/[R$.,\s]/g, '')) / 100;
     return numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 

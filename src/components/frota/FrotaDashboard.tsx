@@ -74,7 +74,7 @@ const FrotaDashboard = () => {
       })) as Viatura[];
       
       // Ordenar viaturas conforme solicitado
-      const ordenCustomizada = ['CAV11', 'CAV12', 'CAV13', 'CAV05', 'CAV06', 'TA01', 'TA02', 'TP'];
+      const ordenCustomizada = ['CAV11', 'CAV12', 'CAV13', 'CAV05', 'CAV06', 'TA01', 'TA02', 'TA03', 'TP'];
       
       const viaturasOrdenadas = viaturasData.sort((a, b) => {
         const cadastroA = a.cadastro || a.id;
@@ -133,7 +133,7 @@ const FrotaDashboard = () => {
         return dataOS.getMonth() === mesAtual && dataOS.getFullYear() === anoAtual;
       })
       .reduce((acc, os) => {
-        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, ''));
+        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
         const placa = os.placaViatura;
         
         if (!acc[placa]) {
@@ -159,7 +159,7 @@ const FrotaDashboard = () => {
           return dataOS.getMonth() === data.getMonth() && dataOS.getFullYear() === data.getFullYear();
         })
         .reduce((total, os) => {
-          const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, ''));
+          const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
           return total + valor;
         }, 0);
 
@@ -383,7 +383,7 @@ const FrotaDashboard = () => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Saldo:</span>
-                          <span className="font-medium">R$ {viatura.SALDO.toLocaleString()}</span>
+                          <span className="font-medium">R$ {(viatura.SALDO / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">OS Total:</span>
