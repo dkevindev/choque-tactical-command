@@ -102,10 +102,14 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
       const querySnapshot = await getDocs(collection(db, 'saldosViaturas'));
       const saldosData = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }) as any)
-        .filter((saldo: any) => 
-          saldo.viaturaId === viatura.id || 
-          (saldo.tipo === 'frota_pesada' && ['TA01', 'TA02', 'TA03', 'TP'].includes(viatura.cadastro || viatura.id))
-        )
+        .filter((saldo: any) => {
+          const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
+          const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
+          return saldo.viaturaId === viatura.id || 
+            (saldo.tipo === 'frota_pesada' && 
+             (FROTA_PESADA_CADASTROS.includes(viatura.cadastro || viatura.id) || 
+              FROTA_PESADA_PLACAS.includes(viatura.PLACA)))
+        })
         .sort((a: any, b: any) => b.anoReferencia - a.anoReferencia);
       
       setSaldosHistorico(saldosData);
@@ -144,13 +148,15 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     const anoAtual = agora.getFullYear();
     
     // Buscar saldo configurado para esta viatura ou para frota pesada
-    const FROTA_PESADA = ['TA01', 'TA02', 'TA03', 'TP'];
+    const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
+    const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
     const cadastroViatura = viatura?.cadastro || viatura?.id;
+    const placaViatura = viatura?.PLACA;
     
     let saldoMensal = 0;
     let saldo12Meses = 0;
     
-    if (FROTA_PESADA.includes(cadastroViatura || '')) {
+    if (FROTA_PESADA_CADASTROS.includes(cadastroViatura || '') || FROTA_PESADA_PLACAS.includes(placaViatura || '')) {
       // Para frota pesada, buscar saldo compartilhado
       const saldoFrotaPesada = saldosHistorico.find(s => s.tipo === 'frota_pesada' && s.anoReferencia === anoAtual);
       if (saldoFrotaPesada) {
