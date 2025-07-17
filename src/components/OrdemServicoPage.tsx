@@ -103,8 +103,7 @@ const OrdemServicoPage = () => {
     try {
       let q: Query<DocumentData> = collection(db, 'ordensDeServico');
 
-      const currentAppId = 'default-app-id'; // AJUSTE AQUI: Use seu appId real!
-      q = query(q, where('appIdAssociado', '==', currentAppId));
+      // Remover o filtro de appIdAssociado para mostrar todas as OS's
 
       // --- FILTRO DE DATAS ---
       if (dateRange.from && dateRange.to) {
@@ -125,7 +124,15 @@ const OrdemServicoPage = () => {
 
       // *** REMOVIDO O limit() AQUI ***
       const snapshot = await getDocs(q); 
-      const fetchedDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OrdemServico));
+      const fetchedDocs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Mapear defeitoRelatado para observacao se não existir observacao
+          observacao: data.observacao || data.defeitoRelatado || ''
+        } as OrdemServico;
+      });
 
       // Filtragem client-side para "contém" (mantida)
       let filteredDocs = fetchedDocs;
