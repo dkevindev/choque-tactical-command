@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import type { BotResponse, Viatura } from '@/bot/types';
-import { responder } from '@/bot/responder';
+import { responder } from '@/bot/index';
 import ViaturaModal from '@/bot/ViaturaModal';
+import FormEntradaOficina from '@/bot/FormEntradaOficina';
+import FormSaidaOficina from '@/bot/FormSaidaOficina';
 import { Mic, MicOff, Send } from 'lucide-react';
 
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
@@ -17,12 +19,14 @@ const CAVBot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Olá! Sou o CAVBOT, seu assistente virtual da CAVALARIA. Como posso ajudá-lo hoje?',
+      text: 'Olá! Sou o CAVBOT, seu assistente virtual da CAVALARIA. Como posso ajudá-lo hoje?\n\n🔧 Posso ajudar com:\n• Consultar dados de viaturas\n• Registrar entrada na oficina\n• Registrar saída da oficina\n• Listar viaturas na oficina',
       sender: 'bot',
       timestamp: new Date()
     }
   ]);
   const [selectedViatura, setSelectedViatura] = useState<Viatura | null>(null);
+  const [showEntradaForm, setShowEntradaForm] = useState(false);
+  const [showSaidaForm, setShowSaidaForm] = useState(false);
   const [inputText, setInputText] = useState('');
 
   const {
@@ -73,6 +77,10 @@ const CAVBot = () => {
       setMessages(prev => [...prev, botMessage]);
     } else if (botResponse.type === 'show_viatura_modal') {
       setSelectedViatura(botResponse.viatura);
+    } else if (botResponse.type === 'form_entrada_oficina') {
+      setShowEntradaForm(true);
+    } else if (botResponse.type === 'form_saida_oficina') {
+      setShowSaidaForm(true);
     }
   };
 
@@ -89,6 +97,16 @@ const CAVBot = () => {
     }
   };
 
+  const handleFormSuccess = (message: string) => {
+    const botMessage: Message = {
+      id: Date.now().toString(),
+      text: message,
+      sender: 'bot',
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, botMessage]);
+  };
+
   return (
     <>
       <div className="chat-container">
@@ -102,7 +120,7 @@ const CAVBot = () => {
               key={msg.id}
               className={`message ${msg.sender === 'user' ? 'user-message' : 'bot-message'}`}
             >
-              <p>{msg.text}</p>
+              <p style={{ whiteSpace: 'pre-line' }}>{msg.text}</p>
               <span className="timestamp">{msg.timestamp.toLocaleTimeString('pt-BR')}</span>
             </div>
           ))}
@@ -145,6 +163,20 @@ const CAVBot = () => {
         <ViaturaModal
           viatura={selectedViatura}
           onClose={() => setSelectedViatura(null)}
+        />
+      )}
+
+      {showEntradaForm && (
+        <FormEntradaOficina
+          onClose={() => setShowEntradaForm(false)}
+          onSuccess={handleFormSuccess}
+        />
+      )}
+
+      {showSaidaForm && (
+        <FormSaidaOficina
+          onClose={() => setShowSaidaForm(false)}
+          onSuccess={handleFormSuccess}
         />
       )}
 
