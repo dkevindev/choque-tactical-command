@@ -113,11 +113,31 @@ const CAVBot = () => {
     handleSendMessage(action);
   };
 
+  const voltarAoMenuPrincipal = () => {
+    setShowQuickButtons(true);
+    const botMessage: Message = {
+      id: Date.now().toString(),
+      text: '🏠 Voltando ao menu principal. Como posso ajudá-lo?',
+      sender: 'bot',
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, botMessage]);
+  };
+
   return (
     <>
       <div className="chat-container">
         <header className="chat-header">
           <h1>CAVBOT - Assistente da Cavalaria</h1>
+          {!showQuickButtons && (
+            <button
+              onClick={voltarAoMenuPrincipal}
+              className="menu-button"
+              title="Voltar ao menu principal"
+            >
+              🏠 Menu
+            </button>
+          )}
         </header>
 
         <main className="chat-messages">
@@ -181,6 +201,16 @@ const CAVBot = () => {
         </main>
 
         <footer className="chat-input-area">
+          {!showQuickButtons && (
+            <button
+              onClick={voltarAoMenuPrincipal}
+              className="menu-button-footer"
+              title="Menu principal"
+            >
+              🏠
+            </button>
+          )}
+          
           <button
             type="button"
             className={`mic-button ${listening ? 'recording' : ''}`}
@@ -238,69 +268,135 @@ const CAVBot = () => {
           display: flex;
           flex-direction: column;
           height: 100vh;
-          max-width: 600px;
-          margin: 0 auto;
+          height: 100dvh; /* Dynamic viewport height for mobile */
+          max-height: 100vh;
+          max-height: 100dvh;
+          width: 100%;
+          max-width: 100vw;
           background: #1f2937;
           color: #f9fafb;
           font-family: 'Roboto', sans-serif;
-          border-radius: 10px;
           overflow: hidden;
-          box-shadow: 0 0 15px rgba(0,0,0,0.5);
+          position: relative;
+        }
+
+        @media (min-width: 640px) {
+          .chat-container {
+            max-width: 600px;
+            margin: 0 auto;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+          }
         }
 
         .chat-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
           padding: 1rem;
           background: #111827;
           font-weight: 700;
-          font-size: 1.25rem;
+          font-size: 1.1rem;
           text-align: center;
           border-bottom: 1px solid #374151;
+          flex-shrink: 0;
+        }
+
+        .chat-header h1 {
+          flex: 1;
+          margin: 0;
+        }
+
+        .menu-button {
+          background: #374151;
+          border: 1px solid #4b5563;
+          color: #d1d5db;
+          padding: 0.5rem 1rem;
+          border-radius: 6px;
+          font-size: 0.9rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .menu-button:hover {
+          background: #4b5563;
+          color: #f3f4f6;
+        }
+
+        .menu-button-footer {
+          background: #374151;
+          border: 1px solid #4b5563;
+          color: #d1d5db;
+          padding: 0.5rem;
+          border-radius: 50%;
+          font-size: 1.2rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 44px;
+          min-height: 44px;
+        }
+
+        .menu-button-footer:hover {
+          background: #4b5563;
+          color: #f3f4f6;
         }
 
         .chat-messages {
           flex: 1;
           padding: 1rem;
           overflow-y: auto;
+          overflow-x: hidden;
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
           scrollbar-width: thin;
           scrollbar-color: #4b5563 transparent;
+          min-height: 0; /* Important for flex child to shrink */
         }
+        
         .chat-messages::-webkit-scrollbar {
-          width: 8px;
+          width: 6px;
         }
+        
         .chat-messages::-webkit-scrollbar-thumb {
           background-color: #4b5563;
-          border-radius: 4px;
+          border-radius: 3px;
         }
 
         .message {
-          max-width: 80%;
+          max-width: 85%;
           padding: 0.75rem 1rem;
-          border-radius: 20px;
+          border-radius: 16px;
           position: relative;
           word-wrap: break-word;
-          font-size: 1rem;
+          word-break: break-word;
+          font-size: 0.95rem;
+          line-height: 1.4;
+          animation: fade-in 0.3s ease-out;
         }
         .user-message {
           align-self: flex-end;
           background: #3b82f6;
           color: white;
-          border-bottom-right-radius: 0;
+          border-bottom-right-radius: 4px;
         }
+        
         .bot-message {
           align-self: flex-start;
           background: #374151;
           border: 1px solid #4b5563;
           color: #d1d5db;
-          border-bottom-left-radius: 0;
+          border-bottom-left-radius: 4px;
         }
 
         .timestamp {
           font-size: 0.7rem;
           color: #9ca3af;
-          margin-top: 2px;
+          margin-top: 4px;
+          display: block;
           user-select: none;
         }
 
@@ -311,6 +407,7 @@ const CAVBot = () => {
           padding: 0.75rem 1rem;
           background: #111827;
           border-top: 1px solid #374151;
+          flex-shrink: 0;
         }
 
         input[type="text"] {
@@ -387,6 +484,7 @@ const CAVBot = () => {
           background: #111827;
           border-radius: 12px;
           border: 1px solid #374151;
+          animation: fade-in 0.5s ease-out;
         }
 
         .quick-actions-header {
@@ -394,7 +492,7 @@ const CAVBot = () => {
           color: #f3f4f6;
           font-weight: 600;
           margin-bottom: 1rem;
-          font-size: 1.1rem;
+          font-size: 1rem;
         }
 
         .quick-buttons {
@@ -427,14 +525,63 @@ const CAVBot = () => {
           box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
 
-        @media (max-width: 500px) {
+        @media (max-width: 640px) {
+          .chat-container {
+            height: 100vh;
+            height: 100dvh;
+            border-radius: 0;
+            box-shadow: none;
+          }
+
+          .chat-header {
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+          }
+
+          .chat-header h1 {
+            font-size: 1rem;
+          }
+
+          .menu-button {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+          }
+
           .quick-buttons {
             grid-template-columns: 1fr;
+            gap: 0.5rem;
           }
           
           .quick-button {
-            font-size: 1rem;
+            font-size: 0.95rem;
             padding: 1rem;
+            text-align: center;
+          }
+
+          .message {
+            max-width: 90%;
+            font-size: 0.95rem;
+            padding: 0.6rem 0.8rem;
+          }
+
+          .chat-input-area {
+            padding: 0.6rem 0.8rem;
+          }
+
+          input[type="text"] {
+            font-size: 1rem;
+            padding: 0.7rem 1rem;
+          }
+        }
+
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
           }
         }
       `}</style>
