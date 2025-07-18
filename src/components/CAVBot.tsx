@@ -191,7 +191,7 @@ const CAVBot = () => {
                 </button>
                 <button 
                   className="quick-button"
-                  onClick={() => handleQuickAction('consultar OS 123')}
+                  onClick={() => handleQuickAction('consultar OS')}
                 >
                   📄 Consultar OS
                 </button>

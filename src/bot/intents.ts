@@ -50,14 +50,37 @@ export const intents: Intent[] = [
     name: 'consultar_os',
     patterns: ['consultar os', 'ordem de serviço', 'os número', 'os '],
     handler: async (input: string) => {
-      // Extrair número da OS
-      const match = input.match(/(?:os|ordem)\s*(\d+)/i);
-      if (match) {
-        const numeroOS = match[1];
+      const inputLower = input.toLowerCase();
+      
+      // Se for apenas "consultar os", pedir o número
+      if (inputLower.trim() === 'consultar os' || inputLower.trim() === 'consultar ordem de serviço') {
+        return { type: 'text', text: 'Por favor, informe o número da OS que deseja consultar.\nExemplo: "consultar OS 45646"' };
+      }
+      
+      // Extrair número da OS - tentativas múltiplas de regex
+      let numeroOS = null;
+      
+      // Tenta vários padrões
+      const patterns = [
+        /(?:os|ordem)\s*(\d+)/i,           // "os 123" ou "ordem 123"
+        /(?:número|numero)\s*(\d+)/i,      // "número 123"
+        /(\d+)/                           // qualquer número na string
+      ];
+      
+      for (const pattern of patterns) {
+        const match = input.match(pattern);
+        if (match) {
+          numeroOS = match[1];
+          break;
+        }
+      }
+      
+      if (numeroOS) {
         const resultado = await consultarOSPorNumero(numeroOS);
         return { type: 'text', text: resultado };
       }
-      return { type: 'text', text: 'Por favor, informe o número da OS. Exemplo: "consultar OS 123"' };
+      
+      return { type: 'text', text: 'Por favor, informe o número da OS. Exemplo: "consultar OS 45646"' };
     },
   },
 ];
