@@ -1,5 +1,5 @@
 import { responderConsultaViatura } from './responderConsultaViatura';
-import { handleEntradaOficina, handleSaidaOficina, listarViaturasNaOficina } from './oficinaHandler';
+import { handleEntradaOficina, handleSaidaOficina, listarViaturasNaOficina, buscarServicosPorTipo, consultarOSPorNumero } from './oficinaHandler';
 import type { BotResponse } from './types';
 
 export interface Intent {
@@ -30,6 +30,34 @@ export const intents: Intent[] = [
     handler: async () => {
       const lista = await listarViaturasNaOficina();
       return { type: 'text', text: lista };
+    },
+  },
+  {
+    name: 'buscar_servico',
+    patterns: ['buscar serviço', 'procurar serviço', 'serviços de', 'buscar por'],
+    handler: async (input: string) => {
+      // Extrair o tipo de serviço da entrada
+      const match = input.match(/(?:buscar|procurar|serviços de|buscar por)\s+(.+)/i);
+      if (match) {
+        const tipoServico = match[1].trim();
+        const resultado = await buscarServicosPorTipo(tipoServico);
+        return { type: 'text', text: resultado };
+      }
+      return { type: 'text', text: 'Por favor, especifique o tipo de serviço que deseja buscar. Exemplo: "buscar serviço bateria"' };
+    },
+  },
+  {
+    name: 'consultar_os',
+    patterns: ['consultar os', 'ordem de serviço', 'os número', 'os '],
+    handler: async (input: string) => {
+      // Extrair número da OS
+      const match = input.match(/(?:os|ordem)\s*(\d+)/i);
+      if (match) {
+        const numeroOS = match[1];
+        const resultado = await consultarOSPorNumero(numeroOS);
+        return { type: 'text', text: resultado };
+      }
+      return { type: 'text', text: 'Por favor, informe o número da OS. Exemplo: "consultar OS 123"' };
     },
   },
 ];

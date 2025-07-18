@@ -172,3 +172,78 @@ export async function listarOficinas(): Promise<Oficina[]> {
     return [];
   }
 }
+
+export async function buscarServicosPorTipo(tipoServico: string): Promise<string> {
+  try {
+    const oficinaSnapshot = await getDocs(collection(db, 'oficina'));
+    const servicos: ViaturaNaOficina[] = [];
+    
+    oficinaSnapshot.forEach((doc) => {
+      const data = doc.data() as ViaturaNaOficina;
+      const servicoTexto = (data.servicoRealizar || '').toLowerCase();
+      const observacaoTexto = (data.observacaoServico || '').toLowerCase();
+      const busca = tipoServico.toLowerCase();
+      
+      if (servicoTexto.includes(busca) || observacaoTexto.includes(busca)) {
+        servicos.push({ id: doc.id, ...data });
+      }
+    });
+
+    if (servicos.length === 0) {
+      return `Nenhum serviço encontrado relacionado a "${tipoServico}".`;
+    }
+
+    let texto = `🔍 Serviços encontrados para "${tipoServico}":\n\n`;
+    servicos.forEach((servico, index) => {
+      texto += `${index + 1}. ${servico.cadastro} - ${servico.placa}\n`;
+      texto += `   📅 Entrada: ${new Date(servico.dataEntrada).toLocaleDateString()}\n`;
+      if (servico.dataSaida) {
+        texto += `   📅 Saída: ${new Date(servico.dataSaida).toLocaleDateString()}\n`;
+      }
+      texto += `   🏭 Oficina: ${servico.oficina}\n`;
+      texto += `   🔧 Serviço: ${servico.servicoRealizar}\n`;
+      if (servico.observacaoServico) {
+        texto += `   ✅ Realizado: ${servico.observacaoServico}\n`;
+      }
+      texto += `   📊 Status: ${servico.status === 'na-oficina' ? 'Na oficina' : servico.status === 'os-pendente' ? 'OS Pendente' : servico.status}\n\n`;
+    });
+    
+    return texto;
+  } catch (error) {
+    console.error('Erro ao buscar serviços:', error);
+    return 'Erro ao buscar serviços. Tente novamente.';
+  }
+}
+
+export async function consultarOSPorNumero(numeroOS: string): Promise<string> {
+  try {
+    const osSnapshot = await getDocs(collection(db, 'ordens-servico'));
+    let osEncontrada = null;
+    
+    osSnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.numeroOS && data.numeroOS.toString() === numeroOS) {
+        osEncontrada = { id: doc.id, ...data };
+      }
+    });
+
+    if (!osEncontrada) {
+      return `OS número ${numeroOS} não encontrada.`;
+    }
+
+    let texto = `📄 Ordem de Serviço ${numeroOS}\n\n`;
+    texto += `🚗 Viatura: ${osEncontrada.cadastro || 'N/A'}\n`;
+    texto += `📅 Data: ${osEncontrada.data ? new Date(osEncontrada.data).toLocaleDateString() : 'N/A'}\n`;
+    texto += `👤 Solicitante: ${osEncontrada.solicitante || 'N/A'}\n`;
+    texto += `🔧 Serviço: ${osEncontrada.servicoSolicitado || osEncontrada.servico || 'N/A'}\n`;
+    if (osEncontrada.observacao) {
+      texto += `📝 Observação: ${osEncontrada.observacao}\n`;
+    }
+    texto += `📊 Status: ${osEncontrada.status || 'Pendente'}\n`;
+    
+    return texto;
+  } catch (error) {
+    console.error('Erro ao consultar OS:', error);
+    return 'Erro ao consultar ordem de serviço. Tente novamente.';
+  }
+}

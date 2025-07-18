@@ -19,7 +19,7 @@ const CAVBot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Olá! Sou o CAVBOT, seu assistente virtual da CAVALARIA. Como posso ajudá-lo hoje?\n\n🔧 Posso ajudar com:\n• Consultar dados de viaturas\n• Registrar entrada na oficina\n• Registrar saída da oficina\n• Listar viaturas na oficina',
+      text: 'Olá! Sou o CAVBOT, seu assistente virtual da CAVALARIA. Como posso ajudá-lo hoje?',
       sender: 'bot',
       timestamp: new Date()
     }
@@ -27,6 +27,7 @@ const CAVBot = () => {
   const [selectedViatura, setSelectedViatura] = useState<Viatura | null>(null);
   const [showEntradaForm, setShowEntradaForm] = useState(false);
   const [showSaidaForm, setShowSaidaForm] = useState(false);
+  const [showQuickButtons, setShowQuickButtons] = useState(true);
   const [inputText, setInputText] = useState('');
 
   const {
@@ -107,6 +108,11 @@ const CAVBot = () => {
     setMessages(prev => [...prev, botMessage]);
   };
 
+  const handleQuickAction = (action: string) => {
+    setShowQuickButtons(false);
+    handleSendMessage(action);
+  };
+
   return (
     <>
       <div className="chat-container">
@@ -125,6 +131,53 @@ const CAVBot = () => {
             </div>
           ))}
           <div ref={messagesEndRef} />
+          
+          {/* Botões de ação rápida */}
+          {showQuickButtons && (
+            <div className="quick-actions">
+              <div className="quick-actions-header">
+                <span>🔧 Como posso ajudar?</span>
+              </div>
+              <div className="quick-buttons">
+                <button 
+                  className="quick-button"
+                  onClick={() => handleQuickAction('consultar dados da CAV - 01')}
+                >
+                  📋 Consultar Viatura
+                </button>
+                <button 
+                  className="quick-button"
+                  onClick={() => handleQuickAction('registrar entrada')}
+                >
+                  🏭 Entrada Oficina
+                </button>
+                <button 
+                  className="quick-button"
+                  onClick={() => handleQuickAction('registrar saída')}
+                >
+                  🚗 Saída Oficina
+                </button>
+                <button 
+                  className="quick-button"
+                  onClick={() => handleQuickAction('viaturas na oficina')}
+                >
+                  📊 Status Oficina
+                </button>
+                <button 
+                  className="quick-button"
+                  onClick={() => handleQuickAction('buscar serviço bateria')}
+                >
+                  🔍 Buscar Serviços
+                </button>
+                <button 
+                  className="quick-button"
+                  onClick={() => handleQuickAction('consultar OS 123')}
+                >
+                  📄 Consultar OS
+                </button>
+              </div>
+            </div>
+          )}
         </main>
 
         <footer className="chat-input-area">
@@ -325,6 +378,63 @@ const CAVBot = () => {
           .message {
             max-width: 90%;
             font-size: 1.1rem;
+          }
+        }
+
+        .quick-actions {
+          margin: 1rem 0;
+          padding: 1rem;
+          background: #111827;
+          border-radius: 12px;
+          border: 1px solid #374151;
+        }
+
+        .quick-actions-header {
+          text-align: center;
+          color: #f3f4f6;
+          font-weight: 600;
+          margin-bottom: 1rem;
+          font-size: 1.1rem;
+        }
+
+        .quick-buttons {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 0.75rem;
+        }
+
+        .quick-button {
+          background: #374151;
+          border: 1px solid #4b5563;
+          color: #d1d5db;
+          padding: 0.75rem 1rem;
+          border-radius: 8px;
+          font-size: 0.9rem;
+          font-weight: 500;
+          text-align: left;
+          transition: all 0.3s ease;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .quick-button:hover {
+          background: #4b5563;
+          border-color: #60a5fa;
+          color: #f3f4f6;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        @media (max-width: 500px) {
+          .quick-buttons {
+            grid-template-columns: 1fr;
+          }
+          
+          .quick-button {
+            font-size: 1rem;
+            padding: 1rem;
           }
         }
       `}</style>
