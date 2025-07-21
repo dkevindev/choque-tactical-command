@@ -91,20 +91,24 @@ const ConfiguracaoFipe = ({ viaturaFipe, onSalvar, saving }: ConfiguracaoFipePro
       <CardContent className="space-y-4">
         {viaturaFipe ? (
           <div className="space-y-3">
-            <div className="flex justify-between items-center p-3 bg-green-50 border border-green-200 rounded">
+            <div className="flex justify-between items-center p-4 bg-military-accent/10 border border-military-accent/30 rounded-lg">
               <div>
-                <p className="text-sm text-muted-foreground">Valor Atual FIPE</p>
-                <p className="text-lg font-semibold text-green-600">
+                <p className="text-sm text-muted-foreground mb-1">Valor Atual FIPE</p>
+                <p className="text-xl font-bold text-military-accent">
                   {(viaturaFipe.valorFipe / 100).toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL'
                   })}
                 </p>
               </div>
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {format(viaturaFipe.dataAtualizacao, 'dd/MM/yyyy')}
-              </Badge>
+              <div className="bg-card border border-border rounded-md px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-military-olive" />
+                  <span className="text-sm font-medium text-foreground">
+                    {format(viaturaFipe.dataAtualizacao, 'dd/MM/yyyy')}
+                  </span>
+                </div>
+              </div>
             </div>
             
             <div className="pt-2 border-t">
@@ -138,8 +142,8 @@ const ConfiguracaoFipe = ({ viaturaFipe, onSalvar, saving }: ConfiguracaoFipePro
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
-              <p className="text-sm text-yellow-800">
+            <div className="p-4 bg-military-warning/10 border border-military-warning/30 rounded-lg">
+              <p className="text-sm text-military-warning font-semibold">
                 <strong>Valor FIPE não configurado.</strong> Configure o valor da tabela FIPE para habilitar o controle de saldo anual.
               </p>
             </div>
