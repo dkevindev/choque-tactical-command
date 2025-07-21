@@ -62,18 +62,24 @@ const FrotaDashboard = () => {
 
   const fetchViaturas = async () => {
     try {
+      console.log('Iniciando busca de viaturas...');
       const querySnapshot = await getDocs(collection(db, 'frota'));
       const viaturasData: Viatura[] = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Viatura[];
 
+      console.log('Dados das viaturas carregados:', viaturasData);
+
       // Ordenar viaturas conforme solicitado
       const ordenCustomizada = ['CAV - 11', 'CAV - 12', 'CAV - 13', 'CAV - 05', 'CAV - 06', 'TA - 01', 'TA - 02', 'TA - 03', 'TP'];
 
       const viaturasOrdenadas = viaturasData.sort((a, b) => {
-        const cadastroA = a.CADASTRO || a.id;
-        const cadastroB = b.CADASTRO || b.id;
+        // Garantir que os valores sejam strings antes de comparar
+        const cadastroA = String(a.CADASTRO || a.id || '');
+        const cadastroB = String(b.CADASTRO || b.id || '');
+
+        console.log('Comparando cadastros:', { cadastroA, cadastroB });
 
         const indexA = ordenCustomizada.indexOf(cadastroA);
         const indexB = ordenCustomizada.indexOf(cadastroB);
@@ -89,12 +95,19 @@ const FrotaDashboard = () => {
         // Se apenas B está na lista, ele vem primeiro
         if (indexB !== -1) return 1;
 
-        // Se nenhum está na lista, ordena por nome (opcional)
+        // Se nenhum está na lista, ordena por nome
         return cadastroA.localeCompare(cadastroB);
       });
+      
+      console.log('Viaturas ordenadas:', viaturasOrdenadas);
       setViaturas(viaturasOrdenadas);
     } catch (error) {
       console.error('Erro ao buscar viaturas:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar viaturas. Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
