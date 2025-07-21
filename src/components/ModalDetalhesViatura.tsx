@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -46,6 +45,9 @@ import {
 
 import { Viatura } from '@/bot/types';
 import { isFroteLeve, isFrotePesada, getPlacasViaturasLeves } from '@/lib/viaturaUtils';
+import ConfiguracaoFipe from '@/components/ConfiguracaoFipe';
+import SaldoAnualCard from '@/components/SaldoAnualCard';
+import { useFipeData } from '@/hooks/useFipeData';
 
 interface OrdemServico {
   id: string;
@@ -77,6 +79,9 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   const [dataFim, setDataFim] = useState<Date | undefined>();
   const [dataEspecifica, setDataEspecifica] = useState<Date | undefined>();
   const { toast } = useToast();
+
+  // Hook para dados FIPE
+  const { saldoAnual } = useFipeData(viatura?.id || '', viatura?.PLACA || '');
 
   useEffect(() => {
     if (viatura && isOpen) {
@@ -382,83 +387,96 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Resumo de Saldos - APENAS MÊS ATUAL */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (Mês Atual)' : 
-                 dadosGraficos.totais.tipoSaldo === 'compartilhado' ? 'Saldo Mensal Compartilhado' : 
-                 'Saldo Não Definido'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {dadosGraficos.totais.tipoSaldo === 'livre' ? (
-                <div className="text-center py-4">
-                  <div className="text-2xl font-bold text-green-600 mb-2">SALDO LIVRE</div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Esta viatura não possui limitação de saldo
-                  </p>
-                  <div className="flex justify-between text-sm border-t pt-2">
-                    <span>Gasto Este Mês:</span>
-                    <span className="font-semibold text-blue-600">
-                      R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
+          {/* Configuração FIPE */}
+          <ConfiguracaoFipe 
+            viaturaId={viatura.id}
+            cadastro={viatura.CADASTRO || ''}
+            placa={viatura.PLACA}
+          />
+
+          {/* Resumo de Saldos - MÊS ATUAL E ANUAL LADO A LADO */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Saldo Mensal */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (Mês Atual)' : 
+                   dadosGraficos.totais.tipoSaldo === 'compartilhado' ? 'Saldo Mensal Compartilhado' : 
+                   'Saldo Não Definido'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {dadosGraficos.totais.tipoSaldo === 'livre' ? (
+                  <div className="text-center py-4">
+                    <div className="text-2xl font-bold text-green-600 mb-2">SALDO LIVRE</div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Esta viatura não possui limitação de saldo
+                    </p>
+                    <div className="flex justify-between text-sm border-t pt-2">
+                      <span>Gasto Este Mês:</span>
+                      <span className="font-semibold text-blue-600">
+                        R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ) : dadosGraficos.totais.tipoSaldo === 'compartilhado' ? (
-                <>
-                  <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
-                    <p className="text-xs text-blue-800">
-                      <strong>Saldo Compartilhado:</strong> Todas as viaturas da frota leve compartilham este saldo mensal
+                ) : dadosGraficos.totais.tipoSaldo === 'compartilhado' ? (
+                  <>
+                    <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
+                      <p className="text-xs text-blue-800">
+                        <strong>Saldo Compartilhado:</strong> Todas as viaturas da frota leve compartilham este saldo mensal
+                      </p>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Saldo Configurado:</span>
+                      <span className="font-semibold text-green-600">
+                        R$ {dadosGraficos.totais.saldoMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Gasto Frota Leve:</span>
+                      <span className="font-semibold text-orange-600">
+                        R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Saldo Restante:</span>
+                      <span className="font-semibold text-blue-600">
+                        R$ {dadosGraficos.totais.saldoDisponivelMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={150}>
+                      <PieChart>
+                        <Pie
+                          data={dadosGraficos.mes}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={30}
+                          outerRadius={60}
+                          dataKey="value"
+                        >
+                          {dadosGraficos.mes.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </>
+                ) : (
+                  <div className="text-center py-4">
+                    <div className="text-xl font-bold text-yellow-600 mb-2">CATEGORIA NÃO DEFINIDA</div>
+                    <p className="text-sm text-muted-foreground">
+                      Esta viatura não foi categorizada como frota leve ou pesada
                     </p>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Saldo Configurado:</span>
-                    <span className="font-semibold text-green-600">
-                      R$ {dadosGraficos.totais.saldoMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Gasto Frota Leve:</span>
-                    <span className="font-semibold text-orange-600">
-                      R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Saldo Restante:</span>
-                    <span className="font-semibold text-blue-600">
-                      R$ {dadosGraficos.totais.saldoDisponivelMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <ResponsiveContainer width="100%" height={150}>
-                    <PieChart>
-                      <Pie
-                        data={dadosGraficos.mes}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={30}
-                        outerRadius={60}
-                        dataKey="value"
-                      >
-                        {dadosGraficos.mes.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </>
-              ) : (
-                <div className="text-center py-4">
-                  <div className="text-xl font-bold text-yellow-600 mb-2">CATEGORIA NÃO DEFINIDA</div>
-                  <p className="text-sm text-muted-foreground">
-                    Esta viatura não foi categorizada como frota leve ou pesada
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Saldo Anual */}
+            <SaldoAnualCard saldoAnual={saldoAnual} />
+          </div>
 
           {/* Informações da Viatura */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
