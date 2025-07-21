@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { collection, getDocs, query, where, orderBy, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -48,6 +49,10 @@ const FrotaDashboard = () => {
     limite12Meses: 50000
   });
   const [isUpdatingSaldos, setIsUpdatingSaldos] = useState(false);
+  const [gastoFroteLeveMes, setGastoFroteLeveMes] = useState(0);
+  const [saldoFroteLeveMes, setSaldoFroteLeveMes] = useState(0);
+  const [gastoFrotePesadaMes, setGastoFrotePesadaMes] = useState(0);
+  const [totalOSMes, setTotalOSMes] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -58,8 +63,9 @@ const FrotaDashboard = () => {
   useEffect(() => {
     if (ordensServico.length > 0) {
       processarGastos();
+      calcularMetricasDashboard();
     }
-  }, [ordensServico]);
+  }, [ordensServico, viaturas]);
 
   const fetchViaturas = async () => {
     try {
@@ -122,6 +128,115 @@ const FrotaDashboard = () => {
       setOrdensServico(osData);
     } catch (error) {
       console.error('Erro ao buscar ordens de serviço:', error);
+    }
+  };
+
+  const calcularMetricasDashboard = async () => {
+    const agora = new Date();
+    const mesAtual = agora.getMonth();
+    const anoAtual = agora.getFullYear();
+
+    console.log('=== INICIANDO CÁLCULO DAS MÉTRICAS DO DASHBOARD ===');
+    console.log('Mês atual:', mesAtual, 'Ano atual:', anoAtual);
+
+    try {
+      // Buscar viaturas da frota leve dinamicamente
+      const viaturasLeves = await buscarViaturasLeves();
+      const viaturasPesadas = await buscarViaturasPesadas();
+      
+      console.log('Viaturas da frota leve encontradas:', viaturasLeves.map(v => ({
+        cadastro: v.CADASTRO,
+        placa: v.PLACA,
+        tipo: v.tipo
+      })));
+      
+      console.log('Viaturas da frota pesada encontradas:', viaturasPesadas.map(v => ({
+        cadastro: v.CADASTRO,
+        placa: v.PLACA,
+        tipo: v.tipo
+      })));
+
+      const placasFroteLeve = viaturasLeves.map(v => v.PLACA);
+      const placasFrotePesada = viaturasPesadas.map(v => v.PLACA);
+
+      console.log('Placas frota leve:', placasFroteLeve);
+      console.log('Placas frota pesada:', placasFrotePesada);
+
+      // Filtrar OS do mês atual
+      const osDoMes = ordensServico.filter(os => {
+        const dataOS = new Date(os.dataOS);
+        const isMesAtual = dataOS.getMonth() === mesAtual && dataOS.getFullYear() === anoAtual;
+        if (isMesAtual) {
+          console.log('OS do mês encontrada:', {
+            placa: os.placaViatura,
+            valor: os.valorOS,
+            data: os.dataOS
+          });
+        }
+        return isMesAtual;
+      });
+
+      console.log('Total de OS do mês atual:', osDoMes.length);
+
+      // Calcular gasto frota leve no mês
+      const gastoLeve = osDoMes
+        .filter(os => {
+          const isLeve = placasFroteLeve.includes(os.placaViatura);
+          if (isLeve) {
+            console.log('OS da frota leve:', {
+              placa: os.placaViatura,
+              valor: os.valorOS,
+              valorNumerico: parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100
+            });
+          }
+          return isLeve;
+        })
+        .reduce((total, os) => {
+          const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
+          return total + valor;
+        }, 0);
+
+      // Calcular gasto frota pesada no mês
+      const gastoPesada = osDoMes
+        .filter(os => {
+          const isPesada = placasFrotePesada.includes(os.placaViatura);
+          if (isPesada) {
+            console.log('OS da frota pesada:', {
+              placa: os.placaViatura,
+              valor: os.valorOS,
+              valorNumerico: parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100
+            });
+          }
+          return isPesada;
+        })
+        .reduce((total, os) => {
+          const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
+          return total + valor;
+        }, 0);
+
+      // Buscar saldo configurado da frota leve
+      const saldosSnapshot = await getDocs(collection(db, 'saldosViaturas'));
+      const saldoFroteLeve = saldosSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }) as any)
+        .find((s: any) => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
+      
+      const saldoConfigurado = (saldoFroteLeve as any)?.saldoMensal || 45000;
+      const saldoRestante = saldoConfigurado - gastoLeve;
+
+      console.log('=== RESULTADOS DOS CÁLCULOS ===');
+      console.log('Gasto frota leve:', gastoLeve);
+      console.log('Saldo configurado frota leve:', saldoConfigurado);
+      console.log('Saldo restante frota leve:', saldoRestante);
+      console.log('Gasto frota pesada:', gastoPesada);
+      console.log('Total OS no mês:', osDoMes.length);
+
+      setGastoFroteLeveMes(gastoLeve);
+      setSaldoFroteLeveMes(saldoRestante);
+      setGastoFrotePesadaMes(gastoPesada);
+      setTotalOSMes(osDoMes.length);
+
+    } catch (error) {
+      console.error('Erro ao calcular métricas do dashboard:', error);
     }
   };
 
@@ -357,6 +472,9 @@ const FrotaDashboard = () => {
       // Limpar cache para garantir dados atualizados
       limparCacheViaturas();
 
+      // Recalcular métricas após atualização
+      await calcularMetricasDashboard();
+
       toast({
         title: "Saldos atualizados",
         description: `Saldos de ${viaturas.length} viaturas atualizados para ${mesAtual.toString().padStart(2, '0')}/${anoAtual}`,
@@ -420,7 +538,7 @@ const FrotaDashboard = () => {
         </div>
       </div>
 
-      {/* Métricas Gerais */}
+      {/* Métricas Gerais - 4 Quadros Solicitados */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -437,11 +555,14 @@ const FrotaDashboard = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-8 w-8 text-yellow-500" />
+              <DollarSign className="h-8 w-8 text-blue-500" />
               <div>
-                <p className="text-sm text-muted-foreground">Críticas/Atenção</p>
-                <p className="text-2xl font-bold">
-                  {Object.values(statusViaturas).filter(status => status?.status !== 'OK').length}
+                <p className="text-sm text-muted-foreground">Frota Leve - Mês</p>
+                <p className="text-lg font-bold text-red-600">
+                  Gasto: R$ {gastoFroteLeveMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-sm font-semibold text-green-600">
+                  Saldo: R$ {saldoFroteLeveMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -451,11 +572,11 @@ const FrotaDashboard = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <DollarSign className="h-8 w-8 text-green-500" />
+              <Wrench className="h-8 w-8 text-orange-500" />
               <div>
-                <p className="text-sm text-muted-foreground">Gasto Mês Atual</p>
-                <p className="text-2xl font-bold">
-                  R$ {gastosMes.reduce((total, item) => total + item.valor, 0).toLocaleString()}
+                <p className="text-sm text-muted-foreground">Frota Pesada - Mês</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  R$ {gastoFrotePesadaMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -465,12 +586,10 @@ const FrotaDashboard = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Wrench className="h-8 w-8 text-blue-500" />
+              <AlertTriangle className="h-8 w-8 text-purple-500" />
               <div>
                 <p className="text-sm text-muted-foreground">OS Este Mês</p>
-                <p className="text-2xl font-bold">
-                  {gastosMes.reduce((total, item) => total + item.count, 0)}
-                </p>
+                <p className="text-2xl font-bold text-purple-600">{totalOSMes}</p>
               </div>
             </div>
           </CardContent>

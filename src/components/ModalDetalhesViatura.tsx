@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -67,7 +68,6 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([]);
   const [ordensFiltered, setOrdensFiltered] = useState<OrdemServico[]>([]);
   const [loading, setLoading] = useState(false);
-  const [saldosHistorico, setSaldosHistorico] = useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({ cadastro: '', modelo: '', placa: '' });
   const [showCadastroModal, setShowCadastroModal] = useState(false);
@@ -81,7 +81,6 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   useEffect(() => {
     if (viatura && isOpen) {
       fetchOrdensServico();
-      fetchSaldosHistorico();
       setEditData({
         cadastro: viatura.CADASTRO || '',
         modelo: viatura.MODELO || '',
@@ -99,6 +98,13 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     
     setLoading(true);
     try {
+      console.log('=== BUSCANDO OS PARA VIATURA ===');
+      console.log('Viatura:', {
+        cadastro: viatura.CADASTRO,
+        placa: viatura.PLACA,
+        tipo: viatura.tipo
+      });
+
       const q = query(
         collection(db, 'ordensDeServico'),
         where('placaViatura', '==', viatura.PLACA)
@@ -109,6 +115,13 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         ...doc.data(),
       })) as OrdemServico[];
       
+      console.log('OS encontradas para a viatura:', osData.map(os => ({
+        numeroOS: os.numeroOS,
+        data: os.dataOS,
+        valor: os.valorOS,
+        valorNumerico: parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100
+      })));
+
       // Ordenar por data mais recente
       osData.sort((a, b) => new Date(b.dataOS).getTime() - new Date(a.dataOS).getTime());
       setOrdensServico(osData);
@@ -116,54 +129,6 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
       console.error('Erro ao buscar ordens de serviço:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchSaldosHistorico = async () => {
-    if (!viatura) return;
-    
-    try {
-      console.log('Buscando saldos históricos para viatura:', viatura);
-      
-      const querySnapshot = await getDocs(collection(db, 'saldosViaturas'));
-      console.log('Total de documentos encontrados na coleção saldosViaturas:', querySnapshot.docs.length);
-      
-      const todosOsSaldos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any);
-      console.log('Todos os saldos carregados:', todosOsSaldos);
-      
-      const saldosData = todosOsSaldos.filter((saldo: any) => {
-          // Incluir saldo específico da viatura
-          const isSaldoEspecifico = saldo.viaturaId === viatura.id;
-          
-          // Incluir saldo de frota pesada se a viatura for pesada
-          const isFrotePesadaSaldo = saldo.tipo === 'frota_pesada' && isFrotePesada(viatura);
-          
-          // Incluir saldo de frota leve se a viatura for leve
-          const isFroteLeveSaldo = saldo.tipo === 'frota_leve' && isFroteLeve(viatura);
-          
-          const resultado = isSaldoEspecifico || isFrotePesadaSaldo || isFroteLeveSaldo;
-          
-          console.log('Filtro de saldo:', {
-            saldoId: saldo.id,
-            saldoTipo: saldo.tipo,
-            viaturaId: viatura.id,
-            viaturaTipo: viatura.tipo,
-            viaturaCadastro: viatura.CADASTRO,
-            viaturaPlaca: viatura.PLACA,
-            isSaldoEspecifico,
-            isFrotePesadaSaldo,
-            isFroteLeveSaldo,
-            resultado
-          });
-          
-          return resultado;
-        })
-        .sort((a: any, b: any) => b.anoReferencia - a.anoReferencia);
-      
-      console.log('Saldos filtrados para esta viatura:', saldosData);
-      setSaldosHistorico(saldosData);
-    } catch (error) {
-      console.error('Erro ao buscar histórico de saldos:', error);
     }
   };
 
@@ -260,37 +225,35 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     }, 0);
   };
 
-  // Calcular gráficos de pizza baseado nos saldos configurados
+  // Calcular gráficos de pizza baseado apenas no mês atual
   const calcularGraficoPizza = async () => {
     const agora = new Date();
     const mesAtual = agora.getMonth();
     const anoAtual = agora.getFullYear();
     
+    console.log('=== CALCULANDO GRÁFICOS PARA VIATURA (SÓ MÊS ATUAL) ===');
+    console.log('Viatura:', viatura?.CADASTRO, 'Placa:', viatura?.PLACA);
+    
     // Verificar se é frota pesada usando função dinâmica
     const viaturaEhPesada = viatura ? isFrotePesada(viatura) : false;
     const viaturaEhLeve = viatura ? isFroteLeve(viatura) : false;
     
-    console.log('Calculando gráficos para viatura:', {
-      viatura: viatura?.CADASTRO,
-      placaViatura: viatura?.PLACA,
+    console.log('Tipo da viatura:', {
       viaturaEhPesada,
       viaturaEhLeve,
-      saldosHistorico
+      tipoArmazenado: viatura?.tipo
     });
     
     let saldoMensal = 0;
-    let saldo12Meses = 0;
     let gastoMesAtual = 0;
-    let gasto12Meses = 0;
     let tipoSaldo = '';
     
     if (viaturaEhPesada) {
       // Para frota pesada, saldo livre (sem limitação)
       tipoSaldo = 'livre';
       saldoMensal = 999999;
-      saldo12Meses = 999999;
       
-      // Gastos apenas desta viatura
+      // Gastos apenas desta viatura no mês atual
       gastoMesAtual = ordensServico
         .filter(os => {
           const dataOS = new Date(os.dataOS);
@@ -301,89 +264,71 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
           return total + valor;
         }, 0);
 
-      gasto12Meses = ordensServico
-        .filter(os => {
-          const dataOS = new Date(os.dataOS);
-          const doze_meses_atras = new Date(anoAtual, mesAtual - 12, 1);
-          return dataOS >= doze_meses_atras;
-        })
-        .reduce((total, os) => {
-          const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
-          return total + valor;
-        }, 0);
+      console.log('Gasto frota pesada (mês atual):', gastoMesAtual);
     } else if (viaturaEhLeve) {
       // Para frota leve
       tipoSaldo = 'compartilhado';
       
-      // SALDO MENSAL: Compartilhado entre toda a frota leve
-      const saldoFroteLeve = saldosHistorico.find(s => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
-      saldoMensal = saldoFroteLeve?.saldoMensal || 0;
-      
-      console.log('Saldo frota leve encontrado:', saldoFroteLeve);
-      console.log('Saldo mensal configurado:', saldoMensal);
-      
-      // SALDO 12 MESES: Individual desta viatura específica
-      const saldoIndividual = saldosHistorico.find(s => 
-        s.viaturaId === viatura?.id && s.anoReferencia === anoAtual
-      );
-      saldo12Meses = saldoIndividual?.saldo12Meses || (viatura?.SALDO || 0) / 100;
-      
-      console.log('Saldo individual encontrado:', saldoIndividual);
-      console.log('Saldo 12 meses configurado:', saldo12Meses);
-      
-      // GASTO MENSAL: Toda a frota leve (buscar placas dinamicamente)
-      const placasFroteLeve = await getPlacasViaturasLeves();
-      console.log('Placas da frota leve (dinâmico):', placasFroteLeve);
-      
-      // Buscar todas as OS da frota leve no mês atual
-      const qFroteLeve = query(collection(db, 'ordensDeServico'));
-      const osFroteLeve = await getDocs(qFroteLeve);
-      
-      gastoMesAtual = osFroteLeve.docs
-        .map(doc => ({ ...doc.data() }) as OrdemServico)
-        .filter(os => {
-          const dataOS = new Date(os.dataOS);
-          return placasFroteLeve.includes(os.placaViatura) &&
-                 dataOS.getMonth() === mesAtual && 
-                 dataOS.getFullYear() === anoAtual;
-        })
-        .reduce((total, os) => {
-          const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
-          return total + valor;
-        }, 0);
+      // Buscar saldo configurado da frota leve
+      try {
+        const saldosSnapshot = await getDocs(collection(db, 'saldosViaturas'));
+        const saldoFroteLeve = saldosSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }) as any)
+          .find((s: any) => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
+        
+        saldoMensal = (saldoFroteLeve as any)?.saldoMensal || 45000;
+        
+        console.log('Saldo frota leve encontrado:', saldoFroteLeve);
+        console.log('Saldo mensal configurado:', saldoMensal);
+        
+        // GASTO MENSAL: Toda a frota leve (buscar placas dinamicamente)
+        const placasFroteLeve = await getPlacasViaturasLeves();
+        console.log('Placas da frota leve (dinâmico):', placasFroteLeve);
+        
+        // Buscar todas as OS da frota leve no mês atual
+        const qFroteLeve = query(collection(db, 'ordensDeServico'));
+        const osFroteLeve = await getDocs(qFroteLeve);
+        
+        gastoMesAtual = osFroteLeve.docs
+          .map(doc => ({ ...doc.data() }) as OrdemServico)
+          .filter(os => {
+            const dataOS = new Date(os.dataOS);
+            const isMesAtual = dataOS.getMonth() === mesAtual && dataOS.getFullYear() === anoAtual;
+            const isFroteLeve = placasFroteLeve.includes(os.placaViatura);
+            
+            if (isMesAtual && isFroteLeve) {
+              console.log('OS da frota leve no mês atual:', {
+                placa: os.placaViatura,
+                valor: os.valorOS,
+                valorNumerico: parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100,
+                data: os.dataOS
+              });
+            }
+            
+            return isMesAtual && isFroteLeve;
+          })
+          .reduce((total, os) => {
+            const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
+            return total + valor;
+          }, 0);
 
-      console.log('Gasto mensal frota leve calculado:', gastoMesAtual);
-
-      // GASTO 12 MESES: Individual desta viatura específica
-      gasto12Meses = ordensServico
-        .filter(os => {
-          const dataOS = new Date(os.dataOS);
-          const doze_meses_atras = new Date(anoAtual, mesAtual - 12, 1);
-          return os.placaViatura === viatura?.PLACA && dataOS >= doze_meses_atras;
-        })
-        .reduce((total, os) => {
-          const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
-          return total + valor;
-        }, 0);
+        console.log('Gasto total frota leve (mês atual):', gastoMesAtual);
+      } catch (error) {
+        console.error('Erro ao buscar saldo da frota leve:', error);
+      }
     } else {
       // Viatura sem categoria definida
       tipoSaldo = 'indefinido';
       saldoMensal = 0;
-      saldo12Meses = 0;
       gastoMesAtual = 0;
-      gasto12Meses = 0;
     }
 
     const saldoDisponivelMes = Math.max(0, saldoMensal - gastoMesAtual);
-    const saldoDisponivel12Meses = Math.max(0, saldo12Meses - gasto12Meses);
 
-    console.log('Resultado dos cálculos:', {
+    console.log('Resultado dos cálculos (mês atual):', {
       saldoMensal,
-      saldo12Meses,
       gastoMesAtual,
-      gasto12Meses,
       saldoDisponivelMes,
-      saldoDisponivel12Meses,
       tipoSaldo
     });
 
@@ -392,15 +337,10 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         { name: 'Usado', value: gastoMesAtual, fill: '#ef4444' },
         { name: 'Disponível', value: saldoDisponivelMes, fill: '#22c55e' }
       ],
-      doze_meses: [
-        { name: 'Usado', value: gasto12Meses, fill: '#ef4444' },
-        { name: 'Disponível', value: saldoDisponivel12Meses, fill: '#22c55e' }
-      ],
       totais: {
         saldoMensal,
-        saldo12Meses,
         gastoMesAtual,
-        gasto12Meses,
+        saldoDisponivelMes,
         tipoSaldo
       }
     };
@@ -411,24 +351,19 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
       { name: 'Usado', value: 0, fill: '#ef4444' },
       { name: 'Disponível', value: 0, fill: '#22c55e' }
     ],
-    doze_meses: [
-      { name: 'Usado', value: 0, fill: '#ef4444' },
-      { name: 'Disponível', value: 0, fill: '#22c55e' }
-    ],
     totais: {
       saldoMensal: 0,
-      saldo12Meses: 0,
       gastoMesAtual: 0,
-      gasto12Meses: 0,
+      saldoDisponivelMes: 0,
       tipoSaldo: ''
     }
   });
 
   useEffect(() => {
-    if (viatura && saldosHistorico.length > 0) {
+    if (viatura && ordensServico.length >= 0) {
       calcularGraficoPizza().then(setDadosGraficos);
     }
-  }, [viatura, saldosHistorico, ordensServico]);
+  }, [viatura, ordensServico]);
 
   if (!viatura) return null;
 
@@ -447,199 +382,83 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Histórico de Saldos */}
-          {saldosHistorico.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Histórico de Saldos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {saldosHistorico.slice(0, 5).map((saldo) => (
-                    <div key={saldo.id} className="flex justify-between items-center text-sm border-b pb-2">
-                      <div>
-                        <span className="font-medium">{saldo.mesReferencia}</span>
-                        {saldo.tipo === 'frota_pesada' && (
-                          <Badge variant="secondary" className="ml-2 text-xs">Frota Pesada</Badge>
-                        )}
-                        {saldo.tipo === 'frota_leve' && (
-                          <Badge variant="default" className="ml-2 text-xs">Frota Leve</Badge>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <div className="text-green-600">
-                          Mensal: R$ {saldo.saldoMensal?.toLocaleString() || 0}
-                        </div>
-                        <div className="text-blue-600">
-                          Anual: R$ {saldo.saldo12Meses?.toLocaleString() || 0}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+          {/* Resumo de Saldos - APENAS MÊS ATUAL */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (Mês Atual)' : 
+                 dadosGraficos.totais.tipoSaldo === 'compartilhado' ? 'Saldo Mensal Compartilhado' : 
+                 'Saldo Não Definido'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {dadosGraficos.totais.tipoSaldo === 'livre' ? (
+                <div className="text-center py-4">
+                  <div className="text-2xl font-bold text-green-600 mb-2">SALDO LIVRE</div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Esta viatura não possui limitação de saldo
+                  </p>
+                  <div className="flex justify-between text-sm border-t pt-2">
+                    <span>Gasto Este Mês:</span>
+                    <span className="font-semibold text-blue-600">
+                      R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Resumo de Saldos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (Mensal)' : 
-                   dadosGraficos.totais.tipoSaldo === 'compartilhado' ? 'Saldo Mensal Compartilhado' : 
-                   'Saldo Não Definido'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {dadosGraficos.totais.tipoSaldo === 'livre' ? (
-                  <div className="text-center py-4">
-                    <div className="text-2xl font-bold text-green-600 mb-2">SALDO LIVRE</div>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Esta viatura não possui limitação de saldo
-                    </p>
-                    <div className="flex justify-between text-sm border-t pt-2">
-                      <span>Gasto Este Mês:</span>
-                      <span className="font-semibold text-blue-600">
-                        R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                ) : dadosGraficos.totais.tipoSaldo === 'compartilhado' ? (
-                  <>
-                    <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
-                      <p className="text-xs text-blue-800">
-                        <strong>Saldo Compartilhado:</strong> Todas as viaturas da frota leve compartilham este saldo mensal
-                      </p>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Saldo Configurado:</span>
-                      <span className="font-semibold text-green-600">
-                        R$ {dadosGraficos.totais.saldoMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Gasto Frota Leve:</span>
-                      <span className="font-semibold text-orange-600">
-                        R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Saldo Restante:</span>
-                      <span className="font-semibold text-blue-600">
-                        R$ {(dadosGraficos.totais.saldoMensal - dadosGraficos.totais.gastoMesAtual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={150}>
-                      <PieChart>
-                        <Pie
-                          data={dadosGraficos.mes}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={30}
-                          outerRadius={60}
-                          dataKey="value"
-                        >
-                          {dadosGraficos.mes.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </>
-                ) : (
-                  <div className="text-center py-4">
-                    <div className="text-xl font-bold text-yellow-600 mb-2">CATEGORIA NÃO DEFINIDA</div>
-                    <p className="text-sm text-muted-foreground">
-                      Esta viatura não foi categorizada como frota leve ou pesada
+              ) : dadosGraficos.totais.tipoSaldo === 'compartilhado' ? (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
+                    <p className="text-xs text-blue-800">
+                      <strong>Saldo Compartilhado:</strong> Todas as viaturas da frota leve compartilham este saldo mensal
                     </p>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (12 Meses)' : 
-                   dadosGraficos.totais.tipoSaldo === 'compartilhado' ? 'Saldo Individual (12 Meses)' : 
-                   'Saldo Não Definido'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {dadosGraficos.totais.tipoSaldo === 'livre' ? (
-                  <div className="text-center py-4">
-                    <div className="text-2xl font-bold text-green-600 mb-2">SALDO LIVRE</div>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Esta viatura não possui limitação de saldo
-                    </p>
-                    <div className="flex justify-between text-sm border-t pt-2">
-                      <span>Gasto 12 Meses:</span>
-                      <span className="font-semibold text-blue-600">
-                        R$ {dadosGraficos.totais.gasto12Meses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Saldo Configurado:</span>
+                    <span className="font-semibold text-green-600">
+                      R$ {dadosGraficos.totais.saldoMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
-                ) : dadosGraficos.totais.tipoSaldo === 'compartilhado' ? (
-                  <>
-                    <div className="bg-orange-50 border border-orange-200 rounded p-2 mb-2">
-                      <p className="text-xs text-orange-800">
-                        <strong>Saldo Individual:</strong> Este saldo é específico desta viatura para os últimos 12 meses
-                      </p>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Saldo Configurado:</span>
-                      <span className="font-semibold text-green-600">
-                        R$ {dadosGraficos.totais.saldo12Meses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Gasto Esta Viatura:</span>
-                      <span className="font-semibold text-orange-600">
-                        R$ {dadosGraficos.totais.gasto12Meses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Saldo Restante:</span>
-                      <span className="font-semibold text-blue-600">
-                        R$ {(dadosGraficos.totais.saldo12Meses - dadosGraficos.totais.gasto12Meses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={150}>
-                      <PieChart>
-                        <Pie
-                          data={dadosGraficos.doze_meses}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={30}
-                          outerRadius={60}
-                          dataKey="value"
-                        >
-                          {dadosGraficos.doze_meses.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </>
-                ) : (
-                  <div className="text-center py-4">
-                    <div className="text-xl font-bold text-yellow-600 mb-2">CATEGORIA NÃO DEFINIDA</div>
-                    <p className="text-sm text-muted-foreground">
-                      Esta viatura não foi categorizada como frota leve ou pesada
-                    </p>
+                  <div className="flex justify-between text-sm">
+                    <span>Gasto Frota Leve:</span>
+                    <span className="font-semibold text-orange-600">
+                      R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Saldo Restante:</span>
+                    <span className="font-semibold text-blue-600">
+                      R$ {dadosGraficos.totais.saldoDisponivelMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <PieChart>
+                      <Pie
+                        data={dadosGraficos.mes}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={60}
+                        dataKey="value"
+                      >
+                        {dadosGraficos.mes.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <div className="text-xl font-bold text-yellow-600 mb-2">CATEGORIA NÃO DEFINIDA</div>
+                  <p className="text-sm text-muted-foreground">
+                    Esta viatura não foi categorizada como frota leve ou pesada
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Informações da Viatura */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
