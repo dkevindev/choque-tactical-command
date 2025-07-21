@@ -6,6 +6,7 @@ export interface ViaturaBasica {
   id: string;
   PLACA: string;
   CADASTRO?: string;
+  MODELO?: string;
   tipo?: 'leve' | 'pesada';
   UTILIZACAO?: string;
 }

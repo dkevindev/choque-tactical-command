@@ -29,7 +29,7 @@ interface Viatura {
   id: string;
   MODELO: string;
   PLACA: string;
-  cadastro?: string;
+  CADASTRO?: string;
   tipo?: 'leve' | 'pesada';
 }
 
@@ -73,8 +73,8 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
       console.log('Viaturas da frota leve (dinâmico):', viaturasLeves);
       console.log('Viaturas da frota pesada (dinâmico):', viaturasPesadas);
 
-      setViaturasFroteLeve(viaturasLeves);
-      setViaturasFrotePesada(viaturasPesadas);
+      setViaturasFroteLeve(viaturasLeves as Viatura[]);
+      setViaturasFrotePesada(viaturasPesadas as Viatura[]);
     } catch (error) {
       console.error('Erro ao buscar viaturas:', error);
     }

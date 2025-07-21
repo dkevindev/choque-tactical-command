@@ -219,10 +219,10 @@ const FrotaDashboard = () => {
       try {
         const saldosSnapshot = await getDocs(collection(db, 'saldosViaturas'));
         const saldoFroteLeve = saldosSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .find(s => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
+          .map(doc => ({ id: doc.id, ...doc.data() }) as any)
+          .find((s: any) => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
         
-        const saldoMensalFroteLeve = saldoFroteLeve?.saldoMensal || 30000; // Valor padrão
+        const saldoMensalFroteLeve = (saldoFroteLeve as any)?.saldoMensal || 30000; // Valor padrão
         const saldoRestante = saldoMensalFroteLeve - gastoFroteLeveAtual;
 
         if (kmRestante <= 1000 || saldoRestante < 1000) {

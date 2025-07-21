@@ -15,6 +15,7 @@ export interface Viatura {
   SALDO: number;
   SITUACAO: string;
   UTILIZACAO: string;
+  tipo?: 'leve' | 'pesada';
 }
 
 export interface ViaturaNaOficina {
