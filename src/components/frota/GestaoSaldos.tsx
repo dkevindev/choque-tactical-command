@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -13,12 +14,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, Truck, Car } from 'lucide-react';
+import { DollarSign, Truck, Car, Info } from 'lucide-react';
 
 interface SaldoConfig {
   id: string;
-  tipo: 'individual' | 'frota_pesada';
-  viaturaId?: string;
+  tipo: 'frota_leve';
   saldoMensal: number;
   saldo12Meses: number;
   mesReferencia: string;
@@ -30,6 +30,7 @@ interface Viatura {
   MODELO: string;
   PLACA: string;
   cadastro?: string;
+  tipo?: 'leve' | 'pesada';
 }
 
 interface GestaoSaldosProps {
@@ -43,7 +44,7 @@ const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
 const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
   const [viaturas, setViaturas] = useState<Viatura[]>([]);
   const [saldos, setSaldos] = useState<SaldoConfig[]>([]);
-  const [saldoFrotaPesada, setSaldoFrotaPesada] = useState({ mensal: 0, anual: 0 });
+  const [saldoFroteLeve, setSaldoFroteLeve] = useState({ mensal: 0, anual: 0 });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -79,12 +80,12 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
       })) as SaldoConfig[];
       setSaldos(saldosData);
 
-      // Configurar saldo da frota pesada
-      const saldoFrotaPesadaDoc = saldosData.find(s => s.tipo === 'frota_pesada' && s.anoReferencia === anoAtual);
-      if (saldoFrotaPesadaDoc) {
-        setSaldoFrotaPesada({
-          mensal: saldoFrotaPesadaDoc.saldoMensal,
-          anual: saldoFrotaPesadaDoc.saldo12Meses
+      // Configurar saldo da frota leve
+      const saldoFroteLeveDoc = saldosData.find(s => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
+      if (saldoFroteLeveDoc) {
+        setSaldoFroteLeve({
+          mensal: saldoFroteLeveDoc.saldoMensal,
+          anual: saldoFroteLeveDoc.saldo12Meses
         });
       }
     } catch (error) {
@@ -92,20 +93,14 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
     }
   };
 
-  const getSaldoViatura = (viaturaId: string) => {
-    const saldo = saldos.find(s => s.viaturaId === viaturaId && s.anoReferencia === anoAtual);
-    return saldo || { saldoMensal: 0, saldo12Meses: 0 };
-  };
-
-  const handleSalvarSaldoViatura = async (viaturaId: string, saldoMensal: number, saldo12Meses: number) => {
+  const handleSalvarSaldoFroteLeve = async () => {
     try {
-      const docId = `${viaturaId}_${anoAtual}`;
+      const docId = `frota_leve_${anoAtual}`;
       const saldoConfig: SaldoConfig = {
         id: docId,
-        tipo: 'individual',
-        viaturaId,
-        saldoMensal,
-        saldo12Meses,
+        tipo: 'frota_leve',
+        saldoMensal: saldoFroteLeve.mensal,
+        saldo12Meses: saldoFroteLeve.anual,
         mesReferencia: mesAtual,
         anoReferencia: anoAtual
       };
@@ -120,57 +115,28 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
 
       toast({
         title: "Saldo salvo",
-        description: `Saldo da viatura ${viaturaId} salvo com sucesso.`,
+        description: "Saldo da frota leve salvo com sucesso.",
       });
     } catch (error) {
-      console.error('Erro ao salvar saldo:', error);
+      console.error('Erro ao salvar saldo da frota leve:', error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar saldo da viatura.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSalvarSaldoFrotaPesada = async () => {
-    try {
-      const docId = `frota_pesada_${anoAtual}`;
-      const saldoConfig: SaldoConfig = {
-        id: docId,
-        tipo: 'frota_pesada',
-        saldoMensal: saldoFrotaPesada.mensal,
-        saldo12Meses: saldoFrotaPesada.anual,
-        mesReferencia: mesAtual,
-        anoReferencia: anoAtual
-      };
-
-      await setDoc(doc(db, 'saldosViaturas', docId), saldoConfig);
-      
-      // Atualizar estado local
-      setSaldos(prev => {
-        const filtered = prev.filter(s => s.id !== docId);
-        return [...filtered, saldoConfig];
-      });
-
-      toast({
-        title: "Saldo salvo",
-        description: "Saldo da frota pesada salvo com sucesso.",
-      });
-    } catch (error) {
-      console.error('Erro ao salvar saldo da frota pesada:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao salvar saldo da frota pesada.",
+        description: "Erro ao salvar saldo da frota leve.",
         variant: "destructive",
       });
     }
   };
 
   const viaturasFroteLeve = viaturas.filter(v => 
-    !FROTA_PESADA_PLACAS.includes(v.PLACA) && !FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id)
+    !FROTA_PESADA_PLACAS.includes(v.PLACA) && 
+    !FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) &&
+    v.tipo !== 'pesada'
   );
+  
   const viaturasFrotePesada = viaturas.filter(v => 
-    FROTA_PESADA_PLACAS.includes(v.PLACA) || FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id)
+    FROTA_PESADA_PLACAS.includes(v.PLACA) || 
+    FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) ||
+    v.tipo === 'pesada'
   );
 
   return (
@@ -184,129 +150,106 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Frota Pesada */}
+          {/* Frota Leve */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5" />
-                Frota Pesada (Saldo Compartilhado)
+                <Car className="h-5 w-5" />
+                Frota Leve (Saldo Compartilhado)
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-sm text-muted-foreground mb-2">
-                Viaturas: {viaturasFrotePesada.map(v => v.cadastro || v.id).join(', ')}
+                Viaturas: {viaturasFroteLeve.map(v => v.cadastro || v.id).join(', ')}
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                <div className="flex items-center gap-2 text-blue-800 text-sm">
+                  <Info className="h-4 w-4" />
+                  <span className="font-medium">
+                    Todas as viaturas da frota leve compartilham este saldo único
+                  </span>
+                </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="saldo-mensal-pesada">Saldo Mensal</Label>
+                  <Label htmlFor="saldo-mensal-leve">Saldo Mensal</Label>
                   <Input
-                    id="saldo-mensal-pesada"
+                    id="saldo-mensal-leve"
                     type="number"
-                    value={saldoFrotaPesada.mensal}
-                    onChange={(e) => setSaldoFrotaPesada(prev => ({ ...prev, mensal: Number(e.target.value) }))}
-                    placeholder="Ex: 10000"
+                    value={saldoFroteLeve.mensal}
+                    onChange={(e) => setSaldoFroteLeve(prev => ({ ...prev, mensal: Number(e.target.value) }))}
+                    placeholder="Ex: 30000"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="saldo-anual-pesada">Saldo 12 Meses</Label>
+                  <Label htmlFor="saldo-anual-leve">Saldo 12 Meses</Label>
                   <Input
-                    id="saldo-anual-pesada"
+                    id="saldo-anual-leve"
                     type="number"
-                    value={saldoFrotaPesada.anual}
-                    onChange={(e) => setSaldoFrotaPesada(prev => ({ ...prev, anual: Number(e.target.value) }))}
-                    placeholder="Ex: 100000"
+                    value={saldoFroteLeve.anual}
+                    onChange={(e) => setSaldoFroteLeve(prev => ({ ...prev, anual: Number(e.target.value) }))}
+                    placeholder="Ex: 300000"
                   />
                 </div>
               </div>
               
-              <Button onClick={handleSalvarSaldoFrotaPesada} className="w-full">
-                Salvar Saldo da Frota Pesada
+              <Button onClick={handleSalvarSaldoFroteLeve} className="w-full">
+                Salvar Saldo da Frota Leve
               </Button>
             </CardContent>
           </Card>
 
           <Separator />
 
-          {/* Frota Leve */}
+          {/* Frota Pesada */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Car className="h-5 w-5" />
-                Frota Leve (Saldos Individuais)
+                <Truck className="h-5 w-5" />
+                Frota Pesada (Saldo Livre)
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {viaturasFroteLeve.map((viatura) => {
-                  const saldoAtual = getSaldoViatura(viatura.id);
-                  return (
-                    <SaldoViaturaCard
-                      key={viatura.id}
-                      viatura={viatura}
-                      saldoAtual={saldoAtual}
-                      onSalvar={handleSalvarSaldoViatura}
-                    />
-                  );
-                })}
+              <div className="text-sm text-muted-foreground mb-4">
+                Viaturas: {viaturasFrotePesada.map(v => v.cadastro || v.id).join(', ')}
+              </div>
+              
+              <div className="bg-green-50 border border-green-200 rounded-md p-4">
+                <div className="flex items-center gap-2 text-green-800 mb-2">
+                  <Info className="h-4 w-4" />
+                  <span className="font-medium">Saldo Livre</span>
+                </div>
+                <p className="text-green-700 text-sm">
+                  A frota pesada não possui limitação de saldo. As viaturas podem realizar 
+                  serviços sem restrições de valor mensal ou anual.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                {viaturasFrotePesada.map((viatura) => (
+                  <Card key={viatura.id} className="border-green-200 bg-green-50/30">
+                    <CardContent className="p-4">
+                      <div className="text-center">
+                        <h3 className="font-semibold text-sm">
+                          {viatura.cadastro || viatura.id} - {viatura.PLACA}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {viatura.MODELO}
+                        </p>
+                        <div className="mt-2 px-2 py-1 bg-green-100 rounded text-green-800 text-xs font-medium">
+                          Saldo Livre
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
       </DialogContent>
     </Dialog>
-  );
-};
-
-interface SaldoViaturaCardProps {
-  viatura: Viatura;
-  saldoAtual: any;
-  onSalvar: (viaturaId: string, saldoMensal: number, saldo12Meses: number) => void;
-}
-
-const SaldoViaturaCard = ({ viatura, saldoAtual, onSalvar }: SaldoViaturaCardProps) => {
-  const [saldoMensal, setSaldoMensal] = useState(saldoAtual.saldoMensal || 0);
-  const [saldo12Meses, setSaldo12Meses] = useState(saldoAtual.saldo12Meses || 0);
-
-  const handleSalvar = () => {
-    onSalvar(viatura.id, saldoMensal, saldo12Meses);
-  };
-
-  return (
-    <Card className="border-border">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">
-          {viatura.cadastro || viatura.id} - {viatura.PLACA}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div>
-          <Label htmlFor={`saldo-mensal-${viatura.id}`}>Saldo Mensal</Label>
-          <Input
-            id={`saldo-mensal-${viatura.id}`}
-            type="number"
-            value={saldoMensal}
-            onChange={(e) => setSaldoMensal(Number(e.target.value))}
-            placeholder="Ex: 3000"
-            className="text-sm"
-          />
-        </div>
-        <div>
-          <Label htmlFor={`saldo-anual-${viatura.id}`}>Saldo 12 Meses</Label>
-          <Input
-            id={`saldo-anual-${viatura.id}`}
-            type="number"
-            value={saldo12Meses}
-            onChange={(e) => setSaldo12Meses(Number(e.target.value))}
-            placeholder="Ex: 30000"
-            className="text-sm"
-          />
-        </div>
-        <Button onClick={handleSalvar} size="sm" className="w-full">
-          Salvar
-        </Button>
-      </CardContent>
-    </Card>
   );
 };
 

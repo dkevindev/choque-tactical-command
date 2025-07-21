@@ -175,10 +175,58 @@ const FrotaDashboard = () => {
 
   const getStatusViatura = (viatura: Viatura) => {
     const kmRestante = viatura.KMOLEO - viatura.KM;
+    
+    // Verificar se é frota pesada
+    const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
+    const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
+    const cadastroViatura = viatura.cadastro || viatura.id;
+    const isFrotePesada = FROTA_PESADA_PLACAS.includes(viatura.PLACA) || 
+                         FROTA_PESADA_CADASTROS.includes(cadastroViatura) ||
+                         viatura.tipo === 'pesada';
 
-    if (kmRestante <= 1000 || viatura.SALDO < 1000) {
+    // Para frota pesada, apenas verificar KM (saldo é livre)
+    if (isFrotePesada) {
+      if (kmRestante <= 1000) {
+        return { status: 'CRÍTICO', variant: 'destructive' as const, cor: 'border-destructive bg-destructive/5' };
+      } else if (kmRestante <= 3000) {
+        return { status: 'ATENÇÃO', variant: 'secondary' as const, cor: 'border-yellow-500 bg-yellow-500/5' };
+      }
+      return { status: 'OK', variant: 'default' as const, cor: 'border-green-500 bg-green-500/5' };
+    }
+
+    // Para frota leve, verificar KM + saldo compartilhado
+    // Buscar saldo da frota leve
+    const agora = new Date();
+    const mesAtual = agora.getMonth();
+    const anoAtual = agora.getFullYear();
+    
+    // Calcular gasto da frota leve no mês atual
+    const placasFroteLeve = viaturas
+      .filter(v => !FROTA_PESADA_PLACAS.includes(v.PLACA) && 
+                   !FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) &&
+                   v.tipo !== 'pesada')
+      .map(v => v.PLACA);
+    
+    const gastoFroteLeveAtual = ordensServico
+      .filter(os => {
+        const dataOS = new Date(os.dataOS);
+        return placasFroteLeve.includes(os.placaViatura) &&
+               dataOS.getMonth() === mesAtual && 
+               dataOS.getFullYear() === anoAtual;
+      })
+      .reduce((total, os) => {
+        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
+        return total + valor;
+      }, 0);
+
+    // Buscar configuração de saldo da frota leve
+    // Por simplicidade, usar um valor padrão se não encontrar configuração
+    const saldoMensalFroteLeve = 30000; // Valor padrão, idealmente buscar do Firebase
+    const saldoRestante = saldoMensalFroteLeve - gastoFroteLeveAtual;
+
+    if (kmRestante <= 1000 || saldoRestante < 1000) {
       return { status: 'CRÍTICO', variant: 'destructive' as const, cor: 'border-destructive bg-destructive/5' };
-    } else if (kmRestante <= 3000 || viatura.SALDO < 2000) {
+    } else if (kmRestante <= 3000 || saldoRestante < 2000) {
       return { status: 'ATENÇÃO', variant: 'secondary' as const, cor: 'border-yellow-500 bg-yellow-500/5' };
     }
     return { status: 'OK', variant: 'default' as const, cor: 'border-green-500 bg-green-500/5' };
@@ -221,21 +269,33 @@ const FrotaDashboard = () => {
         });
 
       // Separar viaturas por tipo
-      const viaturasPesadas = viaturas.filter(v => v.tipo === 'pesada');
-      const viaturasLeves = viaturas.filter(v => v.tipo === 'leve' || !v.tipo);
+      const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
+      const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
+      
+      const viaturasPesadas = viaturas.filter(v => 
+        FROTA_PESADA_PLACAS.includes(v.PLACA) || 
+        FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) ||
+        v.tipo === 'pesada'
+      );
+      
+      const viaturasLeves = viaturas.filter(v => 
+        !FROTA_PESADA_PLACAS.includes(v.PLACA) && 
+        !FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) &&
+        v.tipo !== 'pesada'
+      );
 
-      // Calcular saldo usado da frota pesada (soma de todas as OS das viaturas pesadas no mês)
-      const placasPesadas = viaturasPesadas.map(v => v.PLACA);
-      const saldoUsadoFrotaPesada = ordensMesAtual
-        .filter(os => placasPesadas.includes(os.placa))
+      // Calcular saldo usado da frota leve (soma de todas as OS das viaturas leves no mês)
+      const placasLeves = viaturasLeves.map(v => v.PLACA);
+      const saldoUsadoFroteLeve = ordensMesAtual
+        .filter(os => placasLeves.includes(os.placa))
         .reduce((total, os) => total + (os.valorTotal || 0), 0);
 
-      // Buscar cota da frota pesada e registros existentes
+      // Buscar cota da frota leve
       const saldosViaturasSnapshot = await getDocs(collection(db, 'saldosViaturas'));
       const saldoOficinaSnapshot = await getDocs(collection(db, 'saldoOficina'));
 
-      const docFrotaPesada = saldosViaturasSnapshot.docs.find(doc => doc.data().tipo === 'frota_pesada');
-      const cotaFrotaPesada = docFrotaPesada?.data()?.saldoMensal || 0;
+      const docFroteLeve = saldosViaturasSnapshot.docs.find(doc => doc.data().tipo === 'frota_leve');
+      const cotaFroteLeve = docFroteLeve?.data()?.saldoMensal || 0;
 
       const mesReferenciaAtual = `${mesAtual.toString().padStart(2, '0')}/${anoAtual}`;
 
@@ -243,25 +303,22 @@ const FrotaDashboard = () => {
       for (const viatura of viaturas) {
         let saldoUsado = 0;
         let saldoDisponivel = 0;
+        let tipoSaldo = 'individual';
 
-        if (viatura.tipo === 'pesada') {
-          // Para frota pesada, usar o saldo coletivo
-          saldoUsado = saldoUsadoFrotaPesada;
-          saldoDisponivel = cotaFrotaPesada - saldoUsadoFrotaPesada;
-        } else {
-          // Para frota leve, calcular individualmente
+        if (FROTA_PESADA_PLACAS.includes(viatura.PLACA) || 
+            FROTA_PESADA_CADASTROS.includes(viatura.cadastro || viatura.id) ||
+            viatura.tipo === 'pesada') {
+          // Para frota pesada, saldo livre (sem limitação)
           saldoUsado = ordensMesAtual
             .filter(os => os.placa === viatura.PLACA)
             .reduce((total, os) => total + (os.valorTotal || 0), 0);
-
-          // Buscar cota individual da viatura na coleção saldosViaturas
-          const cotaViatura = saldosViaturasSnapshot.docs
-            .find(doc => {
-              const data = doc.data();
-              return data.placa === viatura.PLACA || data.viaturaId === viatura.PLACA;
-            })?.data()?.saldoMensal || viatura.SALDO || 0;
-
-          saldoDisponivel = cotaViatura - saldoUsado;
+          saldoDisponivel = 999999; // Valor simbólico para saldo livre
+          tipoSaldo = 'livre';
+        } else {
+          // Para frota leve, usar o saldo coletivo
+          saldoUsado = saldoUsadoFroteLeve;
+          saldoDisponivel = cotaFroteLeve - saldoUsadoFroteLeve;
+          tipoSaldo = 'compartilhado';
         }
 
         // Verificar se já existe um registro para esta placa no mês atual
@@ -274,7 +331,8 @@ const FrotaDashboard = () => {
           placa: viatura.PLACA,
           cadastro: viatura.CADASTRO || '',
           modelo: viatura.MODELO,
-          tipo: viatura.tipo || 'leve',
+          tipo: viatura.tipo || (tipoSaldo === 'livre' ? 'pesada' : 'leve'),
+          tipoSaldo: tipoSaldo,
           saldoUsado: saldoUsado,
           saldoDisponivel: saldoDisponivel,
           mesReferencia: mesReferenciaAtual,
