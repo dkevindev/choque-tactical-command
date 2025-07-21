@@ -324,14 +324,11 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
             .find((item: any) => item.tipo === 'frota_pesada');
           cotaMensal = (saldoFrotaPesada as any)?.saldoMensal || 0;
         } else {
-          const saldoViatura = saldosViaturasSnapshot.docs
+          // Para frota leve, buscar saldo compartilhado
+          const saldoFrotaLeve = saldosViaturasSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() }))
-            .find((item: any) => 
-              item.placa === placaViatura || 
-              item.viaturaId === placaViatura ||
-              item.viaturaId === cadastro
-            );
-          cotaMensal = (saldoViatura as any)?.saldoMensal || (viatura as any).SALDO || 0;
+            .find((item: any) => item.tipo === 'frota_leve');
+          cotaMensal = (saldoFrotaLeve as any)?.saldoMensal || 0;
         }
 
         setValoresOriginais({
@@ -363,13 +360,10 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
             .map(doc => ({ id: doc.id, ...doc.data() }))
             .find((item: any) => item.tipo === 'frota_pesada');
         } else {
+          // Para frota leve, buscar saldo compartilhado
           saldoViatura = saldosViaturasSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() }))
-            .find((item: any) => 
-              item.placa === placaViatura || 
-              item.viaturaId === placaViatura ||
-              item.viaturaId === cadastro
-            );
+            .find((item: any) => item.tipo === 'frota_leve');
         }
 
         if (saldoViatura) {
@@ -394,9 +388,9 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     }
   };
 
-  const handleSelectOficina = (nomeOficial: string) => {
-    setOficinaSelecionada(nomeOficial);
-    setFormData(prev => ({ ...prev, oficina: nomeOficial }));
+  const handleSelectOficina = (oficina: Oficina) => {
+    setOficinaSelecionada(oficina.nomeFantasia || oficina.nome);
+    setFormData(prev => ({ ...prev, oficina: oficina.nomeFantasia || oficina.nome }));
     setBuscaOficina('');
     setSugestoesOficina([]);
   };
@@ -655,7 +649,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
                   <li
                     key={oficina.id}
                     className="px-3 py-2 cursor-pointer hover:bg-gray-800"
-                    onClick={() => handleSelectOficina(oficina.nome)}
+                    onClick={() => handleSelectOficina(oficina)}
                   >
                     {oficina.nome} {oficina.nomeFantasia ? `— ${oficina.nomeFantasia}` : ''}
                   </li>
