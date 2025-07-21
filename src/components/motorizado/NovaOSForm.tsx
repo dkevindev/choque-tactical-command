@@ -20,11 +20,13 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon, Car, CheckCheck, DollarSign, XCircle } from 'lucide-react';
 
 interface NovaOSFormProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onBack?: () => void;
+  prefilledData?: any;
 }
 
-const NovaOSForm = ({ isOpen, onClose }: NovaOSFormProps) => {
+const NovaOSForm = ({ isOpen = true, onClose = () => {}, onBack, prefilledData }: NovaOSFormProps) => {
   const [placaViatura, setPlacaViatura] = useState('');
   const [modeloViatura, setModeloViatura] = useState('');
   const [numeroOS, setNumeroOS] = useState('');

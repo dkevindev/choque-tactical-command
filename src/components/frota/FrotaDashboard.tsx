@@ -20,18 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import ModalDetalhesViatura from '@/components/ModalDetalhesViatura';
 import GestaoSaldos from './GestaoSaldos';
-
-interface Viatura {
-  id: string;
-  MODELO: string;
-  PLACA: string;
-  KM: number;
-  KMOLEO: number;
-  SALDO: number;
-  CADASTRO?: string;
-  cadastro: string;
-  tipo?: 'leve' | 'pesada';
-}
+import { Viatura } from '@/bot/types';
 
 interface OrdemServico {
   id: string;
@@ -83,8 +72,8 @@ const FrotaDashboard = () => {
       const ordenCustomizada = ['CAV - 11', 'CAV - 12', 'CAV - 13', 'CAV - 05', 'CAV - 06', 'TA - 01', 'TA - 02', 'TA - 03', 'TP'];
 
       const viaturasOrdenadas = viaturasData.sort((a, b) => {
-        const cadastroA = a.cadastro || a.id;
-        const cadastroB = b.cadastro || b.id;
+        const cadastroA = a.CADASTRO || a.id;
+        const cadastroB = b.CADASTRO || b.id;
 
         const indexA = ordenCustomizada.indexOf(cadastroA);
         const indexB = ordenCustomizada.indexOf(cadastroB);
@@ -179,10 +168,10 @@ const FrotaDashboard = () => {
     // Verificar se é frota pesada
     const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
     const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
-    const cadastroViatura = viatura.cadastro || viatura.id;
+    const cadastroViatura = viatura.CADASTRO || viatura.id;
     const isFrotePesada = FROTA_PESADA_PLACAS.includes(viatura.PLACA) || 
                          FROTA_PESADA_CADASTROS.includes(cadastroViatura) ||
-                         viatura.tipo === 'pesada';
+                         viatura.UTILIZACAO === 'PESADA';
 
     // Para frota pesada, apenas verificar KM (saldo é livre)
     if (isFrotePesada) {
@@ -203,8 +192,8 @@ const FrotaDashboard = () => {
     // Calcular gasto da frota leve no mês atual
     const placasFroteLeve = viaturas
       .filter(v => !FROTA_PESADA_PLACAS.includes(v.PLACA) && 
-                   !FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) &&
-                   v.tipo !== 'pesada')
+                   !FROTA_PESADA_CADASTROS.includes(v.CADASTRO || v.id) &&
+                   v.UTILIZACAO !== 'PESADA')
       .map(v => v.PLACA);
     
     const gastoFroteLeveAtual = ordensServico
@@ -274,14 +263,14 @@ const FrotaDashboard = () => {
       
       const viaturasPesadas = viaturas.filter(v => 
         FROTA_PESADA_PLACAS.includes(v.PLACA) || 
-        FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) ||
-        v.tipo === 'pesada'
+        FROTA_PESADA_CADASTROS.includes(v.CADASTRO || v.id) ||
+        v.UTILIZACAO === 'PESADA'
       );
       
       const viaturasLeves = viaturas.filter(v => 
         !FROTA_PESADA_PLACAS.includes(v.PLACA) && 
-        !FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) &&
-        v.tipo !== 'pesada'
+        !FROTA_PESADA_CADASTROS.includes(v.CADASTRO || v.id) &&
+        v.UTILIZACAO !== 'PESADA'
       );
 
       // Calcular saldo usado da frota leve (soma de todas as OS das viaturas leves no mês)
@@ -306,8 +295,8 @@ const FrotaDashboard = () => {
         let tipoSaldo = 'individual';
 
         if (FROTA_PESADA_PLACAS.includes(viatura.PLACA) || 
-            FROTA_PESADA_CADASTROS.includes(viatura.cadastro || viatura.id) ||
-            viatura.tipo === 'pesada') {
+            FROTA_PESADA_CADASTROS.includes(viatura.CADASTRO || viatura.id) ||
+            viatura.UTILIZACAO === 'PESADA') {
           // Para frota pesada, saldo livre (sem limitação)
           saldoUsado = ordensMesAtual
             .filter(os => os.placa === viatura.PLACA)
@@ -331,7 +320,7 @@ const FrotaDashboard = () => {
           placa: viatura.PLACA,
           cadastro: viatura.CADASTRO || '',
           modelo: viatura.MODELO,
-          tipo: viatura.tipo || (tipoSaldo === 'livre' ? 'pesada' : 'leve'),
+          tipo: viatura.UTILIZACAO || (tipoSaldo === 'livre' ? 'pesada' : 'leve'),
           tipoSaldo: tipoSaldo,
           saldoUsado: saldoUsado,
           saldoDisponivel: saldoDisponivel,
@@ -488,14 +477,14 @@ const FrotaDashboard = () => {
                       <div className="space-y-1 text-xs">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Tipo:</span>
-                          <Badge
-                            variant={viatura.tipo === 'pesada' ? 'destructive' : 'default'}
-                            className="text-xs"
-                          >
-                            {viatura.tipo === 'pesada' ? 'Pesada' :
-                              viatura.tipo === 'leve' ? 'Leve' :
-                                'Não definido'}
-                          </Badge>
+                           <Badge
+                             variant={viatura.UTILIZACAO === 'PESADA' ? 'destructive' : 'default'}
+                             className="text-xs"
+                           >
+                             {viatura.UTILIZACAO === 'PESADA' ? 'Pesada' :
+                               viatura.UTILIZACAO === 'LEVE' ? 'Leve' :
+                                 'Não definido'}
+                           </Badge>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">KM:</span>

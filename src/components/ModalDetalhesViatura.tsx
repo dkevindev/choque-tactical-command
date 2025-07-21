@@ -43,15 +43,7 @@ import {
   Eye
 } from 'lucide-react';
 
-interface Viatura {
-  id: string;
-  MODELO: string;
-  PLACA: string;
-  KM: number;
-  KMOLEO: number;
-  SALDO: number;
-  cadastro?: string;
-}
+import { Viatura } from '@/bot/types';
 
 interface OrdemServico {
   id: string;
@@ -90,7 +82,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
       fetchOrdensServico();
       fetchSaldosHistorico();
       setEditData({
-        cadastro: viatura.cadastro || '',
+        cadastro: viatura.CADASTRO || '',
         modelo: viatura.MODELO || '',
         placa: viatura.PLACA || ''
       });
@@ -138,7 +130,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
           const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
           return saldo.viaturaId === viatura.id || 
             (saldo.tipo === 'frota_pesada' && 
-             (FROTA_PESADA_CADASTROS.includes(viatura.cadastro || viatura.id) || 
+             (FROTA_PESADA_CADASTROS.includes(viatura.CADASTRO || viatura.id) || 
               FROTA_PESADA_PLACAS.includes(viatura.PLACA)))
         })
         .sort((a: any, b: any) => b.anoReferencia - a.anoReferencia);
@@ -251,11 +243,11 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     // Verificar se é frota pesada
     const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
     const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
-    const cadastroViatura = viatura?.cadastro || viatura?.id;
+    const cadastroViatura = viatura?.CADASTRO || viatura?.id;
     const placaViatura = viatura?.PLACA;
     const isFrotePesada = FROTA_PESADA_PLACAS.includes(placaViatura || '') || 
                          FROTA_PESADA_CADASTROS.includes(cadastroViatura || '') ||
-                         viatura?.tipo === 'pesada';
+                         viatura.UTILIZACAO === 'PESADA';
     
     let saldoMensal = 0;
     let saldo12Meses = 0;
@@ -360,7 +352,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Car className="h-6 w-6" />
-            Detalhes da Viatura - {viatura.cadastro || viatura.id}
+            Detalhes da Viatura - {viatura.CADASTRO || viatura.id}
           </DialogTitle>
         </DialogHeader>
 
@@ -582,7 +574,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                           className="p-0 h-auto font-semibold hover:bg-transparent"
                           onClick={() => setShowCadastroModal(true)}
                         >
-                          {viatura.cadastro || 'N/A'}
+                          {viatura.CADASTRO || 'N/A'}
                         </Button>
                       )}
                     </div>
@@ -864,7 +856,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
               <div className="flex items-center justify-center">
                 <div className="text-center">
                   <div className="text-6xl font-bold text-primary mb-2">
-                    {viatura?.cadastro || 'N/A'}
+                    {viatura?.CADASTRO || 'N/A'}
                   </div>
                   <p className="text-muted-foreground">Código de Cadastro da Viatura</p>
                   <p className="text-sm text-muted-foreground mt-2">
