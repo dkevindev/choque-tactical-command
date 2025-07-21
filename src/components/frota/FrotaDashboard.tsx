@@ -26,7 +26,6 @@ import { isFroteLeve, isFrotePesada, buscarViaturasLeves, buscarViaturasPesadas,
 
 interface OrdemServico {
   id: string;
-  cadastroViatura: string;
   placaViatura: string;
   modeloViatura: string;
   numeroOS: string;
@@ -34,7 +33,6 @@ interface OrdemServico {
   valorOS: string;
   observacao: string;
   oficinaResponsavel: string;
-  tipoFrota: string;
 }
 
 const FrotaDashboard = () => {
