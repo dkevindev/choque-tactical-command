@@ -122,19 +122,48 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     if (!viatura) return;
     
     try {
+      console.log('Buscando saldos históricos para viatura:', viatura);
+      
       const querySnapshot = await getDocs(collection(db, 'saldosViaturas'));
-      const saldosData = querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }) as any)
-        .filter((saldo: any) => {
+      console.log('Total de documentos encontrados na coleção saldosViaturas:', querySnapshot.docs.length);
+      
+      const todosOsSaldos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any);
+      console.log('Todos os saldos carregados:', todosOsSaldos);
+      
+      const saldosData = todosOsSaldos.filter((saldo: any) => {
           const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
           const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
-          return saldo.viaturaId === viatura.id || 
-            (saldo.tipo === 'frota_pesada' && 
+          
+          // Incluir saldo específico da viatura
+          const isSaldoEspecifico = saldo.viaturaId === viatura.id;
+          
+          // Incluir saldo de frota pesada
+          const isFrotePesada = saldo.tipo === 'frota_pesada' && 
              (FROTA_PESADA_CADASTROS.includes(viatura.CADASTRO || viatura.id) || 
-              FROTA_PESADA_PLACAS.includes(viatura.PLACA)))
+              FROTA_PESADA_PLACAS.includes(viatura.PLACA));
+          
+          // CORREÇÃO: Incluir saldo de frota leve para viaturas leves
+          const isFroteLeve = saldo.tipo === 'frota_leve';
+          
+          const resultado = isSaldoEspecifico || isFrotePesada || isFroteLeve;
+          
+          console.log('Filtro de saldo:', {
+            saldoId: saldo.id,
+            saldoTipo: saldo.tipo,
+            viaturaId: viatura.id,
+            viaturaCadastro: viatura.CADASTRO,
+            viaturaPlaca: viatura.PLACA,
+            isSaldoEspecifico,
+            isFrotePesada,
+            isFroteLeve,
+            resultado
+          });
+          
+          return resultado;
         })
         .sort((a: any, b: any) => b.anoReferencia - a.anoReferencia);
       
+      console.log('Saldos filtrados para esta viatura:', saldosData);
       setSaldosHistorico(saldosData);
     } catch (error) {
       console.error('Erro ao buscar histórico de saldos:', error);
@@ -249,6 +278,13 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                          FROTA_PESADA_CADASTROS.includes(cadastroViatura || '') ||
                          viatura?.UTILIZACAO === 'PESADA';
     
+    console.log('Calculando gráficos para viatura:', {
+      cadastroViatura,
+      placaViatura,
+      isFrotePesada,
+      saldosHistorico
+    });
+    
     let saldoMensal = 0;
     let saldo12Meses = 0;
     let gastoMesAtual = 0;
@@ -290,11 +326,17 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
       const saldoFroteLeve = saldosHistorico.find(s => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
       saldoMensal = saldoFroteLeve?.saldoMensal || 0;
       
+      console.log('Saldo frota leve encontrado:', saldoFroteLeve);
+      console.log('Saldo mensal configurado:', saldoMensal);
+      
       // SALDO 12 MESES: Individual desta viatura específica
       const saldoIndividual = saldosHistorico.find(s => 
         s.viaturaId === viatura?.id && s.anoReferencia === anoAtual
       );
       saldo12Meses = saldoIndividual?.saldo12Meses || (viatura?.SALDO || 0) / 100;
+      
+      console.log('Saldo individual encontrado:', saldoIndividual);
+      console.log('Saldo 12 meses configurado:', saldo12Meses);
       
       // GASTO MENSAL: Toda a frota leve (para mostrar impacto no saldo compartilhado)
       // Buscar todas as placas da frota leve para calcular gasto conjunto
@@ -327,6 +369,16 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
 
     const saldoDisponivelMes = Math.max(0, saldoMensal - gastoMesAtual);
     const saldoDisponivel12Meses = Math.max(0, saldo12Meses - gasto12Meses);
+
+    console.log('Resultado dos cálculos:', {
+      saldoMensal,
+      saldo12Meses,
+      gastoMesAtual,
+      gasto12Meses,
+      saldoDisponivelMes,
+      saldoDisponivel12Meses,
+      tipoSaldo
+    });
 
     return {
       mes: [
