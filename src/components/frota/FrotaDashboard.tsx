@@ -21,6 +21,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import ModalDetalhesViatura from '@/components/ModalDetalhesViatura';
 import GestaoSaldos from './GestaoSaldos';
 import { Viatura } from '@/bot/types';
+import { isFroteLeve, isFrotePesada, buscarViaturasLeves, buscarViaturasPesadas, limparCacheViaturas } from '@/lib/viaturaUtils';
 
 interface OrdemServico {
   id: string;
@@ -175,19 +176,15 @@ const FrotaDashboard = () => {
     setGastos12Meses(gastos12MesesData);
   };
 
-  const getStatusViatura = (viatura: Viatura) => {
+  const getStatusViatura = async (viatura: Viatura) => {
     const kmRestante = viatura.KMOLEO - viatura.KM;
     
-    // Verificar se é frota pesada
-    const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
-    const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
-    const cadastroViatura = viatura.CADASTRO || viatura.id;
-    const isFrotePesada = FROTA_PESADA_PLACAS.includes(viatura.PLACA) || 
-                         FROTA_PESADA_CADASTROS.includes(cadastroViatura) ||
-                         viatura.UTILIZACAO === 'PESADA';
+    // Verificar se é frota pesada usando função dinâmica
+    const ehFrotePesada = isFrotePesada(viatura);
+    const ehFroteLeve = isFroteLeve(viatura);
 
     // Para frota pesada, apenas verificar KM (saldo é livre)
-    if (isFrotePesada) {
+    if (ehFrotePesada) {
       if (kmRestante <= 1000) {
         return { status: 'CRÍTICO', variant: 'destructive' as const, cor: 'border-destructive bg-destructive/5' };
       } else if (kmRestante <= 3000) {
@@ -197,40 +194,54 @@ const FrotaDashboard = () => {
     }
 
     // Para frota leve, verificar KM + saldo compartilhado
-    // Buscar saldo da frota leve
-    const agora = new Date();
-    const mesAtual = agora.getMonth();
-    const anoAtual = agora.getFullYear();
-    
-    // Calcular gasto da frota leve no mês atual
-    const placasFroteLeve = viaturas
-      .filter(v => !FROTA_PESADA_PLACAS.includes(v.PLACA) && 
-                   !FROTA_PESADA_CADASTROS.includes(v.CADASTRO || v.id) &&
-                   v.UTILIZACAO !== 'PESADA')
-      .map(v => v.PLACA);
-    
-    const gastoFroteLeveAtual = ordensServico
-      .filter(os => {
-        const dataOS = new Date(os.dataOS);
-        return placasFroteLeve.includes(os.placaViatura) &&
-               dataOS.getMonth() === mesAtual && 
-               dataOS.getFullYear() === anoAtual;
-      })
-      .reduce((total, os) => {
-        const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
-        return total + valor;
-      }, 0);
+    if (ehFroteLeve) {
+      const agora = new Date();
+      const mesAtual = agora.getMonth();
+      const anoAtual = agora.getFullYear();
+      
+      // Calcular gasto da frota leve no mês atual
+      const viaturasLeves = await buscarViaturasLeves();
+      const placasFroteLeve = viaturasLeves.map(v => v.PLACA);
+      
+      const gastoFroteLeveAtual = ordensServico
+        .filter(os => {
+          const dataOS = new Date(os.dataOS);
+          return placasFroteLeve.includes(os.placaViatura) &&
+                 dataOS.getMonth() === mesAtual && 
+                 dataOS.getFullYear() === anoAtual;
+        })
+        .reduce((total, os) => {
+          const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
+          return total + valor;
+        }, 0);
 
-    // Buscar configuração de saldo da frota leve
-    // Por simplicidade, usar um valor padrão se não encontrar configuração
-    const saldoMensalFroteLeve = 30000; // Valor padrão, idealmente buscar do Firebase
-    const saldoRestante = saldoMensalFroteLeve - gastoFroteLeveAtual;
+      // Buscar configuração de saldo da frota leve do Firebase
+      try {
+        const saldosSnapshot = await getDocs(collection(db, 'saldosViaturas'));
+        const saldoFroteLeve = saldosSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .find(s => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
+        
+        const saldoMensalFroteLeve = saldoFroteLeve?.saldoMensal || 30000; // Valor padrão
+        const saldoRestante = saldoMensalFroteLeve - gastoFroteLeveAtual;
 
-    if (kmRestante <= 1000 || saldoRestante < 1000) {
+        if (kmRestante <= 1000 || saldoRestante < 1000) {
+          return { status: 'CRÍTICO', variant: 'destructive' as const, cor: 'border-destructive bg-destructive/5' };
+        } else if (kmRestante <= 3000 || saldoRestante < 2000) {
+          return { status: 'ATENÇÃO', variant: 'secondary' as const, cor: 'border-yellow-500 bg-yellow-500/5' };
+        }
+      } catch (error) {
+        console.error('Erro ao buscar saldo da frota leve:', error);
+      }
+    }
+
+    // Para viaturas sem categoria definida
+    if (kmRestante <= 1000) {
       return { status: 'CRÍTICO', variant: 'destructive' as const, cor: 'border-destructive bg-destructive/5' };
-    } else if (kmRestante <= 3000 || saldoRestante < 2000) {
+    } else if (kmRestante <= 3000) {
       return { status: 'ATENÇÃO', variant: 'secondary' as const, cor: 'border-yellow-500 bg-yellow-500/5' };
     }
+    
     return { status: 'OK', variant: 'default' as const, cor: 'border-green-500 bg-green-500/5' };
   };
 
@@ -270,21 +281,9 @@ const FrotaDashboard = () => {
           return dataOS.getMonth() + 1 === mesAtual && dataOS.getFullYear() === anoAtual;
         });
 
-      // Separar viaturas por tipo
-      const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
-      const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
-      
-      const viaturasPesadas = viaturas.filter(v => 
-        FROTA_PESADA_PLACAS.includes(v.PLACA) || 
-        FROTA_PESADA_CADASTROS.includes(v.CADASTRO || v.id) ||
-        v.UTILIZACAO === 'PESADA'
-      );
-      
-      const viaturasLeves = viaturas.filter(v => 
-        !FROTA_PESADA_PLACAS.includes(v.PLACA) && 
-        !FROTA_PESADA_CADASTROS.includes(v.CADASTRO || v.id) &&
-        v.UTILIZACAO !== 'PESADA'
-      );
+      // Separar viaturas por tipo usando funções dinâmicas
+      const viaturasPesadas = await buscarViaturasPesadas();
+      const viaturasLeves = await buscarViaturasLeves();
 
       // Calcular saldo usado da frota leve (soma de todas as OS das viaturas leves no mês)
       const placasLeves = viaturasLeves.map(v => v.PLACA);
@@ -307,20 +306,25 @@ const FrotaDashboard = () => {
         let saldoDisponivel = 0;
         let tipoSaldo = 'individual';
 
-        if (FROTA_PESADA_PLACAS.includes(viatura.PLACA) || 
-            FROTA_PESADA_CADASTROS.includes(viatura.CADASTRO || viatura.id) ||
-            viatura.UTILIZACAO === 'PESADA') {
+        if (isFrotePesada(viatura)) {
           // Para frota pesada, saldo livre (sem limitação)
           saldoUsado = ordensMesAtual
             .filter(os => os.placa === viatura.PLACA)
             .reduce((total, os) => total + (os.valorTotal || 0), 0);
           saldoDisponivel = 999999; // Valor simbólico para saldo livre
           tipoSaldo = 'livre';
-        } else {
+        } else if (isFroteLeve(viatura)) {
           // Para frota leve, usar o saldo coletivo
           saldoUsado = saldoUsadoFroteLeve;
           saldoDisponivel = cotaFroteLeve - saldoUsadoFroteLeve;
           tipoSaldo = 'compartilhado';
+        } else {
+          // Viatura sem categoria
+          saldoUsado = ordensMesAtual
+            .filter(os => os.placa === viatura.PLACA)
+            .reduce((total, os) => total + (os.valorTotal || 0), 0);
+          saldoDisponivel = 0;
+          tipoSaldo = 'indefinido';
         }
 
         // Verificar se já existe um registro para esta placa no mês atual
@@ -333,7 +337,7 @@ const FrotaDashboard = () => {
           placa: viatura.PLACA,
           cadastro: viatura.CADASTRO || '',
           modelo: viatura.MODELO,
-          tipo: viatura.UTILIZACAO || (tipoSaldo === 'livre' ? 'pesada' : 'leve'),
+          tipo: viatura.tipo || 'indefinido',
           tipoSaldo: tipoSaldo,
           saldoUsado: saldoUsado,
           saldoDisponivel: saldoDisponivel,
@@ -349,6 +353,9 @@ const FrotaDashboard = () => {
           await addDoc(collection(db, 'saldoOficina'), dadosAtualizacao);
         }
       }
+
+      // Limpar cache para garantir dados atualizados
+      limparCacheViaturas();
 
       toast({
         title: "Saldos atualizados",
@@ -366,6 +373,23 @@ const FrotaDashboard = () => {
       setIsUpdatingSaldos(false);
     }
   };
+
+  // Usar estado para o status das viaturas para evitar chamadas assíncronas no render
+  const [statusViaturas, setStatusViaturas] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    const calcularStatusTodasViaturas = async () => {
+      const statusMap: Record<string, any> = {};
+      for (const viatura of viaturas) {
+        statusMap[viatura.id] = await getStatusViatura(viatura);
+      }
+      setStatusViaturas(statusMap);
+    };
+
+    if (viaturas.length > 0) {
+      calcularStatusTodasViaturas();
+    }
+  }, [viaturas, ordensServico]);
 
   return (
     <div className="space-y-6">
@@ -417,7 +441,7 @@ const FrotaDashboard = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Críticas/Atenção</p>
                 <p className="text-2xl font-bold">
-                  {viaturas.filter(v => getStatusViatura(v).status !== 'OK').length}
+                  {Object.values(statusViaturas).filter(status => status?.status !== 'OK').length}
                 </p>
               </div>
             </div>
@@ -464,7 +488,7 @@ const FrotaDashboard = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {viaturas.map((viatura) => {
-              const statusInfo = getStatusViatura(viatura);
+              const statusInfo = statusViaturas[viatura.id] || { status: 'OK', variant: 'default', cor: 'border-green-500 bg-green-500/5' };
               const ordensViatura = getOrdensViatura(viatura.PLACA);
               const isSelected = selectedViatura === viatura.id;
 
@@ -491,11 +515,12 @@ const FrotaDashboard = () => {
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Tipo:</span>
                            <Badge
-                             variant={viatura.UTILIZACAO === 'PESADA' ? 'destructive' : 'default'}
+                             variant={viatura.tipo === 'pesada' ? 'destructive' : 
+                                     viatura.tipo === 'leve' ? 'default' : 'secondary'}
                              className="text-xs"
                            >
-                             {viatura.UTILIZACAO === 'PESADA' ? 'Pesada' :
-                               viatura.UTILIZACAO === 'LEVE' ? 'Leve' :
+                             {viatura.tipo === 'pesada' ? 'Pesada' :
+                               viatura.tipo === 'leve' ? 'Leve' :
                                  'Não definido'}
                            </Badge>
                         </div>

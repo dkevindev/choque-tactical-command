@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 
 import { Viatura } from '@/bot/types';
+import { isFroteLeve, isFrotePesada, getPlacasViaturasLeves } from '@/lib/viaturaUtils';
 
 interface OrdemServico {
   id: string;
@@ -131,31 +132,27 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
       console.log('Todos os saldos carregados:', todosOsSaldos);
       
       const saldosData = todosOsSaldos.filter((saldo: any) => {
-          const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
-          const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
-          
           // Incluir saldo específico da viatura
           const isSaldoEspecifico = saldo.viaturaId === viatura.id;
           
-          // Incluir saldo de frota pesada
-          const isFrotePesada = saldo.tipo === 'frota_pesada' && 
-             (FROTA_PESADA_CADASTROS.includes(viatura.CADASTRO || viatura.id) || 
-              FROTA_PESADA_PLACAS.includes(viatura.PLACA));
+          // Incluir saldo de frota pesada se a viatura for pesada
+          const isFrotePesadaSaldo = saldo.tipo === 'frota_pesada' && isFrotePesada(viatura);
           
-          // CORREÇÃO: Incluir saldo de frota leve para viaturas leves
-          const isFroteLeve = saldo.tipo === 'frota_leve';
+          // Incluir saldo de frota leve se a viatura for leve
+          const isFroteLeveSaldo = saldo.tipo === 'frota_leve' && isFroteLeve(viatura);
           
-          const resultado = isSaldoEspecifico || isFrotePesada || isFroteLeve;
+          const resultado = isSaldoEspecifico || isFrotePesadaSaldo || isFroteLeveSaldo;
           
           console.log('Filtro de saldo:', {
             saldoId: saldo.id,
             saldoTipo: saldo.tipo,
             viaturaId: viatura.id,
+            viaturaTipo: viatura.tipo,
             viaturaCadastro: viatura.CADASTRO,
             viaturaPlaca: viatura.PLACA,
             isSaldoEspecifico,
-            isFrotePesada,
-            isFroteLeve,
+            isFrotePesadaSaldo,
+            isFroteLeveSaldo,
             resultado
           });
           
@@ -264,24 +261,20 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   };
 
   // Calcular gráficos de pizza baseado nos saldos configurados
-  const calcularGraficoPizza = () => {
+  const calcularGraficoPizza = async () => {
     const agora = new Date();
     const mesAtual = agora.getMonth();
     const anoAtual = agora.getFullYear();
     
-    // Verificar se é frota pesada
-    const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
-    const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
-    const cadastroViatura = viatura?.CADASTRO || viatura?.id;
-    const placaViatura = viatura?.PLACA;
-    const isFrotePesada = FROTA_PESADA_PLACAS.includes(placaViatura || '') || 
-                         FROTA_PESADA_CADASTROS.includes(cadastroViatura || '') ||
-                         viatura?.UTILIZACAO === 'PESADA';
+    // Verificar se é frota pesada usando função dinâmica
+    const viaturaEhPesada = viatura ? isFrotePesada(viatura) : false;
+    const viaturaEhLeve = viatura ? isFroteLeve(viatura) : false;
     
     console.log('Calculando gráficos para viatura:', {
-      cadastroViatura,
-      placaViatura,
-      isFrotePesada,
+      viatura: viatura?.CADASTRO,
+      placaViatura: viatura?.PLACA,
+      viaturaEhPesada,
+      viaturaEhLeve,
       saldosHistorico
     });
     
@@ -291,7 +284,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     let gasto12Meses = 0;
     let tipoSaldo = '';
     
-    if (isFrotePesada) {
+    if (viaturaEhPesada) {
       // Para frota pesada, saldo livre (sem limitação)
       tipoSaldo = 'livre';
       saldoMensal = 999999;
@@ -318,7 +311,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
           const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
           return total + valor;
         }, 0);
-    } else {
+    } else if (viaturaEhLeve) {
       // Para frota leve
       tipoSaldo = 'compartilhado';
       
@@ -338,11 +331,16 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
       console.log('Saldo individual encontrado:', saldoIndividual);
       console.log('Saldo 12 meses configurado:', saldo12Meses);
       
-      // GASTO MENSAL: Toda a frota leve (para mostrar impacto no saldo compartilhado)
-      // Buscar todas as placas da frota leve para calcular gasto conjunto
-      const placasFroteLeve = ['PMH4J32', 'PMH6E42', 'PMH5I72', 'PMH2C23', 'PMH1D13']; // CAV-11, CAV-12, CAV-13, CAV-05, CAV-06
+      // GASTO MENSAL: Toda a frota leve (buscar placas dinamicamente)
+      const placasFroteLeve = await getPlacasViaturasLeves();
+      console.log('Placas da frota leve (dinâmico):', placasFroteLeve);
       
-      gastoMesAtual = ordensServico
+      // Buscar todas as OS da frota leve no mês atual
+      const qFroteLeve = query(collection(db, 'ordensDeServico'));
+      const osFroteLeve = await getDocs(qFroteLeve);
+      
+      gastoMesAtual = osFroteLeve.docs
+        .map(doc => ({ ...doc.data() }) as OrdemServico)
         .filter(os => {
           const dataOS = new Date(os.dataOS);
           return placasFroteLeve.includes(os.placaViatura) &&
@@ -353,6 +351,8 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
           const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
           return total + valor;
         }, 0);
+
+      console.log('Gasto mensal frota leve calculado:', gastoMesAtual);
 
       // GASTO 12 MESES: Individual desta viatura específica
       gasto12Meses = ordensServico
@@ -365,6 +365,13 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
           const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
           return total + valor;
         }, 0);
+    } else {
+      // Viatura sem categoria definida
+      tipoSaldo = 'indefinido';
+      saldoMensal = 0;
+      saldo12Meses = 0;
+      gastoMesAtual = 0;
+      gasto12Meses = 0;
     }
 
     const saldoDisponivelMes = Math.max(0, saldoMensal - gastoMesAtual);
@@ -399,7 +406,29 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     };
   };
 
-  const dadosGraficos = calcularGraficoPizza();
+  const [dadosGraficos, setDadosGraficos] = useState({
+    mes: [
+      { name: 'Usado', value: 0, fill: '#ef4444' },
+      { name: 'Disponível', value: 0, fill: '#22c55e' }
+    ],
+    doze_meses: [
+      { name: 'Usado', value: 0, fill: '#ef4444' },
+      { name: 'Disponível', value: 0, fill: '#22c55e' }
+    ],
+    totais: {
+      saldoMensal: 0,
+      saldo12Meses: 0,
+      gastoMesAtual: 0,
+      gasto12Meses: 0,
+      tipoSaldo: ''
+    }
+  });
+
+  useEffect(() => {
+    if (viatura && saldosHistorico.length > 0) {
+      calcularGraficoPizza().then(setDadosGraficos);
+    }
+  }, [viatura, saldosHistorico, ordensServico]);
 
   if (!viatura) return null;
 
@@ -436,6 +465,9 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                         {saldo.tipo === 'frota_pesada' && (
                           <Badge variant="secondary" className="ml-2 text-xs">Frota Pesada</Badge>
                         )}
+                        {saldo.tipo === 'frota_leve' && (
+                          <Badge variant="default" className="ml-2 text-xs">Frota Leve</Badge>
+                        )}
                       </div>
                       <div className="text-right">
                         <div className="text-green-600">
@@ -458,7 +490,9 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
-                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (Mensal)' : 'Saldo Mensal Compartilhado'}
+                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (Mensal)' : 
+                   dadosGraficos.totais.tipoSaldo === 'compartilhado' ? 'Saldo Mensal Compartilhado' : 
+                   'Saldo Não Definido'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -475,11 +509,11 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                       </span>
                     </div>
                   </div>
-                ) : (
+                ) : dadosGraficos.totais.tipoSaldo === 'compartilhado' ? (
                   <>
                     <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
                       <p className="text-xs text-blue-800">
-                        <strong>Saldo Compartilhado:</strong> Todas as viaturas da frota leve (CAV-11, CAV-12, CAV-13, CAV-05, CAV-06) usam este saldo mensal
+                        <strong>Saldo Compartilhado:</strong> Todas as viaturas da frota leve compartilham este saldo mensal
                       </p>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -518,6 +552,13 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                       </PieChart>
                     </ResponsiveContainer>
                   </>
+                ) : (
+                  <div className="text-center py-4">
+                    <div className="text-xl font-bold text-yellow-600 mb-2">CATEGORIA NÃO DEFINIDA</div>
+                    <p className="text-sm text-muted-foreground">
+                      Esta viatura não foi categorizada como frota leve ou pesada
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -526,7 +567,9 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <CalendarIcon className="h-4 w-4" />
-                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (12 Meses)' : 'Saldo Individual (12 Meses)'}
+                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (12 Meses)' : 
+                   dadosGraficos.totais.tipoSaldo === 'compartilhado' ? 'Saldo Individual (12 Meses)' : 
+                   'Saldo Não Definido'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -543,7 +586,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                       </span>
                     </div>
                   </div>
-                ) : (
+                ) : dadosGraficos.totais.tipoSaldo === 'compartilhado' ? (
                   <>
                     <div className="bg-orange-50 border border-orange-200 rounded p-2 mb-2">
                       <p className="text-xs text-orange-800">
@@ -586,6 +629,13 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                       </PieChart>
                     </ResponsiveContainer>
                   </>
+                ) : (
+                  <div className="text-center py-4">
+                    <div className="text-xl font-bold text-yellow-600 mb-2">CATEGORIA NÃO DEFINIDA</div>
+                    <p className="text-sm text-muted-foreground">
+                      Esta viatura não foi categorizada como frota leve ou pesada
+                    </p>
+                  </div>
                 )}
               </CardContent>
             </Card>

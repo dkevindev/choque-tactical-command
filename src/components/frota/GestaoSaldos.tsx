@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -15,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Truck, Car, Info } from 'lucide-react';
+import { buscarViaturasLeves, buscarViaturasPesadas } from '@/lib/viaturaUtils';
 
 interface SaldoConfig {
   id: string;
@@ -38,11 +38,10 @@ interface GestaoSaldosProps {
   onClose: () => void;
 }
 
-const FROTA_PESADA_PLACAS = ['PMH7342', 'PMH6432', 'HUQ4028', 'OCO3291'];
-const FROTA_PESADA_CADASTROS = ['TA01', 'TA02', 'TA03', 'TP'];
-
 const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
   const [viaturas, setViaturas] = useState<Viatura[]>([]);
+  const [viaturasFroteLeve, setViaturasFroteLeve] = useState<Viatura[]>([]);
+  const [viaturasFrotePesada, setViaturasFrotePesada] = useState<Viatura[]>([]);
   const [saldos, setSaldos] = useState<SaldoConfig[]>([]);
   const [saldoFroteLeve, setSaldoFroteLeve] = useState({ mensal: 0, anual: 0 });
   const [loading, setLoading] = useState(false);
@@ -66,6 +65,16 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
         ...doc.data(),
       })) as Viatura[];
       setViaturas(viaturasData);
+
+      // Buscar viaturas categorizadas dinamicamente
+      const viaturasLeves = await buscarViaturasLeves();
+      const viaturasPesadas = await buscarViaturasPesadas();
+
+      console.log('Viaturas da frota leve (dinâmico):', viaturasLeves);
+      console.log('Viaturas da frota pesada (dinâmico):', viaturasPesadas);
+
+      setViaturasFroteLeve(viaturasLeves);
+      setViaturasFrotePesada(viaturasPesadas);
     } catch (error) {
       console.error('Erro ao buscar viaturas:', error);
     }
@@ -127,18 +136,6 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
     }
   };
 
-  const viaturasFroteLeve = viaturas.filter(v => 
-    !FROTA_PESADA_PLACAS.includes(v.PLACA) && 
-    !FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) &&
-    v.tipo !== 'pesada'
-  );
-  
-  const viaturasFrotePesada = viaturas.filter(v => 
-    FROTA_PESADA_PLACAS.includes(v.PLACA) || 
-    FROTA_PESADA_CADASTROS.includes(v.cadastro || v.id) ||
-    v.tipo === 'pesada'
-  );
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -160,7 +157,7 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-sm text-muted-foreground mb-2">
-                Viaturas: {viaturasFroteLeve.map(v => v.cadastro || v.id).join(', ')}
+                Viaturas: {viaturasFroteLeve.map(v => v.CADASTRO || v.id).join(', ') || 'Nenhuma viatura categorizada como frota leve'}
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
                 <div className="flex items-center gap-2 text-blue-800 text-sm">
@@ -212,7 +209,7 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
             </CardHeader>
             <CardContent>
               <div className="text-sm text-muted-foreground mb-4">
-                Viaturas: {viaturasFrotePesada.map(v => v.cadastro || v.id).join(', ')}
+                Viaturas: {viaturasFrotePesada.map(v => v.CADASTRO || v.id).join(', ') || 'Nenhuma viatura categorizada como frota pesada'}
               </div>
               
               <div className="bg-green-50 border border-green-200 rounded-md p-4">
@@ -232,7 +229,7 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
                     <CardContent className="p-4">
                       <div className="text-center">
                         <h3 className="font-semibold text-sm">
-                          {viatura.cadastro || viatura.id} - {viatura.PLACA}
+                          {viatura.CADASTRO || viatura.id} - {viatura.PLACA}
                         </h3>
                         <p className="text-xs text-muted-foreground mt-1">
                           {viatura.MODELO}
@@ -244,6 +241,43 @@ const GestaoSaldos = ({ isOpen, onClose }: GestaoSaldosProps) => {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+
+              {viaturasFrotePesada.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>Nenhuma viatura foi categorizada como frota pesada ainda.</p>
+                  <p className="text-sm mt-2">Use a página de Categoria para classificar as viaturas.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Informações sobre Categoria */}
+          <Card className="border-yellow-200 bg-yellow-50/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-yellow-800">
+                <Info className="h-5 w-5" />
+                Categorização Dinâmica
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-yellow-800 text-sm space-y-2">
+                <p>
+                  <strong>Sistema Dinâmico:</strong> As viaturas são automaticamente classificadas 
+                  baseado na categorização feita na página "Categoria" do sistema.
+                </p>
+                <p>
+                  <strong>Frota Leve:</strong> Viaturas marcadas com <code>tipo: 'leve'</code> compartilham 
+                  um saldo mensal comum.
+                </p>
+                <p>
+                  <strong>Frota Pesada:</strong> Viaturas marcadas com <code>tipo: 'pesada'</code> possuem 
+                  saldo livre (sem limitação).
+                </p>
+                <p>
+                  <strong>Para categorizar viaturas:</strong> Vá em Frota → Categoria e arraste as viaturas 
+                  para as respectivas categorias.
+                </p>
               </div>
             </CardContent>
           </Card>
