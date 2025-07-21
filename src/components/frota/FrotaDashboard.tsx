@@ -140,7 +140,7 @@ const FrotaDashboard = () => {
     console.log('Mês atual:', mesAtual, 'Ano atual:', anoAtual);
 
     try {
-      // Buscar viaturas da frota leve e pesada dinamicamente
+      // Buscar viaturas da frota leve dinamicamente
       const viaturasLeves = await buscarViaturasLeves();
       const viaturasPesadas = await buscarViaturasPesadas();
       
@@ -157,14 +157,10 @@ const FrotaDashboard = () => {
       })));
 
       const placasFroteLeve = viaturasLeves.map(v => v.PLACA);
-      const cadastrosFroteLeve = viaturasLeves.map(v => v.CADASTRO);
       const placasFrotePesada = viaturasPesadas.map(v => v.PLACA);
-      const cadastrosFrotePesada = viaturasPesadas.map(v => v.CADASTRO);
 
       console.log('Placas frota leve:', placasFroteLeve);
-      console.log('Cadastros frota leve:', cadastrosFroteLeve);
       console.log('Placas frota pesada:', placasFrotePesada);
-      console.log('Cadastros frota pesada:', cadastrosFrotePesada);
 
       // Filtrar OS do mês atual
       const osDoMes = ordensServico.filter(os => {
@@ -173,7 +169,6 @@ const FrotaDashboard = () => {
         if (isMesAtual) {
           console.log('OS do mês encontrada:', {
             placa: os.placaViatura,
-            cadastro: os.cadastroViatura,
             valor: os.valorOS,
             data: os.dataOS
           });
@@ -186,14 +181,10 @@ const FrotaDashboard = () => {
       // Calcular gasto frota leve no mês
       const gastoLeve = osDoMes
         .filter(os => {
-          const isPlacarLeve = placasFroteLeve.includes(os.placaViatura);
-          const isCadastroLeve = cadastrosFroteLeve.includes(os.cadastroViatura);
-          const isLeve = isPlacarLeve || isCadastroLeve;
-          
+          const isLeve = placasFroteLeve.includes(os.placaViatura);
           if (isLeve) {
             console.log('OS da frota leve:', {
               placa: os.placaViatura,
-              cadastro: os.cadastroViatura,
               valor: os.valorOS,
               valorNumerico: parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100
             });
@@ -205,22 +196,15 @@ const FrotaDashboard = () => {
           return total + valor;
         }, 0);
 
-      // Calcular gasto frota pesada no mês - CORREÇÃO AQUI
+      // Calcular gasto frota pesada no mês
       const gastoPesada = osDoMes
         .filter(os => {
-          const isPlacarPesada = placasFrotePesada.includes(os.placaViatura);
-          const isCadastroPesada = cadastrosFrotePesada.includes(os.cadastroViatura);
-          // Incluir casos especiais como placa "N/D" buscando por cadastro
-          const isEspecial = os.placaViatura === 'N/D' && cadastrosFrotePesada.includes(os.cadastroViatura);
-          const isPesada = isPlacarPesada || isCadastroPesada || isEspecial;
-          
+          const isPesada = placasFrotePesada.includes(os.placaViatura);
           if (isPesada) {
             console.log('OS da frota pesada:', {
               placa: os.placaViatura,
-              cadastro: os.cadastroViatura,
               valor: os.valorOS,
-              valorNumerico: parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100,
-              motivo: isPlacarPesada ? 'placa' : isCadastroPesada ? 'cadastro' : 'especial N/D'
+              valorNumerico: parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100
             });
           }
           return isPesada;

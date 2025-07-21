@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, serverTimestamp, Timestamp, FieldValue, query, where, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -7,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { buscarTodasViaturas, buscarViaturasLeves, buscarViaturasPesadas, isFroteLeve, isFrotePesada } from '@/lib/viaturaUtils';
 
 interface Viatura {
   id: string;
@@ -142,8 +142,6 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     saldoOriginal: 0
   });
 
-  const [isUpdatingSaldos, setIsUpdatingSaldos] = useState(false);
-
   const funcoesAssinatura = [
     'Comandante do RPMON',
     'Subcomandante do RPMONT',
@@ -157,165 +155,6 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     'Comandante do 3ªPel/2ªEsq/RPMONT',
   ];
 
-  const handleAtualizarSaldos = async () => {
-    setIsUpdatingSaldos(true);
-
-    try {
-      console.log('=== INICIANDO ATUALIZAÇÃO AUTOMÁTICA DE SALDOS ===');
-      const agora = new Date();
-      const mesAtual = agora.getMonth() + 1;
-      const anoAtual = agora.getFullYear();
-
-      // Buscar todas as viaturas
-      const todasViaturas = await buscarTodasViaturas();
-      console.log('Total de viaturas encontradas:', todasViaturas.length);
-
-      // Buscar todas as OS do mês atual
-      const osSnapshot = await getDocs(collection(db, 'ordensDeServico'));
-      const ordensMesAtual = osSnapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          placa: doc.data().placaViatura,
-          cadastro: doc.data().cadastroViatura,
-          valorTotal: parseFloat(doc.data().valorOS?.replace(/[R$.,\s]/g, '') || '0') / 100,
-          dataOS: doc.data().dataOS
-        }))
-        .filter(os => {
-          const dataOS = new Date(os.dataOS);
-          return dataOS.getMonth() + 1 === mesAtual && dataOS.getFullYear() === anoAtual;
-        });
-
-      console.log('OS do mês atual encontradas:', ordensMesAtual.length);
-
-      // Separar viaturas por tipo usando funções dinâmicas
-      const viaturasPesadas = await buscarViaturasPesadas();
-      const viaturasLeves = await buscarViaturasLeves();
-
-      console.log('Viaturas pesadas:', viaturasPesadas.map(v => ({ cadastro: v.CADASTRO, placa: v.PLACA })));
-      console.log('Viaturas leves:', viaturasLeves.map(v => ({ cadastro: v.CADASTRO, placa: v.PLACA })));
-
-      // Calcular saldo usado da frota leve (soma de todas as OS das viaturas leves no mês)
-      const placasLeves = viaturasLeves.map(v => v.PLACA);
-      const cadastrosLeves = viaturasLeves.map(v => v.CADASTRO);
-      
-      const saldoUsadoFroteLeve = ordensMesAtual
-        .filter(os => {
-          const isPlacarLeve = placasLeves.includes(os.placa);
-          const isCadastroLeve = cadastrosLeves.includes(os.cadastro);
-          const isLeve = isPlacarLeve || isCadastroLeve;
-          
-          if (isLeve) {
-            console.log('OS da frota leve encontrada:', {
-              placa: os.placa,
-              cadastro: os.cadastro,
-              valor: os.valorTotal
-            });
-          }
-          
-          return isLeve;
-        })
-        .reduce((total, os) => total + (os.valorTotal || 0), 0);
-
-      console.log('Saldo usado frota leve total:', saldoUsadoFroteLeve);
-
-      // Buscar cota da frota leve
-      const saldosViaturasSnapshot = await getDocs(collection(db, 'saldosViaturas'));
-      const saldoOficinaSnapshot = await getDocs(collection(db, 'saldoOficina'));
-
-      const docFroteLeve = saldosViaturasSnapshot.docs.find(doc => doc.data().tipo === 'frota_leve');
-      const cotaFroteLeve = docFroteLeve?.data()?.saldoMensal || 0;
-
-      console.log('Cota mensal frota leve:', cotaFroteLeve);
-
-      const mesReferenciaAtual = `${mesAtual.toString().padStart(2, '0')}/${anoAtual}`;
-
-      // Criar/atualizar registros na coleção saldoOficina
-      for (const viatura of todasViaturas) {
-        let saldoUsado = 0;
-        let saldoDisponivel = 0;
-        let tipoSaldo = 'individual';
-
-        if (isFrotePesada(viatura)) {
-          // Para frota pesada, calcular gasto individual
-          const placasPesadas = viaturasPesadas.map(v => v.PLACA);
-          const cadastrosPesados = viaturasPesadas.map(v => v.CADASTRO);
-          
-          saldoUsado = ordensMesAtual
-            .filter(os => {
-              const isPlacarPesada = placasPesadas.includes(os.placa);
-              const isCadastroPesada = cadastrosPesados.includes(os.cadastro);
-              // Buscar por placa exata, cadastro, ou se a placa for "N/D" buscar por cadastro
-              const isMatch = isPlacarPesada || isCadastroPesada || 
-                             (os.placa === 'N/D' && os.cadastro === viatura.CADASTRO) ||
-                             (os.placa === viatura.PLACA);
-              
-              if (isMatch) {
-                console.log('OS da frota pesada encontrada:', {
-                  viaturaCadastro: viatura.CADASTRO,
-                  viaturaPlaca: viatura.PLACA,
-                  osPlaca: os.placa,
-                  osCadastro: os.cadastro,
-                  valor: os.valorTotal
-                });
-              }
-              
-              return isMatch;
-            })
-            .reduce((total, os) => total + (os.valorTotal || 0), 0);
-          
-          saldoDisponivel = 999999; // Valor simbólico para saldo livre
-          tipoSaldo = 'livre';
-        } else if (isFroteLeve(viatura)) {
-          // Para frota leve, usar o saldo coletivo
-          saldoUsado = saldoUsadoFroteLeve;
-          saldoDisponivel = cotaFroteLeve - saldoUsadoFroteLeve;
-          tipoSaldo = 'compartilhado';
-        } else {
-          // Viatura sem categoria
-          saldoUsado = ordensMesAtual
-            .filter(os => os.placa === viatura.PLACA || os.cadastro === viatura.CADASTRO)
-            .reduce((total, os) => total + (os.valorTotal || 0), 0);
-          saldoDisponivel = 0;
-          tipoSaldo = 'indefinido';
-        }
-
-        // Verificar se já existe um registro para esta placa no mês atual
-        const registroExistente = saldoOficinaSnapshot.docs.find(doc => {
-          const data = doc.data();
-          return (data.placa === viatura.PLACA || data.cadastro === viatura.CADASTRO) && 
-                 data.mesReferencia === mesReferenciaAtual;
-        });
-
-        const dadosAtualizacao = {
-          placa: viatura.PLACA,
-          cadastro: viatura.CADASTRO || '',
-          modelo: viatura.MODELO,
-          tipo: viatura.tipo || 'indefinido',
-          tipoSaldo: tipoSaldo,
-          saldoUsado: saldoUsado,
-          saldoDisponivel: saldoDisponivel,
-          mesReferencia: mesReferenciaAtual,
-          dataAtualizacao: new Date().toISOString(),
-        };
-
-        if (registroExistente) {
-          // Atualizar registro existente
-          await updateDoc(doc(db, 'saldoOficina', registroExistente.id), dadosAtualizacao);
-        } else {
-          // Criar novo registro
-          await addDoc(collection(db, 'saldoOficina'), dadosAtualizacao);
-        }
-      }
-
-      console.log('=== SALDOS ATUALIZADOS COM SUCESSO ===');
-
-    } catch (error) {
-      console.error('Erro ao atualizar saldos:', error);
-    } finally {
-      setIsUpdatingSaldos(false);
-    }
-  };
-
   useEffect(() => {
     const fetchOficinas = async () => {
       const snapshot = await getDocs(collection(db, 'oficinas'));
@@ -325,7 +164,8 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
       }));
       setOficinas(lista);
     };
-    
+    fetchOficinas();
+
     const fetchViaturasPendentes = async () => {
       try {
         const snapshot = await getDocs(collection(db, 'oficina'));
@@ -344,26 +184,16 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         console.error('Erro ao buscar viaturas pendentes:', error);
       }
     };
+    fetchViaturasPendentes();
 
-    const initializeForm = async () => {
-      await fetchOficinas();
-      await fetchViaturasPendentes();
-      
-      // Atualizar saldos automaticamente quando abrir Nova OS
-      await handleAtualizarSaldos();
-      
-      // Se houver dados preenchidos, buscar saldo específico
-      if (prefilledData?.cadastro) {
-        setFormData(prev => ({
-          ...prev,
-          cadastro: prefilledData.cadastro,
-          defeito: prefilledData.servico || ''
-        }));
-        await buscarSaldoECota(prefilledData.cadastro, formData.dataOS);
-      }
-    };
-    
-    initializeForm();
+    if (prefilledData?.cadastro) {
+      setFormData(prev => ({
+        ...prev,
+        cadastro: prefilledData.cadastro,
+        defeito: prefilledData.servico || ''
+      }));
+      buscarSaldoECota(prefilledData.cadastro, formData.dataOS);
+    }
   }, [prefilledData]);
 
   useEffect(() => {
