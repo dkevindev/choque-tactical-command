@@ -247,7 +247,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     const placaViatura = viatura?.PLACA;
     const isFrotePesada = FROTA_PESADA_PLACAS.includes(placaViatura || '') || 
                          FROTA_PESADA_CADASTROS.includes(cadastroViatura || '') ||
-                         viatura.UTILIZACAO === 'PESADA';
+                         viatura?.UTILIZACAO === 'PESADA';
     
     let saldoMensal = 0;
     let saldo12Meses = 0;
@@ -256,7 +256,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     let tipoSaldo = '';
     
     if (isFrotePesada) {
-      // Para frota pesada, saldo livre
+      // Para frota pesada, saldo livre (sem limitação)
       tipoSaldo = 'livre';
       saldoMensal = 999999;
       saldo12Meses = 999999;
@@ -283,32 +283,41 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
           return total + valor;
         }, 0);
     } else {
-      // Para frota leve, buscar saldo compartilhado
+      // Para frota leve
       tipoSaldo = 'compartilhado';
-      const saldoFroteLeve = saldosHistorico.find(s => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
-      if (saldoFroteLeve) {
-        saldoMensal = saldoFroteLeve.saldoMensal || 0;
-        saldo12Meses = saldoFroteLeve.saldo12Meses || 0;
-      }
       
-      // Para frota leve, considerar gastos de toda a frota leve
-      // Aqui por simplicidade, mostrar apenas os gastos desta viatura
-      // mas indicar que é parte do saldo compartilhado
+      // SALDO MENSAL: Compartilhado entre toda a frota leve
+      const saldoFroteLeve = saldosHistorico.find(s => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
+      saldoMensal = saldoFroteLeve?.saldoMensal || 0;
+      
+      // SALDO 12 MESES: Individual desta viatura específica
+      const saldoIndividual = saldosHistorico.find(s => 
+        s.viaturaId === viatura?.id && s.anoReferencia === anoAtual
+      );
+      saldo12Meses = saldoIndividual?.saldo12Meses || (viatura?.SALDO || 0) / 100;
+      
+      // GASTO MENSAL: Toda a frota leve (para mostrar impacto no saldo compartilhado)
+      // Buscar todas as placas da frota leve para calcular gasto conjunto
+      const placasFroteLeve = ['PMH4J32', 'PMH6E42', 'PMH5I72', 'PMH2C23', 'PMH1D13']; // CAV-11, CAV-12, CAV-13, CAV-05, CAV-06
+      
       gastoMesAtual = ordensServico
         .filter(os => {
           const dataOS = new Date(os.dataOS);
-          return dataOS.getMonth() === mesAtual && dataOS.getFullYear() === anoAtual;
+          return placasFroteLeve.includes(os.placaViatura) &&
+                 dataOS.getMonth() === mesAtual && 
+                 dataOS.getFullYear() === anoAtual;
         })
         .reduce((total, os) => {
           const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
           return total + valor;
         }, 0);
 
+      // GASTO 12 MESES: Individual desta viatura específica
       gasto12Meses = ordensServico
         .filter(os => {
           const dataOS = new Date(os.dataOS);
           const doze_meses_atras = new Date(anoAtual, mesAtual - 12, 1);
-          return dataOS >= doze_meses_atras;
+          return os.placaViatura === viatura?.PLACA && dataOS >= doze_meses_atras;
         })
         .reduce((total, os) => {
           const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
@@ -397,7 +406,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
-                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (Mensal)' : 'Resumo Saldo Mensal'}
+                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (Mensal)' : 'Saldo Mensal Compartilhado'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -418,7 +427,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <>
                     <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
                       <p className="text-xs text-blue-800">
-                        <strong>Saldo Compartilhado:</strong> Todas as viaturas da frota leve usam este saldo
+                        <strong>Saldo Compartilhado:</strong> Todas as viaturas da frota leve (CAV-11, CAV-12, CAV-13, CAV-05, CAV-06) usam este saldo mensal
                       </p>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -428,13 +437,16 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span>Gasto Esta Viatura:</span>
+                      <span>Gasto Frota Leve:</span>
                       <span className="font-semibold text-orange-600">
                         R$ {dadosGraficos.totais.gastoMesAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    <div className="text-xs text-muted-foreground italic">
-                      * Para ver o gasto total da frota leve, consulte o dashboard
+                    <div className="flex justify-between text-sm">
+                      <span>Saldo Restante:</span>
+                      <span className="font-semibold text-blue-600">
+                        R$ {(dadosGraficos.totais.saldoMensal - dadosGraficos.totais.gastoMesAtual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
                     </div>
                     <ResponsiveContainer width="100%" height={150}>
                       <PieChart>
@@ -462,7 +474,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
                   <CalendarIcon className="h-4 w-4" />
-                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (12 Meses)' : 'Resumo Saldo 12 Meses'}
+                  {dadosGraficos.totais.tipoSaldo === 'livre' ? 'Saldo Livre (12 Meses)' : 'Saldo Individual (12 Meses)'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -481,9 +493,9 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   </div>
                 ) : (
                   <>
-                    <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
-                      <p className="text-xs text-blue-800">
-                        <strong>Saldo Compartilhado:</strong> Todas as viaturas da frota leve usam este saldo
+                    <div className="bg-orange-50 border border-orange-200 rounded p-2 mb-2">
+                      <p className="text-xs text-orange-800">
+                        <strong>Saldo Individual:</strong> Este saldo é específico desta viatura para os últimos 12 meses
                       </p>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -498,8 +510,11 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                         R$ {dadosGraficos.totais.gasto12Meses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    <div className="text-xs text-muted-foreground italic">
-                      * Para ver o gasto total da frota leve, consulte o dashboard
+                    <div className="flex justify-between text-sm">
+                      <span>Saldo Restante:</span>
+                      <span className="font-semibold text-blue-600">
+                        R$ {(dadosGraficos.totais.saldo12Meses - dadosGraficos.totais.gasto12Meses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
                     </div>
                     <ResponsiveContainer width="100%" height={150}>
                       <PieChart>
