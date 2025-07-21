@@ -49,20 +49,20 @@ const SaldoAnualCard = ({ saldoAnual }: SaldoAnualCardProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="bg-blue-50 border border-blue-200 rounded p-3">
-          <p className="text-xs text-blue-800 mb-2">
+        <div className="bg-military-accent/10 border border-military-accent/30 rounded-lg p-4">
+          <p className="text-sm text-military-accent font-semibold mb-3">
             <strong>Limite Anual:</strong> 70% do valor FIPE para gastos em 12 meses
           </p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <span className="text-blue-600">Valor FIPE:</span>
-              <div className="font-semibold">
+              <span className="text-muted-foreground">Valor FIPE:</span>
+              <div className="font-bold text-primary">
                 R$ {saldoAnual.valorFipe.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
             <div>
-              <span className="text-blue-600">Limite por OS:</span>
-              <div className="font-semibold">
+              <span className="text-muted-foreground">Limite por OS:</span>
+              <div className="font-bold text-military-olive">
                 R$ {saldoAnual.limitePorOS.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
