@@ -54,6 +54,7 @@ interface OrdemServico {
   Arquivo: string;
   appIdAssociado: string;
   COMPLETO: boolean;
+  numeroOficina: string;
 }
 
 // --- Helpers para a data ---
@@ -530,7 +531,7 @@ const OrdemServicoPage = () => {
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <p className="col-span-1 text-muted-foreground font-semibold">Arquivo:</p>
-                  <p className="col-span-3">{selectedOS.Arquivo || 'N/D'}</p>
+                  <p className="col-span-3">{selectedOS.numeroOficina || 'N/D'}</p>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <p className="col-span-1 text-muted-foreground font-semibold">Data Criação:</p>
