@@ -86,7 +86,9 @@ app.post('/', async (req, res) => {
 
         // --- 6. Enviar o arquivo de volta para o cliente ---
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        res.setHeader('Content-Disposition', `attachment; filename="Ordem_Servico_${osData.numeroOS || 'gerada'}.docx"`);
+
+        const nomeArquivo = `${osData.numeroOficina || '000'} - COLOG - ${osData.placaViatura || 'SEM-PLACA'} - OS ${osData.numeroOS || 'sem-numero'}`.replace(/[^\w\s\-]/gi, '');
+        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}.docx"`);
         res.send(buffer);
 
     } catch (error) {
