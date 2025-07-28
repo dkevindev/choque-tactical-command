@@ -80,6 +80,8 @@ interface OrdemServico {
     funcao: string;
   };
   dataCriacao?: Timestamp | FieldValue;
+  // NOVO CAMPO
+  arquivo?: string;
 }
 
 interface NovaOSFormProps {
@@ -100,19 +102,21 @@ interface ViaturaPendente {
 
 const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   const [formData, setFormData] = useState({
-    cadastro: '',
-    modelo: '',
-    dataOS: '',
-    defeito: '',
-    oficina: '',
-    numeroOficina: '',
-    numeroOS: '',
-    valorOS: '',
-    cotaMensal: '',
-    saldoDisponivel: '',
-    tipoFrota: 'leve',
-    placa: ''
-  });
+  cadastro: '',
+  modelo: '',
+  dataOS: '',
+  defeito: '',
+  oficina: '',
+  numeroOficina: '',
+  numeroOS: '',
+  valorOS: '',
+  cotaMensal: '',
+  saldoDisponivel: '',
+  tipoFrota: 'leve',
+  placa: '',
+  // NOVO CAMPO
+  arquivo: ''
+});;
 
   const [sugestoes, setSugestoes] = useState<Viatura[]>([]);
   const [showSugestoes, setShowSugestoes] = useState(false);
@@ -646,67 +650,75 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.numeroOS.trim()) {
-      alert('Por favor, informe o número da Ordem de Serviço (OS).');
-      return;
-    }
+  if (!formData.numeroOS.trim()) {
+    alert('Por favor, informe o número da Ordem de Serviço (OS).');
+    return;
+  }
 
-    try {
-      const numeroOS = formData.numeroOS;
+  try {
+    const numeroOS = formData.numeroOS;
+    const osRef = collection(db, 'ordensDeServico');
+    const q = query(osRef, where('numeroOS', '==', numeroOS));
+    const querySnapshot = await getDocs(q);
 
-      const osRef = collection(db, 'ordensDeServico');
-      const q = query(osRef, where('numeroOS', '==', numeroOS));
-      const querySnapshot = await getDocs(q);
+    let osDataParaEnvio: OrdemServico;
+    let osJaExistiaNoBD = false;
 
-      let osDataParaEnvio: OrdemServico;
-      let osJaExistiaNoBD = false;
+    if (!querySnapshot.empty) {
+      const osDoc = querySnapshot.docs[0];
+      osDataParaEnvio = osDoc.data() as OrdemServico;
+      osJaExistiaNoBD = true;
+      alert(`Atenção: A Ordem de Serviço número ${numeroOS} já existe no banco de dados! O documento será gerado com os dados existentes.`);
+      console.log('OS existente encontrada:', osDataParaEnvio);
+    } else {
+      // Formate a placa para o campo 'arquivo'. Use 'N/D' se não houver placa.
+      // Certifique-se de que formData.placa exista e não seja null/undefined
+      const placaFormatada = (formData.placa && formData.placa !== 'N/D') ? formData.placa.replace(/\s/g, '').toUpperCase() : 'ND';
 
-      if (!querySnapshot.empty) {
-        const osDoc = querySnapshot.docs[0];
-        osDataParaEnvio = osDoc.data() as OrdemServico;
-        osJaExistiaNoBD = true;
-        alert(`Atenção: A Ordem de Serviço número ${numeroOS} já existe no banco de dados! O documento será gerado com os dados existentes.`);
-        console.log('OS existente encontrada:', osDataParaEnvio);
-      } else {
-        osDataParaEnvio = {
-          cadastroViatura: formData.cadastro,
-          modeloViatura: formData.modelo,
-          dataOS: formData.dataOS,
-          defeitoRelatado: formData.defeito,
-          oficinaResponsavel: formData.oficina,
-          numeroOficina: formData.numeroOficina,
-          numeroOS: formData.numeroOS,
-          valorOS: formData.valorOS,
-          cotaMensal: formData.cotaMensal,
-          saldoDisponivel: formData.saldoDisponivel,
-          tipoFrota: formData.tipoFrota,
-          placaViatura: formData.placa,
+      // Gerar o valor do campo 'arquivo' usando formData.numeroOficina
+      const arquivoGerado = `${formData.numeroOficina} - COLOG - ${placaFormatada} - OS ${formData.numeroOS}`;
+
+      osDataParaEnvio = {
+        cadastroViatura: formData.cadastro,
+        modeloViatura: formData.modelo,
+        dataOS: formData.dataOS,
+        defeitoRelatado: formData.defeito,
+        oficinaResponsavel: formData.oficina,
+        numeroOficina: formData.numeroOficina,
+        numeroOS: formData.numeroOS,
+        valorOS: formData.valorOS,
+        cotaMensal: formData.cotaMensal,
+        saldoDisponivel: formData.saldoDisponivel,
+        tipoFrota: formData.tipoFrota,
+        placaViatura: formData.placa,
+        // NOVO CAMPO ADICIONADO AQUI
+        arquivo: arquivoGerado,
+      };
+
+      if (assinaturaSelecionada.policial && assinaturaSelecionada.funcao) {
+        osDataParaEnvio.assinatura = {
+          policial: {
+            NOME: assinaturaSelecionada.policial.NOME,
+            'Post/Grad': assinaturaSelecionada.policial['Post/Grad'] || '',
+            CPF: assinaturaSelecionada.policial.CPF,
+            Matrícula: assinaturaSelecionada.policial.Matrícula,
+            'NOME DE GUERRA1': assinaturaSelecionada.policial['NOME DE GUERRA1'],
+            AGÊNCIA: assinaturaSelecionada.policial.AGÊNCIA,
+            BANCO: assinaturaSelecionada.policial.BANCO,
+            CONTA: assinaturaSelecionada.policial.CONTA,
+          },
+          funcao: assinaturaSelecionada.funcao,
         };
+      }
 
-        if (assinaturaSelecionada.policial && assinaturaSelecionada.funcao) {
-          osDataParaEnvio.assinatura = {
-            policial: {
-              NOME: assinaturaSelecionada.policial.NOME,
-              'Post/Grad': assinaturaSelecionada.policial['Post/Grad'] || '',
-              CPF: assinaturaSelecionada.policial.CPF,
-              Matrícula: assinaturaSelecionada.policial.Matrícula,
-              'NOME DE GUERRA1': assinaturaSelecionada.policial['NOME DE GUERRA1'],
-              AGÊNCIA: assinaturaSelecionada.policial.AGÊNCIA,
-              BANCO: assinaturaSelecionada.policial.BANCO,
-              CONTA: assinaturaSelecionada.policial.CONTA,
-            },
-            funcao: assinaturaSelecionada.funcao,
-          };
-        }
-
-        const dadosParaSalvarNoFirestore = {
-          ...osDataParaEnvio,
-          dataCriacao: serverTimestamp(),
-        };
-        const docRef = await addDoc(collection(db, 'ordensDeServico'), dadosParaSalvarNoFirestore);
-        console.log('Nova Ordem de Serviço salva com ID:', docRef.id);
-        alert('Ordem de Serviço cadastrada com sucesso no Firebase!');
-
+      const dadosParaSalvarNoFirestore = {
+        ...osDataParaEnvio,
+        dataCriacao: serverTimestamp(),
+      };
+      const docRef = await addDoc(collection(db, 'ordensDeServico'), dadosParaSalvarNoFirestore);
+      console.log('Nova Ordem de Serviço salva com ID:', docRef.id);
+      alert('Ordem de Serviço cadastrada com sucesso no Firebase!');
+      
         if (viaturasSelecionadas.length > 0) {
           for (const viatura of viaturasSelecionadas) {
             const viaturaPendente = viaturasPendentes.find(v => v.cadastro === viatura);
