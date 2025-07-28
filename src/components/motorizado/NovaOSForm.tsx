@@ -748,7 +748,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
      if (response.ok) {
   const blob = await response.blob();
   const disposition = response.headers.get('Content-Disposition');
-  let filename = 'download.docx';
+  let filename = `${osDataParaEnvio.numeroOficina || '000'}-COLOG-${osDataParaEnvio.placaViatura || 'SEM-PLACA'}-OS-${osDataParaEnvio.numeroOS || 'sem-numero'}`
 
   if (disposition && disposition.indexOf('attachment') !== -1) {
     const filenameRegex = /filename="?(.+)"?/;
