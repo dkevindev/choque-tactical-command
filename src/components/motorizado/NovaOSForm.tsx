@@ -745,22 +745,33 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         body: JSON.stringify(osDataParaEnvio),
       });
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Ordem_Servico_${osDataParaEnvio.numeroOS || 'gerada'}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        alert('Documento DOCX gerado e download iniciado!');
-      } else {
-        const errorText = await response.text();
-        alert(`Erro ao gerar o documento DOCX. Detalhes: ${errorText}`);
-        console.error('Erro na geração do DOCX pela Cloud Function:', errorText);
-      }
+     if (response.ok) {
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition');
+  let filename = 'download.docx';
+
+  if (disposition && disposition.indexOf('attachment') !== -1) {
+    const filenameRegex = /filename="?(.+)"?/;
+    const matches = filenameRegex.exec(disposition);
+    if (matches != null && matches[1]) {
+      filename = matches[1];
+    }
+  }
+
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;  // usar o nome do backend aqui
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+  alert('Documento DOCX gerado e download iniciado!');
+} else {
+  const errorText = await response.text();
+  alert(`Erro ao gerar o documento DOCX. Detalhes: ${errorText}`);
+  console.error('Erro na geração do DOCX pela Cloud Function:', errorText);
+}
 
     } catch (error) {
       console.error('Erro geral no processo:', error);
