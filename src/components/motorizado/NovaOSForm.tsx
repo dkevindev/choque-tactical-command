@@ -748,7 +748,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
      if (response.ok) {
   const blob = await response.blob();
   const disposition = response.headers.get('Content-Disposition');
-  let filename = `${osDataParaEnvio.numeroOficina || '000'}-COLOG-${osDataParaEnvio.placaViatura || 'SEM-PLACA'}-OS-${osDataParaEnvio.numeroOS || 'sem-numero'}`
+  let filename = `${formData.numeroOficina} - COLOG - ${formData.placa} - OS ${formData.numeroOS}`
 
   if (disposition && disposition.indexOf('attachment') !== -1) {
     const filenameRegex = /filename="?(.+)"?/;
@@ -761,7 +761,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;  // usar o nome do backend aqui
+  a.download = `${osDataParaEnvio.numeroOficina || '000'}-COLOG-${osDataParaEnvio.placaViatura || 'SEM-PLACA'}-OS-${osDataParaEnvio.numeroOS || 'sem-numero'}`;  // usar o nome do backend aqui
   document.body.appendChild(a);
   a.click();
   a.remove();
