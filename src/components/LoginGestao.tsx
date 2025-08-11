@@ -100,7 +100,7 @@ const LoginGestao = () => {
           
           <div className="mt-4 text-center">
             <p className="text-xs text-muted-foreground">
-              Sistema restrito • CAVALARIA PM-SP
+              Sistema restrito • CAVALARIA PM-CE
             </p>
           </div>
         </CardContent>

@@ -160,7 +160,7 @@ const Home = () => {
         {/* Footer */}
         <div className="text-center mt-12">
           <p className="text-xs text-muted-foreground">
-            Sistema integrado • CAVALARIA PM-SP • Versão 2.1.0
+            Sistema integrado • CAVALARIA PM-CE • DKCODE
           </p>
         </div>
       </div>
