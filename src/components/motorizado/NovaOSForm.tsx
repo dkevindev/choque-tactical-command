@@ -761,7 +761,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${osDataParaEnvio.numeroOficina || '000'}-COLOG-${osDataParaEnvio.placaViatura || 'SEM-PLACA'}-OS-${osDataParaEnvio.numeroOS || 'sem-numero'}`;  // usar o nome do backend aqui
+  a.download = `${osDataParaEnvio.numeroOficina || '000'} - COLOG -${osDataParaEnvio.cadastroViatura || 'SEM-PLACA'} - OS ${osDataParaEnvio.numeroOS || 'sem-numero'}`;  // usar o nome do backend aqui
   document.body.appendChild(a);
   a.click();
   a.remove();
