@@ -192,6 +192,48 @@ export async function buscarServicosPorTipo(tipoServico: string): Promise<string
 }
 
 export async function consultarOSPorNumero(numeroOS: string): Promise<string> {
-  // Solicitar autenticação para esta funcionalidade
-  return 'Para consultar OS, é necessário autenticação.\n\n🔐 Por favor, informe sua matrícula e senha de usuário com acesso ao GESTÃO E LOGÍSTICA.';
+  try {
+    // Buscar OS pelo número
+    const osRef = collection(db, 'ordensDeServico');
+    const q = query(osRef, where('numeroOS', '==', String(numeroOS).trim()));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return `Nenhuma OS encontrada com o número ${numeroOS}.`;
+    }
+
+    const os = snapshot.docs[0].data() as any;
+
+    // Montar resposta amigável
+    const linhas: string[] = [];
+    linhas.push('📄 Ordem de Serviço');
+    linhas.push('');
+    linhas.push(`Número da OS: ${os.numeroOS || '—'}`);
+    linhas.push(`Data: ${os.dataOS || '—'}`);
+    linhas.push('');
+    linhas.push('🚓 Viatura');
+    linhas.push(`Cadastro: ${os.cadastroViatura || '—'}`);
+    linhas.push(`Placa: ${os.placaViatura || '—'}`);
+    linhas.push(`Modelo: ${os.modeloViatura || '—'}`);
+    linhas.push('');
+    linhas.push('🏭 Oficina');
+    linhas.push(`Oficina: ${os.oficinaResponsavel || '—'}`);
+    linhas.push(`Nº Oficina: ${os.numeroOficina || '—'}`);
+    linhas.push('');
+    linhas.push('💰 Valores');
+    linhas.push(`Valor OS: ${os.valorOS || '—'}`);
+    linhas.push(`Cota mensal: ${os.cotaMensal || '—'}`);
+    linhas.push(`Saldo disponível: ${os.saldoDisponivel || '—'}`);
+    linhas.push(`Tipo de frota: ${os.tipoFrota || '—'}`);
+    if (os.defeitoRelatado) {
+      linhas.push('');
+      linhas.push('📝 Defeito relatado');
+      linhas.push(`${os.defeitoRelatado}`);
+    }
+
+    return linhas.join('\n');
+  } catch (error) {
+    console.error('Erro ao consultar OS por número:', error);
+    return 'Erro ao consultar a OS. Tente novamente.';
+  }
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { BotResponse, Viatura } from '@/bot/types';
 import { responder } from '@/bot/index';
+import { consultarOSPorNumero } from '@/bot/oficinaHandler';
 import ViaturaModal from '@/bot/ViaturaModal';
 import FormEntradaOficina from '@/bot/FormEntradaOficina';
 import FormSaidaOficina from '@/bot/FormSaidaOficina';
@@ -29,6 +30,25 @@ const CAVBot = () => {
   const [showSaidaForm, setShowSaidaForm] = useState(false);
   const [showQuickButtons, setShowQuickButtons] = useState(true);
   const [inputText, setInputText] = useState('');
+
+  // Fluxo de autenticação passo a passo
+  const [flow, setFlow] = useState<{
+    active: boolean;
+    type?: 'os' | 'vtr' | 'entrada' | 'saida';
+    stage?: 'ask_matricula' | 'ask_senha' | 'ask_target';
+    matricula?: string;
+    senha?: string;
+  }>({ active: false });
+
+  const pushBot = (text: string) => {
+    const botMessage: Message = {
+      id: (Date.now() + Math.random()).toString(),
+      text,
+      sender: 'bot',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, botMessage]);
+  };
 
   const {
     transcript,
@@ -66,6 +86,68 @@ const CAVBot = () => {
     setInputText('');
     resetTranscript();
 
+    // Fluxo de autenticação ativo
+    if (flow.active) {
+      if (flow.stage === 'ask_matricula') {
+        setFlow(prev => ({ ...prev, stage: 'ask_senha', matricula: textToSend }));
+        pushBot('Informe sua senha:');
+        return;
+      }
+
+      if (flow.stage === 'ask_senha') {
+        const type = flow.type;
+        setFlow(prev => ({ ...prev, stage: 'ask_target', senha: textToSend }));
+        pushBot('Logado com sucesso');
+        if (type === 'os') {
+          pushBot('Digite o número da OS:');
+        } else {
+          pushBot('Informe o cadastro da viatura (ex: CAV-13, OII_6398_Descaracterizada):');
+        }
+        return;
+      }
+
+      if (flow.stage === 'ask_target') {
+        if (flow.type === 'os') {
+          const numero = (textToSend.match(/\d+/) || [])[0];
+          if (!numero) {
+            pushBot('Por favor, informe um número de OS válido.');
+            return;
+          }
+          const resultado = await consultarOSPorNumero(numero);
+          pushBot(resultado);
+          setFlow({ active: false });
+          return;
+        } else {
+          // Consultar VTR: encaminhar ao bot com a frase "dados da <cadastro>"
+          const consulta = `dados da ${textToSend}`;
+          const botResponse: BotResponse = await responder(consulta);
+          if (botResponse.type === 'show_viatura_modal') {
+            setSelectedViatura(botResponse.viatura);
+          } else if (botResponse.type === 'text') {
+            pushBot(botResponse.text);
+          }
+          setFlow({ active: false });
+          return;
+        }
+      }
+    }
+
+    // Iniciar fluxos ao reconhecer comandos diretos
+    const lower = textToSend.toLowerCase().trim();
+    if (lower.includes('consultar os') || lower.includes('ordem de serviço')) {
+      setShowQuickButtons(false);
+      setFlow({ active: true, type: 'os', stage: 'ask_matricula' });
+      pushBot('Informe sua matrícula:');
+      return;
+    }
+    if (lower.includes('consultar vtr') || lower.includes('consultar viatura') || lower.startsWith('consultar dados')) {
+      setShowQuickButtons(false);
+      setFlow({ active: true, type: 'vtr', stage: 'ask_matricula' });
+      pushBot('Informe sua matrícula (Portal do Policial):');
+      return;
+    }
+
+    // Comportamento padrão do bot
     const botResponse: BotResponse = await responder(textToSend);
 
     if (botResponse.type === 'text') {
@@ -110,6 +192,17 @@ const CAVBot = () => {
 
   const handleQuickAction = (action: string) => {
     setShowQuickButtons(false);
+    const lower = action.toLowerCase();
+    if (lower.includes('consultar os')) {
+      setFlow({ active: true, type: 'os', stage: 'ask_matricula' });
+      pushBot('Informe sua matrícula:');
+      return;
+    }
+    if (lower.includes('consultar dados') || lower.includes('consultar viatura')) {
+      setFlow({ active: true, type: 'vtr', stage: 'ask_matricula' });
+      pushBot('Informe sua matrícula (Portal do Policial):');
+      return;
+    }
     handleSendMessage(action);
   };
 
