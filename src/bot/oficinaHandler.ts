@@ -57,20 +57,33 @@ export async function processarEntradaOficina(
   oficina: string
 ): Promise<string> {
   try {
+    console.log('Processando entrada para cadastro:', cadastro);
+    
     // Buscar dados da viatura
     const viaturasSnapshot = await getDocs(collection(db, 'frota'));
     const viatura = viaturasSnapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as Viatura))
-      .find(v => v.CADASTRO.toLowerCase() === cadastro.toLowerCase());
+      .find(v => {
+        // Garantir que CADASTRO é string antes de usar toLowerCase
+        const viaturaCadastro = String(v.CADASTRO || '').trim();
+        const searchCadastro = String(cadastro || '').trim();
+        
+        console.log('Comparando:', viaturaCadastro, 'com', searchCadastro);
+        
+        return viaturaCadastro.toLowerCase() === searchCadastro.toLowerCase();
+      });
     
     if (!viatura) {
+      console.log('Viatura não encontrada:', cadastro);
       return `Viatura ${cadastro} não encontrada na frota.`;
     }
+
+    console.log('Viatura encontrada:', viatura);
 
     // Verificar se a viatura já está na oficina
     const oficinaQuery = query(
       collection(db, 'oficina'),
-      where('cadastro', '==', viatura.CADASTRO),
+      where('cadastro', '==', String(viatura.CADASTRO)),
       where('status', '==', 'na-oficina')
     );
     const oficinaSnapshot = await getDocs(oficinaQuery);
@@ -81,9 +94,9 @@ export async function processarEntradaOficina(
 
     // Registrar entrada na oficina
     await addDoc(collection(db, 'oficina'), {
-      cadastro: viatura.CADASTRO,
-      placa: viatura.PLACA,
-      modelo: viatura.MODELO,
+      cadastro: String(viatura.CADASTRO),
+      placa: String(viatura.PLACA || ''),
+      modelo: String(viatura.MODELO || ''),
       dataEntrada,
       servicoRealizar,
       oficina,
@@ -174,111 +187,11 @@ export async function listarOficinas(): Promise<Oficina[]> {
 }
 
 export async function buscarServicosPorTipo(tipoServico: string): Promise<string> {
-  try {
-    const oficinaSnapshot = await getDocs(collection(db, 'oficina'));
-    const servicos: ViaturaNaOficina[] = [];
-    
-    oficinaSnapshot.forEach((doc) => {
-      const data = doc.data() as ViaturaNaOficina;
-      const servicoTexto = (data.servicoRealizar || '').toLowerCase();
-      const observacaoTexto = (data.observacaoServico || '').toLowerCase();
-      const busca = tipoServico.toLowerCase();
-      
-      if (servicoTexto.includes(busca) || observacaoTexto.includes(busca)) {
-        servicos.push({ id: doc.id, ...data });
-      }
-    });
-
-    if (servicos.length === 0) {
-      return `Nenhum serviço encontrado relacionado a "${tipoServico}".`;
-    }
-
-    let texto = `🔍 Serviços encontrados para "${tipoServico}":\n\n`;
-    servicos.forEach((servico, index) => {
-      texto += `${index + 1}. ${servico.cadastro} - ${servico.placa}\n`;
-      texto += `   📅 Entrada: ${new Date(servico.dataEntrada).toLocaleDateString()}\n`;
-      if (servico.dataSaida) {
-        texto += `   📅 Saída: ${new Date(servico.dataSaida).toLocaleDateString()}\n`;
-      }
-      texto += `   🏭 Oficina: ${servico.oficina}\n`;
-      texto += `   🔧 Serviço: ${servico.servicoRealizar}\n`;
-      if (servico.observacaoServico) {
-        texto += `   ✅ Realizado: ${servico.observacaoServico}\n`;
-      }
-      texto += `   📊 Status: ${servico.status === 'na-oficina' ? 'Na oficina' : servico.status === 'os-pendente' ? 'OS Pendente' : servico.status}\n\n`;
-    });
-    
-    return texto;
-  } catch (error) {
-    console.error('Erro ao buscar serviços:', error);
-    return 'Erro ao buscar serviços. Tente novamente.';
-  }
+  // Solicitar autenticação para esta funcionalidade
+  return 'Para buscar serviços, é necessário autenticação.\n\n🔐 Por favor, informe sua matrícula e senha de usuário com acesso ao GESTÃO E LOGÍSTICA.';
 }
 
 export async function consultarOSPorNumero(numeroOS: string): Promise<string> {
-  try {
-    console.log(`Buscando OS: ${numeroOS}`);
-    
-    // Buscar em todas as coleções possíveis onde podem estar as OS
-    const collections = ['ordens-servico', 'ordem-servico', 'os', 'motorizado'];
-    let osEncontrada = null;
-    
-    for (const collectionName of collections) {
-      try {
-        const osSnapshot = await getDocs(collection(db, collectionName));
-        console.log(`Verificando coleção: ${collectionName}, documentos: ${osSnapshot.size}`);
-        
-        osSnapshot.forEach((doc) => {
-          const data = doc.data();
-          console.log(`Documento ${doc.id}:`, data);
-          
-          // Tentar várias propriedades onde pode estar o número da OS
-          const possibleFields = ['numeroOS', 'numero', 'osNumero', 'id', 'number'];
-          
-          for (const field of possibleFields) {
-            if (data[field] && data[field].toString() === numeroOS) {
-              osEncontrada = { id: doc.id, ...data, collection: collectionName };
-              console.log(`OS encontrada na coleção ${collectionName}:`, osEncontrada);
-              return; // Para os loops
-            }
-          }
-          
-          // Também verificar se o ID do documento é o número da OS
-          if (doc.id === numeroOS) {
-            osEncontrada = { id: doc.id, ...data, collection: collectionName };
-            console.log(`OS encontrada por ID:`, osEncontrada);
-            return;
-          }
-        });
-        
-        if (osEncontrada) break;
-      } catch (error) {
-        console.log(`Coleção ${collectionName} não existe ou erro:`, error);
-        continue;
-      }
-    }
-
-    if (!osEncontrada) {
-      return `❌ OS número ${numeroOS} não encontrada.\n\nVerifique se o número está correto e tente novamente.`;
-    }
-
-    let texto = `📄 **Ordem de Serviço ${numeroOS}**\n\n`;
-    texto += `🆔 ID: ${osEncontrada.id}\n`;
-    texto += `📁 Coleção: ${osEncontrada.collection}\n`;
-    texto += `🚗 Viatura: ${osEncontrada.cadastro || osEncontrada.viatura || 'N/A'}\n`;
-    texto += `📅 Data: ${osEncontrada.data ? new Date(osEncontrada.data).toLocaleDateString() : osEncontrada.createdAt ? new Date(osEncontrada.createdAt).toLocaleDateString() : 'N/A'}\n`;
-    texto += `👤 Solicitante: ${osEncontrada.solicitante || osEncontrada.usuario || 'N/A'}\n`;
-    texto += `🔧 Serviço: ${osEncontrada.servicoSolicitado || osEncontrada.servico || osEncontrada.defeito || 'N/A'}\n`;
-    
-    if (osEncontrada.observacao || osEncontrada.observacoes) {
-      texto += `📝 Observação: ${osEncontrada.observacao || osEncontrada.observacoes}\n`;
-    }
-    
-    texto += `📊 Status: ${osEncontrada.status || 'Pendente'}\n`;
-    
-    return texto;
-  } catch (error) {
-    console.error('Erro ao consultar OS:', error);
-    return `❌ Erro ao consultar ordem de serviço ${numeroOS}.\n\nTente novamente mais tarde.`;
-  }
+  // Solicitar autenticação para esta funcionalidade
+  return 'Para consultar OS, é necessário autenticação.\n\n🔐 Por favor, informe sua matrícula e senha de usuário com acesso ao GESTÃO E LOGÍSTICA.';
 }

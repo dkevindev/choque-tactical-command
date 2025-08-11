@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,8 +39,21 @@ const FormEntradaOficina = ({ onClose, onSuccess }: FormEntradaOficinaProps) => 
       const querySnapshot = await getDocs(collection(db, 'frota'));
       const viaturasData: Viatura[] = [];
       querySnapshot.forEach((doc) => {
-        viaturasData.push({ id: doc.id, ...doc.data() } as Viatura);
+        const data = doc.data() as Viatura;
+        // Garantir que CADASTRO existe e é uma string
+        if (data.CADASTRO) {
+          viaturasData.push({ 
+            id: doc.id, 
+            ...data,
+            CADASTRO: String(data.CADASTRO).trim()
+          });
+        }
       });
+      
+      // Ordenar por cadastro para facilitar localização
+      viaturasData.sort((a, b) => String(a.CADASTRO).localeCompare(String(b.CADASTRO)));
+      
+      console.log('Viaturas carregadas:', viaturasData.length);
       setViaturas(viaturasData);
     } catch (error) {
       console.error('Erro ao buscar viaturas:', error);
@@ -57,6 +71,12 @@ const FormEntradaOficina = ({ onClose, onSuccess }: FormEntradaOficinaProps) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.cadastro) {
+      onSuccess('❌ Por favor, selecione uma viatura.');
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -98,24 +118,38 @@ const FormEntradaOficina = ({ onClose, onSuccess }: FormEntradaOficinaProps) => 
               <Label htmlFor="cadastro" className="text-gray-200">Viatura (Cadastro)</Label>
               <Select 
                 value={formData.cadastro} 
-                onValueChange={(value) => setFormData({...formData, cadastro: value})}
+                onValueChange={(value) => {
+                  console.log('Viatura selecionada:', value);
+                  setFormData({...formData, cadastro: value});
+                }}
                 required
               >
                 <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                   <SelectValue placeholder="Selecione a viatura" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-700 border-gray-600">
-                  {viaturas.map((viatura) => (
-                    <SelectItem 
-                      key={viatura.id} 
-                      value={viatura.CADASTRO}
-                      className="text-white hover:bg-gray-600"
-                    >
-                      {viatura.CADASTRO} - {viatura.PLACA} ({viatura.MODELO})
-                    </SelectItem>
-                  ))}
+                <SelectContent className="bg-gray-700 border-gray-600 max-h-60 overflow-y-auto">
+                  {viaturas.map((viatura) => {
+                    const cadastroDisplay = String(viatura.CADASTRO || 'N/A');
+                    const placaDisplay = String(viatura.PLACA || 'N/A');
+                    const modeloDisplay = String(viatura.MODELO || 'N/A');
+                    
+                    return (
+                      <SelectItem 
+                        key={viatura.id} 
+                        value={cadastroDisplay}
+                        className="text-white hover:bg-gray-600 cursor-pointer"
+                      >
+                        {cadastroDisplay} - {placaDisplay} ({modeloDisplay})
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+              {formData.cadastro && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Selecionado: {formData.cadastro}
+                </p>
+              )}
             </div>
 
             <div>
