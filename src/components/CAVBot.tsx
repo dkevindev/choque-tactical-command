@@ -159,8 +159,8 @@ const CAVBot = () => {
 
       const nova = {
         id: Date.now().toString(),
-        x: posicaoTemporaria?.x ?? 0,
-        y: posicaoTemporaria?.y ?? 0,
+        x: posicaoTemporaria ? posicaoTemporaria.x * 100 : 0,
+        y: posicaoTemporaria ? posicaoTemporaria.y * 100 : 0,
         tipo: avariaDraft.tipo,
         descricao: avariaDraft.descricao || '',
         data: new Date().toISOString(),
@@ -303,8 +303,8 @@ const CAVBot = () => {
         setAvariasImagens({
           frontal: data.imagemFrontal || undefined,
           traseira: data.imagemTraseira || undefined,
-          esquerdo: data.imagemLadoEsquerdo || undefined,
-          direito: data.imagemLadoDireito || undefined,
+          esquerdo: data.imagemEsquerdo || data.imagemLadoEsquerdo || undefined,
+          direito: data.imagemDireito || data.imagemLadoDireito || undefined,
         });
       } catch (e) {
         console.error('Erro ao carregar avarias da viatura:', e);
@@ -700,40 +700,6 @@ const CAVBot = () => {
                 <span>Selecione a VTR</span>
               </div>
 
-              {/* Select simples como alternativa aos botões */}
-              <div className="select-fallback">
-                <select onChange={handleVtrSelectChange} defaultValue="">
-                  <option value="">
-                    {vtrStep === 'root' && 'Escolha a frota...'}
-                    {vtrStep === 'leve-categoria' && 'Escolha a categoria...'}
-                    {(vtrStep === 'pesada' || vtrStep === 'leve-operacional' || vtrStep === 'leve-adm') && 'Escolha a viatura...'}
-                  </option>
-
-                  {vtrStep === 'root' && (
-                    <>
-                      <option value="pesada">🚚 Frota Pesada</option>
-                      <option value="leve">🚗 Frota Leve</option>
-                    </>
-                  )}
-
-                  {vtrStep === 'leve-categoria' && (
-                    <>
-                      <option value="operacional">🛡️ Operacional</option>
-                      <option value="adm">🏢 Administrativa</option>
-                      <option value="back">⬅️ Voltar</option>
-                    </>
-                  )}
-
-                  {(vtrStep === 'pesada' || vtrStep === 'leve-operacional' || vtrStep === 'leve-adm') && (
-                    <>
-                      <option value="back">⬅️ Voltar</option>
-                      {listaViaturas.map(v => (
-                        <option key={v.id} value={v.id}>{v.CADASTRO || v.PLACA}</option>
-                      ))}
-                    </>
-                  )}
-                </select>
-              </div>
 
               {vtrStep === 'root' && (
                 <div className="quick-buttons">
@@ -792,7 +758,7 @@ const CAVBot = () => {
                   <button
                     key={a.k}
                     className="quick-button"
-                    onClick={() => setAvariasAngulo(a.k)}
+                    onClick={() => { setAvariasAngulo(a.k); setPosicaoTemporaria(null); setMarcandoAvaria(false); }}
                     style={avariasAngulo === a.k ? { borderColor: '#60a5fa', background: '#4b5563' } : undefined}
                   >
                     {a.label}
@@ -811,15 +777,14 @@ const CAVBot = () => {
                     style={{ width: '100%', height: 'auto', display: 'block', cursor: 'crosshair', opacity: 1 }}
                     loading="lazy"
                   />
-                  {/* Marcações existentes */}
                   {avariasLista.filter((a: any) => a.angulo === avariasAngulo).map((a: any) => (
                     <span
                       key={a.id}
                       title={`${a.tipo} • ${a.gravidade}${a.descricao ? ' • ' + a.descricao : ''}`}
                       style={{
                         position: 'absolute',
-                        left: `${(a.x ?? 0) * 100}%`,
-                        top: `${(a.y ?? 0) * 100}%`,
+                        left: `${((a.x ?? 0) > 1 ? (a.x ?? 0) : (a.x ?? 0) * 100)}%`,
+                        top: `${((a.y ?? 0) > 1 ? (a.y ?? 0) : (a.y ?? 0) * 100)}%`,
                         width: 14,
                         height: 14,
                         background: '#ef4444',
