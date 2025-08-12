@@ -7,6 +7,8 @@ import FormEntradaOficina from '@/bot/FormEntradaOficina';
 import FormSaidaOficina from '@/bot/FormSaidaOficina';
 import { Mic, MicOff, Send } from 'lucide-react';
 import { buscarViaturasLeves, buscarViaturasPesadas, type ViaturaBasica } from '@/lib/viaturaUtils';
+import { db } from '@/firebase';
+import { collection, getDocs, query, where, doc, getDoc, updateDoc, addDoc } from 'firebase/firestore';
 
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
@@ -35,8 +37,19 @@ const CAVBot = () => {
   // Fluxo de autenticação passo a passo
   const [flow, setFlow] = useState<{
     active: boolean;
-    type?: 'os' | 'vtr' | 'entrada' | 'saida';
-    stage?: 'ask_matricula' | 'ask_senha' | 'ask_target';
+    type?: 'os' | 'vtr' | 'entrada' | 'saida' | 'avarias';
+    stage?:
+      | 'ask_matricula'
+      | 'ask_senha'
+      | 'ask_target'
+      | 'avarias_ui'
+      | 'avarias_ask_tipo'
+      | 'avarias_ask_desc'
+      | 'avarias_ask_gravidade'
+      | 'service_start_motorista'
+      | 'service_start_km'
+      | 'service_start_area'
+      | 'service_end_km';
     matricula?: string;
     senha?: string;
   }>({ active: false });
@@ -45,6 +58,15 @@ const CAVBot = () => {
   const [vtrStep, setVtrStep] = useState<'none' | 'root' | 'pesada' | 'leve-categoria' | 'leve-operacional' | 'leve-adm'>('none');
   const [listaViaturas, setListaViaturas] = useState<ViaturaBasica[]>([]);
   const [loadingVtrs, setLoadingVtrs] = useState(false);
+
+  // Contexto de Avarias no bot
+  type AnguloAvaria = 'frontal' | 'traseira' | 'esquerdo' | 'direito' | 'mecanico' | 'interno';
+  type Policial = { id: string; NOME: string; Matrícula: string | number };
+  const [policialLogado, setPolicialLogado] = useState<Policial | null>(null);
+  const [avariasViatura, setAvariasViatura] = useState<ViaturaBasica | null>(null);
+  const [avariasAngulo, setAvariasAngulo] = useState<AnguloAvaria>('frontal');
+  const [avariaDraft, setAvariaDraft] = useState<{ tipo?: string; descricao?: string; gravidade?: 'LEVE' | 'MODERADA' | 'GRAVE' }>({});
+  const [servicoDraft, setServicoDraft] = useState<{ motorista?: string; kmInicial?: number; area?: string }>({});
 
   const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
   const isOperacionalCadastro = (cad?: string): boolean => {
@@ -97,6 +119,14 @@ const CAVBot = () => {
   };
 
   const handleSelectViatura = async (v: ViaturaBasica) => {
+    if (flow.active && flow.type === 'avarias') {
+      setAvariasViatura(v);
+      await carregarServicoAberto(v.id);
+      setFlow(prev => ({ ...prev, stage: 'avarias_ui' }));
+      pushBot(`Viatura selecionada: ${v.CADASTRO || v.PLACA}. Selecione um ângulo ou inicie/encerre serviço abaixo.`);
+      return;
+    }
+
     const label = v.CADASTRO || v.PLACA;
     const consulta = `dados da ${label}`;
     const botResponse: BotResponse = await responder(consulta);
