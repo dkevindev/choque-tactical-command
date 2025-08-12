@@ -65,6 +65,7 @@ const CAVBot = () => {
   const [policialLogado, setPolicialLogado] = useState<Policial | null>(null);
   const [avariasViatura, setAvariasViatura] = useState<ViaturaBasica | null>(null);
   const [avariasAngulo, setAvariasAngulo] = useState<AnguloAvaria>('frontal');
+  const [avariasLista, setAvariasLista] = useState<any[]>([]);
   const [avariaDraft, setAvariaDraft] = useState<{ tipo?: string; descricao?: string; gravidade?: 'LEVE' | 'MODERADA' | 'GRAVE' }>({});
   const [servicoDraft, setServicoDraft] = useState<{ motorista?: string; kmInicial?: number; area?: string }>({});
   const [servicoAberto, setServicoAberto] = useState<any | null>(null);
@@ -149,6 +150,7 @@ const CAVBot = () => {
         reportadoPorPolicial: true,
       };
       await updateDoc(ref, { avarias: [...lista, nova] });
+      setAvariasLista([...lista, nova]);
       pushBot(`✅ Avaria registrada (${nova.tipo} - ${nova.gravidade}) no ângulo ${avariasAngulo}.`);
       setAvariaDraft({});
     } catch (e) {
@@ -271,6 +273,15 @@ const CAVBot = () => {
     if (flow.active && flow.type === 'avarias') {
       setAvariasViatura(v);
       await carregarServicoAberto(v.id);
+      try {
+        const ref = doc(db, 'frota', v.id);
+        const snap = await getDoc(ref);
+        const data = snap.exists() ? (snap.data() as any) : {};
+        setAvariasLista(Array.isArray(data.avarias) ? data.avarias : []);
+      } catch (e) {
+        console.error('Erro ao carregar avarias da viatura:', e);
+        setAvariasLista([]);
+      }
       setFlow(prev => ({ ...prev, stage: 'avarias_ui' }));
       pushBot(`Viatura selecionada: ${v.CADASTRO || v.PLACA}. Selecione um ângulo ou inicie/encerre serviço abaixo.`);
       return;
@@ -705,6 +716,94 @@ const CAVBot = () => {
                   )}
                 </div>
               )}
+            </div>
+          )}
+          {flow.active && flow.type === 'avarias' && flow.stage === 'avarias_ui' && (
+            <div className="quick-actions">
+              <div className="quick-actions-header">
+                <span>
+                  Avarias - {avariasViatura?.CADASTRO || avariasViatura?.PLACA}
+                  {servicoAberto ? ' • Serviço ABERTO' : ' • Sem serviço aberto'}
+                </span>
+              </div>
+
+              {/* Ângulos de inspeção */}
+              <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                {([
+                  { k: 'frontal', label: 'Frente' },
+                  { k: 'traseira', label: 'Trás' },
+                  { k: 'esquerdo', label: 'Esquerdo' },
+                  { k: 'direito', label: 'Direito' },
+                  { k: 'mecanico', label: 'Mecânica' },
+                  { k: 'interno', label: 'Interno' },
+                ] as any[]).map(a => (
+                  <button
+                    key={a.k}
+                    className="quick-button"
+                    onClick={() => setAvariasAngulo(a.k)}
+                    style={avariasAngulo === a.k ? { borderColor: '#60a5fa', background: '#4b5563' } : undefined}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Ações de serviço */}
+              <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginTop: '0.75rem' }}>
+                {!servicoAberto ? (
+                  <button
+                    className="quick-button"
+                    onClick={() => { setFlow(prev => ({ ...prev, stage: 'service_start_motorista' })); pushBot('Informe o motorista:'); }}
+                  >
+                    ▶️ Iniciar Serviço
+                  </button>
+                ) : (
+                  <button
+                    className="quick-button"
+                    onClick={() => { setFlow(prev => ({ ...prev, stage: 'service_end_km' })); pushBot('Informe o KM final:'); }}
+                  >
+                    ⏹️ Encerrar Serviço
+                  </button>
+                )}
+                <button
+                  className="quick-button"
+                  onClick={() => { setFlow(prev => ({ ...prev, stage: 'ask_target' })); startVtrSelection(); pushBot('Trocar VTR: escolha a frota.'); }}
+                >
+                  🚘 Trocar VTR
+                </button>
+              </div>
+
+              {/* Registrar nova avaria */}
+              <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(1, 1fr)', marginTop: '0.75rem' }}>
+                <button
+                  className="quick-button"
+                  onClick={() => { setFlow(prev => ({ ...prev, stage: 'avarias_ask_tipo' })); pushBot('Informe o tipo da avaria:'); }}
+                >
+                  ➕ Registrar Avaria no ângulo {avariasAngulo}
+                </button>
+              </div>
+
+              {/* Lista de avarias do ângulo */}
+              <div style={{ marginTop: '0.75rem' }}>
+                <div className="quick-actions-header" style={{ marginBottom: '0.5rem' }}>
+                  Avarias neste ângulo
+                </div>
+                <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(1, 1fr)' }}>
+                  {avariasLista.filter((a: any) => a.angulo === avariasAngulo).length === 0 ? (
+                    <div className="quick-actions-header">Nenhuma avaria registrada.</div>
+                  ) : (
+                    avariasLista.filter((a: any) => a.angulo === avariasAngulo).map((a: any) => (
+                      <div key={a.id} className="quick-button" style={{ justifyContent: 'space-between' }}>
+                        <div>
+                          <strong>{a.tipo}</strong> — {a.gravidade}
+                          {a.descricao ? ` • ${a.descricao}` : ''}
+                        </div>
+                        <small style={{ color: '#9ca3af' }}>{new Date(a.data).toLocaleDateString('pt-BR')}</small>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </main>
