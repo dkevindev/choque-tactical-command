@@ -165,10 +165,12 @@ const CAVBot = () => {
         responsavel: policialLogado.NOME,
         angulo: avariasAngulo,
         reportadoPorPolicial: true,
+      };
       await updateDoc(ref, { avarias: [...lista, nova] });
       setAvariasLista([...lista, nova]);
       pushBot(`✅ Avaria registrada (${nova.tipo} - ${nova.gravidade}) no ângulo ${avariasAngulo}.`);
       setAvariaDraft({});
+      setPosicaoTemporaria(null);
     } catch (e) {
       console.error('Erro ao salvar avaria:', e);
       pushBot('Erro ao salvar avaria.');
@@ -177,8 +179,8 @@ const CAVBot = () => {
 
   // Iniciar serviço diário
   const iniciarServico = async () => {
-    if (!avariasViatura || !policialLogado || !servicoDraft.motorista || !servicoDraft.kmInicial || !servicoDraft.area) {
-      pushBot('Preencha motorista, KM inicial e área para iniciar o serviço.');
+    if (!avariasViatura || !policialLogado || !servicoDraft.kmInicial || !servicoDraft.area) {
+      pushBot('Preencha KM inicial e área para iniciar o serviço.');
       return;
     }
     try {
@@ -186,7 +188,7 @@ const CAVBot = () => {
         viaturaId: avariasViatura.id,
         cadastro: avariasViatura.CADASTRO || null,
         placa: avariasViatura.PLACA,
-        motorista: servicoDraft.motorista,
+        motorista: servicoDraft.motorista || policialLogado.NOME,
         kmInicial: servicoDraft.kmInicial,
         area: servicoDraft.area,
         status: 'aberto',
@@ -341,6 +343,26 @@ const CAVBot = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imagemRef = useRef<HTMLImageElement>(null);
+
+  const getImagemAngulo = () => {
+    if (!avariasImagens) return undefined;
+    switch (avariasAngulo) {
+      case 'frontal': return avariasImagens.frontal;
+      case 'traseira': return avariasImagens.traseira;
+      case 'esquerdo': return avariasImagens.esquerdo;
+      case 'direito': return avariasImagens.direito;
+      default: return undefined;
+    }
+  };
+
+  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    setPosicaoTemporaria({ x, y });
+    setMarcandoAvaria(true);
+    pushBot('Posição marcada. Agora clique em "Registrar Avaria" e informe os detalhes.');
+  };
 
   // Scroll automático ao receber mensagens
   useEffect(() => {
@@ -771,12 +793,62 @@ const CAVBot = () => {
                 ))}
               </div>
 
+              {/* Imagem do ângulo com marcações */}
+              {(['frontal','traseira','esquerdo','direito'] as const).includes(avariasAngulo as any) && getImagemAngulo() && (
+                <div style={{ position: 'relative', width: '100%', marginTop: '0.75rem', border: '1px solid #374151', borderRadius: 8, overflow: 'hidden', background: '#0b1020' }}>
+                  <img
+                    ref={imagemRef}
+                    src={getImagemAngulo()}
+                    alt={`Imagem ${avariasAngulo} da viatura`}
+                    onClick={handleImageClick}
+                    style={{ width: '100%', height: 'auto', display: 'block', cursor: 'crosshair', opacity: 1 }}
+                    loading="lazy"
+                  />
+                  {/* Marcações existentes */}
+                  {avariasLista.filter((a: any) => a.angulo === avariasAngulo).map((a: any) => (
+                    <span
+                      key={a.id}
+                      title={`${a.tipo} • ${a.gravidade}${a.descricao ? ' • ' + a.descricao : ''}`}
+                      style={{
+                        position: 'absolute',
+                        left: `${(a.x ?? 0) * 100}%`,
+                        top: `${(a.y ?? 0) * 100}%`,
+                        width: 14,
+                        height: 14,
+                        background: '#ef4444',
+                        borderRadius: '50%',
+                        border: '2px solid #fff',
+                        transform: 'translate(-50%, -50%)',
+                        boxShadow: '0 0 0 2px rgba(239,68,68,0.35)',
+                      }}
+                    />
+                  ))}
+                  {/* Marcação temporária */}
+                  {posicaoTemporaria && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: `${posicaoTemporaria.x * 100}%`,
+                        top: `${posicaoTemporaria.y * 100}%`,
+                        width: 14,
+                        height: 14,
+                        background: '#f59e0b',
+                        borderRadius: '50%',
+                        border: '2px solid #fff',
+                        transform: 'translate(-50%, -50%)',
+                        boxShadow: '0 0 0 2px rgba(245,158,11,0.35)',
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+
               {/* Ações de serviço */}
               <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginTop: '0.75rem' }}>
                 {!servicoAberto ? (
                   <button
                     className="quick-button"
-                    onClick={() => { setFlow(prev => ({ ...prev, stage: 'service_start_motorista' })); pushBot('Informe o motorista:'); }}
+                    onClick={() => { setServicoDraft(prev => ({ ...prev, motorista: policialLogado?.NOME || 'Motorista' })); setFlow(prev => ({ ...prev, stage: 'service_start_km' })); pushBot('Informe o KM inicial:'); }}
                   >
                     ▶️ Iniciar Serviço
                   </button>
