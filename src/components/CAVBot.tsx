@@ -96,11 +96,115 @@ const CAVBot = () => {
         pushBot(`Há um serviço em aberto: motorista ${data.motorista || '-'}, KM inicial ${data.kmInicial ?? '-'}, área ${data.area ?? '-'}.`);
       } else {
         setServicoAberto(null);
-        pushBot('Nenhum serviço em aberto para esta viatura.');
+        // mensagem informativa apenas quando já houver seleção
       }
     } catch (e) {
       console.error('Erro ao verificar serviço aberto:', e);
       pushBot('Não foi possível verificar serviços em aberto no momento.');
+    }
+  };
+
+  // Verificar credenciais do policial
+  const verificarPolicial = async (mat: string, pass: string): Promise<Policial | null> => {
+    try {
+      let snap = await getDocs(query(collection(db, 'policiais'), where('Matrícula', '==', parseInt(mat))));
+      if (snap.empty) {
+        snap = await getDocs(query(collection(db, 'policiais'), where('Matrícula', '==', mat)));
+      }
+      if (snap.empty) return null;
+      const d = snap.docs[0];
+      const data: any = d.data();
+      const primeiroAcesso = data.primeiroAcesso !== false || !data.senha;
+      const senhaOk = primeiroAcesso ? pass === mat : data.senha === pass;
+      if (!senhaOk) return null;
+      return { id: d.id, NOME: data.NOME, Matrícula: data.Matrícula };
+    } catch (e) {
+      console.error('Erro ao verificar policial:', e);
+      return null;
+    }
+  };
+
+  // Salvar avaria no documento da viatura (coleção 'frota')
+  const salvarAvaria = async (options?: { gravidade?: 'LEVE' | 'MODERADA' | 'GRAVE' }) => {
+    if (!avariasViatura || !policialLogado || !avariaDraft.tipo) {
+      pushBot('Dados insuficientes para salvar a avaria.');
+      return;
+    }
+    try {
+      const ref = doc(db, 'frota', avariasViatura.id);
+      const snap = await getDoc(ref);
+      const data = snap.exists() ? snap.data() as any : {};
+      const lista = Array.isArray(data.avarias) ? data.avarias : [];
+      const nova = {
+        id: Date.now().toString(),
+        x: 0,
+        y: 0,
+        tipo: avariaDraft.tipo,
+        descricao: avariaDraft.descricao || '',
+        data: new Date().toISOString(),
+        gravidade: (options?.gravidade || avariaDraft.gravidade || 'LEVE'),
+        status: 'PENDENTE',
+        responsavel: policialLogado.NOME,
+        angulo: avariasAngulo,
+        reportadoPorPolicial: true,
+      };
+      await updateDoc(ref, { avarias: [...lista, nova] });
+      pushBot(`✅ Avaria registrada (${nova.tipo} - ${nova.gravidade}) no ângulo ${avariasAngulo}.`);
+      setAvariaDraft({});
+    } catch (e) {
+      console.error('Erro ao salvar avaria:', e);
+      pushBot('Erro ao salvar avaria.');
+    }
+  };
+
+  // Iniciar serviço diário
+  const iniciarServico = async () => {
+    if (!avariasViatura || !policialLogado || !servicoDraft.motorista || !servicoDraft.kmInicial || !servicoDraft.area) {
+      pushBot('Preencha motorista, KM inicial e área para iniciar o serviço.');
+      return;
+    }
+    try {
+      const docRef = await addDoc(collection(db, 'servicosDiarios'), {
+        viaturaId: avariasViatura.id,
+        cadastro: avariasViatura.CADASTRO || null,
+        placa: avariasViatura.PLACA,
+        motorista: servicoDraft.motorista,
+        kmInicial: servicoDraft.kmInicial,
+        area: servicoDraft.area,
+        status: 'aberto',
+        iniciadoEm: new Date().toISOString(),
+        policialId: policialLogado.id,
+        policialNome: policialLogado.NOME,
+      });
+      setServicoAberto({ id: docRef.id, ...servicoDraft, status: 'aberto' });
+      pushBot('✅ Serviço iniciado com sucesso.');
+      setServicoDraft({});
+    } catch (e) {
+      console.error('Erro ao iniciar serviço:', e);
+      pushBot('Erro ao iniciar serviço.');
+    }
+  };
+
+  // Encerrar serviço diário
+  const encerrarServico = async (kmFinal: number) => {
+    if (!servicoAberto) {
+      pushBot('Não há serviço aberto.');
+      return;
+    }
+    try {
+      const ref = doc(db, 'servicosDiarios', servicoAberto.id);
+      await updateDoc(ref, {
+        kmFinal,
+        status: 'encerrado',
+        encerradoEm: new Date().toISOString(),
+        encerradoPorId: policialLogado?.id || null,
+        encerradoPorNome: policialLogado?.NOME || null,
+      });
+      setServicoAberto(null);
+      pushBot('✅ Serviço encerrado com sucesso.');
+    } catch (e) {
+      console.error('Erro ao encerrar serviço:', e);
+      pushBot('Erro ao encerrar serviço.');
     }
   };
 
@@ -213,6 +317,7 @@ const CAVBot = () => {
 
     // Fluxo de autenticação ativo
     if (flow.active) {
+      // 1) Credenciais
       if (flow.stage === 'ask_matricula') {
         setFlow(prev => ({ ...prev, stage: 'ask_senha', matricula: textToSend }));
         pushBot('Informe sua senha:');
@@ -221,17 +326,27 @@ const CAVBot = () => {
 
       if (flow.stage === 'ask_senha') {
         const type = flow.type;
-        setFlow(prev => ({ ...prev, stage: 'ask_target', senha: textToSend }));
-        pushBot('Logado com sucesso');
+        const pol = await verificarPolicial(flow.matricula || '', textToSend);
+        if (!pol) {
+          pushBot('❌ Matrícula ou senha incorreta. Tente novamente.');
+          setFlow({ active: true, type, stage: 'ask_matricula' });
+          return;
+        }
+        setPolicialLogado(pol);
+        pushBot(`✅ Logado como ${pol.NOME}.`);
+
         if (type === 'os') {
+          setFlow(prev => ({ ...prev, stage: 'ask_target' }));
           pushBot('Digite o número da OS:');
         } else {
+          setFlow(prev => ({ ...prev, stage: 'ask_target' }));
           startVtrSelection();
           pushBot('Selecione a VTR abaixo: escolha a frota.');
         }
         return;
       }
 
+      // 2) Entrada do alvo (OS ou VTR)
       if (flow.stage === 'ask_target') {
         if (flow.type === 'os') {
           const numero = (textToSend.match(/\d+/) || [])[0];
@@ -243,8 +358,9 @@ const CAVBot = () => {
           pushBot(resultado);
           setFlow({ active: false });
           return;
-        } else {
-          // Consultar VTR: encaminhar ao bot com a frase "dados da <cadastro>"
+        }
+
+        if (flow.type === 'vtr') {
           const consulta = `dados da ${textToSend}`;
           const botResponse: BotResponse = await responder(consulta);
           if (botResponse.type === 'show_viatura_modal') {
@@ -253,6 +369,72 @@ const CAVBot = () => {
             pushBot(botResponse.text);
           }
           setFlow({ active: false });
+          return;
+        }
+
+        if (flow.type === 'avarias') {
+          // Usuário deve selecionar via botões
+          pushBot('Use os botões acima para selecionar a viatura.');
+          return;
+        }
+      }
+
+      // 3) Fluxo de AVARIAS - coletar dados
+      if (flow.type === 'avarias') {
+        if (flow.stage === 'avarias_ask_tipo') {
+          setAvariaDraft(prev => ({ ...prev, tipo: textToSend }));
+          setFlow(prev => ({ ...prev, stage: 'avarias_ask_desc' }));
+          pushBot('Descreva a avaria (ou digite "-" para pular):');
+          return;
+        }
+        if (flow.stage === 'avarias_ask_desc') {
+          const desc = textToSend.trim() === '-' ? '' : textToSend;
+          setAvariaDraft(prev => ({ ...prev, descricao: desc }));
+          setFlow(prev => ({ ...prev, stage: 'avarias_ask_gravidade' }));
+          pushBot('Informe a gravidade: LEVE, MODERADA ou GRAVE.');
+          return;
+        }
+        if (flow.stage === 'avarias_ask_gravidade') {
+          const g = textToSend.toUpperCase();
+          const allowed = ['LEVE','MODERADA','GRAVE'] as const;
+          if (!allowed.includes(g as any)) {
+            pushBot('Valor inválido. Digite: LEVE, MODERADA ou GRAVE.');
+            return;
+          }
+          setAvariaDraft(prev => ({ ...prev, gravidade: g as any }));
+          await salvarAvaria({ gravidade: g as any });
+          setFlow(prev => ({ ...prev, stage: 'avarias_ui' }));
+          return;
+        }
+
+        // Serviço - iniciar
+        if (flow.stage === 'service_start_motorista') {
+          setServicoDraft(prev => ({ ...prev, motorista: textToSend }));
+          setFlow(prev => ({ ...prev, stage: 'service_start_km' }));
+          pushBot('Informe o KM inicial:');
+          return;
+        }
+        if (flow.stage === 'service_start_km') {
+          const km = parseInt(textToSend.replace(/\D/g, ''));
+          if (isNaN(km)) { pushBot('KM inválido. Digite apenas números.'); return; }
+          setServicoDraft(prev => ({ ...prev, kmInicial: km }));
+          setFlow(prev => ({ ...prev, stage: 'service_start_area' }));
+          pushBot('Informe a área de serviço:');
+          return;
+        }
+        if (flow.stage === 'service_start_area') {
+          setServicoDraft(prev => ({ ...prev, area: textToSend }));
+          await iniciarServico();
+          setFlow(prev => ({ ...prev, stage: 'avarias_ui' }));
+          return;
+        }
+
+        // Serviço - encerrar
+        if (flow.stage === 'service_end_km') {
+          const kmf = parseInt(textToSend.replace(/\D/g, ''));
+          if (isNaN(kmf)) { pushBot('KM inválido. Digite apenas números.'); return; }
+          await encerrarServico(kmf);
+          setFlow(prev => ({ ...prev, stage: 'avarias_ui' }));
           return;
         }
       }
@@ -327,6 +509,11 @@ const CAVBot = () => {
     if (lower.includes('consultar dados') || lower.includes('consultar viatura')) {
       setFlow({ active: true, type: 'vtr', stage: 'ask_matricula' });
       pushBot('Informe sua matrícula (Portal do Policial):');
+      return;
+    }
+    if (lower.includes('avarias')) {
+      setFlow({ active: true, type: 'avarias', stage: 'ask_matricula' });
+      pushBot('🔐 Acesso ao registro de avarias. Informe sua matrícula:');
       return;
     }
     handleSendMessage(action);
@@ -413,6 +600,12 @@ const CAVBot = () => {
                   onClick={() => handleQuickAction('consultar OS')}
                 >
                   📄 Consultar OS
+                </button>
+                <button 
+                  className="quick-button"
+                  onClick={() => handleQuickAction('Avarias')}
+                >
+                  🛠️ Avarias
                 </button>
               </div>
             </div>
