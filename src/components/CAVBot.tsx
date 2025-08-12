@@ -69,6 +69,15 @@ const CAVBot = () => {
   const [avariaDraft, setAvariaDraft] = useState<{ tipo?: string; descricao?: string; gravidade?: 'LEVE' | 'MODERADA' | 'GRAVE' }>({});
   const [servicoDraft, setServicoDraft] = useState<{ motorista?: string; kmInicial?: number; area?: string }>({});
   const [servicoAberto, setServicoAberto] = useState<any | null>(null);
+  // Imagens e marcação de avarias na UI do bot
+  const [avariasImagens, setAvariasImagens] = useState<{
+    frontal?: string;
+    traseira?: string;
+    esquerdo?: string;
+    direito?: string;
+  } | null>(null);
+  const [marcandoAvaria, setMarcandoAvaria] = useState(false);
+  const [posicaoTemporaria, setPosicaoTemporaria] = useState<{ x: number; y: number } | null>(null);
 
   const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
   const isOperacionalCadastro = (cad?: string): boolean => {
@@ -134,21 +143,28 @@ const CAVBot = () => {
     try {
       const ref = doc(db, 'frota', avariasViatura.id);
       const snap = await getDoc(ref);
-      const data = snap.exists() ? snap.data() as any : {};
+      const data = snap.exists() ? (snap.data() as any) : {};
       const lista = Array.isArray(data.avarias) ? data.avarias : [];
+
+      // Para ângulos com imagem, exigir marcação por clique
+      const angulosComImagem = ['frontal', 'traseira', 'esquerdo', 'direito'] as const;
+      if (angulosComImagem.includes(avariasAngulo as any) && !posicaoTemporaria) {
+        pushBot('Clique na imagem para marcar a posição da avaria antes de salvar.');
+        return;
+      }
+
       const nova = {
         id: Date.now().toString(),
-        x: 0,
-        y: 0,
+        x: posicaoTemporaria?.x ?? 0,
+        y: posicaoTemporaria?.y ?? 0,
         tipo: avariaDraft.tipo,
         descricao: avariaDraft.descricao || '',
         data: new Date().toISOString(),
-        gravidade: (options?.gravidade || avariaDraft.gravidade || 'LEVE'),
+        gravidade: options?.gravidade || avariaDraft.gravidade || 'LEVE',
         status: 'PENDENTE',
         responsavel: policialLogado.NOME,
         angulo: avariasAngulo,
         reportadoPorPolicial: true,
-      };
       await updateDoc(ref, { avarias: [...lista, nova] });
       setAvariasLista([...lista, nova]);
       pushBot(`✅ Avaria registrada (${nova.tipo} - ${nova.gravidade}) no ângulo ${avariasAngulo}.`);
@@ -278,6 +294,12 @@ const CAVBot = () => {
         const snap = await getDoc(ref);
         const data = snap.exists() ? (snap.data() as any) : {};
         setAvariasLista(Array.isArray(data.avarias) ? data.avarias : []);
+        setAvariasImagens({
+          frontal: data.imagemFrontal || undefined,
+          traseira: data.imagemTraseira || undefined,
+          esquerdo: data.imagemLadoEsquerdo || undefined,
+          direito: data.imagemLadoDireito || undefined,
+        });
       } catch (e) {
         console.error('Erro ao carregar avarias da viatura:', e);
         setAvariasLista([]);
@@ -318,6 +340,7 @@ const CAVBot = () => {
   } = useSpeechRecognition();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const imagemRef = useRef<HTMLImageElement>(null);
 
   // Scroll automático ao receber mensagens
   useEffect(() => {
