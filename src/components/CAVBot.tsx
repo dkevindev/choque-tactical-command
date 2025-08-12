@@ -67,6 +67,7 @@ const CAVBot = () => {
   const [avariasAngulo, setAvariasAngulo] = useState<AnguloAvaria>('frontal');
   const [avariaDraft, setAvariaDraft] = useState<{ tipo?: string; descricao?: string; gravidade?: 'LEVE' | 'MODERADA' | 'GRAVE' }>({});
   const [servicoDraft, setServicoDraft] = useState<{ motorista?: string; kmInicial?: number; area?: string }>({});
+  const [servicoAberto, setServicoAberto] = useState<any | null>(null);
 
   const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
   const isOperacionalCadastro = (cad?: string): boolean => {
@@ -77,6 +78,30 @@ const CAVBot = () => {
 
   const startVtrSelection = () => {
     setVtrStep('root');
+  };
+
+  // Verifica se existe serviço em aberto para a viatura
+  const carregarServicoAberto = async (viaturaId: string) => {
+    try {
+      const qServ = query(
+        collection(db, 'servicosDiarios'),
+        where('viaturaId', '==', viaturaId),
+        where('status', '==', 'aberto')
+      );
+      const snap = await getDocs(qServ);
+      if (!snap.empty) {
+        const d = snap.docs[0];
+        const data: any = d.data();
+        setServicoAberto({ id: d.id, ...data });
+        pushBot(`Há um serviço em aberto: motorista ${data.motorista || '-'}, KM inicial ${data.kmInicial ?? '-'}, área ${data.area ?? '-'}.`);
+      } else {
+        setServicoAberto(null);
+        pushBot('Nenhum serviço em aberto para esta viatura.');
+      }
+    } catch (e) {
+      console.error('Erro ao verificar serviço aberto:', e);
+      pushBot('Não foi possível verificar serviços em aberto no momento.');
+    }
   };
 
   const loadPesadas = async () => {
