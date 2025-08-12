@@ -247,6 +247,26 @@ const CAVBot = () => {
     }
   };
 
+  const handleVtrSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (vtrStep === 'root') {
+      if (value === 'pesada') return loadPesadas();
+      if (value === 'leve') return goLeveCategoria();
+      return;
+    }
+    if (vtrStep === 'leve-categoria') {
+      if (value === 'operacional') return loadLevesOperacional();
+      if (value === 'adm') return loadLevesAdministrativa();
+      if (value === 'back') return setVtrStep('root');
+      return;
+    }
+    if (vtrStep === 'pesada' || vtrStep === 'leve-operacional' || vtrStep === 'leve-adm') {
+      if (value === 'back') return setVtrStep(vtrStep === 'pesada' ? 'root' : 'leve-categoria');
+      const v = listaViaturas.find(v => v.id === value);
+      if (v) return handleSelectViatura(v);
+    }
+  };
+
   const handleSelectViatura = async (v: ViaturaBasica) => {
     if (flow.active && flow.type === 'avarias') {
       setAvariasViatura(v);
@@ -611,10 +631,45 @@ const CAVBot = () => {
             </div>
           )}
 
-          {flow.active && flow.type === 'vtr' && flow.stage === 'ask_target' && (
+          {(flow.active && (flow.type === 'vtr' || flow.type === 'avarias') && flow.stage === 'ask_target') && (
             <div className="quick-actions">
               <div className="quick-actions-header">
                 <span>Selecione a VTR</span>
+              </div>
+
+              {/* Select simples como alternativa aos botões */}
+              <div className="select-fallback">
+                <select onChange={handleVtrSelectChange} defaultValue="">
+                  <option value="">
+                    {vtrStep === 'root' && 'Escolha a frota...'}
+                    {vtrStep === 'leve-categoria' && 'Escolha a categoria...'}
+                    {(vtrStep === 'pesada' || vtrStep === 'leve-operacional' || vtrStep === 'leve-adm') && 'Escolha a viatura...'}
+                  </option>
+
+                  {vtrStep === 'root' && (
+                    <>
+                      <option value="pesada">🚚 Frota Pesada</option>
+                      <option value="leve">🚗 Frota Leve</option>
+                    </>
+                  )}
+
+                  {vtrStep === 'leve-categoria' && (
+                    <>
+                      <option value="operacional">🛡️ Operacional</option>
+                      <option value="adm">🏢 Administrativa</option>
+                      <option value="back">⬅️ Voltar</option>
+                    </>
+                  )}
+
+                  {(vtrStep === 'pesada' || vtrStep === 'leve-operacional' || vtrStep === 'leve-adm') && (
+                    <>
+                      <option value="back">⬅️ Voltar</option>
+                      {listaViaturas.map(v => (
+                        <option key={v.id} value={v.id}>{v.CADASTRO || v.PLACA}</option>
+                      ))}
+                    </>
+                  )}
+                </select>
               </div>
 
               {vtrStep === 'root' && (
