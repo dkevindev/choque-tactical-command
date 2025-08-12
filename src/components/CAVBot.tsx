@@ -78,6 +78,10 @@ const CAVBot = () => {
   } | null>(null);
   const [marcandoAvaria, setMarcandoAvaria] = useState(false);
   const [posicaoTemporaria, setPosicaoTemporaria] = useState<{ x: number; y: number } | null>(null);
+  const [showAvariaModal, setShowAvariaModal] = useState(false);
+  const [modalTipo, setModalTipo] = useState('');
+  const [modalDesc, setModalDesc] = useState('');
+  const [modalGravidade, setModalGravidade] = useState<'LEVE' | 'MODERADA' | 'GRAVE'>('LEVE');
 
   const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
   const isOperacionalCadastro = (cad?: string): boolean => {
@@ -361,7 +365,10 @@ const CAVBot = () => {
     const y = (e.clientY - rect.top) / rect.height;
     setPosicaoTemporaria({ x, y });
     setMarcandoAvaria(true);
-    pushBot('Posição marcada. Agora clique em "Registrar Avaria" e informe os detalhes.');
+    setModalTipo('');
+    setModalDesc('');
+    setModalGravidade('LEVE');
+    setShowAvariaModal(true);
   };
 
   // Scroll automático ao receber mensagens
@@ -843,6 +850,13 @@ const CAVBot = () => {
                 </div>
               )}
 
+              {(['frontal','traseira','esquerdo','direito'] as const).includes(avariasAngulo as any) && !getImagemAngulo() && (
+                <div className="quick-actions-header" style={{ marginTop: '0.75rem' }}>
+                  Imagem do ângulo "{avariasAngulo}" não configurada para esta viatura.
+                </div>
+              )}
+
+
               {/* Ações de serviço */}
               <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginTop: '0.75rem' }}>
                 {!servicoAberto ? (
@@ -964,6 +978,45 @@ const CAVBot = () => {
           onClose={() => setShowSaidaForm(false)}
           onSuccess={handleFormSuccess}
         />
+      )}
+
+      {showAvariaModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: '1rem', width: 'min(520px, 92vw)' }}>
+            <div className="quick-actions-header" style={{ marginBottom: '0.75rem' }}>Registrar avaria ({avariasAngulo})</div>
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>Tipo</label>
+                <input value={modalTipo} onChange={e => setModalTipo(e.target.value)} placeholder="Ex: Amassado, Risco" style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151', borderRadius: 8, padding: '0.5rem 0.75rem' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>Descrição (opcional)</label>
+                <textarea value={modalDesc} onChange={e => setModalDesc(e.target.value)} rows={3} placeholder="Detalhes da avaria" style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151', borderRadius: 8, padding: '0.5rem 0.75rem', resize: 'vertical' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>Gravidade</label>
+                <select value={modalGravidade} onChange={e => setModalGravidade(e.target.value as any)} style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
+                  <option value="LEVE">LEVE</option>
+                  <option value="MODERADA">MODERADA</option>
+                  <option value="GRAVE">GRAVE</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="quick-button" onClick={() => { setShowAvariaModal(false); setPosicaoTemporaria(null); }}>
+                  Cancelar
+                </button>
+                <button className="quick-button" onClick={async () => {
+                  if (!modalTipo.trim()) { pushBot('Informe o tipo da avaria.'); return; }
+                  setAvariaDraft({ tipo: modalTipo.trim(), descricao: modalDesc.trim(), gravidade: modalGravidade });
+                  await salvarAvaria({ gravidade: modalGravidade });
+                  setShowAvariaModal(false);
+                }}>
+                  Registrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`
