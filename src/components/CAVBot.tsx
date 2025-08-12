@@ -61,7 +61,7 @@ const CAVBot = () => {
 
   // Contexto de Avarias no bot
   type AnguloAvaria = 'frontal' | 'traseira' | 'esquerdo' | 'direito' | 'mecanico' | 'interno';
-  type Policial = { id: string; NOME: string; Matrícula: string | number };
+  type Policial = { id: string; NOME: string; Matrícula: string | number; nomeGuerra1?: string };
   const [policialLogado, setPolicialLogado] = useState<Policial | null>(null);
   const [avariasViatura, setAvariasViatura] = useState<ViaturaBasica | null>(null);
   const [avariasAngulo, setAvariasAngulo] = useState<AnguloAvaria>('frontal');
@@ -82,6 +82,7 @@ const CAVBot = () => {
   const [modalTipo, setModalTipo] = useState('');
   const [modalDesc, setModalDesc] = useState('');
   const [modalGravidade, setModalGravidade] = useState<'LEVE' | 'MODERADA' | 'GRAVE'>('LEVE');
+  const [avariaSelecionada, setAvariaSelecionada] = useState<any | null>(null);
 
   const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
   const isOperacionalCadastro = (cad?: string): boolean => {
@@ -131,7 +132,7 @@ const CAVBot = () => {
       const primeiroAcesso = data.primeiroAcesso !== false || !data.senha;
       const senhaOk = primeiroAcesso ? pass === mat : data.senha === pass;
       if (!senhaOk) return null;
-      return { id: d.id, NOME: data.NOME, Matrícula: data.Matrícula };
+      return { id: d.id, NOME: data.NOME, Matrícula: data.Matrícula, nomeGuerra1: data['NOME DE GUERRA1'] || data['NOME DE GUERRA'] || data.NOME };
     } catch (e) {
       console.error('Erro ao verificar policial:', e);
       return null;
@@ -166,7 +167,7 @@ const CAVBot = () => {
         data: new Date().toISOString(),
         gravidade: options?.gravidade || avariaDraft.gravidade || 'LEVE',
         status: 'PENDENTE',
-        responsavel: policialLogado.NOME,
+        responsavel: policialLogado.nomeGuerra1 || policialLogado.NOME,
         angulo: avariasAngulo,
         reportadoPorPolicial: true,
       };
@@ -192,13 +193,16 @@ const CAVBot = () => {
         viaturaId: avariasViatura.id,
         cadastro: avariasViatura.CADASTRO || null,
         placa: avariasViatura.PLACA,
-        motorista: servicoDraft.motorista || policialLogado.NOME,
+        motorista: servicoDraft.motorista || policialLogado.nomeGuerra1 || policialLogado.NOME,
+        motoristaId: policialLogado.id,
         kmInicial: servicoDraft.kmInicial,
         area: servicoDraft.area,
+        localAtuacao: servicoDraft.area,
         status: 'aberto',
         iniciadoEm: new Date().toISOString(),
         policialId: policialLogado.id,
         policialNome: policialLogado.NOME,
+        policialNomeGuerra1: policialLogado.nomeGuerra1 || null,
       });
       setServicoAberto({ id: docRef.id, ...servicoDraft, status: 'aberto' });
       pushBot('✅ Serviço iniciado com sucesso.');

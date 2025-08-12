@@ -96,8 +96,8 @@ const AvariasPage = () => {
           modelo: data.MODELO,
           imagemFrontal: data.imagemFrontal || '',
           imagemTraseira: data.imagemTraseira || '',
-          imagemLadoEsquerdo: data.imagemLadoEsquerdo || '',
-          imagemLadoDireito: data.imagemLadoDireito || '',
+          imagemLadoEsquerdo: data.imagemEsquerdo || data.imagemLadoEsquerdo || '',
+          imagemLadoDireito: data.imagemDireito || data.imagemLadoDireito || '',
           avarias: data.avarias || []
         });
       });
