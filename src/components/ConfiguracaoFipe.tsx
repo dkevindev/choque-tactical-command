@@ -105,7 +105,12 @@ const ConfiguracaoFipe = ({ viaturaFipe, onSalvar, saving }: ConfiguracaoFipePro
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-military-olive" />
                   <span className="text-sm font-medium text-foreground">
-                    {format(viaturaFipe.dataAtualizacao, 'dd/MM/yyyy')}
+                    {viaturaFipe.dataAtualizacao && viaturaFipe.dataAtualizacao instanceof Date 
+                      ? format(viaturaFipe.dataAtualizacao, 'dd/MM/yyyy')
+                      : viaturaFipe.dataAtualizacao 
+                        ? format(new Date(viaturaFipe.dataAtualizacao), 'dd/MM/yyyy')
+                        : 'Data não disponível'
+                    }
                   </span>
                 </div>
               </div>
