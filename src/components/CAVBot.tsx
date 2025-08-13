@@ -61,7 +61,7 @@ const CAVBot = () => {
 
   // Contexto de Avarias no bot
   type AnguloAvaria = 'frontal' | 'traseira' | 'esquerdo' | 'direito' | 'mecanico' | 'interno';
-  type Policial = { id: string; NOME: string; Matrícula: string | number; nomeGuerra1?: string };
+  type Policial = { id: string; NOME: string; Matrícula: string | number; nomeGuerra1?: string; acessos?: { gestaoLogistica?: boolean; cavbot?: boolean; reservaArmamento?: boolean; guardaQuartel?: boolean }; primeiroAcesso?: boolean; senhaDefault?: boolean };
   const [policialLogado, setPolicialLogado] = useState<Policial | null>(null);
   const [avariasViatura, setAvariasViatura] = useState<ViaturaBasica | null>(null);
   const [avariasAngulo, setAvariasAngulo] = useState<AnguloAvaria>('frontal');
@@ -83,6 +83,24 @@ const CAVBot = () => {
   const [modalDesc, setModalDesc] = useState('');
   const [modalGravidade, setModalGravidade] = useState<'LEVE' | 'MODERADA' | 'GRAVE'>('LEVE');
   const [avariaSelecionada, setAvariaSelecionada] = useState<any | null>(null);
+  const [showAvariaDetalhe, setShowAvariaDetalhe] = useState(false);
+  
+  // Encerramento de serviço via menu
+  type ServicoItem = { id: string; viaturaId: string; cadastro?: string | null; placa?: string; motorista?: string; motoristaId?: string; kmInicial?: number; area?: string };
+  const [showEncerrarModal, setShowEncerrarModal] = useState(false);
+  const [encerrarStep, setEncerrarStep] = useState<'list' | 'senha' | 'km'>('list');
+  const [servicosAbertos, setServicosAbertos] = useState<ServicoItem[]>([]);
+  const [servicoSelecionado, setServicoSelecionado] = useState<ServicoItem | null>(null);
+  const [senhaMotorista, setSenhaMotorista] = useState('');
+  const [kmFinalInput, setKmFinalInput] = useState('');
+  const [encerrarMsg, setEncerrarMsg] = useState<string>('');
+  const [policialEncerrar, setPolicialEncerrar] = useState<{ id: string; NOME: string; nomeGuerra1?: string } | null>(null);
+
+  // Troca de senha no primeiro acesso
+  const [showTrocarSenha, setShowTrocarSenha] = useState(false);
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmNovaSenha, setConfirmNovaSenha] = useState('');
+  const [trocarSenhaMsg, setTrocarSenhaMsg] = useState('');
 
   const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
   const isOperacionalCadastro = (cad?: string): boolean => {
@@ -130,9 +148,18 @@ const CAVBot = () => {
       const d = snap.docs[0];
       const data: any = d.data();
       const primeiroAcesso = data.primeiroAcesso !== false || !data.senha;
-      const senhaOk = primeiroAcesso ? pass === mat : data.senha === pass;
+      const senhaDefault = data.senha ? String(data.senha) === String(data.Matrícula) : true;
+      const senhaOk = primeiroAcesso ? pass === String(mat) : String(data.senha) === String(pass);
       if (!senhaOk) return null;
-      return { id: d.id, NOME: data.NOME, Matrícula: data.Matrícula, nomeGuerra1: data['NOME DE GUERRA1'] || data['NOME DE GUERRA'] || data.NOME };
+      return {
+        id: d.id,
+        NOME: data.NOME,
+        Matrícula: data.Matrícula,
+        nomeGuerra1: data['NOME DE GUERRA1'] || data['NOME DE GUERRA'] || data.NOME,
+        acessos: data.acessos || {},
+        primeiroAcesso,
+        senhaDefault,
+      };
     } catch (e) {
       console.error('Erro ao verificar policial:', e);
       return null;
@@ -183,8 +210,11 @@ const CAVBot = () => {
   };
 
   // Iniciar serviço diário
-  const iniciarServico = async () => {
-    if (!avariasViatura || !policialLogado || !servicoDraft.kmInicial || !servicoDraft.area) {
+  const iniciarServico = async (payload?: { motorista?: string; kmInicial: number; area: string }) => {
+    const kmInicialVal = payload?.kmInicial ?? servicoDraft.kmInicial;
+    const areaVal = payload?.area ?? servicoDraft.area;
+    const motoristaVal = payload?.motorista ?? servicoDraft.motorista ?? (policialLogado?.nomeGuerra1 || policialLogado?.NOME);
+    if (!avariasViatura || !policialLogado || !kmInicialVal || !areaVal) {
       pushBot('Preencha KM inicial e área para iniciar o serviço.');
       return;
     }
@@ -193,18 +223,18 @@ const CAVBot = () => {
         viaturaId: avariasViatura.id,
         cadastro: avariasViatura.CADASTRO || null,
         placa: avariasViatura.PLACA,
-        motorista: servicoDraft.motorista || policialLogado.nomeGuerra1 || policialLogado.NOME,
+        motorista: motoristaVal,
         motoristaId: policialLogado.id,
-        kmInicial: servicoDraft.kmInicial,
-        area: servicoDraft.area,
-        localAtuacao: servicoDraft.area,
+        kmInicial: kmInicialVal,
+        area: areaVal,
+        localAtuacao: areaVal,
         status: 'aberto',
         iniciadoEm: new Date().toISOString(),
         policialId: policialLogado.id,
         policialNome: policialLogado.NOME,
         policialNomeGuerra1: policialLogado.nomeGuerra1 || null,
       });
-      setServicoAberto({ id: docRef.id, ...servicoDraft, status: 'aberto' });
+      setServicoAberto({ id: docRef.id, motorista: motoristaVal, kmInicial: kmInicialVal, area: areaVal, status: 'aberto', viaturaId: avariasViatura.id });
       pushBot('✅ Serviço iniciado com sucesso.');
       setServicoDraft({});
     } catch (e) {
@@ -228,6 +258,11 @@ const CAVBot = () => {
         encerradoPorId: policialLogado?.id || null,
         encerradoPorNome: policialLogado?.NOME || null,
       });
+      // Atualizar KM da VTR na coleção 'frota'
+      const vtrId = avariasViatura?.id || (servicoAberto as any)?.viaturaId;
+      if (vtrId) {
+        await updateDoc(doc(db, 'frota', vtrId), { KM: kmFinal });
+      }
       setServicoAberto(null);
       pushBot('✅ Serviço encerrado com sucesso.');
     } catch (e) {
@@ -421,6 +456,18 @@ const CAVBot = () => {
         }
         setPolicialLogado(pol);
         pushBot(`✅ Logado como ${pol.NOME}.`);
+        // Primeira vez com senha igual à matrícula: exigir troca de senha
+        if ((pol as any).senhaDefault || textToSend === String(flow.matricula || '')) {
+          setShowTrocarSenha(true);
+        }
+
+        // Restrição: Consultar Viatura apenas para quem tem acesso à Gestão e Logística
+        if (type === 'vtr' && !(pol.acessos?.gestaoLogistica)) {
+          pushBot('🔒 Acesso negado: apenas usuários com permissão "GESTÃO E LOGÍSTICA" podem consultar viaturas.');
+          setFlow({ active: false });
+          setShowQuickButtons(true);
+          return;
+        }
 
         if (type === 'os') {
           setFlow(prev => ({ ...prev, stage: 'ask_target' }));
@@ -511,7 +558,7 @@ const CAVBot = () => {
         }
         if (flow.stage === 'service_start_area') {
           setServicoDraft(prev => ({ ...prev, area: textToSend }));
-          await iniciarServico();
+          await iniciarServico({ motorista: servicoDraft.motorista ?? (policialLogado?.nomeGuerra1 || policialLogado?.NOME), kmInicial: (servicoDraft.kmInicial as number), area: textToSend });
           setFlow(prev => ({ ...prev, stage: 'avarias_ui' }));
           return;
         }
@@ -694,6 +741,23 @@ const CAVBot = () => {
                 >
                   🛠️ Avarias
                 </button>
+                <button
+                  className="quick-button"
+                  onClick={async () => {
+                    setShowEncerrarModal(true);
+                    setEncerrarStep('list');
+                    try {
+                      const q = query(collection(db, 'servicosDiarios'), where('status','==','aberto'));
+                      const snap = await getDocs(q);
+                      const items: ServicoItem[] = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+                      setServicosAbertos(items);
+                    } catch (e) {
+                      pushBot('Erro ao carregar serviços abertos.');
+                    }
+                  }}
+                >
+                  ⏹️ Encerrar Serviço
+                </button>
               </div>
             </div>
           )}
@@ -785,6 +849,7 @@ const CAVBot = () => {
                     <span
                       key={a.id}
                       title={`${a.tipo} • ${a.gravidade}${a.descricao ? ' • ' + a.descricao : ''}`}
+                      onClick={() => { setAvariaSelecionada(a); setShowAvariaDetalhe(true); }}
                       style={{
                         position: 'absolute',
                         left: `${((a.x ?? 0) > 1 ? (a.x ?? 0) : (a.x ?? 0) * 100)}%`,
@@ -796,6 +861,7 @@ const CAVBot = () => {
                         border: '2px solid #fff',
                         transform: 'translate(-50%, -50%)',
                         boxShadow: '0 0 0 2px rgba(239,68,68,0.35)',
+                        cursor: 'pointer',
                       }}
                     />
                   ))}
@@ -824,7 +890,6 @@ const CAVBot = () => {
                   Imagem do ângulo "{avariasAngulo}" não configurada para esta viatura.
                 </div>
               )}
-
 
               {/* Ações de serviço */}
               <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginTop: '0.75rem' }}>
@@ -855,7 +920,18 @@ const CAVBot = () => {
               <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(1, 1fr)', marginTop: '0.75rem' }}>
                 <button
                   className="quick-button"
-                  onClick={() => { setFlow(prev => ({ ...prev, stage: 'avarias_ask_tipo' })); pushBot('Informe o tipo da avaria:'); }}
+                  onClick={() => {
+                    const isAnguloComImagem = (['frontal','traseira','esquerdo','direito'] as const).includes(avariasAngulo as any) && !!getImagemAngulo();
+                    if (isAnguloComImagem) {
+                      pushBot('Clique na imagem para marcar a posição e abrir o formulário da avaria.');
+                    } else {
+                      setPosicaoTemporaria(null);
+                      setModalTipo('');
+                      setModalDesc('');
+                      setModalGravidade('LEVE');
+                      setShowAvariaModal(true);
+                    }
+                  }}
                 >
                   ➕ Registrar Avaria no ângulo {avariasAngulo}
                 </button>
@@ -949,6 +1025,121 @@ const CAVBot = () => {
         />
       )}
 
+      {showAvariaDetalhe && avariaSelecionada && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: '1rem', width: 'min(520px, 92vw)' }}>
+            <div className="quick-actions-header" style={{ marginBottom: '0.75rem' }}>Detalhes da avaria</div>
+            <div style={{ color: '#e5e7eb', display: 'grid', gap: 8 }}>
+              <div><strong>Tipo:</strong> {avariaSelecionada.tipo}</div>
+              <div><strong>Gravidade:</strong> {avariaSelecionada.gravidade}</div>
+              {avariaSelecionada.descricao && (<div><strong>Descrição:</strong> {avariaSelecionada.descricao}</div>)}
+              <div><strong>Ângulo:</strong> {avariaSelecionada.angulo}</div>
+              <div><strong>Responsável:</strong> {avariaSelecionada.responsavel}</div>
+              <div><strong>Data:</strong> {new Date(avariaSelecionada.data).toLocaleString('pt-BR')}</div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+              <button className="quick-button" onClick={() => { setShowAvariaDetalhe(false); setAvariaSelecionada(null); }}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEncerrarModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: '1rem', width: 'min(600px, 94vw)' }}>
+            <div className="quick-actions-header" style={{ marginBottom: '0.75rem' }}>Encerrar Serviço</div>
+
+            {encerrarStep === 'list' && (
+              <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(1, 1fr)' }}>
+                {servicosAbertos.length === 0 ? (
+                  <div className="quick-actions-header">Não há serviços abertos.</div>
+                ) : (
+                  servicosAbertos.map(s => (
+                    <button key={s.id} className="quick-button" onClick={() => { setServicoSelecionado(s); setEncerrarStep('senha'); setEncerrarMsg(''); }}>
+                      {s.cadastro || s.placa} • Motorista: {s.motorista || '-'} • KM inicial: {s.kmInicial ?? '-'}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+
+            {encerrarStep === 'senha' && servicoSelecionado && (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div style={{ color: '#9ca3af' }}>Informe a senha do motorista ({servicoSelecionado.motorista || 'motorista'})</div>
+                <input type="password" value={senhaMotorista} onChange={e => setSenhaMotorista(e.target.value)} placeholder="Senha" style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151', borderRadius: 8, padding: '0.5rem 0.75rem' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <button className="quick-button" onClick={() => { setEncerrarStep('list'); setServicoSelecionado(null); setSenhaMotorista(''); }}>{'⬅️ Voltar'}</button>
+                  <button className="quick-button" onClick={async () => {
+                    try {
+                      if (!servicoSelecionado?.motoristaId) { setEncerrarMsg('Motorista não identificado.'); return; }
+                      const polRef = doc(db, 'policiais', servicoSelecionado.motoristaId);
+                      const polSnap = await getDoc(polRef);
+                      if (!polSnap.exists()) { setEncerrarMsg('Motorista não encontrado.'); return; }
+                      const data: any = polSnap.data();
+                      const primeiroAcesso = data.primeiroAcesso !== false || !data.senha;
+                      const senhaOk = primeiroAcesso ? senhaMotorista === String(data.Matrícula) : data.senha === senhaMotorista;
+                      if (!senhaOk) { setEncerrarMsg('Senha incorreta.'); return; }
+                      setPolicialEncerrar({ id: polSnap.id, NOME: data.NOME, nomeGuerra1: data['NOME DE GUERRA1'] || data['NOME DE GUERRA'] || data.NOME });
+                      setEncerrarStep('km');
+                      setEncerrarMsg('');
+                    } catch (e) {
+                      setEncerrarMsg('Erro ao validar senha.');
+                    }
+                  }}>Validar</button>
+                </div>
+                {encerrarMsg && <div style={{ color: '#fca5a5' }}>{encerrarMsg}</div>}
+              </div>
+            )}
+
+            {encerrarStep === 'km' && servicoSelecionado && (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div style={{ color: '#9ca3af' }}>Informe o KM final da VTR ({servicoSelecionado.cadastro || servicoSelecionado.placa})</div>
+                <input inputMode="numeric" value={kmFinalInput} onChange={e => setKmFinalInput(e.target.value)} placeholder="KM final" style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151', borderRadius: 8, padding: '0.5rem 0.75rem' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <button className="quick-button" onClick={() => { setEncerrarStep('senha'); }}>{'⬅️ Voltar'}</button>
+                  <button className="quick-button" onClick={async () => {
+                    const kmf = parseInt(kmFinalInput.replace(/\D/g,'') || '');
+                    if (isNaN(kmf)) { setEncerrarMsg('KM inválido.'); return; }
+                    try {
+                      // Atualizar serviço
+                      await updateDoc(doc(db, 'servicosDiarios', servicoSelecionado.id), {
+                        kmFinal: kmf,
+                        status: 'encerrado',
+                        encerradoEm: new Date().toISOString(),
+                        encerradoPorId: policialEncerrar?.id || null,
+                        encerradoPorNome: policialEncerrar?.NOME || null,
+                        encerradoPorNomeGuerra1: policialEncerrar?.nomeGuerra1 || null,
+                      });
+                      // Atualizar KM da frota
+                      if (servicoSelecionado.viaturaId) {
+                        await updateDoc(doc(db, 'frota', servicoSelecionado.viaturaId), { KM: kmf });
+                      }
+                      setEncerrarMsg('✅ Serviço encerrado com sucesso.');
+                      setTimeout(() => {
+                        setShowEncerrarModal(false);
+                        setEncerrarStep('list');
+                        setServicoSelecionado(null);
+                        setServicosAbertos([]);
+                        setSenhaMotorista('');
+                        setKmFinalInput('');
+                        setEncerrarMsg('');
+                      }, 1000);
+                    } catch (e) {
+                      setEncerrarMsg('Erro ao encerrar serviço.');
+                    }
+                  }}>Encerrar</button>
+                </div>
+                {encerrarMsg && <div style={{ color: encerrarMsg.startsWith('✅') ? '#86efac' : '#fca5a5' }}>{encerrarMsg}</div>}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+              <button className="quick-button" onClick={() => setShowEncerrarModal(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAvariaModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
           <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: '1rem', width: 'min(520px, 92vw)' }}>
@@ -982,6 +1173,43 @@ const CAVBot = () => {
                 }}>
                   Registrar
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTrocarSenha && policialLogado && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
+          <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: '1rem', width: 'min(520px, 92vw)' }}>
+            <div className="quick-actions-header" style={{ marginBottom: '0.75rem' }}>Definir nova senha</div>
+            <div style={{ color: '#9ca3af', marginBottom: 8 }}>Por segurança, defina uma nova senha diferente da sua matrícula.</div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>Nova senha</label>
+                <input type="password" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="Nova senha" style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151', borderRadius: 8, padding: '0.5rem 0.75rem' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>Confirmar senha</label>
+                <input type="password" value={confirmNovaSenha} onChange={e => setConfirmNovaSenha(e.target.value)} placeholder="Confirmar senha" style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151', borderRadius: 8, padding: '0.5rem 0.75rem' }} />
+              </div>
+              {trocarSenhaMsg && <div style={{ color: trocarSenhaMsg.startsWith('✅') ? '#86efac' : '#fca5a5' }}>{trocarSenhaMsg}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="quick-button" onClick={() => { setShowTrocarSenha(false); setNovaSenha(''); setConfirmNovaSenha(''); setTrocarSenhaMsg(''); }}>Cancelar</button>
+                <button className="quick-button" onClick={async () => {
+                  const matStr = String(policialLogado?.Matrícula || '');
+                  if (novaSenha.length < 6) { setTrocarSenhaMsg('A senha deve ter pelo menos 6 caracteres.'); return; }
+                  if (novaSenha !== confirmNovaSenha) { setTrocarSenhaMsg('As senhas não conferem.'); return; }
+                  if (novaSenha === matStr) { setTrocarSenhaMsg('A nova senha não pode ser igual à matrícula.'); return; }
+                  try {
+                    await updateDoc(doc(db, 'policiais', policialLogado!.id), { senha: novaSenha, primeiroAcesso: false });
+                    setTrocarSenhaMsg('✅ Senha atualizada com sucesso.');
+                    pushBot('🔒 Senha atualizada com sucesso.');
+                    setTimeout(() => { setShowTrocarSenha(false); setNovaSenha(''); setConfirmNovaSenha(''); setTrocarSenhaMsg(''); }, 800);
+                  } catch (e) {
+                    setTrocarSenhaMsg('Erro ao atualizar a senha.');
+                  }
+                }}>Salvar</button>
               </div>
             </div>
           </div>
