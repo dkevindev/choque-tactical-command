@@ -105,12 +105,18 @@ const ConfiguracaoFipe = ({ viaturaFipe, onSalvar, saving }: ConfiguracaoFipePro
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-military-olive" />
                   <span className="text-sm font-medium text-foreground">
-                    {viaturaFipe.dataAtualizacao && viaturaFipe.dataAtualizacao instanceof Date 
-                      ? format(viaturaFipe.dataAtualizacao, 'dd/MM/yyyy')
-                      : viaturaFipe.dataAtualizacao 
-                        ? format(new Date(viaturaFipe.dataAtualizacao), 'dd/MM/yyyy')
-                        : 'Data não disponível'
-                    }
+                    {(() => {
+                      try {
+                        if (!viaturaFipe.dataAtualizacao) return 'Data não disponível';
+                        const date = viaturaFipe.dataAtualizacao instanceof Date 
+                          ? viaturaFipe.dataAtualizacao 
+                          : new Date(viaturaFipe.dataAtualizacao);
+                        if (isNaN(date.getTime())) return 'Data inválida';
+                        return format(date, 'dd/MM/yyyy');
+                      } catch (error) {
+                        return 'Data não disponível';
+                      }
+                    })()}
                   </span>
                 </div>
               </div>
