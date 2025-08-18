@@ -102,25 +102,10 @@ const OrdemServicoPage = () => {
     setLoading(true);
     setError(null);
     try {
+      // Buscar todos os documentos sem filtros complexos
       let q: Query<DocumentData> = collection(db, 'ordensDeServico');
-
-      // Remover o filtro de appIdAssociado para mostrar todas as OS's
-
-      // --- FILTRO DE DATAS ---
-      if (dateRange.from && dateRange.to) {
-        const startDateString = format(dateRange.from, 'yyyy-MM-dd');
-        const endDateString = format(dateRange.to, 'yyyy-MM-dd');
-        q = query(q, where('dataOS', '>=', startDateString), where('dataOS', '<=', endDateString));
-      } else if (selectedMonthYear && selectedMonthYear !== 'all') {
-        const [year, month] = selectedMonthYear.split('-');
-        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-        const endDate = new Date(parseInt(year), parseInt(month), 0);
-        const startDateString = format(startDate, 'yyyy-MM-dd');
-        const endDateString = format(endDate, 'yyyy-MM-dd');
-        q = query(q, where('dataOS', '>=', startDateString), where('dataOS', '<=', endDateString));
-      }
       
-      // Ordena por dataCriacao (IMPORTANTE para garantir ordem consistente)
+      // Ordenar apenas por dataCriacao para evitar problemas de índice
       q = query(q, orderBy('dataCriacao', 'desc'));
 
       // *** REMOVIDO O limit() AQUI ***
@@ -135,14 +120,44 @@ const OrdemServicoPage = () => {
         } as OrdemServico;
       });
 
-      // Filtragem client-side para "contém" (mantida)
+      // Filtragem client-side completa
       let filteredDocs = fetchedDocs;
       const lowerSearchViatura = searchViatura.trim().toLowerCase();
       const lowerSearchDefeito = searchDefeito.trim().toLowerCase();
       const lowerSearchNumeroOS = searchNumeroOS.trim().toLowerCase();
 
+      // Aplicar filtro de data
+      if (dateRange.from || dateRange.to || (selectedMonthYear && selectedMonthYear !== 'all')) {
+        filteredDocs = filteredDocs.filter(os => {
+          if (!os.dataOS) return false;
+          
+          try {
+            const osDate = parseISO(os.dataOS);
+            if (!isValid(osDate)) return false;
+
+            // Filtro por range de datas
+            if (dateRange.from && dateRange.to) {
+              return osDate >= dateRange.from && osDate <= dateRange.to;
+            }
+            
+            // Filtro por mês/ano
+            if (selectedMonthYear && selectedMonthYear !== 'all') {
+              const [year, month] = selectedMonthYear.split('-');
+              const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+              const endDate = new Date(parseInt(year), parseInt(month), 0);
+              return osDate >= startDate && osDate <= endDate;
+            }
+            
+            return true;
+          } catch (error) {
+            return false;
+          }
+        });
+      }
+
+      // Aplicar filtros de texto
       if (lowerSearchViatura || lowerSearchDefeito || lowerSearchNumeroOS) {
-        filteredDocs = fetchedDocs.filter(os => {
+        filteredDocs = filteredDocs.filter(os => {
           const viaturaData = `${os.cadastroViatura || ''} ${os.modeloViatura || ''} ${os.placaViatura || ''}`.toLowerCase();
           const observacaoData = (os.observacao || '').toLowerCase();
           const numeroOSData = (os.numeroOS || '').toLowerCase();
