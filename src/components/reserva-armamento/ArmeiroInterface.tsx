@@ -229,7 +229,7 @@ const ArmeiroInterface = () => {
   const policialsFiltrados = policiais.filter(p => {
     const filtroLower = buscaPolicial.toLowerCase();
     const nomeMatch = (p.NOME?.toLowerCase() || '').includes(filtroLower);
-    const matriculaMatch = (p['Matrícula'] || '').includes(buscaPolicial);
+    const matriculaMatch = (p['Matrícula']?.toString() || '').includes(buscaPolicial);
     const numeralMatch = (p.NUMERAL?.toString() || '').includes(buscaPolicial);
     
     console.log('🔍 Filtrando policial:', {
