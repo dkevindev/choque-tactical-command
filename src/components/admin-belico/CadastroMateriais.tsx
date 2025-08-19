@@ -190,12 +190,24 @@ const CadastroMateriais = () => {
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Cadastro de Materiais Bélicos</h3>
-          <p className="text-sm text-muted-foreground">Gerencie armamentos, munições e equipamentos</p>
+          <p className="text-sm text-muted-foreground">
+            Cadastre armamentos, munições e equipamentos para cautelas permanentes
+          </p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Material
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowForm(true)} 
+            className="flex items-center gap-2"
+          >
+            <Target className="h-4 w-4" />
+            Gerenciar Categorias
+          </Button>
+          <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Material
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

@@ -208,33 +208,31 @@ const BelicoContent = () => {
         <CardHeader>
           <CardTitle className="text-foreground flex items-center gap-2">
             <Target className="h-5 w-5" />
-            CONTROLE BÉLICO
+            CONTROLE BÉLICO - CAUTELAS PERMANENTES
           </CardTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            Sistema para gerenciar cautelas permanentes de materiais bélicos aos policiais
+          </p>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="materiais" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
+          <Tabs defaultValue="cautelas" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="cautelas">Cautelas Permanentes</TabsTrigger>
               <TabsTrigger value="materiais">Materiais</TabsTrigger>
-              <TabsTrigger value="categorias">Categorias</TabsTrigger>
               <TabsTrigger value="estoque">Estoque</TabsTrigger>
-              <TabsTrigger value="cautelas">Cautelas</TabsTrigger>
               <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="cautelas">
+              <GerenciarCautelas />
+            </TabsContent>
 
             <TabsContent value="materiais">
               <CadastroMateriais />
             </TabsContent>
 
-            <TabsContent value="categorias">
-              <GerenciarCategorias />
-            </TabsContent>
-
             <TabsContent value="estoque">
               <ControleEstoque />
-            </TabsContent>
-
-            <TabsContent value="cautelas">
-              <GerenciarCautelas />
             </TabsContent>
 
             <TabsContent value="relatorios">

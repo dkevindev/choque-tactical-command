@@ -13,11 +13,14 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Eye
+  Eye,
+  Plus,
+  Target
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
+import NovaCautelaForm from './NovaCautelaForm';
 
 interface Cautela {
   id: string;
@@ -49,6 +52,7 @@ const GerenciarCautelas = () => {
   const [statusFiltro, setStatusFiltro] = useState('todos');
   const [tipoFiltro, setTipoFiltro] = useState('todos');
   const [cautelaDetalhes, setCautelaDetalhes] = useState<Cautela | null>(null);
+  const [showNovaForm, setShowNovaForm] = useState(false);
 
   useEffect(() => {
     loadCautelas();
@@ -177,10 +181,29 @@ const GerenciarCautelas = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold text-foreground">Gerenciar Cautelas</h3>
-        <p className="text-sm text-muted-foreground">Controle de cautelas permanentes e temporárias</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Cautelas Permanentes</h3>
+          <p className="text-sm text-muted-foreground">
+            Gerenciar cautelas permanentes de materiais bélicos aos policiais
+          </p>
+        </div>
+        <Button onClick={() => setShowNovaForm(true)} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Nova Cautela Permanente
+        </Button>
       </div>
+
+      {/* Form para Nova Cautela */}
+      {showNovaForm && (
+        <NovaCautelaForm 
+          onClose={() => setShowNovaForm(false)}
+          onSuccess={() => {
+            setShowNovaForm(false);
+            loadCautelas();
+          }}
+        />
+      )}
 
       {/* Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
