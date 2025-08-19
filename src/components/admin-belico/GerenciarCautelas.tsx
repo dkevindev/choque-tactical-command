@@ -46,8 +46,8 @@ interface Cautela {
 const GerenciarCautelas = () => {
   const [cautelas, setCautelas] = useState<Cautela[]>([]);
   const [filtro, setFiltro] = useState('');
-  const [statusFiltro, setStatusFiltro] = useState('');
-  const [tipoFiltro, setTipoFiltro] = useState('');
+  const [statusFiltro, setStatusFiltro] = useState('todos');
+  const [tipoFiltro, setTipoFiltro] = useState('todos');
   const [cautelaDetalhes, setCautelaDetalhes] = useState<Cautela | null>(null);
 
   useEffect(() => {
@@ -159,10 +159,10 @@ const GerenciarCautelas = () => {
   };
 
   const cautelasFiltradas = cautelas.filter(cautela => {
-    const matchNome = cautela.policialNome.toLowerCase().includes(filtro.toLowerCase());
-    const matchMatricula = cautela.policialMatricula.includes(filtro);
-    const matchStatus = statusFiltro === '' || cautela.status === statusFiltro;
-    const matchTipo = tipoFiltro === '' || cautela.tipoDocumento === tipoFiltro;
+    const matchNome = cautela.policialNome?.toLowerCase().includes(filtro.toLowerCase()) || false;
+    const matchMatricula = cautela.policialMatricula?.includes(filtro) || false;
+    const matchStatus = statusFiltro === 'todos' || statusFiltro === '' || cautela.status === statusFiltro;
+    const matchTipo = tipoFiltro === 'todos' || tipoFiltro === '' || cautela.tipoDocumento === tipoFiltro;
     
     return (matchNome || matchMatricula) && matchStatus && matchTipo;
   });
@@ -236,7 +236,7 @@ const GerenciarCautelas = () => {
                 <SelectValue placeholder="Filtrar por status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os status</SelectItem>
+                <SelectItem value="todos">Todos os status</SelectItem>
                 <SelectItem value="ativa">Ativa</SelectItem>
                 <SelectItem value="finalizada">Finalizada</SelectItem>
                 <SelectItem value="vencida">Vencida</SelectItem>
@@ -248,7 +248,7 @@ const GerenciarCautelas = () => {
                 <SelectValue placeholder="Filtrar por tipo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os tipos</SelectItem>
+                <SelectItem value="todos">Todos os tipos</SelectItem>
                 <SelectItem value="permanente">Permanente</SelectItem>
                 <SelectItem value="temporaria">Temporária</SelectItem>
               </SelectContent>

@@ -326,6 +326,7 @@ const RelatoriosBelico = () => {
                       <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="todas">Todas as categorias</SelectItem>
                       <SelectItem value="armamento">Armamento</SelectItem>
                       <SelectItem value="epi">EPI</SelectItem>
                       <SelectItem value="municao">Munição</SelectItem>
@@ -343,9 +344,9 @@ const RelatoriosBelico = () => {
                       <SelectValue placeholder="Selecione um status" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
                       <SelectItem value="ativa">Ativa</SelectItem>
                       <SelectItem value="vencida">Vencida</SelectItem>
-                      <SelectItem value="todas">Todas</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

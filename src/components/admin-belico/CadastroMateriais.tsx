@@ -40,7 +40,7 @@ const CadastroMateriais = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [filtro, setFiltro] = useState('');
-  const [categoriaFiltro, setCategoriaFiltro] = useState('');
+  const [categoriaFiltro, setCategoriaFiltro] = useState('todas');
   const [formData, setFormData] = useState({
     nome: '',
     categoria: '',
@@ -177,9 +177,9 @@ const CadastroMateriais = () => {
   };
 
   const materiaisFiltrados = materiais.filter(material => {
-    const matchNome = material.nome.toLowerCase().includes(filtro.toLowerCase());
+    const matchNome = material.nome?.toLowerCase().includes(filtro.toLowerCase()) || false;
     const matchSerie = material.numeroSerie?.toLowerCase().includes(filtro.toLowerCase()) || false;
-    const matchCategoria = categoriaFiltro === '' || material.categoria === categoriaFiltro;
+    const matchCategoria = categoriaFiltro === 'todas' || categoriaFiltro === '' || material.categoria === categoriaFiltro;
     
     return (matchNome || matchSerie) && matchCategoria;
   });
@@ -216,7 +216,7 @@ const CadastroMateriais = () => {
                 <SelectValue placeholder="Filtrar por categoria" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas as categorias</SelectItem>
+                <SelectItem value="todas">Todas as categorias</SelectItem>
                 {categorias.map(categoria => (
                   <SelectItem key={categoria} value={categoria}>{categoria}</SelectItem>
                 ))}

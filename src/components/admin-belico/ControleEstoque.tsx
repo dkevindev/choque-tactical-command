@@ -49,8 +49,8 @@ const ControleEstoque = () => {
     porCategoria: {}
   });
   const [filtro, setFiltro] = useState('');
-  const [categoriaFiltro, setCategoriaFiltro] = useState('');
-  const [statusFiltro, setStatusFiltro] = useState('');
+  const [categoriaFiltro, setCategoriaFiltro] = useState('todas');
+  const [statusFiltro, setStatusFiltro] = useState('todos');
 
   useEffect(() => {
     loadDadosEstoque();
@@ -155,15 +155,16 @@ const ControleEstoque = () => {
   };
 
   const materiaisFiltrados = materiais.filter(material => {
-    const matchNome = material.nome.toLowerCase().includes(filtro.toLowerCase());
+    const matchNome = material.nome?.toLowerCase().includes(filtro.toLowerCase()) || false;
     const matchSerie = material.numeroSerie?.toLowerCase().includes(filtro.toLowerCase()) || false;
-    const matchCategoria = categoriaFiltro === '' || material.categoria === categoriaFiltro;
+    const matchCategoria = categoriaFiltro === 'todas' || categoriaFiltro === '' || material.categoria === categoriaFiltro;
     
     let matchStatus = true;
     if (statusFiltro === 'disponivel') matchStatus = material.disponivel && !material.cautelado;
     else if (statusFiltro === 'cautelado') matchStatus = material.cautelado;
     else if (statusFiltro === 'manutencao') matchStatus = material.statusManutencao === 'manutencao';
     else if (statusFiltro === 'baixado') matchStatus = material.statusManutencao === 'baixa';
+    else if (statusFiltro === 'todos' || statusFiltro === '') matchStatus = true;
     
     return (matchNome || matchSerie) && matchCategoria && matchStatus;
   });
@@ -279,7 +280,7 @@ const ControleEstoque = () => {
                 <SelectValue placeholder="Filtrar por categoria" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas as categorias</SelectItem>
+                <SelectItem value="todas">Todas as categorias</SelectItem>
                 {categorias.map(categoria => (
                   <SelectItem key={categoria} value={categoria}>{categoria}</SelectItem>
                 ))}
@@ -291,7 +292,7 @@ const ControleEstoque = () => {
                 <SelectValue placeholder="Filtrar por status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os status</SelectItem>
+                <SelectItem value="todos">Todos os status</SelectItem>
                 <SelectItem value="disponivel">Disponível</SelectItem>
                 <SelectItem value="cautelado">Cautelado</SelectItem>
                 <SelectItem value="manutencao">Manutenção</SelectItem>
