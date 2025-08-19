@@ -33,11 +33,11 @@ interface Material {
 
 interface Policial {
   id: string;
-  nome: string;
-  matricula: string;
-  numeral: string;
-  posto: string;
-  situacao: string;
+  NOME: string;
+  'Matrícula': string;
+  NUMERAL: number;
+  'Post/Grad': string;
+  'SITUAÇÃO': string;
 }
 
 interface ReservaAtiva {
@@ -115,9 +115,9 @@ const ArmeiroInterface = () => {
       console.error('❌ Erro ao carregar policiais:', error);
       // Mock data for development
       const mockPoliciais = [
-        { id: '1', nome: 'João Silva Santos', matricula: '123456', numeral: '001', posto: 'Soldado', situacao: 'Ativo' },
-        { id: '2', nome: 'Maria Oliveira Costa', matricula: '123457', numeral: '002', posto: 'Cabo', situacao: 'Ativo' },
-        { id: '3', nome: 'Carlos Souza Lima', matricula: '123458', numeral: '003', posto: 'Sargento', situacao: 'Ativo' }
+        { id: '1', NOME: 'João Silva Santos', 'Matrícula': '123456', NUMERAL: 1, 'Post/Grad': 'Soldado', 'SITUAÇÃO': 'Ativo' },
+        { id: '2', NOME: 'Maria Oliveira Costa', 'Matrícula': '123457', NUMERAL: 2, 'Post/Grad': 'Cabo', 'SITUAÇÃO': 'Ativo' },
+        { id: '3', NOME: 'Carlos Souza Lima', 'Matrícula': '123458', NUMERAL: 3, 'Post/Grad': 'Sargento', 'SITUAÇÃO': 'Ativo' }
       ];
       console.log('🎭 Usando dados mock:', mockPoliciais);
       setPoliciais(mockPoliciais);
@@ -157,7 +157,7 @@ const ArmeiroInterface = () => {
   const selecionarPolicial = (policial: Policial) => {
     setPolicialSelecionado(policial);
     setBuscaPolicial('');
-    toast.success(`Policial ${policial.nome} selecionado`);
+    toast.success(`Policial ${policial.NOME} selecionado`);
   };
 
   const adicionarMaterial = (material: Material) => {
@@ -228,12 +228,14 @@ const ArmeiroInterface = () => {
 
   const policialsFiltrados = policiais.filter(p => {
     const filtroLower = buscaPolicial.toLowerCase();
-    const nomeMatch = (p.nome?.toLowerCase() || '').includes(filtroLower);
-    const matriculaMatch = (p.matricula || '').includes(buscaPolicial);
-    const numeralMatch = (p.numeral || '').includes(buscaPolicial);
+    const nomeMatch = (p.NOME?.toLowerCase() || '').includes(filtroLower);
+    const matriculaMatch = (p['Matrícula'] || '').includes(buscaPolicial);
+    const numeralMatch = (p.NUMERAL?.toString() || '').includes(buscaPolicial);
     
     console.log('🔍 Filtrando policial:', {
-      nome: p.nome,
+      nome: p.NOME,
+      matricula: p['Matrícula'],
+      numeral: p.NUMERAL,
       filtro: buscaPolicial,
       nomeMatch,
       matriculaMatch,
@@ -325,9 +327,9 @@ const ArmeiroInterface = () => {
                     <div className="p-4 bg-primary/10 border border-primary rounded">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-semibold text-foreground">{policialSelecionado.nome}</h3>
+                          <h3 className="font-semibold text-foreground">{policialSelecionado.NOME}</h3>
                           <p className="text-sm text-muted-foreground">
-                            {policialSelecionado.posto} • Mat: {policialSelecionado.matricula} • Num: {policialSelecionado.numeral}
+                            {policialSelecionado['Post/Grad']} • Mat: {policialSelecionado['Matrícula']} • Num: {policialSelecionado.NUMERAL}
                           </p>
                         </div>
                         <Button 
@@ -351,9 +353,9 @@ const ArmeiroInterface = () => {
                             className="p-3 bg-muted hover:bg-accent cursor-pointer rounded border"
                             onClick={() => selecionarPolicial(policial)}
                           >
-                            <h4 className="font-medium text-foreground">{policial.nome}</h4>
+                            <h4 className="font-medium text-foreground">{policial.NOME}</h4>
                             <p className="text-sm text-muted-foreground">
-                              {policial.posto} • Mat: {policial.matricula} • Num: {policial.numeral}
+                              {policial['Post/Grad']} • Mat: {policial['Matrícula']} • Num: {policial.NUMERAL}
                             </p>
                           </div>
                         ))
@@ -525,7 +527,7 @@ const ArmeiroInterface = () => {
           <CardContent>
             <div className="space-y-3">
               <p className="text-foreground">
-                <strong>Policial:</strong> {policiais.find(p => p.id === reservaAtiva.policialId)?.nome || 'Carregando...'}
+                <strong>Policial:</strong> {policiais.find(p => p.id === reservaAtiva.policialId)?.NOME || 'Carregando...'}
               </p>
               <div>
                 <p className="text-foreground font-medium mb-2">Materiais enviados:</p>
