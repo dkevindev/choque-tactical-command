@@ -226,6 +226,18 @@ const ArmeiroInterface = () => {
     (m.categoria?.toLowerCase() || '').includes(buscaMaterial.toLowerCase())
   );
 
+  // Agrupar materiais por categoria
+  const materiaisPorCategoria = materiaisFiltrados.reduce((acc, material) => {
+    const categoria = material.categoria || 'Sem Categoria';
+    if (!acc[categoria]) {
+      acc[categoria] = [];
+    }
+    acc[categoria].push(material);
+    return acc;
+  }, {} as Record<string, Material[]>);
+
+  const categorias = Object.keys(materiaisPorCategoria).sort();
+
   return (
     <div className="space-y-6">
       {/* Header Controls */}
@@ -301,9 +313,9 @@ const ArmeiroInterface = () => {
                       </div>
                     </div>
                   ) : (
-                    buscaPolicial && (
-                      <div className="max-h-40 overflow-y-auto space-y-2">
-                        {policialsFiltrados.map(policial => (
+                    <div className="max-h-40 overflow-y-auto space-y-2">
+                      {policialsFiltrados.length > 0 ? (
+                        policialsFiltrados.map(policial => (
                           <div
                             key={policial.id}
                             className="p-3 bg-muted hover:bg-accent cursor-pointer rounded border"
@@ -314,9 +326,17 @@ const ArmeiroInterface = () => {
                               {policial.posto} • Mat: {policial.matricula} • Num: {policial.numeral}
                             </p>
                           </div>
-                        ))}
-                      </div>
-                    )
+                        ))
+                      ) : buscaPolicial ? (
+                        <p className="text-center text-muted-foreground py-4">
+                          Nenhum policial encontrado
+                        </p>
+                      ) : (
+                        <p className="text-center text-muted-foreground py-4">
+                          Digite para buscar policiais
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -397,24 +417,66 @@ const ArmeiroInterface = () => {
                   />
                 </div>
 
-                <div className="max-h-96 overflow-y-auto space-y-2">
-                  {materiaisFiltrados.map(material => (
-                    <div
-                      key={material.id}
-                      className="p-3 bg-muted hover:bg-accent cursor-pointer rounded border flex items-center justify-between"
-                      onClick={() => adicionarMaterial(material)}
-                    >
-                      <div>
-                        <h4 className="font-medium text-foreground">{material.nome}</h4>
-                        <p className="text-sm text-muted-foreground">{material.categoria}</p>
-                        {material.numeroSerie && (
-                          <p className="text-xs text-muted-foreground">Série: {material.numeroSerie}</p>
+                <Tabs defaultValue={categorias[0]} className="w-full">
+                  <TabsList className="grid w-full grid-cols-4 mb-4">
+                    {categorias.slice(0, 4).map(categoria => (
+                      <TabsTrigger key={categoria} value={categoria} className="text-xs">
+                        {categoria}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  {categorias.map(categoria => (
+                    <TabsContent key={categoria} value={categoria}>
+                      <div className="max-h-80 overflow-y-auto space-y-2">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge variant="outline">{categoria}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {materiaisPorCategoria[categoria].length} itens
+                          </span>
+                        </div>
+                        
+                        {materiaisPorCategoria[categoria].map(material => (
+                          <div
+                            key={material.id}
+                            className="p-3 bg-muted hover:bg-accent cursor-pointer rounded border flex items-center justify-between"
+                            onClick={() => adicionarMaterial(material)}
+                          >
+                            <div>
+                              <h4 className="font-medium text-foreground">{material.nome}</h4>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs">{material.categoria}</Badge>
+                                {material.calibre && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {material.calibre}
+                                  </Badge>
+                                )}
+                              </div>
+                              {material.numeroSerie && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Série: {material.numeroSerie}
+                                </p>
+                              )}
+                            </div>
+                            <Plus className="h-4 w-4 text-primary" />
+                          </div>
+                        ))}
+                        
+                        {materiaisPorCategoria[categoria].length === 0 && (
+                          <p className="text-center text-muted-foreground py-8">
+                            Nenhum material encontrado nesta categoria
+                          </p>
                         )}
                       </div>
-                      <Plus className="h-4 w-4 text-primary" />
-                    </div>
+                    </TabsContent>
                   ))}
-                </div>
+                </Tabs>
+
+                {categorias.length === 0 && (
+                  <p className="text-center text-muted-foreground py-8">
+                    {buscaMaterial ? 'Nenhum material encontrado' : 'Nenhum material disponível'}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
