@@ -216,14 +216,14 @@ const ArmeiroInterface = () => {
   };
 
   const policialsFiltrados = policiais.filter(p => 
-    p.nome.toLowerCase().includes(buscaPolicial.toLowerCase()) ||
-    p.matricula.includes(buscaPolicial) ||
-    p.numeral.includes(buscaPolicial)
+    (p.nome?.toLowerCase() || '').includes(buscaPolicial.toLowerCase()) ||
+    (p.matricula || '').includes(buscaPolicial) ||
+    (p.numeral || '').includes(buscaPolicial)
   );
 
   const materiaisFiltrados = materiaisDisponiveis.filter(m =>
-    m.nome.toLowerCase().includes(buscaMaterial.toLowerCase()) ||
-    m.categoria.toLowerCase().includes(buscaMaterial.toLowerCase())
+    (m.nome?.toLowerCase() || '').includes(buscaMaterial.toLowerCase()) ||
+    (m.categoria?.toLowerCase() || '').includes(buscaMaterial.toLowerCase())
   );
 
   return (
