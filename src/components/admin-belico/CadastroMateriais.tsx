@@ -24,13 +24,14 @@ interface Material {
   id: string;
   nome: string;
   categoria: string;
+  subcategoria?: string; // Para munição: "Letal" ou "IMPO"
   calibre?: string;
   numeroSerie?: string;
+  quantidade?: number; // Para munição e EPI
   disponivel: boolean;
   cautelado?: boolean;
   cauteladoPara?: string;
   fabricante?: string;
-  anoFabricacao?: number;
   observacoes?: string;
   createdAt: Date;
 }
@@ -44,11 +45,12 @@ const CadastroMateriais = () => {
   const [formData, setFormData] = useState({
     nome: '',
     categoria: '',
+    subcategoria: '',
     calibre: '',
     numeroSerie: '',
+    quantidade: '',
     disponivel: true,
     fabricante: '',
-    anoFabricacao: '',
     observacoes: ''
   });
 
@@ -86,16 +88,26 @@ const CadastroMateriais = () => {
           numeroSerie: 'BR001',
           disponivel: true,
           fabricante: 'Taurus',
-          anoFabricacao: 2020,
           createdAt: new Date()
         },
         {
           id: '2',
-          nome: 'Colete Balístico',
+          nome: 'Munição .40',
+          categoria: 'Munição',
+          subcategoria: 'Letal',
+          calibre: '.40',
+          quantidade: 500,
+          disponivel: true,
+          fabricante: 'CBC',
+          createdAt: new Date()
+        },
+        {
+          id: '3',
+          nome: 'Escudo Balístico',
           categoria: 'EPI',
+          quantidade: 10,
           disponivel: true,
           fabricante: 'Proteção',
-          anoFabricacao: 2021,
           createdAt: new Date()
         }
       ]);
@@ -106,11 +118,12 @@ const CadastroMateriais = () => {
     setFormData({
       nome: '',
       categoria: '',
+      subcategoria: '',
       calibre: '',
       numeroSerie: '',
+      quantidade: '',
       disponivel: true,
       fabricante: '',
-      anoFabricacao: '',
       observacoes: ''
     });
     setEditingMaterial(null);
@@ -125,10 +138,21 @@ const CadastroMateriais = () => {
       return;
     }
 
+    // Validação para munição e EPI
+    if ((formData.categoria === 'Munição' || formData.categoria === 'EPI') && !formData.quantidade) {
+      toast.error('Quantidade é obrigatória para Munição e EPI');
+      return;
+    }
+
+    if (formData.categoria === 'Munição' && !formData.subcategoria) {
+      toast.error('Subcategoria é obrigatória para Munição');
+      return;
+    }
+
     try {
       const materialData = {
         ...formData,
-        anoFabricacao: formData.anoFabricacao ? parseInt(formData.anoFabricacao) : undefined,
+        quantidade: formData.quantidade ? parseInt(formData.quantidade) : undefined,
         createdAt: new Date()
       };
 
@@ -152,11 +176,12 @@ const CadastroMateriais = () => {
     setFormData({
       nome: material.nome,
       categoria: material.categoria,
+      subcategoria: material.subcategoria || '',
       calibre: material.calibre || '',
       numeroSerie: material.numeroSerie || '',
+      quantidade: material.quantidade?.toString() || '',
       disponivel: material.disponivel,
       fabricante: material.fabricante || '',
-      anoFabricacao: material.anoFabricacao?.toString() || '',
       observacoes: material.observacoes || ''
     });
     setEditingMaterial(material);
@@ -311,18 +336,36 @@ const CadastroMateriais = () => {
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="anoFabricacao">Ano de Fabricação</Label>
-                  <Input
-                    id="anoFabricacao"
-                    type="number"
-                    value={formData.anoFabricacao}
-                    onChange={(e) => setFormData(prev => ({ ...prev, anoFabricacao: e.target.value }))}
-                    placeholder="Ex: 2020"
-                    min="1900"
-                    max={new Date().getFullYear()}
-                  />
-                </div>
+                {/* Subcategoria - apenas para munição */}
+                {formData.categoria === 'Munição' && (
+                  <div>
+                    <Label htmlFor="subcategoria">Subcategoria *</Label>
+                    <Select value={formData.subcategoria} onValueChange={(value) => setFormData(prev => ({ ...prev, subcategoria: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a subcategoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Letal">Letal</SelectItem>
+                        <SelectItem value="IMPO">IMPO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Quantidade - para munição e EPI */}
+                {(formData.categoria === 'Munição' || formData.categoria === 'EPI') && (
+                  <div>
+                    <Label htmlFor="quantidade">Quantidade *</Label>
+                    <Input
+                      id="quantidade"
+                      type="number"
+                      value={formData.quantidade}
+                      onChange={(e) => setFormData(prev => ({ ...prev, quantidade: e.target.value }))}
+                      placeholder="Ex: 500"
+                      min="0"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -371,8 +414,10 @@ const CadastroMateriais = () => {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Categoria</TableHead>
+                  <TableHead>Subcategoria</TableHead>
                   <TableHead>Calibre</TableHead>
                   <TableHead>Série</TableHead>
+                  <TableHead>Quantidade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Fabricante</TableHead>
                   <TableHead>Ações</TableHead>
@@ -385,8 +430,20 @@ const CadastroMateriais = () => {
                     <TableCell>
                       <Badge variant="outline">{material.categoria}</Badge>
                     </TableCell>
+                    <TableCell>
+                      {material.subcategoria ? (
+                        <Badge variant={material.subcategoria === 'Letal' ? 'destructive' : 'secondary'}>
+                          {material.subcategoria}
+                        </Badge>
+                      ) : '-'}
+                    </TableCell>
                     <TableCell>{material.calibre || '-'}</TableCell>
                     <TableCell className="font-mono text-sm">{material.numeroSerie || '-'}</TableCell>
+                    <TableCell>
+                      {material.quantidade ? (
+                        <Badge variant="outline">{material.quantidade}</Badge>
+                      ) : '-'}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={material.disponivel ? 'default' : 'secondary'}>
                         {material.disponivel ? 'Disponível' : 'Indisponível'}

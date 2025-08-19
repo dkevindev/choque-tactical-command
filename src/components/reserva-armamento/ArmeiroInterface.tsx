@@ -14,8 +14,10 @@ import {
   CheckCircle,
   AlertCircle,
   BookOpen,
-  Lock
+  Lock,
+  X
 } from 'lucide-react';
+import MaterialCard from '@/components/MaterialCard';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
@@ -24,11 +26,15 @@ interface Material {
   id: string;
   nome: string;
   categoria: string;
+  subcategoria?: string; // Para munição: "Letal" ou "IMPO"
   calibre?: string;
   numeroSerie?: string;
+  quantidade?: number; // Para munição e EPI
   disponivel: boolean;
   cautelado?: boolean;
   cauteladoPara?: string;
+  fabricante?: string;
+  observacoes?: string;
 }
 
 interface Policial {
@@ -160,26 +166,40 @@ const ArmeiroInterface = () => {
     toast.success(`Policial ${policial.NOME} selecionado`);
   };
 
-  const adicionarMaterial = (material: Material) => {
+  const adicionarMaterial = (material: Material, quantidade?: number) => {
     const materialExistente = materiaisSelecionados.find(m => m.materialId === material.id);
     
     if (materialExistente) {
-      setMateriaisSelecionados(prev => 
-        prev.map(m => 
-          m.materialId === material.id 
-            ? { ...m, quantidade: m.quantidade + 1 }
-            : m
-        )
-      );
+      toast.info(`${material.nome} já foi selecionado`);
+      return;
+    }
+
+    // Para munição e EPI, usar quantidade especificada
+    if ((material.categoria === 'Munição' || material.categoria === 'EPI') && material.quantidade && quantidade) {
+      if (quantidade > material.quantidade) {
+        toast.error(`Quantidade indisponível. Máximo: ${material.quantidade}`);
+        return;
+      }
+      
+      setMateriaisSelecionados(prev => [...prev, {
+        materialId: material.id,
+        nome: material.nome,
+        categoria: material.categoria,
+        quantidade: quantidade
+      }]);
+      
+      toast.success(`${material.nome} (${quantidade}) adicionado`);
     } else {
+      // Para armamentos e acessórios (sistema atual)
       setMateriaisSelecionados(prev => [...prev, {
         materialId: material.id,
         nome: material.nome,
         categoria: material.categoria,
         quantidade: 1
       }]);
+      
+      toast.success(`${material.nome} adicionado`);
     }
-    toast.success(`${material.nome} adicionado`);
   };
 
   const removerMaterial = (materialId: string) => {
@@ -469,29 +489,11 @@ const ArmeiroInterface = () => {
                         </div>
                         
                         {materiaisPorCategoria[categoria].map(material => (
-                          <div
-                            key={material.id}
-                            className="p-3 bg-muted hover:bg-accent cursor-pointer rounded border flex items-center justify-between"
-                            onClick={() => adicionarMaterial(material)}
-                          >
-                            <div>
-                              <h4 className="font-medium text-foreground">{material.nome}</h4>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="secondary" className="text-xs">{material.categoria}</Badge>
-                                {material.calibre && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {material.calibre}
-                                  </Badge>
-                                )}
-                              </div>
-                              {material.numeroSerie && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Série: {material.numeroSerie}
-                                </p>
-                              )}
-                            </div>
-                            <Plus className="h-4 w-4 text-primary" />
-                          </div>
+                          <MaterialCard 
+                            key={material.id} 
+                            material={material}
+                            onAdd={adicionarMaterial}
+                          />
                         ))}
                         
                         {materiaisPorCategoria[categoria].length === 0 && (
