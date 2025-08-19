@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Power, PowerOff, User, Clock, Package } from "lucide-react";
+import { Search, Power, PowerOff, User, Clock, Package, BookOpen, Target, Plus, Minus, CheckCircle, AlertCircle, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -146,7 +146,7 @@ const ArmeiroInterface = () => {
       const reservas = data?.map(reserva => ({
         id: reserva.id,
         policial: reserva.policial,
-        materiais: JSON.parse(reserva.materiais || '[]'),
+        materiais: JSON.parse(String(reserva.materiais || '[]')),
         status: reserva.status,
         created_at: reserva.created_at
       })) || [];
