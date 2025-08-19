@@ -15,11 +15,17 @@ import {
   Clock,
   TrendingUp
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FrotaPage from '@/components/FrotaPage';
 import DocumentosPage from './DocumentosPaga';
 import OrdemServicoPage from '@/components/OrdemServicoPage';
 import GestaoAcesso from '@/components/GestaoAcesso';
 import ServicosPage from '@/components/frota/ServicosPage';
+import CadastroMateriais from '@/components/admin-belico/CadastroMateriais';
+import GerenciarCategorias from '@/components/admin-belico/GerenciarCategorias';
+import ControleEstoque from '@/components/admin-belico/ControleEstoque';
+import GerenciarCautelas from '@/components/admin-belico/GerenciarCautelas';
+import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -195,18 +201,51 @@ const PatrimonioContent = () => (
   </Card>
 );
 
-const BelicoContent = () => (
-  <Card className="bg-card border-border shadow-tactical">
-    <CardHeader>
-      <CardTitle className="text-foreground">CONTROLE BÉLICO</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-muted-foreground">
-        Módulo de armamentos e munições em desenvolvimento...
-      </p>
-    </CardContent>
-  </Card>
-);
+const BelicoContent = () => {
+  return (
+    <div className="space-y-6">
+      <Card className="bg-card border-border shadow-tactical">
+        <CardHeader>
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            CONTROLE BÉLICO
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="materiais" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="materiais">Materiais</TabsTrigger>
+              <TabsTrigger value="categorias">Categorias</TabsTrigger>
+              <TabsTrigger value="estoque">Estoque</TabsTrigger>
+              <TabsTrigger value="cautelas">Cautelas</TabsTrigger>
+              <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="materiais">
+              <CadastroMateriais />
+            </TabsContent>
+
+            <TabsContent value="categorias">
+              <GerenciarCategorias />
+            </TabsContent>
+
+            <TabsContent value="estoque">
+              <ControleEstoque />
+            </TabsContent>
+
+            <TabsContent value="cautelas">
+              <GerenciarCautelas />
+            </TabsContent>
+
+            <TabsContent value="relatorios">
+              <RelatoriosBelico />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 const FrotaContent = () => (
   <FrotaPage />
