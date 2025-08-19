@@ -95,21 +95,32 @@ const ArmeiroInterface = () => {
   };
 
   const loadPoliciais = async () => {
+    console.log('🔍 Tentando carregar policiais...');
     try {
       const querySnapshot = await getDocs(collection(db, 'policiais'));
-      const policiais = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Policial));
+      console.log('📊 Documentos encontrados:', querySnapshot.size);
+      
+      const policiais = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('👮 Policial encontrado:', data);
+        return {
+          id: doc.id,
+          ...data
+        } as Policial;
+      });
+      
+      console.log('✅ Policiais carregados:', policiais);
       setPoliciais(policiais);
     } catch (error) {
-      console.error('Erro ao carregar policiais:', error);
+      console.error('❌ Erro ao carregar policiais:', error);
       // Mock data for development
-      setPoliciais([
+      const mockPoliciais = [
         { id: '1', nome: 'João Silva Santos', matricula: '123456', numeral: '001', posto: 'Soldado', situacao: 'Ativo' },
         { id: '2', nome: 'Maria Oliveira Costa', matricula: '123457', numeral: '002', posto: 'Cabo', situacao: 'Ativo' },
         { id: '3', nome: 'Carlos Souza Lima', matricula: '123458', numeral: '003', posto: 'Sargento', situacao: 'Ativo' }
-      ]);
+      ];
+      console.log('🎭 Usando dados mock:', mockPoliciais);
+      setPoliciais(mockPoliciais);
     }
   };
 
@@ -215,11 +226,27 @@ const ArmeiroInterface = () => {
     }
   };
 
-  const policialsFiltrados = policiais.filter(p => 
-    (p.nome?.toLowerCase() || '').includes(buscaPolicial.toLowerCase()) ||
-    (p.matricula || '').includes(buscaPolicial) ||
-    (p.numeral || '').includes(buscaPolicial)
-  );
+  const policialsFiltrados = policiais.filter(p => {
+    const filtroLower = buscaPolicial.toLowerCase();
+    const nomeMatch = (p.nome?.toLowerCase() || '').includes(filtroLower);
+    const matriculaMatch = (p.matricula || '').includes(buscaPolicial);
+    const numeralMatch = (p.numeral || '').includes(buscaPolicial);
+    
+    console.log('🔍 Filtrando policial:', {
+      nome: p.nome,
+      filtro: buscaPolicial,
+      nomeMatch,
+      matriculaMatch,
+      numeralMatch,
+      resultado: nomeMatch || matriculaMatch || numeralMatch
+    });
+    
+    return nomeMatch || matriculaMatch || numeralMatch;
+  });
+
+  console.log('👥 Policiais disponíveis:', policiais.length);
+  console.log('🔍 Busca atual:', buscaPolicial);
+  console.log('✅ Policiais filtrados:', policialsFiltrados.length);
 
   const materiaisFiltrados = materiaisDisponiveis.filter(m =>
     (m.nome?.toLowerCase() || '').includes(buscaMaterial.toLowerCase()) ||
@@ -314,6 +341,9 @@ const ArmeiroInterface = () => {
                     </div>
                   ) : (
                     <div className="max-h-40 overflow-y-auto space-y-2">
+                      <div className="text-xs text-muted-foreground mb-2">
+                        Mostrando {policialsFiltrados.length} de {policiais.length} policiais
+                      </div>
                       {policialsFiltrados.length > 0 ? (
                         policialsFiltrados.map(policial => (
                           <div
@@ -329,11 +359,11 @@ const ArmeiroInterface = () => {
                         ))
                       ) : buscaPolicial ? (
                         <p className="text-center text-muted-foreground py-4">
-                          Nenhum policial encontrado
+                          Nenhum policial encontrado para "{buscaPolicial}"
                         </p>
                       ) : (
                         <p className="text-center text-muted-foreground py-4">
-                          Digite para buscar policiais
+                          Digite para buscar policiais ({policiais.length} disponíveis)
                         </p>
                       )}
                     </div>
