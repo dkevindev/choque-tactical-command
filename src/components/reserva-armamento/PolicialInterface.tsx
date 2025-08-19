@@ -298,50 +298,52 @@ const PolicialInterface = () => {
 
   if (step === 'login') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md bg-card border-border shadow-tactical">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
-              <User className="h-6 w-6" />
-              Acesso do Policial
+            <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2 text-foreground">
+              <User className="h-6 w-6 text-primary" />
+              Acesso do Policial - Sistema CPMR
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Matrícula</label>
+              <label className="text-sm font-medium text-foreground">Matrícula</label>
               <Input
                 placeholder="Digite sua matrícula"
                 value={matricula}
                 onChange={(e) => setMatricula(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                className="bg-input border-border text-foreground"
               />
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Senha</label>
+              <label className="text-sm font-medium text-foreground">Senha</label>
               <Input
                 type="password"
                 placeholder="Digite sua senha"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                className="bg-input border-border text-foreground"
               />
             </div>
             
             <Button 
               onClick={handleLogin}
               disabled={loading}
-              className="w-full"
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Lock className="h-4 w-4 mr-2" />
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
 
             <div className="text-xs text-muted-foreground text-center">
-              Sistema de Reserva de Armamento - Firebase
+              Sistema de Reserva de Armamento - CPMR - Firebase
             </div>
             
-            <div className="text-xs text-yellow-600 text-center border border-yellow-200 rounded p-2 bg-yellow-50">
+            <div className="text-xs text-amber-600 text-center border border-amber-600 rounded p-2 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-400 dark:text-amber-400">
               💡 Use qualquer matrícula cadastrada no sistema. Se não há campo senha, use qualquer senha.
             </div>
           </CardContent>
@@ -351,14 +353,14 @@ const PolicialInterface = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-background p-4">
       <div className="container mx-auto max-w-4xl space-y-6">
         {/* Header com info do usuário */}
-        <Card>
+        <Card className="bg-card border-border shadow-tactical">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-xl font-bold">{policialLogado?.NOME}</h1>
+                <h1 className="text-xl font-bold text-foreground">{policialLogado?.NOME}</h1>
                 <p className="text-sm text-muted-foreground">
                   {policialLogado?.['Post/Grad']} - Mat: {policialLogado?.['Matrícula']}
                 </p>
@@ -371,16 +373,16 @@ const PolicialInterface = () => {
         </Card>
 
         {reservaAtiva ? (
-          <Card>
+          <Card className="bg-card border-border shadow-tactical">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-600">
+              <CardTitle className="flex items-center gap-2 text-amber-600">
                 <Clock className="h-5 w-5" />
                 Reserva Pendente - Confirme o Recebimento
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-4 bg-orange-50 rounded-lg">
-                <p className="text-sm font-medium">
+              <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm font-medium text-foreground">
                   Armeiro: {reservaAtiva.armeiro}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -398,14 +400,14 @@ const PolicialInterface = () => {
                       key={index}
                       className={`p-3 border rounded-lg cursor-pointer transition-all ${
                         isConfirmado
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                          : 'bg-muted border-border hover:bg-accent'
                       }`}
                       onClick={() => confirmarMaterial(material.materialId)}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="font-medium flex items-center gap-2">
+                          <div className="font-medium flex items-center gap-2 text-foreground">
                             {material.nome}
                             {isConfirmado && <CheckCircle className="h-4 w-4 text-green-600" />}
                           </div>
@@ -444,10 +446,10 @@ const PolicialInterface = () => {
             </CardContent>
           </Card>
         ) : (
-          <Card>
+          <Card className="bg-card border-border shadow-tactical">
             <CardContent className="p-8 text-center">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">Nenhuma Reserva Ativa</h3>
+              <h3 className="text-lg font-medium mb-2 text-foreground">Nenhuma Reserva Ativa</h3>
               <p className="text-muted-foreground">
                 Você não possui materiais aguardando confirmação no momento.
               </p>
