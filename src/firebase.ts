@@ -6,13 +6,12 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDaLNUwBnkePNQTTmobulDjCKxbYcrY_Jk",
-  authDomain: "finkevin-fbd9a.firebaseapp.com",
-  projectId: "finkevin-fbd9a",
-  storageBucket: "finkevin-fbd9a.firebasestorage.app",
-  messagingSenderId: "191264877497",
-  appId: "1:191264877497:web:29b68850f516b71ad26468",
-  measurementId: "G-NHL2KDXDJJ"
+  apiKey: "AIzaSyDUi-2wC4EXyOkZy4PiLH6DgQX07FcHIpE",
+  authDomain: "os-rpmont-2025.firebaseapp.com",
+  projectId: "os-rpmont-2025",
+  storageBucket: "os-rpmont-2025.firebasestorage.app",
+  messagingSenderId: "6083238815",
+  appId: "1:6083238815:web:124c188c051d45ac753baa"
 };
 
 // Inicializa Firebase
