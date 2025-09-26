@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Truck, Eye, Trash2 } from 'lucide-react';
+import { CalendarIcon, Truck, Eye, Trash2, Edit } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,8 @@ import {
   Firestore,
   Timestamp,
   deleteDoc,
-  doc
+  doc,
+  updateDoc
 } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 
@@ -96,6 +97,22 @@ const OrdemServicoPage = () => {
   const [deletePassword, setDeletePassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
+
+  // --- Estados para o Modal Edição ---
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [osToEditState, setOsToEditState] = useState<OrdemServico | null>(null);
+  const [editData, setEditData] = useState({
+    cadastroViatura: '',
+    placaViatura: '',
+    modeloViatura: '',
+    numeroOS: '',
+    dataOS: '',
+    observacao: '',
+    oficinaResponsavel: '',
+    valorOS: ''
+  });
+  const [viaturas, setViaturas] = useState<any[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
 
   // A função fetchOrdensServico agora só aplica filtros e ordenação, sem limite
   const fetchOrdensServico = useCallback(async () => {
@@ -192,7 +209,21 @@ const OrdemServicoPage = () => {
   // useEffect agora apenas dispara fetchOrdensServico quando os filtros mudam
   useEffect(() => {
     fetchOrdensServico();
+    fetchViaturas();
   }, [fetchOrdensServico, searchViatura, searchDefeito, searchNumeroOS, dateRange, selectedMonthYear]);
+
+  const fetchViaturas = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'frota'));
+      const viaturasData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setViaturas(viaturasData);
+    } catch (error) {
+      console.error('Erro ao buscar viaturas:', error);
+    }
+  };
 
 
   const openModal = (os: OrdemServico) => {
@@ -215,6 +246,156 @@ const OrdemServicoPage = () => {
     setOsToDelete(null);
     setDeletePassword('');
     setIsDeleting(false);
+  };
+
+  const openEditModal = (os: OrdemServico) => {
+    setOsToEditState(os);
+    setEditData({
+      cadastroViatura: os.cadastroViatura || '',
+      placaViatura: os.placaViatura || '',
+      modeloViatura: os.modeloViatura || '',
+      numeroOS: os.numeroOS || '',
+      dataOS: os.dataOS || '',
+      observacao: os.observacao || '',
+      oficinaResponsavel: os.oficinaResponsavel || '',
+      valorOS: os.valorOS || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setOsToEditState(null);
+    setEditData({
+      cadastroViatura: '',
+      placaViatura: '',
+      modeloViatura: '',
+      numeroOS: '',
+      dataOS: '',
+      observacao: '',
+      oficinaResponsavel: '',
+      valorOS: ''
+    });
+    setIsEditing(false);
+  };
+
+  const handleEditOS = async () => {
+    if (!osToEditState || !editData.cadastroViatura.trim()) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione uma viatura válida.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const viaturaSelecionada = viaturas.find(v => v.CADASTRO === editData.cadastroViatura);
+    if (!viaturaSelecionada) {
+      toast({
+        title: "Erro", 
+        description: "Viatura não encontrada.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsEditing(true);
+    try {
+      // Verificar se houve mudança de viatura (e possível mudança de tipo de frota)
+      const viaturalAnterior = osToEditState.cadastroViatura;
+      const viaturaNova = editData.cadastroViatura;
+      
+      let saldoAjustado = false;
+      
+      if (viaturalAnterior !== viaturaNova) {
+        // Buscar dados das viaturas para verificar mudança de tipo de frota
+        const viaturalAnteriorData = viaturas.find(v => v.CADASTRO === viaturalAnterior);
+        const viaturalNovaData = viaturas.find(v => v.CADASTRO === viaturaNova);
+        
+        if (viaturalAnteriorData && viaturalNovaData) {
+          const tipoAnterior = viaturalAnteriorData.CATEGORIA?.includes('LEVE') ? 'leve' : 'pesada';
+          const tipoNovo = viaturalNovaData.CATEGORIA?.includes('LEVE') ? 'leve' : 'pesada';
+          
+          // Se mudou de frota leve para pesada ou vice-versa, ajustar saldos
+          if (tipoAnterior !== tipoNovo) {
+            const valorOS = parseFloat(editData.valorOS.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+            
+            try {
+              // Buscar configuração de saldos
+              const saldosSnapshot = await getDocs(collection(db, 'saldosViaturas'));
+              const saldoFroteLeve = saldosSnapshot.docs.find(doc => doc.data().tipo === 'leve');
+              
+              if (saldoFroteLeve && valorOS > 0) {
+                const saldoAtual = saldoFroteLeve.data().saldoMensal || 0;
+                let novoSaldo = saldoAtual;
+                
+                if (tipoAnterior === 'leve' && tipoNovo === 'pesada') {
+                  // Moveu de leve para pesada: devolver valor ao saldo da frota leve
+                  novoSaldo = saldoAtual + valorOS;
+                } else if (tipoAnterior === 'pesada' && tipoNovo === 'leve') {
+                  // Moveu de pesada para leve: descontar valor do saldo da frota leve
+                  novoSaldo = Math.max(0, saldoAtual - valorOS);
+                }
+                
+                if (novoSaldo !== saldoAtual) {
+                  await updateDoc(doc(db, 'saldosViaturas', saldoFroteLeve.id), {
+                    saldoMensal: novoSaldo
+                  });
+                  saldoAjustado = true;
+                }
+              }
+            } catch (error) {
+              console.error('Erro ao ajustar saldos:', error);
+            }
+          }
+        }
+      }
+
+      // Atualizar a OS no Firebase
+      await updateDoc(doc(db, 'ordensDeServico', osToEditState.id), {
+        cadastroViatura: editData.cadastroViatura,
+        placaViatura: viaturaSelecionada.PLACA,
+        modeloViatura: viaturaSelecionada.MODELO,
+        numeroOS: editData.numeroOS,
+        dataOS: editData.dataOS,
+        observacao: editData.observacao,
+        oficinaResponsavel: editData.oficinaResponsavel,
+        valorOS: editData.valorOS
+      });
+
+      // Atualizar localmente
+      setOrdensServico(prev => prev.map(os => 
+        os.id === osToEditState.id 
+          ? { 
+              ...os, 
+              cadastroViatura: editData.cadastroViatura,
+              placaViatura: viaturaSelecionada.PLACA,
+              modeloViatura: viaturaSelecionada.MODELO,
+              numeroOS: editData.numeroOS,
+              dataOS: editData.dataOS,
+              observacao: editData.observacao,
+              oficinaResponsavel: editData.oficinaResponsavel,
+              valorOS: editData.valorOS
+            }
+          : os
+      ));
+
+      toast({
+        title: "Sucesso",
+        description: `OS ${editData.numeroOS} foi editada com sucesso.${saldoAjustado ? ' Saldos foram ajustados automaticamente.' : ''}`,
+      });
+
+      closeEditModal();
+    } catch (error) {
+      console.error("Erro ao editar OS:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao editar a OS. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEditing(false);
+    }
   };
 
   const handleDeleteOS = async () => {
@@ -446,6 +627,9 @@ const OrdemServicoPage = () => {
                         <Button variant="ghost" size="icon" onClick={() => openModal(os)}>
                           <Eye className="h-4 w-4" />
                         </Button>
+                        <Button variant="ghost" size="icon" onClick={() => openEditModal(os)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => openDeleteModal(os)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -569,6 +753,123 @@ const OrdemServicoPage = () => {
           )}
           <div className="flex justify-end">
             <Button onClick={closeModal}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- Modal de Edição da OS --- */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Ordem de Serviço</DialogTitle>
+            <DialogDescription>
+              Edite os dados da OS. Caso troque a viatura entre frota leve e pesada, os saldos serão ajustados automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Viatura (Cadastro)</label>
+                <Select value={editData.cadastroViatura} onValueChange={(value) => {
+                  const viaturaSelecionada = viaturas.find(v => v.CADASTRO === value);
+                  if (viaturaSelecionada) {
+                    setEditData({
+                      ...editData,
+                      cadastroViatura: value,
+                      placaViatura: viaturaSelecionada.PLACA,
+                      modeloViatura: viaturaSelecionada.MODELO
+                    });
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a viatura" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {viaturas.map((viatura) => (
+                      <SelectItem key={viatura.id} value={viatura.CADASTRO}>
+                        {viatura.CADASTRO} - {viatura.PLACA} ({viatura.MODELO})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Número da OS</label>
+                <Input
+                  value={editData.numeroOS}
+                  onChange={(e) => setEditData({...editData, numeroOS: e.target.value})}
+                  placeholder="Número da OS"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Placa</label>
+                <Input
+                  value={editData.placaViatura}
+                  readOnly
+                  className="bg-muted"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Modelo</label>
+                <Input
+                  value={editData.modeloViatura}
+                  readOnly
+                  className="bg-muted"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Data da OS</label>
+                <Input
+                  type="date"
+                  value={editData.dataOS}
+                  onChange={(e) => setEditData({...editData, dataOS: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Valor da OS</label>
+                <Input
+                  value={editData.valorOS}
+                  onChange={(e) => setEditData({...editData, valorOS: e.target.value})}
+                  placeholder="R$ 0,00"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Oficina Responsável</label>
+              <Input
+                value={editData.oficinaResponsavel}
+                onChange={(e) => setEditData({...editData, oficinaResponsavel: e.target.value})}
+                placeholder="Nome da oficina"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Observação/Defeito</label>
+              <textarea
+                className="w-full min-h-[100px] p-3 border border-input bg-background rounded-md"
+                value={editData.observacao}
+                onChange={(e) => setEditData({...editData, observacao: e.target.value})}
+                placeholder="Descreva o defeito ou serviço realizado..."
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={closeEditModal} disabled={isEditing}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleEditOS} 
+              disabled={isEditing || !editData.cadastroViatura.trim()}
+            >
+              {isEditing ? 'Salvando...' : 'Salvar Alterações'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

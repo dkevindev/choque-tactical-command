@@ -420,25 +420,15 @@ const OficinaPage = () => {
                             </Button>
                           )}
                           {viatura.status === 'os-pendente' && (
-                            <>
-                              <Button
-                                size="sm"
-                                className="bg-primary hover:bg-primary/90"
-                                onClick={() => handleCriarOS(viatura)}
-                              >
-                                <FileText className="h-4 w-4 mr-1" />
-                                Criar OS
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                                onClick={() => handleConcluirOS(viatura)}
-                              >
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Concluir
-                              </Button>
-                            </>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                              onClick={() => handleConcluirOS(viatura)}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Concluir
+                            </Button>
                           )}
                         </div>
                       </TableCell>
