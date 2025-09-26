@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Calendar, FileText, AlertCircle, Building2 } from 'lucide-react';
+import { Plus, Calendar, FileText, AlertCircle, Building2, CheckCircle } from 'lucide-react';
 import { collection, addDoc, getDocs, updateDoc, doc, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
@@ -24,7 +24,7 @@ interface ViaturaNaOficina {
   oficina: string;
   dataSaida?: string;
   observacaoServico?: string;
-  status: 'na-oficina' | 'os-pendente';
+  status: 'na-oficina' | 'os-pendente' | 'concluida';
   createdAt: string;
 }
 
@@ -240,12 +240,37 @@ const OficinaPage = () => {
     });
   };
 
+  const handleConcluirOS = async (viatura: ViaturaNaOficina) => {
+    try {
+      await updateDoc(doc(db, 'oficina', viatura.id), {
+        status: 'concluida',
+        dataConclusao: new Date().toISOString()
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "OS marcada como concluída!"
+      });
+
+      fetchViaturasNaOficina();
+    } catch (error) {
+      console.error('Erro ao concluir OS:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao marcar OS como concluída",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'na-oficina':
         return <Badge variant="secondary" className="bg-orange-100 text-orange-800">Na Oficina</Badge>;
       case 'os-pendente':
         return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">OS Pendente</Badge>;
+      case 'concluida':
+        return <Badge variant="default" className="bg-green-100 text-green-800">Concluída</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -253,7 +278,7 @@ const OficinaPage = () => {
 
   // Separar viaturas com pendências das demais
   const viaturasComPendencia = viaturasNaOficina.filter(v => v.status === 'na-oficina' || v.status === 'os-pendente');
-  const viaturasFinalizadas = viaturasNaOficina.filter(v => v.status !== 'na-oficina' && v.status !== 'os-pendente');
+  const viaturasFinalizadas = viaturasNaOficina.filter(v => v.status === 'concluida');
 
   return (
     <div className="space-y-6">
@@ -395,14 +420,25 @@ const OficinaPage = () => {
                             </Button>
                           )}
                           {viatura.status === 'os-pendente' && (
-                            <Button
-                              size="sm"
-                              className="bg-primary hover:bg-primary/90"
-                              onClick={() => handleCriarOS(viatura)}
-                            >
-                              <FileText className="h-4 w-4 mr-1" />
-                              Criar OS
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                className="bg-primary hover:bg-primary/90"
+                                onClick={() => handleCriarOS(viatura)}
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                Criar OS
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                                onClick={() => handleConcluirOS(viatura)}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Concluir
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
