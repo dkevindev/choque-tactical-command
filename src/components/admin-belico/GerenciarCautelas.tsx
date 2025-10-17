@@ -160,7 +160,7 @@ const GerenciarCautelas = () => {
 
   const gerarDocumento = async (cautela: Cautela) => {
   try {
-    const response = await fetch('https://us-central1-SEU-PROJETO.cloudfunctions.net/gerarOrdemServicoDocx/cautela', {
+    const response = await fetch('https://us-central1-finkevin-fbd9a.cloudfunctions.net/gerarCautelaDocx', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
