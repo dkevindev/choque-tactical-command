@@ -188,7 +188,7 @@ const CadastroMateriais = () => {
       const materialData = {
         ...formData,
         vencimento: vencimentoCalculado,
-        quantidade: formData.quantidade ? parseInt(formData.quantidade) : undefined,
+        quantidade: formData.quantidade !== '' ? parseInt(formData.quantidade) : null,
         anosValidade: formData.anosValidade ? parseInt(formData.anosValidade) : undefined,
         createdAt: new Date()
       };

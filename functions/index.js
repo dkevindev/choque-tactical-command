@@ -1,5 +1,3 @@
-// functions/index.js (ou index.ts)
-
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const PizZip = require('pizzip');
@@ -12,12 +10,14 @@ const path = require('path');
 // Inicialize o Firebase Admin SDK (se ainda não fez)
 admin.initializeApp();
 
+// --- FUNÇÃO EXISTENTE ---
+
 const app = express();
 // Use cors para permitir requisições do seu frontend
 app.use(cors({ origin: true }));
 app.use(express.json()); // Para parsear o corpo da requisição JSON
 
-// Endpoint HTTP para gerar o DOCX
+// Endpoint HTTP para gerar o DOCX da ordem de serviço
 app.post('/', async (req, res) => {
     let tempFilePath; // Declarado com 'let' fora do try
 
@@ -32,10 +32,8 @@ app.post('/', async (req, res) => {
 
         // --- 1. Baixar o modelo DOCX do Firebase Storage ---
         const bucket = admin.storage().bucket();
-        // CORREÇÃO FINAL DO NOME DO ARQUIVO: 'template-os.docx'
         const filePath = 'templates/template-os.docx'; // Caminho exato no seu Storage
 
-        // Nome do arquivo temporário no ambiente da Cloud Function.
         tempFilePath = path.join('/tmp', `modelo-${osData.numeroOS || 'temp'}.docx`);
 
         await bucket.file(filePath).download({ destination: tempFilePath });
@@ -116,5 +114,72 @@ app.post('/', async (req, res) => {
     }
 });
 
-// Exporte a função HTTP para o Firebase
+// Exporta a função HTTP para o Firebase
 exports.gerarOrdemServicoDocx = functions.https.onRequest(app);
+
+
+// --- NOVA FUNÇÃO: geração do DOCX para cautela ---
+
+
+app.post('/cautela', async (req, res) => {
+    let tempFilePath;
+
+    try {
+        const data = req.body;
+
+        // Validação simples dos dados que você mencionou
+        if (
+            !data.categoria || !data.marca || !data.genero || !data.tamanho || !data.numeroSerie ||
+            !data.grad || !data.numeral || !data.nome || !data.matricula
+        ) {
+            return res.status(400).send('Dados incompletos para gerar o documento de cautela.');
+        }
+
+        const bucket = admin.storage().bucket();
+        const templatePath = 'templates/template-cautela.docx'; // Ajuste para o caminho do seu template de cautela
+        tempFilePath = path.join('/tmp', `template-cautela-${Date.now()}.docx`);
+
+        await bucket.file(templatePath).download({ destination: tempFilePath });
+        console.log('Template baixado para:', tempFilePath);
+
+        const content = fs.readFileSync(tempFilePath, 'binary');
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+        // Mapear os dados para o template
+        const templateData = {
+            categoria: data.categoria,
+            marca: data.marca,
+            genero: data.genero,
+            tamanho: data.tamanho,
+            numeroSerie: data.numeroSerie,
+            grad: data.grad,
+            numeral: data.numeral,
+            nome: data.nome,
+            matricula: data.matricula,
+        };
+
+        doc.render(templateData);
+
+        const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+        const nomeArquivo = `Cautela-${data.nome.replace(/\s+/g, '_')}-${Date.now()}.docx`;
+        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+
+        res.send(buffer);
+
+    } catch (error) {
+        console.error('Erro ao gerar o documento de cautela:', error);
+        res.status(500).send('Erro interno ao gerar o documento de cautela.');
+    } finally {
+        try {
+            if (tempFilePath) fs.unlinkSync(tempFilePath);
+        } catch (err) {
+            console.warn('Não foi possível excluir o arquivo temporário:', err);
+        }
+    }
+});
+
+exports.gerarCautelaDocx = functions.https.onRequest(app);

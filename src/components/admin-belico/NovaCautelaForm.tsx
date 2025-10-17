@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { 
-  Plus, 
+import {
+  Plus,
   Save,
   X,
   User,
@@ -20,13 +20,28 @@ import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 
+// Interface original do Firestore
 interface Policial {
+  id: string;
+  NOME: string;
+  'Post/Grad': string;
+  SITUAÇÃO: string;
+  'FUNÇÃO': string;
+  Unidade: string;
+  Matrícula?: string;
+  [key: string]: any;
+}
+
+// Interface interna que você usará no estado e na UI
+interface PolicialInterno {
   id: string;
   nome: string;
   matricula: string;
   patente: string;
   situacao: string;
   numeral?: string;
+  funcao?: string;
+  unidade?: string;
 }
 
 interface Material {
@@ -35,6 +50,7 @@ interface Material {
   categoria: string;
   numeroSerie?: string;
   disponivel: boolean;
+  vencimento?: string;
 }
 
 interface MaterialSelecionado {
@@ -43,6 +59,7 @@ interface MaterialSelecionado {
   categoria: string;
   numeroSerie?: string;
   observacoes?: string;
+  vencimento?: string
 }
 
 interface NovaCautelaFormProps {
@@ -51,35 +68,43 @@ interface NovaCautelaFormProps {
 }
 
 const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
-  const [policiais, setPoliciais] = useState<Policial[]>([]);
+  const [policiais, setPoliciais] = useState<PolicialInterno[]>([]);
   const [materiais, setMateriais] = useState<Material[]>([]);
   const [policialSelecionado, setPolicialSelecionado] = useState('');
   const [materiaisSelecionados, setMateriaisSelecionados] = useState<MaterialSelecionado[]>([]);
   const [observacoes, setObservacoes] = useState('');
   const [loading, setLoading] = useState(false);
   const [buscaPolicial, setBuscaPolicial] = useState('');
+  const [buscaMaterial, setBuscaMaterial] = useState('');
 
   useEffect(() => {
-    loadPoliciais();
+    carregarPoliciais();
     loadMateriais();
   }, []);
 
-  const loadPoliciais = async () => {
+  // Carrega policiais do Firestore e transforma para PolicialInterno
+  const carregarPoliciais = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'policiais'));
-      const policiaisData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Policial));
-      setPoliciais(policiaisData.filter(p => p.situacao === 'ativo'));
+      const policiaisData: PolicialInterno[] = querySnapshot.docs.map(doc => {
+        const data = doc.data() as Policial;
+        return {
+          id: doc.id,
+          nome: data.NOME,
+          matricula: data.Matrícula || '',
+          patente: data['Post/Grad'],
+          situacao: (data.SITUAÇÃO || '').trim().toLowerCase(),
+          numeral: data.NUMERAL ?? '',  // Aqui o campo exato
+          funcao: data['FUNÇÃO'] || '',
+          unidade: data.Unidade || ''
+        };
+      });
+
+      // Exibe todos, sem filtro por situação
+      setPoliciais(policiaisData);
     } catch (error) {
       console.error('Erro ao carregar policiais:', error);
-      // Mock data for development
-      setPoliciais([
-        { id: '1', nome: 'João Silva', matricula: '12345', patente: 'Sargento', situacao: 'ativo' },
-        { id: '2', nome: 'Maria Santos', matricula: '12346', patente: 'Cabo', situacao: 'ativo' },
-        { id: '3', nome: 'Pedro Oliveira', matricula: '12347', patente: 'Soldado', situacao: 'ativo' }
-      ]);
+      setPoliciais([]);
     }
   };
 
@@ -97,7 +122,6 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
       setMateriais(materiaisData);
     } catch (error) {
       console.error('Erro ao carregar materiais:', error);
-      // Mock data for development
       setMateriais([
         { id: '1', nome: 'Pistola .40', categoria: 'Armamento', numeroSerie: 'BR001', disponivel: true },
         { id: '2', nome: 'Colete Balístico', categoria: 'EPI', numeroSerie: 'CV001', disponivel: true },
@@ -120,6 +144,7 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
       nome: material.nome,
       categoria: material.categoria,
       numeroSerie: material.numeroSerie,
+      datadeVencimento: material.vencimento,
       observacoes: ''
     }]);
   };
@@ -129,14 +154,14 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
   };
 
   const atualizarObservacoesMaterial = (materialId: string, observacoes: string) => {
-    setMateriaisSelecionados(prev => 
+    setMateriaisSelecionados(prev =>
       prev.map(m => m.materialId === materialId ? { ...m, observacoes } : m)
     );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!policialSelecionado) {
       toast.error('Selecione um policial');
       return;
@@ -151,7 +176,7 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
 
     try {
       const policial = policiais.find(p => p.id === policialSelecionado);
-      
+
       const cautelaData = {
         policialId: policialSelecionado,
         policialNome: policial?.nome,
@@ -162,7 +187,7 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
         status: 'ativa',
         tipoDocumento: 'permanente',
         dataInicio: new Date(),
-        dataVencimento: null, // Cautela permanente não tem vencimento
+        dataVencimento: null,
         createdAt: new Date(),
         createdBy: 'admin' // TODO: pegar do usuário logado
       };
@@ -170,7 +195,7 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
       await addDoc(collection(db, 'cautelas_permanentes'), cautelaData);
 
       // TODO: Atualizar status dos materiais para cautelados
-      
+
       toast.success('Cautela permanente criada com sucesso');
       onSuccess();
       onClose();
@@ -182,18 +207,39 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
     }
   };
 
-  const materiaisDisponiveis = materiais.filter(m => 
+  const materiaisDisponiveis = materiais.filter(m =>
     !materiaisSelecionados.some(ms => ms.materialId === m.id)
   );
 
+  // Filtra policiais pela busca
   const policiaisFiltrados = policiais.filter(p => {
     const busca = buscaPolicial.toLowerCase();
+
     return (
-      p.nome.toLowerCase().includes(busca) ||
-      p.matricula.toLowerCase().includes(busca) ||
-      (p.numeral && p.numeral.toLowerCase().includes(busca))
+      (p.nome || '').toLowerCase().includes(busca) ||
+      (String(p.matricula) || '').toLowerCase().includes(busca) ||
+      (p.numeral !== undefined && p.numeral !== null
+        ? String(p.numeral).toLowerCase().includes(busca)
+        : false)
     );
   });
+
+  // Filtra materiais pela busca
+  const materiaisFiltrados = materiaisDisponiveis.filter(m => {
+    const busca = buscaMaterial.toLowerCase();
+    return (
+      (m.nome || '').toLowerCase().includes(busca) ||
+      (m.numeroSerie ? m.numeroSerie.toLowerCase().includes(busca) : false)
+    );
+  });
+
+  useEffect(() => {
+    if (policiaisFiltrados.length > 0) {
+      setPolicialSelecionado(policiaisFiltrados[0].id);
+    } else {
+      setPolicialSelecionado('');
+    }
+  }, [policiaisFiltrados]);
 
   return (
     <Card className="bg-primary/10 border-primary">
@@ -225,15 +271,15 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
                   <SelectValue placeholder="Selecione o policial" />
                 </SelectTrigger>
                 <SelectContent>
-                  {policiaisFiltrados.length === 0 ? (
+                  {policiaisFiltrados.length === 0 && buscaPolicial.trim() !== '' ? (
                     <div className="p-2 text-sm text-muted-foreground text-center">
                       Nenhum policial encontrado
                     </div>
                   ) : (
-                    policiaisFiltrados.map(policial => (
+                    (buscaPolicial.trim() === '' ? policiais : policiaisFiltrados).map(policial => (
                       <SelectItem key={policial.id} value={policial.id}>
                         {policial.patente} {policial.nome} - Mat: {policial.matricula}
-                        {policial.numeral && ` - ${policial.numeral}`}
+                        {policial.numeral ? ` - ${policial.numeral}` : ''}
                       </SelectItem>
                     ))
                   )}
@@ -243,119 +289,111 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
           </div>
 
           {/* Seleção de Materiais */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Materiais para Cautela
-              </Label>
-              <Select onValueChange={adicionarMaterial}>
-                <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Adicionar material" />
-                </SelectTrigger>
-                <SelectContent>
-                  {materiaisDisponiveis.map(material => (
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Materiais *
+            </Label>
+            <Input
+              placeholder="Buscar material por nome ou número de série..."
+              value={buscaMaterial}
+              onChange={(e) => setBuscaMaterial(e.target.value)}
+            />
+            <Select
+              value=""
+              onValueChange={adicionarMaterial}
+              disabled={materiaisFiltrados.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um material" />
+              </SelectTrigger>
+              <SelectContent>
+                {materiaisFiltrados.length === 0 && buscaMaterial.trim() !== '' ? (
+                  <div className="p-2 text-sm text-muted-foreground text-center">
+                    Nenhum material encontrado
+                  </div>
+                ) : (
+                  materiaisFiltrados.map(material => (
                     <SelectItem key={material.id} value={material.id}>
-                      {material.nome} {material.numeroSerie ? `- ${material.numeroSerie}` : ''}
+                      {material.nome || material.categoria}
+                      {material.numeroSerie ? ` - ${material.numeroSerie}` : ''}
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
 
+          {/* Lista de Materiais Selecionados */}
+          <div>
             {materiaisSelecionados.length > 0 && (
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="text-base">Materiais Selecionados</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Material</TableHead>
-                        <TableHead>Categoria</TableHead>
-                        <TableHead>Série</TableHead>
-                        <TableHead>Observações</TableHead>
-                        <TableHead>Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {materiaisSelecionados.map(material => (
-                        <TableRow key={material.materialId}>
-                          <TableCell className="font-medium">{material.nome}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{material.categoria}</Badge>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {material.numeroSerie || '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              placeholder="Observações específicas..."
-                              value={material.observacoes || ''}
-                              onChange={(e) => atualizarObservacoesMaterial(material.materialId, e.target.value)}
-                              className="w-full"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removerMaterial(material.materialId)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
-
-            {materiaisSelecionados.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <AlertCircle className="h-12 w-12 mx-auto mb-2" />
-                <p>Nenhum material selecionado</p>
-                <p className="text-sm">Use o seletor acima para adicionar materiais</p>
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material</TableHead>
+                    <TableHead>Nº Série</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Observações</TableHead>
+                    <TableHead>Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {materiaisSelecionados.map(material => (
+                    <TableRow key={material.materialId}>
+                      <TableCell>{material.nome}</TableCell>
+                      <TableCell>{material.numeroSerie || '-'}</TableCell>
+                      <TableCell>{material.categoria}</TableCell>
+                      <TableCell>
+                        <Textarea
+                          value={material.observacoes}
+                          onChange={(e) =>
+                            atualizarObservacoesMaterial(material.materialId, e.target.value)
+                          }
+                          placeholder="Observações"
+                          className="resize-none"
+                          rows={1}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removerMaterial(material.materialId)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </div>
 
           {/* Observações Gerais */}
           <div className="space-y-2">
-            <Label htmlFor="observacoes">Observações Gerais</Label>
+            <Label>Observações gerais</Label>
             <Textarea
-              id="observacoes"
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
-              placeholder="Observações sobre a cautela permanente..."
+              placeholder="Observações adicionais..."
               rows={3}
             />
           </div>
 
           {/* Botões */}
-          <div className="flex gap-2 pt-4">
-            <Button 
-              type="submit" 
-              className="flex items-center gap-2"
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={onClose}
+              type="button"
               disabled={loading}
             >
-              <Save className="h-4 w-4" />
-              {loading ? 'Criando...' : 'Criar Cautela Permanente'}
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onClose} 
-              className="flex items-center gap-2"
-              disabled={loading}
-            >
-              <X className="h-4 w-4" />
               Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              <Save className="mr-2 h-4 w-4" />
+              Salvar
             </Button>
           </div>
         </form>

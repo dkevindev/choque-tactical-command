@@ -33,6 +33,7 @@ interface Cautela {
     categoria: string;
     numeroSerie?: string;
     quantidade: number;
+    datadeVencimento?: string;
   }>;
   dataInicio: Date;
   dataFim?: Date;
@@ -157,10 +158,52 @@ const GerenciarCautelas = () => {
     }
   };
 
-  const gerarDocumento = (cautela: Cautela) => {
-    // Here you would implement document generation
-    toast.success('Documento gerado com sucesso');
-  };
+  const gerarDocumento = async (cautela: Cautela) => {
+  try {
+    const response = await fetch('https://us-central1-SEU-PROJETO.cloudfunctions.net/gerarOrdemServicoDocx/cautela', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        policial: {
+          nome: cautela.policialNome,
+          matricula: cautela.policialMatricula,
+          grad: '', // Ajuste se tiver posto/graduação
+          numeral: '', // Ajuste se tiver numeral
+        },
+        materiais: cautela.materiais.map((material) => ({
+          nome: material.nome,
+          categoria: material.categoria,
+          genero: material.categoria, // ou outro campo apropriado
+          tamanho: String(material.quantidade),
+          numeroSerie: material.numeroSerie || '',
+        })),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao gerar o documento');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    const nomeArquivo = `Cautela_${cautela.policialNome.replace(/\s+/g, '_')}_${cautela.id}.docx`;
+    link.href = url;
+    link.setAttribute('download', nomeArquivo);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+
+    toast.success('Documento gerado com sucesso!');
+  } catch (error) {
+    console.error('Erro ao gerar documento:', error);
+    toast.error('Erro ao gerar documento');
+  }
+};
+
 
   const cautelasFiltradas = cautelas.filter(cautela => {
     const matchNome = cautela.policialNome?.toLowerCase().includes(filtro.toLowerCase()) || false;
@@ -416,8 +459,11 @@ const GerenciarCautelas = () => {
                           {material.numeroSerie && (
                             <p className="text-xs text-muted-foreground">Série: {material.numeroSerie}</p>
                           )}
+                          {material.datadeVencimento && (
+                            <p className="text-xs text-muted-foreground">Data de Vencimento: {material.datadeVencimento}</p>
+                          )}
                         </div>
-                        <Badge variant="outline">Qtd: {material.quantidade}</Badge>
+                        <Badge variant="outline">Qtd: {material.quantidade ? material.quantidade : 1}</Badge>
                       </div>
                     </div>
                   ))}
