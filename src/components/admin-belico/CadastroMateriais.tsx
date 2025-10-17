@@ -53,7 +53,10 @@ const CadastroMateriais = () => {
     fabricante: '',
     observacoes: '',
     tamanhoColete: '',
-    vencimento: ''
+    vencimento: '',
+    dataFabricacao: '',
+    anosValidade: '',
+    sexo: ''
   });
 
   const categorias = [
@@ -129,7 +132,10 @@ const CadastroMateriais = () => {
       fabricante: '',
       observacoes: '',
       tamanhoColete: '',
-      vencimento: ''
+      vencimento: '',
+      dataFabricacao: '',
+      anosValidade: '',
+      sexo: ''
     });
     setEditingMaterial(null);
     setShowForm(false);
@@ -138,8 +144,14 @@ const CadastroMateriais = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.nome || !formData.categoria) {
-      toast.error('Preencha os campos obrigatórios');
+    // Validação condicional: nome não é obrigatório para Colete Balístico
+    if (formData.categoria !== 'Colete Balístico' && !formData.nome) {
+      toast.error('Preencha o nome do material');
+      return;
+    }
+    
+    if (!formData.categoria) {
+      toast.error('Selecione a categoria');
       return;
     }
 
@@ -154,10 +166,30 @@ const CadastroMateriais = () => {
       return;
     }
 
+    // Validação específica para Colete Balístico
+    if (formData.categoria === 'Colete Balístico') {
+      if (!formData.tamanhoColete || !formData.dataFabricacao || !formData.anosValidade || !formData.sexo) {
+        toast.error('Preencha todos os campos obrigatórios do Colete Balístico');
+        return;
+      }
+    }
+
     try {
+      // Calcular vencimento automaticamente para Colete Balístico
+      let vencimentoCalculado = formData.vencimento;
+      if (formData.categoria === 'Colete Balístico' && formData.dataFabricacao && formData.anosValidade) {
+        const dataFab = new Date(formData.dataFabricacao);
+        const anosVal = parseInt(formData.anosValidade);
+        const dataVencimento = new Date(dataFab);
+        dataVencimento.setFullYear(dataVencimento.getFullYear() + anosVal);
+        vencimentoCalculado = dataVencimento.toISOString().split('T')[0];
+      }
+
       const materialData = {
         ...formData,
+        vencimento: vencimentoCalculado,
         quantidade: formData.quantidade ? parseInt(formData.quantidade) : undefined,
+        anosValidade: formData.anosValidade ? parseInt(formData.anosValidade) : undefined,
         createdAt: new Date()
       };
 
@@ -189,7 +221,10 @@ const CadastroMateriais = () => {
       fabricante: material.fabricante || '',
       observacoes: material.observacoes || '',
       tamanhoColete: (material as any).tamanhoColete || '',
-      vencimento: (material as any).vencimento || ''
+      vencimento: (material as any).vencimento || '',
+      dataFabricacao: (material as any).dataFabricacao || '',
+      anosValidade: (material as any).anosValidade?.toString() || '',
+      sexo: (material as any).sexo || ''
     });
     setEditingMaterial(material);
     setShowForm(true);
@@ -397,12 +432,55 @@ const CadastroMateriais = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="vencimento">Vencimento *</Label>
+                      <Label htmlFor="sexo">Sexo *</Label>
+                      <Select value={formData.sexo} onValueChange={(value) => setFormData(prev => ({ ...prev, sexo: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o sexo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Masculino">Masculino</SelectItem>
+                          <SelectItem value="Feminino">Feminino</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="dataFabricacao">Data de Fabricação *</Label>
+                      <Input
+                        id="dataFabricacao"
+                        type="date"
+                        value={formData.dataFabricacao}
+                        onChange={(e) => setFormData(prev => ({ ...prev, dataFabricacao: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="anosValidade">Anos de Validade *</Label>
+                      <Input
+                        id="anosValidade"
+                        type="number"
+                        value={formData.anosValidade}
+                        onChange={(e) => setFormData(prev => ({ ...prev, anosValidade: e.target.value }))}
+                        placeholder="Ex: 5"
+                        min="1"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="vencimento">Vencimento (calculado automaticamente)</Label>
                       <Input
                         id="vencimento"
                         type="date"
-                        value={formData.vencimento}
-                        onChange={(e) => setFormData(prev => ({ ...prev, vencimento: e.target.value }))}
+                        value={
+                          formData.dataFabricacao && formData.anosValidade
+                            ? (() => {
+                                const dataFab = new Date(formData.dataFabricacao);
+                                const anosVal = parseInt(formData.anosValidade);
+                                const dataVenc = new Date(dataFab);
+                                dataVenc.setFullYear(dataVenc.getFullYear() + anosVal);
+                                return dataVenc.toISOString().split('T')[0];
+                              })()
+                            : ''
+                        }
+                        disabled
+                        className="bg-muted"
                       />
                     </div>
                   </>
