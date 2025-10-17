@@ -51,13 +51,16 @@ const CadastroMateriais = () => {
     quantidade: '',
     disponivel: true,
     fabricante: '',
-    observacoes: ''
+    observacoes: '',
+    tamanhoColete: '',
+    vencimento: ''
   });
 
   const categorias = [
     'Armamento',
     'Munição',
     'EPI',
+    'Colete Balístico',
     'Acessório',
     'Equipamento Tático'
   ];
@@ -124,7 +127,9 @@ const CadastroMateriais = () => {
       quantidade: '',
       disponivel: true,
       fabricante: '',
-      observacoes: ''
+      observacoes: '',
+      tamanhoColete: '',
+      vencimento: ''
     });
     setEditingMaterial(null);
     setShowForm(false);
@@ -182,7 +187,9 @@ const CadastroMateriais = () => {
       quantidade: material.quantidade?.toString() || '',
       disponivel: material.disponivel,
       fabricante: material.fabricante || '',
-      observacoes: material.observacoes || ''
+      observacoes: material.observacoes || '',
+      tamanhoColete: (material as any).tamanhoColete || '',
+      vencimento: (material as any).vencimento || ''
     });
     setEditingMaterial(material);
     setShowForm(true);
@@ -365,6 +372,36 @@ const CadastroMateriais = () => {
                       min="0"
                     />
                   </div>
+                )}
+
+                {/* Campos específicos para Colete Balístico */}
+                {formData.categoria === 'Colete Balístico' && (
+                  <>
+                    <div>
+                      <Label htmlFor="tamanhoColete">Tamanho do Colete *</Label>
+                      <Select value={formData.tamanhoColete} onValueChange={(value) => setFormData(prev => ({ ...prev, tamanhoColete: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tamanho" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="P">P</SelectItem>
+                          <SelectItem value="M">M</SelectItem>
+                          <SelectItem value="G">G</SelectItem>
+                          <SelectItem value="GG">GG</SelectItem>
+                          <SelectItem value="XG">XG</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="vencimento">Vencimento *</Label>
+                      <Input
+                        id="vencimento"
+                        type="date"
+                        value={formData.vencimento}
+                        onChange={(e) => setFormData(prev => ({ ...prev, vencimento: e.target.value }))}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
 

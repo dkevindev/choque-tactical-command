@@ -26,6 +26,7 @@ interface Policial {
   matricula: string;
   patente: string;
   situacao: string;
+  numeral?: string;
 }
 
 interface Material {
@@ -56,6 +57,7 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
   const [materiaisSelecionados, setMateriaisSelecionados] = useState<MaterialSelecionado[]>([]);
   const [observacoes, setObservacoes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [buscaPolicial, setBuscaPolicial] = useState('');
 
   useEffect(() => {
     loadPoliciais();
@@ -184,6 +186,15 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
     !materiaisSelecionados.some(ms => ms.materialId === m.id)
   );
 
+  const policiaisFiltrados = policiais.filter(p => {
+    const busca = buscaPolicial.toLowerCase();
+    return (
+      p.nome.toLowerCase().includes(busca) ||
+      p.matricula.toLowerCase().includes(busca) ||
+      (p.numeral && p.numeral.toLowerCase().includes(busca))
+    );
+  });
+
   return (
     <Card className="bg-primary/10 border-primary">
       <CardHeader>
@@ -203,18 +214,32 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
               <User className="h-4 w-4" />
               Policial Responsável *
             </Label>
-            <Select value={policialSelecionado} onValueChange={setPolicialSelecionado}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o policial" />
-              </SelectTrigger>
-              <SelectContent>
-                {policiais.map(policial => (
-                  <SelectItem key={policial.id} value={policial.id}>
-                    {policial.patente} {policial.nome} - Mat: {policial.matricula}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Input
+                placeholder="Buscar por nome, matrícula ou numeral..."
+                value={buscaPolicial}
+                onChange={(e) => setBuscaPolicial(e.target.value)}
+              />
+              <Select value={policialSelecionado} onValueChange={setPolicialSelecionado}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o policial" />
+                </SelectTrigger>
+                <SelectContent>
+                  {policiaisFiltrados.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      Nenhum policial encontrado
+                    </div>
+                  ) : (
+                    policiaisFiltrados.map(policial => (
+                      <SelectItem key={policial.id} value={policial.id}>
+                        {policial.patente} {policial.nome} - Mat: {policial.matricula}
+                        {policial.numeral && ` - ${policial.numeral}`}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Seleção de Materiais */}
