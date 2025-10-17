@@ -288,16 +288,18 @@ const CadastroMateriais = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="nome">Nome do Material *</Label>
-                  <Input
-                    id="nome"
-                    value={formData.nome}
-                    onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
-                    placeholder="Ex: Pistola .40"
-                    required
-                  />
-                </div>
+                {formData.categoria !== 'Colete Balístico' && (
+                  <div>
+                    <Label htmlFor="nome">Nome do Material *</Label>
+                    <Input
+                      id="nome"
+                      value={formData.nome}
+                      onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
+                      placeholder="Ex: Pistola .40"
+                      required
+                    />
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="categoria">Categoria *</Label>
@@ -313,15 +315,17 @@ const CadastroMateriais = () => {
                   </Select>
                 </div>
 
-                <div>
-                  <Label htmlFor="calibre">Calibre</Label>
-                  <Input
-                    id="calibre"
-                    value={formData.calibre}
-                    onChange={(e) => setFormData(prev => ({ ...prev, calibre: e.target.value }))}
-                    placeholder="Ex: .40, 12, 9mm"
-                  />
-                </div>
+                {formData.categoria !== 'Colete Balístico' && (
+                  <div>
+                    <Label htmlFor="calibre">Calibre</Label>
+                    <Input
+                      id="calibre"
+                      value={formData.calibre}
+                      onChange={(e) => setFormData(prev => ({ ...prev, calibre: e.target.value }))}
+                      placeholder="Ex: .40, 12, 9mm"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="numeroSerie">Número de Série</Label>
