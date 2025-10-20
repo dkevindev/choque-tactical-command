@@ -176,9 +176,16 @@ appCautela.post('/', async (req, res) => {
     } catch (error) {
         console.error('Erro ao gerar o documento de cautela:', error);
         if (error.properties) {
-            console.error(JSON.stringify({ error: error.properties }));
+            const e = {
+                message: error.message,
+                name: error.name,
+                stack: error.stack,
+                properties: error.properties,
+            };
+            console.error('Erro detalhado do Docxtemplater:', JSON.stringify(e, null, 2));
+            return res.status(500).send(`Erro ao preencher o template: ${error.message}. Verifique os placeholders no template.`);
         }
-        res.status(500).send('Erro interno ao gerar o documento de cautela.');
+        res.status(500).send(`Erro interno ao gerar o documento de cautela: ${error.message}`);
     } finally {
         try { if (tempFilePath) fs.unlinkSync(tempFilePath); } 
         catch (err) { console.warn('Não foi possível excluir o arquivo temporário:', err); }
