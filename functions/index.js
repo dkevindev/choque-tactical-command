@@ -7,18 +7,14 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 
-// Inicialize o Firebase Admin SDK (se ainda não fez)
 admin.initializeApp();
 
-// --- FUNÇÃO EXISTENTE ---
+// ----------------- FUNÇÃO ORDEM DE SERVIÇO -----------------
+const appOS = express();
+appOS.use(cors({ origin: true }));
+appOS.use(express.json());
 
-const app = express();
-// Use cors para permitir requisições do seu frontend
-app.use(cors({ origin: true }));
-app.use(express.json()); // Para parsear o corpo da requisição JSON
-
-// Endpoint HTTP para gerar o DOCX da ordem de serviço
-app.post('/', async (req, res) => {
+appOS.post('/', async (req, res) => {
     let tempFilePath; // Declarado com 'let' fora do try
 
     try {
@@ -114,36 +110,32 @@ app.post('/', async (req, res) => {
     }
 });
 
-// Exporta a função HTTP para o Firebase
-exports.gerarOrdemServicoDocx = functions.https.onRequest(app);
+exports.gerarOrdemServicoDocx = functions.https.onRequest(appOS);
 
+// ----------------- FUNÇÃO CAUTELA -----------------
+const appCautela = express();
+appCautela.use(cors({ origin: true }));
+appCautela.use(express.json());
 
-// --- NOVA FUNÇÃO: geração do DOCX para cautela ---
-
-
-app.post('/cautela', async (req, res) => {
+appCautela.post('/', async (req, res) => {
+    console.log('Endpoint / gerando cautela acessado!');
+    console.log('Corpo recebido:', req.body);
     let tempFilePath;
-
     try {
         const data = req.body;
 
-        // 🔍 Tratamento de nome vazio (usa categoria como nome)
-        if (!data.nome || data.nome.trim() === "") {
-            data.nome = data.categoria || "Equipamento";
+        // Validação da estrutura de dados recebida
+        if (!data.policial || !data.policial.nome || !data.policial.matricula) {
+            return res.status(400).send('Dados do policial incompletos.');
         }
 
-        // ✅ Validação básica apenas dos campos essenciais
-        if (
-            !data.categoria || !data.marca || !data.numeroSerie ||
-            !data.grad || !data.numeral || !data.matricula
-        ) {
-            return res.status(400).send('Dados incompletos para gerar o documento de cautela.');
+        if (!data.materiais || !Array.isArray(data.materiais) || data.materiais.length === 0) {
+            return res.status(400).send('Nenhum material informado para a cautela.');
         }
 
         const bucket = admin.storage().bucket();
         const templatePath = 'templates/template-cautela.docx';
         tempFilePath = path.join('/tmp', `template-cautela-${Date.now()}.docx`);
-
         await bucket.file(templatePath).download({ destination: tempFilePath });
         console.log('Template baixado para:', tempFilePath);
 
@@ -151,45 +143,42 @@ app.post('/cautela', async (req, res) => {
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
-        // 🧾 Dados enviados para o template .docx
+        // Preparar dados para o template
+        // Assumindo que o template suporta múltiplos materiais ou gera um documento por material
+        const material = data.materiais[0]; // Pega o primeiro material para documento único
+        
         const templateData = {
-            categoria: data.categoria,
-            marca: data.marca,
-            genero: data.genero,
-            tamanho: data.tamanho,
-            numeroSerie: data.numeroSerie,
-            grad: data.grad,
-            numeral: data.numeral,
-            nome: data.nome,       // Agora sempre terá valor
-            matricula: data.matricula,
+            categoria: material.categoria || '',
+            marca: material.fabricante || '',
+            genero: material.genero || material.sexo || '',
+            tamanho: material.tamanho || material.tamanhoColete || '',
+            numeroSerie: material.numeroSerie || '',
+            grad: data.policial.grad || '',
+            numeral: data.policial.numeral || '',
+            nome: data.policial.nome || '',
+            matricula: data.policial.matricula || '',
             dataAtual: new Date().toLocaleDateString('pt-BR')
         };
 
+        console.log('Dados para o template:', templateData);
+
         doc.render(templateData);
+        const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
 
-        const buffer = doc.getZip().generate({
-            type: 'nodebuffer',
-            compression: 'DEFLATE'
-        });
-
-        const nomeArquivo = `Cautela-${data.nome.replace(/\s+/g, '_')}-${Date.now()}.docx`;
-
+        const nomeArquivo = `Cautela-${data.policial.nome.replace(/\s+/g, '_')}-${Date.now()}.docx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
-
-        res.send(Buffer.from(buffer));
-        res.end();
-
+        res.send(buffer);
     } catch (error) {
         console.error('Erro ao gerar o documento de cautela:', error);
+        if (error.properties) {
+            console.error(JSON.stringify({ error: error.properties }));
+        }
         res.status(500).send('Erro interno ao gerar o documento de cautela.');
     } finally {
-        try {
-            if (tempFilePath) fs.unlinkSync(tempFilePath);
-        } catch (err) {
-            console.warn('Não foi possível excluir o arquivo temporário:', err);
-        }
+        try { if (tempFilePath) fs.unlinkSync(tempFilePath); } 
+        catch (err) { console.warn('Não foi possível excluir o arquivo temporário:', err); }
     }
 });
 
-exports.gerarCautelaDocx = functions.https.onRequest(app);
+exports.gerarCautelaDocx = functions.https.onRequest(appCautela);
