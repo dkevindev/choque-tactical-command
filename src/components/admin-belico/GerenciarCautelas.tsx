@@ -167,51 +167,51 @@ const GerenciarCautelas = () => {
   };
 
   const gerarDocumento = async (cautela: Cautela) => {
-  try {
-    const response = await fetch('https://gerarcauteladocx-owvlmrnsjq-uc.a.run.app', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        policial: {
-          nome: cautela.policialNome,
-          matricula: cautela.policialMatricula,
-          grad: cautela.policialPatente , // Ajuste se tiver posto/graduação
-          numeral: cautela.numeral , // Ajuste se tiver numeral
+    try {
+      // Pega o primeiro material para gerar o documento (conforme a função Firebase)
+      const material = cautela.materiais[0];
+      
+      const response = await fetch('https://gerarcauteladocx-owvlmrnsjq-uc.a.run.app', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        materiais: cautela.materiais.map((material) => ({
-          nome: material.nome,
-          categoria: material.categoria,
-          genero: material.sexo, // ou outro campo apropriado
-          tamanho: material.tamanhoColete,
+        body: JSON.stringify({
+          categoria: material.categoria || '',
+          marca: material.fabricante || '',
+          genero: material.sexo || '',
+          tamanho: material.tamanhoColete || '',
           numeroSerie: material.numeroSerie || '',
-          fabricante: material.fabricante
-        })),
-      }),
-    });
+          grad: cautela.policialPatente || '',
+          numeral: cautela.numeral || '',
+          nome: cautela.policialNome,
+          matricula: cautela.policialMatricula
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error('Erro ao gerar o documento');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erro na resposta:', errorText);
+        throw new Error(`Erro ao gerar o documento: ${errorText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      const nomeArquivo = `Cautela-${cautela.policialNome.replace(/\s+/g, '_')}-${Date.now()}.docx`;
+      link.href = url;
+      link.setAttribute('download', nomeArquivo);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+
+      toast.success('Documento gerado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao gerar documento:', error);
+      toast.error('Erro ao gerar documento. Verifique os dados e tente novamente.');
     }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-
-    const nomeArquivo = `Cautela_${cautela.policialNome.replace(/\s+/g, '_')}_${cautela.id}.docx`;
-    link.href = url;
-    link.setAttribute('download', nomeArquivo);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode?.removeChild(link);
-
-    toast.success('Documento gerado com sucesso!');
-  } catch (error) {
-    console.error('Erro ao gerar documento:', error);
-    toast.error('Erro ao gerar documento');
-  }
-};
+  };
 
 
   const cautelasFiltradas = cautelas.filter(cautela => {
