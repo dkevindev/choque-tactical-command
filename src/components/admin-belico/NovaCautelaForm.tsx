@@ -51,6 +51,9 @@ interface Material {
   numeroSerie?: string;
   disponivel: boolean;
   vencimento?: string;
+  sexo?: string
+  tamanhoColete?: string;
+  fabricante?: string
 }
 
 interface MaterialSelecionado {
@@ -59,7 +62,10 @@ interface MaterialSelecionado {
   categoria: string;
   numeroSerie?: string;
   observacoes?: string;
-  vencimento?: string
+  vencimento?: string;
+  tamanhoColete?: string;
+  sexo?: string;
+  fabricante?: string;
 }
 
 interface NovaCautelaFormProps {
@@ -145,7 +151,10 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
       categoria: material.categoria,
       numeroSerie: material.numeroSerie,
       datadeVencimento: material.vencimento,
-      observacoes: ''
+      sexo: material.sexo,
+      tamanhoColete: material.tamanhoColete,
+      observacoes: '',
+      fabricante: material.fabricante
     }]);
   };
 
@@ -189,7 +198,8 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
         dataInicio: new Date(),
         dataVencimento: null,
         createdAt: new Date(),
-        createdBy: 'admin' // TODO: pegar do usuário logado
+        createdBy: 'admin', // TODO: pegar do usuário logado,
+        numeral: policial?.numeral
       };
 
       await addDoc(collection(db, 'cautelas_permanentes'), cautelaData);

@@ -127,16 +127,21 @@ app.post('/cautela', async (req, res) => {
     try {
         const data = req.body;
 
-        // Validação simples dos dados que você mencionou
+        // 🔍 Tratamento de nome vazio (usa categoria como nome)
+        if (!data.nome || data.nome.trim() === "") {
+            data.nome = data.categoria || "Equipamento";
+        }
+
+        // ✅ Validação básica apenas dos campos essenciais
         if (
-            !data.categoria || !data.marca || !data.genero || !data.tamanho || !data.numeroSerie ||
-            !data.grad || !data.numeral || !data.nome || !data.matricula
+            !data.categoria || !data.marca || !data.numeroSerie ||
+            !data.grad || !data.numeral || !data.matricula
         ) {
             return res.status(400).send('Dados incompletos para gerar o documento de cautela.');
         }
 
         const bucket = admin.storage().bucket();
-        const templatePath = 'templates/template-cautela.docx'; // Ajuste para o caminho do seu template de cautela
+        const templatePath = 'templates/template-cautela.docx';
         tempFilePath = path.join('/tmp', `template-cautela-${Date.now()}.docx`);
 
         await bucket.file(templatePath).download({ destination: tempFilePath });
@@ -146,7 +151,7 @@ app.post('/cautela', async (req, res) => {
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
-        // Mapear os dados para o template
+        // 🧾 Dados enviados para o template .docx
         const templateData = {
             categoria: data.categoria,
             marca: data.marca,
@@ -155,20 +160,25 @@ app.post('/cautela', async (req, res) => {
             numeroSerie: data.numeroSerie,
             grad: data.grad,
             numeral: data.numeral,
-            nome: data.nome,
+            nome: data.nome,       // Agora sempre terá valor
             matricula: data.matricula,
+            dataAtual: new Date().toLocaleDateString('pt-BR')
         };
 
         doc.render(templateData);
 
-        const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
-
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        const buffer = doc.getZip().generate({
+            type: 'nodebuffer',
+            compression: 'DEFLATE'
+        });
 
         const nomeArquivo = `Cautela-${data.nome.replace(/\s+/g, '_')}-${Date.now()}.docx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
 
-        res.send(buffer);
+        res.send(Buffer.from(buffer));
+        res.end();
 
     } catch (error) {
         console.error('Erro ao gerar o documento de cautela:', error);

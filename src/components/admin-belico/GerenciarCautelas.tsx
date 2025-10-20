@@ -26,7 +26,9 @@ interface Cautela {
   id: string;
   policialId: string;
   policialNome: string;
+  policialPatente?: string;
   policialMatricula: string;
+  numeral?: number;
   materiais: Array<{
     materialId: string;
     nome: string;
@@ -34,6 +36,9 @@ interface Cautela {
     numeroSerie?: string;
     quantidade: number;
     datadeVencimento?: string;
+    tamanhoColete?: string;
+    sexo?: string;
+    fabricante?: string;
   }>;
   dataInicio: Date;
   dataFim?: Date;
@@ -45,6 +50,9 @@ interface Cautela {
   };
   observacoes?: string;
   documentoGerado?: boolean;
+  sexo?: string;
+  tamanhoColete?: string;
+  fabricante?: string;
 }
 
 const GerenciarCautelas = () => {
@@ -160,7 +168,7 @@ const GerenciarCautelas = () => {
 
   const gerarDocumento = async (cautela: Cautela) => {
   try {
-    const response = await fetch('https://us-central1-finkevin-fbd9a.cloudfunctions.net/gerarCautelaDocx', {
+    const response = await fetch('https://gerarcauteladocx-owvlmrnsjq-uc.a.run.app', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -169,15 +177,16 @@ const GerenciarCautelas = () => {
         policial: {
           nome: cautela.policialNome,
           matricula: cautela.policialMatricula,
-          grad: '', // Ajuste se tiver posto/graduação
-          numeral: '', // Ajuste se tiver numeral
+          grad: cautela.policialPatente , // Ajuste se tiver posto/graduação
+          numeral: cautela.numeral , // Ajuste se tiver numeral
         },
         materiais: cautela.materiais.map((material) => ({
           nome: material.nome,
           categoria: material.categoria,
-          genero: material.categoria, // ou outro campo apropriado
-          tamanho: String(material.quantidade),
+          genero: material.sexo, // ou outro campo apropriado
+          tamanho: material.tamanhoColete,
           numeroSerie: material.numeroSerie || '',
+          fabricante: material.fabricante
         })),
       }),
     });
