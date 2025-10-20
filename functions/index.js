@@ -149,13 +149,17 @@ appCautela.post('/', async (req, res) => {
         
         const templateData = {
             categoria: material.categoria || '',
+            fabricante: material.fabricante || '',
             marca: material.fabricante || '',
-            genero: material.genero || material.sexo || '',
-            tamanho: material.tamanho || material.tamanhoColete || '',
+            genero: material.sexo || '',
+            sexo: material.sexo || '',
+            tamanho: material.tamanhoColete || '',
+            tamanhoColete: material.tamanhoColete || '',
             numeroSerie: material.numeroSerie || '',
             grad: data.policial.grad || '',
             numeral: data.policial.numeral || '',
             nome: data.policial.nome || '',
+            policial: data.policial.nome || '',
             matricula: data.policial.matricula || '',
             dataAtual: new Date().toLocaleDateString('pt-BR')
         };
