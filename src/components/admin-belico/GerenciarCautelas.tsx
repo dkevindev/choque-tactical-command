@@ -168,24 +168,25 @@ const GerenciarCautelas = () => {
 
   const gerarDocumento = async (cautela: Cautela) => {
     try {
-      // Pega o primeiro material para gerar o documento (conforme a função Firebase)
-      const material = cautela.materiais[0];
-      
       const response = await fetch('https://gerarcauteladocx-owvlmrnsjq-uc.a.run.app', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          categoria: material.categoria || '',
-          marca: material.fabricante || '',
-          genero: material.sexo || '',
-          tamanho: material.tamanhoColete || '',
-          numeroSerie: material.numeroSerie || '',
-          grad: cautela.policialPatente || '',
-          numeral: cautela.numeral || '',
-          nome: cautela.policialNome,
-          matricula: cautela.policialMatricula
+          policial: {
+            nome: cautela.policialNome,
+            matricula: cautela.policialMatricula,
+            grad: cautela.policialPatente || '',
+            numeral: cautela.numeral || ''
+          },
+          materiais: cautela.materiais.map(material => ({
+            categoria: material.categoria || '',
+            fabricante: material.fabricante || '',
+            sexo: material.sexo || '',
+            tamanhoColete: material.tamanhoColete || '',
+            numeroSerie: material.numeroSerie || ''
+          }))
         }),
       });
 
