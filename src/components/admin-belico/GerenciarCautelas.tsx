@@ -176,13 +176,16 @@ const GerenciarCautelas = () => {
 
   const gerarDocumento = async (cautela: Cautela) => {
     try {
+      console.log('Gerando documento para cautela:', cautela.numeroCautela);
+      console.log('Dados da cautela completa:', cautela);
+      
       const response = await fetch('https://gerarcauteladocx-owvlmrnsjq-uc.a.run.app', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          numeroCautela: cautela.numeroCautela || '',
+          numeroCautela: cautela.numeroCautela || 'S/N',
           policial: {
             nome: cautela.policialNome,
             matricula: cautela.policialMatricula,
