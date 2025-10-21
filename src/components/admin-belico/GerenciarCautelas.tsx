@@ -25,7 +25,6 @@ import NovaCautelaForm from './NovaCautelaForm';
 interface Cautela {
   id: string;
   numeroCautela?: string;
-  ano?: number;
   numeroSequencial?: number;
   policialId: string;
   policialNome: string;

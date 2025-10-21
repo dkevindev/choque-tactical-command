@@ -186,30 +186,18 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
     try {
       const policial = policiais.find(p => p.id === policialSelecionado);
 
-      // Gerar número da cautela
-      const anoAtual = new Date().getFullYear();
-      
-      // Buscar TODAS as cautelas e filtrar pelo ano atual
+      // Gerar número da cautela - sequência simples
       const querySnapshot = await getDocs(collection(db, 'cautelas_permanentes'));
-      
-      // Filtrar cautelas do ano atual baseado na data de criação
-      const cautelasAnoAtual = querySnapshot.docs.filter(doc => {
-        const data = doc.data();
-        const dataInicio = data.dataInicio?.toDate() || data.createdAt?.toDate();
-        return dataInicio && dataInicio.getFullYear() === anoAtual;
-      });
-      
-      const quantidadeAnoAtual = cautelasAnoAtual.length;
+      const totalCautelas = querySnapshot.size;
       
       // Gerar próximo número
-      const proximoNumero = quantidadeAnoAtual + 1;
-      const numeroCautela = `${String(proximoNumero).padStart(3, '0')}/${anoAtual}`;
+      const proximoNumero = totalCautelas + 1;
+      const numeroCautela = String(proximoNumero).padStart(3, '0');
       
-      console.log(`Gerando cautela ${numeroCautela} (${quantidadeAnoAtual} cautelas existentes no ano ${anoAtual})`);
+      console.log(`Gerando cautela ${numeroCautela} (${totalCautelas} cautelas existentes)`);
 
       const cautelaData = {
         numeroCautela,
-        ano: anoAtual,
         numeroSequencial: proximoNumero,
         policialId: policialSelecionado,
         policialNome: policial?.nome,
