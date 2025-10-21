@@ -143,50 +143,73 @@ appCautela.post('/', async (req, res) => {
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
+        // Primeiro, identificar o calibre da arma principal
+        let calibreArma = '';
+        const armaPrincipal = data.materiais.find(m => m.categoria === 'Armamento');
+        if (armaPrincipal && armaPrincipal.calibre) {
+            calibreArma = armaPrincipal.calibre;
+        }
+
         // Preparar dados para o template - processar TODOS os materiais
         const materiaisFormatados = data.materiais.map(material => {
-            let descricao = material.nome || material.categoria || '';
+            let descricao = '';
+            let calibre = material.calibre || material.calibreMunicao || '';
+            let modelo = material.modelo || '';
+            let marca = material.fabricante || '';
+            let numeroSerie = material.numeroSerie || '';
+            let quantidade = material.quantidade || 1;
+            let tamanho = material.tamanhoColete || '';
+            let genero = material.sexo || '';
             
-            // Para Armamento
+            // Para Armamento - apenas o tipo (Pistola, Fuzil, etc)
             if (material.categoria === 'Armamento') {
-                const detalhes = [];
-                if (material.modelo) detalhes.push(material.modelo);
-                if (material.calibre) detalhes.push(`Calibre ${material.calibre}`);
-                if (detalhes.length > 0) {
-                    descricao = `${descricao} - ${detalhes.join(' ')}`;
+                descricao = material.nome || 'Pistola';
+                // Remove qualquer texto após " - " para pegar só o tipo
+                if (descricao.includes(' - ')) {
+                    descricao = descricao.split(' - ')[0];
                 }
             }
-            
-            // Para Munições
-            if (material.subcategoria === 'Munição' || material.nome?.includes('Munição') || material.nome?.includes('Munições')) {
-                const qtd = material.quantidadeMunicoes || material.quantidade || '';
-                descricao = `${qtd} Munições`;
-                if (material.calibreMunicao || material.calibre) {
-                    descricao += ` ${material.calibreMunicao || material.calibre}`;
+            // Para Munições - apenas "Munição" (quantidade já está na coluna QTD)
+            else if (material.subcategoria === 'Munição' || material.nome?.includes('Munição') || material.nome?.includes('Munições')) {
+                descricao = 'Munição';
+                quantidade = material.quantidadeMunicoes || material.quantidade || 1;
+                // Herdar calibre da arma se não tiver calibre próprio
+                if (!calibre && calibreArma) {
+                    calibre = calibreArma;
                 }
             }
-            
-            // Para Carregadores
-            if (material.subcategoria === 'Carregador' || material.nome?.includes('Carregador')) {
-                const qtd = material.quantidadeCarregadores || material.quantidade || '';
-                descricao = `${qtd} Carregador(es)`;
-                if (material.calibre) descricao += ` ${material.calibre}`;
-                if (material.modelo) descricao += ` - ${material.modelo}`;
+            // Para Carregadores - apenas "Carregador" (quantidade e calibre nas colunas próprias)
+            else if (material.subcategoria === 'Carregador' || material.nome?.includes('Carregador')) {
+                descricao = 'Carregador';
+                quantidade = material.quantidadeCarregadores || material.quantidade || 1;
+                // Herdar calibre da arma se não tiver calibre próprio
+                if (!calibre && calibreArma) {
+                    calibre = calibreArma;
+                }
+                // Limpar modelo se for igual ao da arma (evitar redundância)
+                if (armaPrincipal && modelo === armaPrincipal.modelo) {
+                    modelo = '';
+                }
+            }
+            // Para Colete Balístico
+            else if (material.categoria === 'Colete Balístico' || material.nome?.includes('Colete')) {
+                descricao = 'Colete Balístico';
+                // Colete usa fabricante (marca), tamanho e gênero nas colunas apropriadas
+            }
+            // Fallback para outros materiais
+            else {
+                descricao = material.nome || material.categoria || '';
             }
             
             return {
-                categoria: material.categoria || '',
                 descricao: descricao,
-                fabricante: material.fabricante || '',
-                marca: material.fabricante || '',
-                modelo: material.modelo || '',
-                calibre: material.calibre || material.calibreMunicao || '',
-                numeroSerie: material.numeroSerie || '',
-                quantidade: material.quantidade || material.quantidadeMunicoes || material.quantidadeCarregadores || 1,
-                tamanho: material.tamanhoColete || '',
-                tamanhoColete: material.tamanhoColete || '',
-                genero: material.sexo || '',
-                sexo: material.sexo || ''
+                marca: marca,
+                modelo: modelo,
+                calibre: calibre,
+                numeroSerie: numeroSerie,
+                quantidade: quantidade,
+                tamanho: tamanho,
+                genero: genero
             };
         });
         
