@@ -390,8 +390,20 @@ const CadastroMateriais = () => {
           });
           toast.success('Material(is) adicionado(s) à cautela existente do policial');
         } else {
-          // Criar nova cautela
+          // Criar nova cautela com numeração
+          // Gerar número da cautela - sequência simples
+          const querySnapshot = await getDocs(collection(db, 'cautelas_permanentes'));
+          const totalCautelas = querySnapshot.size;
+          
+          // Gerar próximo número
+          const proximoNumero = totalCautelas + 1;
+          const numeroCautela = String(proximoNumero).padStart(3, '0');
+          
+          console.log(`Gerando cautela ${numeroCautela} (${totalCautelas} cautelas existentes)`);
+          
           const cautelaData = {
+            numeroCautela,
+            numeroSequencial: proximoNumero,
             policialId: formData.policialAssociadoId,
             policialNome: policial?.nome,
             policialMatricula: policial?.matricula,
@@ -407,7 +419,7 @@ const CadastroMateriais = () => {
           };
 
           await addDoc(collection(db, 'cautelas_permanentes'), cautelaData);
-          toast.success('Cautela criada automaticamente para o policial');
+          toast.success(`Cautela ${numeroCautela} criada automaticamente para o policial`);
         }
       }
 
