@@ -39,6 +39,9 @@ interface Cautela {
     tamanhoColete?: string;
     sexo?: string;
     fabricante?: string;
+    modelo?: string;
+    calibre?: string;
+    subcategoria?: string;
   }>;
   dataInicio: Date;
   dataFim?: Date;
@@ -457,28 +460,37 @@ const GerenciarCautelas = () => {
                 </div>
               </div>
 
-              <div>
-                <h4 className="font-semibold text-foreground mb-2">Materiais Cautelados</h4>
-                <div className="space-y-2">
-                  {cautelaDetalhes.materiais.map((material, index) => (
-                    <div key={index} className="p-3 bg-muted rounded border">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium text-foreground">{material.nome}</p>
-                          <p className="text-sm text-muted-foreground">{material.categoria}</p>
-                          {material.numeroSerie && (
-                            <p className="text-xs text-muted-foreground">Série: {material.numeroSerie}</p>
-                          )}
-                          {material.datadeVencimento && (
-                            <p className="text-xs text-muted-foreground">Data de Vencimento: {material.datadeVencimento}</p>
-                          )}
+                <div>
+                  <h4 className="font-semibold text-foreground mb-2">Materiais Cautelados</h4>
+                  <div className="space-y-2">
+                    {cautelaDetalhes.materiais.map((material, index) => (
+                      <div key={index} className="p-3 bg-muted rounded border">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-foreground">{material.nome}</p>
+                            <p className="text-sm text-muted-foreground">{material.categoria}</p>
+                            {material.numeroSerie && (
+                              <p className="text-xs text-muted-foreground">Série: {material.numeroSerie}</p>
+                            )}
+                            {material.fabricante && (
+                              <p className="text-xs text-muted-foreground">Fabricante: {material.fabricante}</p>
+                            )}
+                            {material.modelo && (
+                              <p className="text-xs text-muted-foreground">Modelo: {material.modelo}</p>
+                            )}
+                            {material.calibre && (
+                              <p className="text-xs text-muted-foreground">Calibre: {material.calibre}</p>
+                            )}
+                            {material.datadeVencimento && (
+                              <p className="text-xs text-muted-foreground">Data de Vencimento: {material.datadeVencimento}</p>
+                            )}
+                          </div>
+                          <Badge variant="outline">Qtd: {material.quantidade ? material.quantidade : 1}</Badge>
                         </div>
-                        <Badge variant="outline">Qtd: {material.quantidade ? material.quantidade : 1}</Badge>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
               <div>
                 <h4 className="font-semibold text-foreground mb-2">Assinatura Eletrônica</h4>
