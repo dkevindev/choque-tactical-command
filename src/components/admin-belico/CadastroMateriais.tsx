@@ -272,40 +272,66 @@ const CadastroMateriais = () => {
         toast.success('Material cadastrado com sucesso');
       }
 
-      // Se foi associado a um policial, criar cautela automaticamente
+      // Se foi associado a um policial, criar ou atualizar cautela automaticamente
       if (formData.policialAssociadoId && !editingMaterial) {
         const policial = policiais.find(p => p.id === formData.policialAssociadoId);
         
-        const cautelaData = {
-          policialId: formData.policialAssociadoId,
-          policialNome: policial?.nome,
-          policialMatricula: policial?.matricula,
-          policialPatente: policial?.patente,
-          numeral: policial?.numeral,
-          materiais: [{
-            materialId: materialId,
-            nome: materialData.nome,
-            categoria: materialData.categoria,
-            numeroSerie: materialData.numeroSerie,
-            quantidade: 1,
-            tamanhoColete: materialData.tamanhoColete,
-            sexo: materialData.sexo,
-            fabricante: materialData.fabricante,
-            quantidadeCarregadores: materialData.quantidadeCarregadores,
-            quantidadeMunicoes: materialData.quantidadeMunicoes,
-            calibreMunicao: materialData.calibreMunicao,
-            numeroSIARM: materialData.numeroSIARM
-          }],
-          observacoes: formData.observacoes || '',
-          status: 'ativa',
-          tipoDocumento: 'permanente',
-          dataInicio: new Date(),
-          createdAt: new Date(),
-          createdBy: 'admin'
+        // Verificar se já existe uma cautela ativa para este policial
+        const cautelasQuery = query(
+          collection(db, 'cautelas_permanentes'),
+          orderBy('createdAt', 'desc')
+        );
+        const cautelasSnapshot = await getDocs(cautelasQuery);
+        const cautelaExistente = cautelasSnapshot.docs.find(doc => {
+          const data = doc.data();
+          return data.policialId === formData.policialAssociadoId && data.status === 'ativa';
+        });
+
+        const novoMaterial = {
+          materialId: materialId,
+          nome: materialData.nome,
+          categoria: materialData.categoria,
+          numeroSerie: materialData.numeroSerie,
+          quantidade: 1,
+          tamanhoColete: materialData.tamanhoColete,
+          sexo: materialData.sexo,
+          fabricante: materialData.fabricante,
+          quantidadeCarregadores: materialData.quantidadeCarregadores,
+          quantidadeMunicoes: materialData.quantidadeMunicoes,
+          calibreMunicao: materialData.calibreMunicao,
+          numeroSIARM: materialData.numeroSIARM
         };
 
-        await addDoc(collection(db, 'cautelas_permanentes'), cautelaData);
-        toast.success('Cautela criada automaticamente para o policial');
+        if (cautelaExistente) {
+          // Atualizar cautela existente adicionando o novo material
+          const materiaisAtualizados = [...(cautelaExistente.data().materiais || []), novoMaterial];
+          await updateDoc(doc(db, 'cautelas_permanentes', cautelaExistente.id), {
+            materiais: materiaisAtualizados,
+            observacoes: formData.observacoes 
+              ? `${cautelaExistente.data().observacoes}\n${formData.observacoes}`.trim()
+              : cautelaExistente.data().observacoes
+          });
+          toast.success('Material adicionado à cautela existente do policial');
+        } else {
+          // Criar nova cautela
+          const cautelaData = {
+            policialId: formData.policialAssociadoId,
+            policialNome: policial?.nome,
+            policialMatricula: policial?.matricula,
+            policialPatente: policial?.patente,
+            numeral: policial?.numeral,
+            materiais: [novoMaterial],
+            observacoes: formData.observacoes || '',
+            status: 'ativa',
+            tipoDocumento: 'permanente',
+            dataInicio: new Date(),
+            createdAt: new Date(),
+            createdBy: 'admin'
+          };
+
+          await addDoc(collection(db, 'cautelas_permanentes'), cautelaData);
+          toast.success('Cautela criada automaticamente para o policial');
+        }
       }
 
       resetForm();
