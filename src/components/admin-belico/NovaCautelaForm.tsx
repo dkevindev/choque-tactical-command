@@ -186,7 +186,25 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
     try {
       const policial = policiais.find(p => p.id === policialSelecionado);
 
+      // Gerar número da cautela
+      const anoAtual = new Date().getFullYear();
+      
+      // Buscar cautelas do ano atual
+      const q = query(
+        collection(db, 'cautelas_permanentes'),
+        where('ano', '==', anoAtual)
+      );
+      const querySnapshot = await getDocs(q);
+      const quantidadeAnoAtual = querySnapshot.size;
+      
+      // Gerar próximo número
+      const proximoNumero = quantidadeAnoAtual + 1;
+      const numeroCautela = `${String(proximoNumero).padStart(3, '0')}/${anoAtual}`;
+
       const cautelaData = {
+        numeroCautela,
+        ano: anoAtual,
+        numeroSequencial: proximoNumero,
         policialId: policialSelecionado,
         policialNome: policial?.nome,
         policialMatricula: policial?.matricula,
@@ -206,7 +224,7 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
 
       // TODO: Atualizar status dos materiais para cautelados
 
-      toast.success('Cautela permanente criada com sucesso');
+      toast.success(`Cautela ${numeroCautela} criada com sucesso`);
       onSuccess();
       onClose();
     } catch (error) {

@@ -24,6 +24,9 @@ import NovaCautelaForm from './NovaCautelaForm';
 
 interface Cautela {
   id: string;
+  numeroCautela?: string;
+  ano?: number;
+  numeroSequencial?: number;
   policialId: string;
   policialNome: string;
   policialPatente?: string;
@@ -363,6 +366,7 @@ const GerenciarCautelas = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Nº Cautela</TableHead>
                   <TableHead>Policial</TableHead>
                   <TableHead>Materiais</TableHead>
                   <TableHead>Tipo</TableHead>
@@ -375,6 +379,11 @@ const GerenciarCautelas = () => {
               <TableBody>
                 {cautelasFiltradas.map(cautela => (
                   <TableRow key={cautela.id}>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono">
+                        {cautela.numeroCautela || '-'}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <div>
                         <p className="font-medium text-foreground">{cautela.policialNome}</p>
@@ -462,6 +471,7 @@ const GerenciarCautelas = () => {
                 
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Dados da Cautela</h4>
+                  <p><strong>Número:</strong> {cautelaDetalhes.numeroCautela || '-'}</p>
                   <p><strong>Tipo:</strong> {cautelaDetalhes.tipoDocumento}</p>
                   <p><strong>Status:</strong> {cautelaDetalhes.status}</p>
                   <p><strong>Data Início:</strong> {cautelaDetalhes.dataInicio.toLocaleString()}</p>
