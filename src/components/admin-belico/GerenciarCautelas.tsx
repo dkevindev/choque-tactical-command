@@ -42,6 +42,9 @@ interface Cautela {
     modelo?: string;
     calibre?: string;
     subcategoria?: string;
+    quantidadeCarregadores?: number;
+    quantidadeMunicoes?: number;
+    calibreMunicao?: string;
   }>;
   dataInicio: Date;
   dataFim?: Date;
@@ -464,29 +467,71 @@ const GerenciarCautelas = () => {
                   <h4 className="font-semibold text-foreground mb-2">Materiais Cautelados</h4>
                   <div className="space-y-2">
                     {cautelaDetalhes.materiais.map((material, index) => (
-                      <div key={index} className="p-3 bg-muted rounded border">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium text-foreground">{material.nome}</p>
-                            <p className="text-sm text-muted-foreground">{material.categoria}</p>
-                            {material.numeroSerie && (
-                              <p className="text-xs text-muted-foreground">Série: {material.numeroSerie}</p>
-                            )}
-                            {material.fabricante && (
-                              <p className="text-xs text-muted-foreground">Fabricante: {material.fabricante}</p>
-                            )}
-                            {material.modelo && (
-                              <p className="text-xs text-muted-foreground">Modelo: {material.modelo}</p>
-                            )}
-                            {material.calibre && (
-                              <p className="text-xs text-muted-foreground">Calibre: {material.calibre}</p>
-                            )}
-                            {material.datadeVencimento && (
-                              <p className="text-xs text-muted-foreground">Data de Vencimento: {material.datadeVencimento}</p>
-                            )}
+                      <div key={index}>
+                        {/* Item principal */}
+                        <div className="p-3 bg-muted rounded border">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium text-foreground">{material.nome}</p>
+                              <p className="text-sm text-muted-foreground">{material.categoria}</p>
+                              {material.numeroSerie && (
+                                <p className="text-xs text-muted-foreground">Série: {material.numeroSerie}</p>
+                              )}
+                              {material.fabricante && (
+                                <p className="text-xs text-muted-foreground">Fabricante: {material.fabricante}</p>
+                              )}
+                              {material.modelo && (
+                                <p className="text-xs text-muted-foreground">Modelo: {material.modelo}</p>
+                              )}
+                              {material.calibre && (
+                                <p className="text-xs text-muted-foreground">Calibre: {material.calibre}</p>
+                              )}
+                              {material.datadeVencimento && (
+                                <p className="text-xs text-muted-foreground">Data de Vencimento: {material.datadeVencimento}</p>
+                              )}
+                            </div>
+                            <Badge variant="outline">Qtd: {material.quantidade ? material.quantidade : 1}</Badge>
                           </div>
-                          <Badge variant="outline">Qtd: {material.quantidade ? material.quantidade : 1}</Badge>
                         </div>
+                        
+                        {/* Se for armamento e tiver carregadores/munições, exibir como itens separados */}
+                        {material.categoria === 'Armamento' && (
+                          <>
+                            {material.quantidadeCarregadores && material.quantidadeCarregadores > 0 && (
+                              <div className="p-3 bg-muted/70 rounded border mt-2 ml-4">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <p className="font-medium text-foreground">
+                                      Carregadores {material.calibre || material.calibreMunicao || ''} {material.modelo ? `- ${material.modelo}` : ''}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">Acessório</p>
+                                    {material.fabricante && (
+                                      <p className="text-xs text-muted-foreground">Fabricante: {material.fabricante}</p>
+                                    )}
+                                  </div>
+                                  <Badge variant="outline">Qtd: {material.quantidadeCarregadores}</Badge>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {material.quantidadeMunicoes && material.quantidadeMunicoes > 0 && (
+                              <div className="p-3 bg-muted/70 rounded border mt-2 ml-4">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <p className="font-medium text-foreground">
+                                      Munição {material.calibreMunicao || material.calibre || ''}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">Munição - Letal</p>
+                                    {(material.calibreMunicao || material.calibre) && (
+                                      <p className="text-xs text-muted-foreground">Calibre: {material.calibreMunicao || material.calibre}</p>
+                                    )}
+                                  </div>
+                                  <Badge variant="outline">Qtd: {material.quantidadeMunicoes}</Badge>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
