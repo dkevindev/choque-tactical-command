@@ -143,25 +143,61 @@ appCautela.post('/', async (req, res) => {
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
-        // Preparar dados para o template
-        // Assumindo que o template suporta múltiplos materiais ou gera um documento por material
-        const material = data.materiais[0]; // Pega o primeiro material para documento único
+        // Preparar dados para o template - processar TODOS os materiais
+        const materiaisFormatados = data.materiais.map(material => {
+            let descricao = material.nome || material.categoria || '';
+            
+            // Para Armamento
+            if (material.categoria === 'Armamento') {
+                const detalhes = [];
+                if (material.modelo) detalhes.push(material.modelo);
+                if (material.calibre) detalhes.push(`Calibre ${material.calibre}`);
+                if (detalhes.length > 0) {
+                    descricao = `${descricao} - ${detalhes.join(' ')}`;
+                }
+            }
+            
+            // Para Munições
+            if (material.subcategoria === 'Munição' || material.nome?.includes('Munição') || material.nome?.includes('Munições')) {
+                const qtd = material.quantidadeMunicoes || material.quantidade || '';
+                descricao = `${qtd} Munições`;
+                if (material.calibreMunicao || material.calibre) {
+                    descricao += ` ${material.calibreMunicao || material.calibre}`;
+                }
+            }
+            
+            // Para Carregadores
+            if (material.subcategoria === 'Carregador' || material.nome?.includes('Carregador')) {
+                const qtd = material.quantidadeCarregadores || material.quantidade || '';
+                descricao = `${qtd} Carregador(es)`;
+                if (material.calibre) descricao += ` ${material.calibre}`;
+                if (material.modelo) descricao += ` - ${material.modelo}`;
+            }
+            
+            return {
+                categoria: material.categoria || '',
+                descricao: descricao,
+                fabricante: material.fabricante || '',
+                marca: material.fabricante || '',
+                modelo: material.modelo || '',
+                calibre: material.calibre || material.calibreMunicao || '',
+                numeroSerie: material.numeroSerie || '',
+                quantidade: material.quantidade || material.quantidadeMunicoes || material.quantidadeCarregadores || 1,
+                tamanho: material.tamanhoColete || '',
+                tamanhoColete: material.tamanhoColete || '',
+                genero: material.sexo || '',
+                sexo: material.sexo || ''
+            };
+        });
         
         const templateData = {
-            categoria: material.categoria || '',
-            fabricante: material.fabricante || '',
-            marca: material.fabricante || '',
-            genero: material.sexo || '',
-            sexo: material.sexo || '',
-            tamanho: material.tamanhoColete || '',
-            tamanhoColete: material.tamanhoColete || '',
-            numeroSerie: material.numeroSerie || '',
             grad: data.policial.grad || '',
             numeral: data.policial.numeral || '',
             nome: data.policial.nome || '',
             policial: data.policial.nome || '',
             matricula: data.policial.matricula || '',
-            dataAtual: new Date().toLocaleDateString('pt-BR')
+            dataAtual: new Date().toLocaleDateString('pt-BR'),
+            materiais: materiaisFormatados
         };
 
         console.log('Dados para o template:', templateData);

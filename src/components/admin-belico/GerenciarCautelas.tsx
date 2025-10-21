@@ -187,11 +187,19 @@ const GerenciarCautelas = () => {
             numeral: cautela.numeral || ''
           },
           materiais: cautela.materiais.map(material => ({
+            nome: material.nome || '',
             categoria: material.categoria || '',
+            subcategoria: material.subcategoria || '',
             fabricante: material.fabricante || '',
+            modelo: material.modelo || '',
+            calibre: material.calibre || '',
+            calibreMunicao: material.calibreMunicao || '',
             sexo: material.sexo || '',
             tamanhoColete: material.tamanhoColete || '',
-            numeroSerie: material.numeroSerie || ''
+            numeroSerie: material.numeroSerie || '',
+            quantidade: material.quantidade || 1,
+            quantidadeCarregadores: material.quantidadeCarregadores || 0,
+            quantidadeMunicoes: material.quantidadeMunicoes || 0
           }))
         }),
       });
