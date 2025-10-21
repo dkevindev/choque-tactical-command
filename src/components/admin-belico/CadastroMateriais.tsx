@@ -116,11 +116,49 @@ const CadastroMateriais = () => {
     try {
       const q = query(collection(db, 'materiais_belicos'), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      const materiaisData = querySnapshot.docs.map(doc => ({
+      let materiaisData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate() || new Date()
       } as Material));
+
+      // Carregar cautelas ativas para sincronizar status dos materiais
+      const cautelasQuery = query(collection(db, 'cautelas_permanentes'));
+      const cautelasSnapshot = await getDocs(cautelasQuery);
+      const cautelasAtivas = cautelasSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((c: any) => c.status === 'ativa');
+
+      // Criar mapa de materiais cautelados
+      const materiaisCautelados = new Map<string, { policialNome: string, policialId: string }>();
+      cautelasAtivas.forEach((cautela: any) => {
+        if (cautela.materiais && Array.isArray(cautela.materiais)) {
+          cautela.materiais.forEach((mat: any) => {
+            if (mat.materialId) {
+              materiaisCautelados.set(mat.materialId, {
+                policialNome: `${cautela.policialPatente} ${cautela.policialNome}`,
+                policialId: cautela.policialId
+              });
+            }
+          });
+        }
+      });
+
+      // Atualizar status dos materiais baseado nas cautelas ativas
+      materiaisData = materiaisData.map(material => {
+        const cautelaInfo = materiaisCautelados.get(material.id);
+        if (cautelaInfo) {
+          return {
+            ...material,
+            cautelado: true,
+            disponivel: false,
+            policialAssociadoNome: cautelaInfo.policialNome,
+            policialAssociadoId: cautelaInfo.policialId
+          };
+        }
+        return material;
+      });
+
       setMateriais(materiaisData);
     } catch (error) {
       console.error('Erro ao carregar materiais:', error);
