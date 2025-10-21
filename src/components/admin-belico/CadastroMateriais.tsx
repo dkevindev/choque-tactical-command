@@ -743,7 +743,7 @@ const CadastroMateriais = () => {
                         const policial = policiais.find(p => p.id === value);
                         setFormData(prev => ({ 
                           ...prev, 
-                          policialAssociadoId: value,
+                          policialAssociadoId: value === 'none' ? '' : value,
                           policialAssociadoNome: policial ? `${policial.patente} ${policial.nome}` : ''
                         }));
                       }}
@@ -752,7 +752,7 @@ const CadastroMateriais = () => {
                         <SelectValue placeholder="Selecione o policial" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Nenhum (Reserva de Armamento)</SelectItem>
+                        <SelectItem value="none">Nenhum (Reserva de Armamento)</SelectItem>
                         {policiais
                           .filter(p => {
                             const busca = buscaPolicial.toLowerCase();
