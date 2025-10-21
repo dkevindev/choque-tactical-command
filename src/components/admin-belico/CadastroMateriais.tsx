@@ -329,20 +329,23 @@ const CadastroMateriais = () => {
           return data.policialId === formData.policialAssociadoId && data.status === 'ativa';
         });
 
-        const novoMaterial = {
+        // Criar objeto do material para cautela apenas com campos válidos
+        const novoMaterial: any = {
           materialId: materialId,
           nome: materialData.nome,
           categoria: materialData.categoria,
-          numeroSerie: materialData.numeroSerie,
-          quantidade: 1,
-          tamanhoColete: materialData.tamanhoColete,
-          sexo: materialData.sexo,
-          fabricante: materialData.fabricante,
-          quantidadeCarregadores: materialData.quantidadeCarregadores,
-          quantidadeMunicoes: materialData.quantidadeMunicoes,
-          calibreMunicao: materialData.calibreMunicao,
-          numeroSIARM: materialData.numeroSIARM
+          quantidade: 1
         };
+        
+        // Adicionar campos opcionais apenas se existirem
+        if (materialData.numeroSerie) novoMaterial.numeroSerie = materialData.numeroSerie;
+        if (materialData.tamanhoColete) novoMaterial.tamanhoColete = materialData.tamanhoColete;
+        if (materialData.sexo) novoMaterial.sexo = materialData.sexo;
+        if (materialData.fabricante) novoMaterial.fabricante = materialData.fabricante;
+        if (materialData.quantidadeCarregadores) novoMaterial.quantidadeCarregadores = materialData.quantidadeCarregadores;
+        if (materialData.quantidadeMunicoes) novoMaterial.quantidadeMunicoes = materialData.quantidadeMunicoes;
+        if (materialData.calibreMunicao) novoMaterial.calibreMunicao = materialData.calibreMunicao;
+        if (materialData.numeroSIARM) novoMaterial.numeroSIARM = materialData.numeroSIARM;
 
         if (cautelaExistente) {
           // Atualizar cautela existente adicionando o novo material
