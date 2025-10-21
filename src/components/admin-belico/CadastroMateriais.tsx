@@ -35,6 +35,7 @@ interface Material {
   policialAssociadoId?: string;
   policialAssociadoNome?: string;
   fabricante?: string;
+  modelo?: string;
   observacoes?: string;
   createdAt: Date;
   // Campos específicos para armas
@@ -59,6 +60,7 @@ const CadastroMateriais = () => {
     quantidade: '',
     disponivel: true,
     fabricante: '',
+    modelo: '',
     observacoes: '',
     tamanhoColete: '',
     vencimento: '',
@@ -208,6 +210,7 @@ const CadastroMateriais = () => {
       quantidade: '',
       disponivel: true,
       fabricante: '',
+      modelo: '',
       observacoes: '',
       tamanhoColete: '',
       vencimento: '',
@@ -289,6 +292,7 @@ const CadastroMateriais = () => {
       if (formData.policialAssociadoId) materialDataBase.policialAssociadoId = formData.policialAssociadoId;
       if (formData.policialAssociadoNome) materialDataBase.policialAssociadoNome = formData.policialAssociadoNome;
       if (formData.fabricante) materialDataBase.fabricante = formData.fabricante;
+      if (formData.modelo) materialDataBase.modelo = formData.modelo;
       if (formData.observacoes) materialDataBase.observacoes = formData.observacoes;
       if (vencimentoCalculado) materialDataBase.vencimento = vencimentoCalculado;
       if (formData.anosValidade) materialDataBase.anosValidade = parseInt(formData.anosValidade);
@@ -329,8 +333,11 @@ const CadastroMateriais = () => {
           return data.policialId === formData.policialAssociadoId && data.status === 'ativa';
         });
 
-        // Criar objeto do material para cautela apenas com campos válidos
-        const novoMaterial: any = {
+        // Criar array de materiais para a cautela
+        const materiaisParaCautela: any[] = [];
+        
+        // Item principal (arma/material)
+        const itemPrincipal: any = {
           materialId: materialId,
           nome: materialData.nome,
           categoria: materialData.categoria,
@@ -338,25 +345,50 @@ const CadastroMateriais = () => {
         };
         
         // Adicionar campos opcionais apenas se existirem
-        if (materialData.numeroSerie) novoMaterial.numeroSerie = materialData.numeroSerie;
-        if (materialData.tamanhoColete) novoMaterial.tamanhoColete = materialData.tamanhoColete;
-        if (materialData.sexo) novoMaterial.sexo = materialData.sexo;
-        if (materialData.fabricante) novoMaterial.fabricante = materialData.fabricante;
-        if (materialData.quantidadeCarregadores) novoMaterial.quantidadeCarregadores = materialData.quantidadeCarregadores;
-        if (materialData.quantidadeMunicoes) novoMaterial.quantidadeMunicoes = materialData.quantidadeMunicoes;
-        if (materialData.calibreMunicao) novoMaterial.calibreMunicao = materialData.calibreMunicao;
-        if (materialData.numeroSIARM) novoMaterial.numeroSIARM = materialData.numeroSIARM;
+        if (materialData.numeroSerie) itemPrincipal.numeroSerie = materialData.numeroSerie;
+        if (materialData.tamanhoColete) itemPrincipal.tamanhoColete = materialData.tamanhoColete;
+        if (materialData.sexo) itemPrincipal.sexo = materialData.sexo;
+        if (materialData.fabricante) itemPrincipal.fabricante = materialData.fabricante;
+        if (materialData.modelo) itemPrincipal.modelo = materialData.modelo;
+        if (materialData.numeroSIARM) itemPrincipal.numeroSIARM = materialData.numeroSIARM;
+        
+        materiaisParaCautela.push(itemPrincipal);
+        
+        // Se for armamento, adicionar carregadores e munições como itens separados
+        if (materialData.categoria === 'Armamento') {
+          if (materialData.quantidadeCarregadores && materialData.quantidadeCarregadores > 0) {
+            materiaisParaCautela.push({
+              materialId: `${materialId}_carregadores`,
+              nome: `Carregadores - ${materialData.nome}`,
+              categoria: 'Acessório',
+              quantidade: materialData.quantidadeCarregadores,
+              fabricante: materialData.fabricante,
+              modelo: materialData.modelo
+            });
+          }
+          
+          if (materialData.quantidadeMunicoes && materialData.quantidadeMunicoes > 0) {
+            materiaisParaCautela.push({
+              materialId: `${materialId}_municoes`,
+              nome: `Munição ${materialData.calibreMunicao || materialData.calibre || ''}`,
+              categoria: 'Munição',
+              subcategoria: 'Letal',
+              quantidade: materialData.quantidadeMunicoes,
+              calibre: materialData.calibreMunicao || materialData.calibre
+            });
+          }
+        }
 
         if (cautelaExistente) {
-          // Atualizar cautela existente adicionando o novo material
-          const materiaisAtualizados = [...(cautelaExistente.data().materiais || []), novoMaterial];
+          // Atualizar cautela existente adicionando os novos materiais
+          const materiaisAtualizados = [...(cautelaExistente.data().materiais || []), ...materiaisParaCautela];
           await updateDoc(doc(db, 'cautelas_permanentes', cautelaExistente.id), {
             materiais: materiaisAtualizados,
             observacoes: formData.observacoes 
               ? `${cautelaExistente.data().observacoes}\n${formData.observacoes}`.trim()
               : cautelaExistente.data().observacoes
           });
-          toast.success('Material adicionado à cautela existente do policial');
+          toast.success('Material(is) adicionado(s) à cautela existente do policial');
         } else {
           // Criar nova cautela
           const cautelaData = {
@@ -365,7 +397,7 @@ const CadastroMateriais = () => {
             policialMatricula: policial?.matricula,
             policialPatente: policial?.patente,
             numeral: policial?.numeral,
-            materiais: [novoMaterial],
+            materiais: materiaisParaCautela,
             observacoes: formData.observacoes || '',
             status: 'ativa',
             tipoDocumento: 'permanente',
@@ -397,6 +429,7 @@ const CadastroMateriais = () => {
       quantidade: material.quantidade?.toString() || '',
       disponivel: material.disponivel,
       fabricante: material.fabricante || '',
+      modelo: material.modelo || '',
       observacoes: material.observacoes || '',
       tamanhoColete: (material as any).tamanhoColete || '',
       vencimento: (material as any).vencimento || '',
@@ -566,6 +599,16 @@ const CadastroMateriais = () => {
                     value={formData.fabricante}
                     onChange={(e) => setFormData(prev => ({ ...prev, fabricante: e.target.value }))}
                     placeholder="Ex: Taurus, CBC"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="modelo">Modelo</Label>
+                  <Input
+                    id="modelo"
+                    value={formData.modelo}
+                    onChange={(e) => setFormData(prev => ({ ...prev, modelo: e.target.value }))}
+                    placeholder="Ex: PT 100, MD2, MD6"
                   />
                 </div>
 
