@@ -40,15 +40,22 @@ interface Policial {
   telefone?: string;
 }
 
+interface CautelaData {
+  armamento?: string; // Número de série da arma
+  colete?: string; // Número de série do colete
+}
+
 const PolicialTable = () => {
   const [policiais, setPoliciais] = useState<Policial[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPolicial, setSelectedPolicial] = useState<Policial | null>(null);
+  const [cautelasMap, setCautelasMap] = useState<Map<string, CautelaData>>(new Map());
 
   useEffect(() => {
-    const loadPoliciais = async () => {
+    const loadData = async () => {
       try {
+        // Carregar policiais
         const querySnapshot = await getDocs(collection(db, 'policiais'));
         const policiaisData: Policial[] = [];
         
@@ -60,15 +67,49 @@ const PolicialTable = () => {
         });
         
         setPoliciais(policiaisData);
-        console.log('Policiais carregados:', policiaisData);
+        
+        // Carregar cautelas ativas
+        const cautelasSnapshot = await getDocs(collection(db, 'cautelas_permanentes'));
+        const cautelasData = new Map<string, CautelaData>();
+        
+        cautelasSnapshot.forEach((doc) => {
+          const cautela = doc.data();
+          if (cautela.status === 'ativa' && cautela.policialId) {
+            const materiais = cautela.materiais || [];
+            const data: CautelaData = {};
+            
+            // Buscar armamento (Pistola, Fuzil, Carabina, etc)
+            const armamento = materiais.find((m: any) => 
+              m.categoria === 'Armamento' && m.numeroSerie
+            );
+            if (armamento) {
+              data.armamento = armamento.numeroSerie;
+            }
+            
+            // Buscar colete
+            const colete = materiais.find((m: any) => 
+              m.categoria === 'Colete Balístico' && m.numeroSerie
+            );
+            if (colete) {
+              data.colete = colete.numeroSerie;
+            }
+            
+            if (data.armamento || data.colete) {
+              cautelasData.set(cautela.policialId, data);
+            }
+          }
+        });
+        
+        setCautelasMap(cautelasData);
+        console.log('Policiais e cautelas carregados');
       } catch (error) {
-        console.error('Erro ao carregar policiais:', error);
+        console.error('Erro ao carregar dados:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadPoliciais();
+    loadData();
   }, []);
 
   const getPostGradOrder = (postGrad: string) => {
@@ -98,12 +139,20 @@ const PolicialTable = () => {
     return funcao.includes('RESP SUBCOMANDO RPMONT') || funcao.includes('CMT');
   };
 
-  const filteredPoliciais = policiais.filter(policial =>
-    (policial.NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (policial.Matrícula?.toString() || '').includes(searchTerm) ||
-    (policial['Post/Grad'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (policial.NUMERAL?.toString() || '').includes(searchTerm)
-  ).sort((a, b) => {
+  const filteredPoliciais = policiais.filter(policial => {
+    const cautelaData = cautelasMap.get(policial.id);
+    const armamentoSerie = cautelaData?.armamento || '';
+    const coleteSerie = cautelaData?.colete || '';
+    
+    return (
+      (policial.NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (policial.Matrícula?.toString() || '').includes(searchTerm) ||
+      (policial['Post/Grad'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (policial.NUMERAL?.toString() || '').includes(searchTerm) ||
+      armamentoSerie.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      coleteSerie.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }).sort((a, b) => {
     // Primeiro: quem tem CMT RPMONT sempre no topo
     const aHasCmtRpmont = hasCmtRpmont(a);
     const bHasCmtRpmont = hasCmtRpmont(b);
@@ -173,7 +222,7 @@ const PolicialTable = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome, matrícula, posto ou numeral..."
+            placeholder="Buscar por nome, matrícula, posto, numeral ou nº de série..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -189,21 +238,35 @@ const PolicialTable = () => {
             <TableHead>NUMERAL</TableHead>
             <TableHead>NOME</TableHead>
             <TableHead>POSTO</TableHead>
-            <TableHead>UNIDADE</TableHead>
-            <TableHead>SITUAÇÃO</TableHead>
+            <TableHead>ARMAMENTO</TableHead>
+            <TableHead>COLETE</TableHead>
             <TableHead>AÇÕES</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredPoliciais.map((policial) => (
-            <TableRow key={policial.id}>
-              <TableCell className="font-medium">{policial.Matrícula || 'N/A'}</TableCell>
-              <TableCell className="font-medium">{policial.NUMERAL || 'N/A'}</TableCell>
-              <TableCell>{policial.NOME || 'N/A'}</TableCell>
-              <TableCell>{policial['Post/Grad'] || 'N/A'}</TableCell>
-              <TableCell>{policial.UNIDADE || 'N/A'}</TableCell>
-              <TableCell>{getStatusBadge(policial.SITUAÇÃO || '')}</TableCell>
-              <TableCell>
+          {filteredPoliciais.map((policial) => {
+            const cautelaData = cautelasMap.get(policial.id);
+            return (
+              <TableRow key={policial.id}>
+                <TableCell className="font-medium">{policial.Matrícula || 'N/A'}</TableCell>
+                <TableCell className="font-medium">{policial.NUMERAL || 'N/A'}</TableCell>
+                <TableCell>{policial.NOME || 'N/A'}</TableCell>
+                <TableCell>{policial['Post/Grad'] || 'N/A'}</TableCell>
+                <TableCell className="font-mono text-sm">
+                  {cautelaData?.armamento ? (
+                    <Badge variant="default">{cautelaData.armamento}</Badge>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+                <TableCell className="font-mono text-sm">
+                  {cautelaData?.colete ? (
+                    <Badge variant="secondary">{cautelaData.colete}</Badge>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+                <TableCell>
                 <div className="flex gap-2">
                   <Dialog>
                     <DialogTrigger asChild>
@@ -383,7 +446,8 @@ const PolicialTable = () => {
                 </div>
               </TableCell>
             </TableRow>
-          ))}
+          );
+          })}
         </TableBody>
       </Table>
 
