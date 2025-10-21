@@ -189,17 +189,23 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
       // Gerar número da cautela
       const anoAtual = new Date().getFullYear();
       
-      // Buscar cautelas do ano atual
-      const q = query(
-        collection(db, 'cautelas_permanentes'),
-        where('ano', '==', anoAtual)
-      );
-      const querySnapshot = await getDocs(q);
-      const quantidadeAnoAtual = querySnapshot.size;
+      // Buscar TODAS as cautelas e filtrar pelo ano atual
+      const querySnapshot = await getDocs(collection(db, 'cautelas_permanentes'));
+      
+      // Filtrar cautelas do ano atual baseado na data de criação
+      const cautelasAnoAtual = querySnapshot.docs.filter(doc => {
+        const data = doc.data();
+        const dataInicio = data.dataInicio?.toDate() || data.createdAt?.toDate();
+        return dataInicio && dataInicio.getFullYear() === anoAtual;
+      });
+      
+      const quantidadeAnoAtual = cautelasAnoAtual.length;
       
       // Gerar próximo número
       const proximoNumero = quantidadeAnoAtual + 1;
       const numeroCautela = `${String(proximoNumero).padStart(3, '0')}/${anoAtual}`;
+      
+      console.log(`Gerando cautela ${numeroCautela} (${quantidadeAnoAtual} cautelas existentes no ano ${anoAtual})`);
 
       const cautelaData = {
         numeroCautela,
