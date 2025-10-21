@@ -228,6 +228,7 @@ appCautela.post('/', async (req, res) => {
             });
         
         const templateData = {
+            ncautela: data.numeroCautela || '',
             grad: data.policial.grad || '',
             numeral: data.policial.numeral || '',
             nome: data.policial.nome || '',

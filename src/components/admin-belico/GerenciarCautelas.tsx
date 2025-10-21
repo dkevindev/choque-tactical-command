@@ -183,6 +183,7 @@ const GerenciarCautelas = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          numeroCautela: cautela.numeroCautela || '',
           policial: {
             nome: cautela.policialNome,
             matricula: cautela.policialMatricula,
