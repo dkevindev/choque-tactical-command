@@ -272,31 +272,35 @@ const CadastroMateriais = () => {
         vencimentoCalculado = dataVencimento.toISOString().split('T')[0];
       }
 
-      const materialData: any = {
+      // Criar objeto base com campos obrigatórios
+      const materialDataBase: any = {
         nome: formData.nome || formData.categoria,
         categoria: formData.categoria,
-        subcategoria: formData.subcategoria || undefined,
-        calibre: formData.calibre || undefined,
-        numeroSerie: formData.numeroSerie || undefined,
-        quantidade: formData.quantidade !== '' ? parseInt(formData.quantidade) : undefined,
         disponivel: formData.policialAssociadoId ? false : true,
         cautelado: formData.policialAssociadoId ? true : false,
-        policialAssociadoId: formData.policialAssociadoId || undefined,
-        policialAssociadoNome: formData.policialAssociadoNome || undefined,
-        fabricante: formData.fabricante || undefined,
-        observacoes: formData.observacoes || undefined,
-        vencimento: vencimentoCalculado || undefined,
-        anosValidade: formData.anosValidade ? parseInt(formData.anosValidade) : undefined,
-        tamanhoColete: formData.tamanhoColete || undefined,
-        dataFabricacao: formData.dataFabricacao || undefined,
-        sexo: formData.sexo || undefined,
-        // Campos específicos para armas
-        quantidadeCarregadores: formData.quantidadeCarregadores ? parseInt(formData.quantidadeCarregadores) : undefined,
-        quantidadeMunicoes: formData.quantidadeMunicoes ? parseInt(formData.quantidadeMunicoes) : undefined,
-        calibreMunicao: formData.calibreMunicao || undefined,
-        numeroSIARM: formData.numeroSIARM || undefined,
         createdAt: new Date()
       };
+
+      // Adicionar campos opcionais apenas se tiverem valor
+      if (formData.subcategoria) materialDataBase.subcategoria = formData.subcategoria;
+      if (formData.calibre) materialDataBase.calibre = formData.calibre;
+      if (formData.numeroSerie) materialDataBase.numeroSerie = formData.numeroSerie;
+      if (formData.quantidade !== '') materialDataBase.quantidade = parseInt(formData.quantidade);
+      if (formData.policialAssociadoId) materialDataBase.policialAssociadoId = formData.policialAssociadoId;
+      if (formData.policialAssociadoNome) materialDataBase.policialAssociadoNome = formData.policialAssociadoNome;
+      if (formData.fabricante) materialDataBase.fabricante = formData.fabricante;
+      if (formData.observacoes) materialDataBase.observacoes = formData.observacoes;
+      if (vencimentoCalculado) materialDataBase.vencimento = vencimentoCalculado;
+      if (formData.anosValidade) materialDataBase.anosValidade = parseInt(formData.anosValidade);
+      if (formData.tamanhoColete) materialDataBase.tamanhoColete = formData.tamanhoColete;
+      if (formData.dataFabricacao) materialDataBase.dataFabricacao = formData.dataFabricacao;
+      if (formData.sexo) materialDataBase.sexo = formData.sexo;
+      if (formData.quantidadeCarregadores) materialDataBase.quantidadeCarregadores = parseInt(formData.quantidadeCarregadores);
+      if (formData.quantidadeMunicoes) materialDataBase.quantidadeMunicoes = parseInt(formData.quantidadeMunicoes);
+      if (formData.calibreMunicao) materialDataBase.calibreMunicao = formData.calibreMunicao;
+      if (formData.numeroSIARM) materialDataBase.numeroSIARM = formData.numeroSIARM;
+
+      const materialData = materialDataBase;
 
       let materialId: string;
       
