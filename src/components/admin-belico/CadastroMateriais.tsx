@@ -14,7 +14,8 @@ import {
   Target, 
   Save,
   X,
-  Search
+  Search,
+  User
 } from 'lucide-react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -31,9 +32,16 @@ interface Material {
   disponivel: boolean;
   cautelado?: boolean;
   cauteladoPara?: string;
+  policialAssociadoId?: string;
+  policialAssociadoNome?: string;
   fabricante?: string;
   observacoes?: string;
   createdAt: Date;
+  // Campos específicos para armas
+  quantidadeCarregadores?: number;
+  quantidadeMunicoes?: number;
+  calibreMunicao?: string;
+  numeroSIARM?: string;
 }
 
 const CadastroMateriais = () => {
@@ -56,8 +64,19 @@ const CadastroMateriais = () => {
     vencimento: '',
     dataFabricacao: '',
     anosValidade: '',
-    sexo: ''
+    sexo: '',
+    // Campos para cautela
+    policialAssociadoId: '',
+    policialAssociadoNome: '',
+    // Campos específicos para armas
+    quantidadeCarregadores: '',
+    quantidadeMunicoes: '',
+    calibreMunicao: '',
+    numeroSIARM: ''
   });
+
+  const [policiais, setPoliciais] = useState<any[]>([]);
+  const [buscaPolicial, setBuscaPolicial] = useState('');
 
   const categorias = [
     'Armamento',
@@ -70,7 +89,28 @@ const CadastroMateriais = () => {
 
   useEffect(() => {
     loadMateriais();
+    carregarPoliciais();
   }, []);
+
+  const carregarPoliciais = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'policiais'));
+      const policiaisData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          nome: data.NOME,
+          matricula: data.Matrícula || '',
+          patente: data['Post/Grad'],
+          numeral: data.NUMERAL || ''
+        };
+      });
+      setPoliciais(policiaisData);
+    } catch (error) {
+      console.error('Erro ao carregar policiais:', error);
+      setPoliciais([]);
+    }
+  };
 
   const loadMateriais = async () => {
     try {
@@ -135,8 +175,15 @@ const CadastroMateriais = () => {
       vencimento: '',
       dataFabricacao: '',
       anosValidade: '',
-      sexo: ''
+      sexo: '',
+      policialAssociadoId: '',
+      policialAssociadoNome: '',
+      quantidadeCarregadores: '',
+      quantidadeMunicoes: '',
+      calibreMunicao: '',
+      numeroSIARM: ''
     });
+    setBuscaPolicial('');
     setEditingMaterial(null);
     setShowForm(false);
   };
@@ -155,9 +202,11 @@ const CadastroMateriais = () => {
       return;
     }
 
-    // Validação para munição e EPI
-    if ((formData.categoria === 'Munição' || formData.categoria === 'EPI') && !formData.quantidade) {
-      toast.error('Quantidade é obrigatória para Munição e EPI');
+    // Validação para munição e EPI (apenas se NÃO estiver associando a um policial)
+    if ((formData.categoria === 'Munição' || formData.categoria === 'EPI') && 
+        !formData.policialAssociadoId && 
+        !formData.quantidade) {
+      toast.error('Quantidade é obrigatória para Munição e EPI que não são cautelados');
       return;
     }
 
@@ -185,20 +234,78 @@ const CadastroMateriais = () => {
         vencimentoCalculado = dataVencimento.toISOString().split('T')[0];
       }
 
-      const materialData = {
-        ...formData,
-        vencimento: vencimentoCalculado,
-        quantidade: formData.quantidade !== '' ? parseInt(formData.quantidade) : null,
+      const materialData: any = {
+        nome: formData.nome || formData.categoria,
+        categoria: formData.categoria,
+        subcategoria: formData.subcategoria || undefined,
+        calibre: formData.calibre || undefined,
+        numeroSerie: formData.numeroSerie || undefined,
+        quantidade: formData.quantidade !== '' ? parseInt(formData.quantidade) : undefined,
+        disponivel: formData.policialAssociadoId ? false : true,
+        cautelado: formData.policialAssociadoId ? true : false,
+        policialAssociadoId: formData.policialAssociadoId || undefined,
+        policialAssociadoNome: formData.policialAssociadoNome || undefined,
+        fabricante: formData.fabricante || undefined,
+        observacoes: formData.observacoes || undefined,
+        vencimento: vencimentoCalculado || undefined,
         anosValidade: formData.anosValidade ? parseInt(formData.anosValidade) : undefined,
+        tamanhoColete: formData.tamanhoColete || undefined,
+        dataFabricacao: formData.dataFabricacao || undefined,
+        sexo: formData.sexo || undefined,
+        // Campos específicos para armas
+        quantidadeCarregadores: formData.quantidadeCarregadores ? parseInt(formData.quantidadeCarregadores) : undefined,
+        quantidadeMunicoes: formData.quantidadeMunicoes ? parseInt(formData.quantidadeMunicoes) : undefined,
+        calibreMunicao: formData.calibreMunicao || undefined,
+        numeroSIARM: formData.numeroSIARM || undefined,
         createdAt: new Date()
       };
 
+      let materialId: string;
+      
       if (editingMaterial) {
         await updateDoc(doc(db, 'materiais_belicos', editingMaterial.id), materialData);
+        materialId = editingMaterial.id;
         toast.success('Material atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'materiais_belicos'), materialData);
+        const docRef = await addDoc(collection(db, 'materiais_belicos'), materialData);
+        materialId = docRef.id;
         toast.success('Material cadastrado com sucesso');
+      }
+
+      // Se foi associado a um policial, criar cautela automaticamente
+      if (formData.policialAssociadoId && !editingMaterial) {
+        const policial = policiais.find(p => p.id === formData.policialAssociadoId);
+        
+        const cautelaData = {
+          policialId: formData.policialAssociadoId,
+          policialNome: policial?.nome,
+          policialMatricula: policial?.matricula,
+          policialPatente: policial?.patente,
+          numeral: policial?.numeral,
+          materiais: [{
+            materialId: materialId,
+            nome: materialData.nome,
+            categoria: materialData.categoria,
+            numeroSerie: materialData.numeroSerie,
+            quantidade: 1,
+            tamanhoColete: materialData.tamanhoColete,
+            sexo: materialData.sexo,
+            fabricante: materialData.fabricante,
+            quantidadeCarregadores: materialData.quantidadeCarregadores,
+            quantidadeMunicoes: materialData.quantidadeMunicoes,
+            calibreMunicao: materialData.calibreMunicao,
+            numeroSIARM: materialData.numeroSIARM
+          }],
+          observacoes: formData.observacoes || '',
+          status: 'ativa',
+          tipoDocumento: 'permanente',
+          dataInicio: new Date(),
+          createdAt: new Date(),
+          createdBy: 'admin'
+        };
+
+        await addDoc(collection(db, 'cautelas_permanentes'), cautelaData);
+        toast.success('Cautela criada automaticamente para o policial');
       }
 
       resetForm();
@@ -224,8 +331,17 @@ const CadastroMateriais = () => {
       vencimento: (material as any).vencimento || '',
       dataFabricacao: (material as any).dataFabricacao || '',
       anosValidade: (material as any).anosValidade?.toString() || '',
-      sexo: (material as any).sexo || ''
+      sexo: (material as any).sexo || '',
+      policialAssociadoId: material.policialAssociadoId || '',
+      policialAssociadoNome: material.policialAssociadoNome || '',
+      quantidadeCarregadores: material.quantidadeCarregadores?.toString() || '',
+      quantidadeMunicoes: material.quantidadeMunicoes?.toString() || '',
+      calibreMunicao: material.calibreMunicao || '',
+      numeroSIARM: material.numeroSIARM || ''
     });
+    if (material.policialAssociadoNome) {
+      setBuscaPolicial(material.policialAssociadoNome);
+    }
     setEditingMaterial(material);
     setShowForm(true);
   };
@@ -485,6 +601,119 @@ const CadastroMateriais = () => {
                     </div>
                   </>
                 )}
+
+                {/* Campos específicos para Armamento */}
+                {formData.categoria === 'Armamento' && (
+                  <>
+                    <div>
+                      <Label htmlFor="quantidadeCarregadores">Quantidade de Carregadores</Label>
+                      <Input
+                        id="quantidadeCarregadores"
+                        type="number"
+                        value={formData.quantidadeCarregadores}
+                        onChange={(e) => setFormData(prev => ({ ...prev, quantidadeCarregadores: e.target.value }))}
+                        placeholder="Ex: 3"
+                        min="0"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="quantidadeMunicoes">Quantidade de Munições</Label>
+                      <Input
+                        id="quantidadeMunicoes"
+                        type="number"
+                        value={formData.quantidadeMunicoes}
+                        onChange={(e) => setFormData(prev => ({ ...prev, quantidadeMunicoes: e.target.value }))}
+                        placeholder="Ex: 50"
+                        min="0"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="calibreMunicao">Calibre da Munição</Label>
+                      <Input
+                        id="calibreMunicao"
+                        value={formData.calibreMunicao}
+                        onChange={(e) => setFormData(prev => ({ ...prev, calibreMunicao: e.target.value }))}
+                        placeholder="Ex: .40, 9mm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="numeroSIARM">Número da Cautela SIARM</Label>
+                      <Input
+                        id="numeroSIARM"
+                        value={formData.numeroSIARM}
+                        onChange={(e) => setFormData(prev => ({ ...prev, numeroSIARM: e.target.value }))}
+                        placeholder="Ex: 2024/123"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Seção de Associação ao Policial */}
+              <div className="border-t pt-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  <h4 className="font-semibold text-foreground">Associar ao Policial (Opcional)</h4>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Se este material será cautelado imediatamente a um policial, selecione abaixo. 
+                  Caso contrário, ele ficará na reserva de armamento.
+                </p>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="buscaPolicial">Buscar Policial</Label>
+                  <Input
+                    id="buscaPolicial"
+                    placeholder="Buscar por nome, matrícula ou numeral..."
+                    value={buscaPolicial}
+                    onChange={(e) => setBuscaPolicial(e.target.value)}
+                  />
+                </div>
+
+                {buscaPolicial && (
+                  <div className="space-y-2">
+                    <Label>Selecionar Policial</Label>
+                    <Select 
+                      value={formData.policialAssociadoId} 
+                      onValueChange={(value) => {
+                        const policial = policiais.find(p => p.id === value);
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          policialAssociadoId: value,
+                          policialAssociadoNome: policial ? `${policial.patente} ${policial.nome}` : ''
+                        }));
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o policial" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Nenhum (Reserva de Armamento)</SelectItem>
+                        {policiais
+                          .filter(p => {
+                            const busca = buscaPolicial.toLowerCase();
+                            return (
+                              p.nome.toLowerCase().includes(busca) ||
+                              String(p.matricula).toLowerCase().includes(busca) ||
+                              String(p.numeral || '').toLowerCase().includes(busca)
+                            );
+                          })
+                          .map(policial => (
+                            <SelectItem key={policial.id} value={policial.id}>
+                              {policial.patente} {policial.nome} - Mat: {policial.matricula}
+                              {policial.numeral ? ` - ${policial.numeral}` : ''}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {formData.policialAssociadoNome && (
+                  <Badge variant="default" className="text-sm">
+                    Será cautelado para: {formData.policialAssociadoNome}
+                  </Badge>
+                )}
               </div>
 
               <div>
@@ -533,12 +762,9 @@ const CadastroMateriais = () => {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Categoria</TableHead>
-                  <TableHead>Subcategoria</TableHead>
-                  <TableHead>Calibre</TableHead>
                   <TableHead>Série</TableHead>
-                  <TableHead>Quantidade</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Fabricante</TableHead>
+                  <TableHead>Cautelado Para</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -549,26 +775,17 @@ const CadastroMateriais = () => {
                     <TableCell>
                       <Badge variant="outline">{material.categoria}</Badge>
                     </TableCell>
-                    <TableCell>
-                      {material.subcategoria ? (
-                        <Badge variant={material.subcategoria === 'Letal' ? 'destructive' : 'secondary'}>
-                          {material.subcategoria}
-                        </Badge>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>{material.calibre || '-'}</TableCell>
                     <TableCell className="font-mono text-sm">{material.numeroSerie || '-'}</TableCell>
                     <TableCell>
-                      {material.quantidade ? (
-                        <Badge variant="outline">{material.quantidade}</Badge>
-                      ) : '-'}
+                      {material.cautelado ? (
+                        <Badge variant="secondary">Cautelado</Badge>
+                      ) : (
+                        <Badge variant="default">Reserva</Badge>
+                      )}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={material.disponivel ? 'default' : 'secondary'}>
-                        {material.disponivel ? 'Disponível' : 'Indisponível'}
-                      </Badge>
+                    <TableCell className="text-sm">
+                      {material.policialAssociadoNome || '-'}
                     </TableCell>
-                    <TableCell>{material.fabricante || '-'}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
