@@ -119,7 +119,8 @@ appCautela.use(express.json());
 
 appCautela.post('/', async (req, res) => {
     console.log('Endpoint / gerando cautela acessado!');
-    console.log('Corpo recebido:', req.body);
+    console.log('Corpo recebido:', JSON.stringify(req.body, null, 2));
+    console.log('Número da cautela recebido:', req.body.numeroCautela);
     let tempFilePath;
     try {
         const data = req.body;
@@ -239,7 +240,8 @@ appCautela.post('/', async (req, res) => {
             materiaisColetes: materiaisColetes
         };
 
-        console.log('Dados para o template:', templateData);
+        console.log('Dados para o template:', JSON.stringify(templateData, null, 2));
+        console.log('ncautela final:', templateData.ncautela);
 
         doc.render(templateData);
         const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
