@@ -15,12 +15,14 @@ import {
   AlertCircle,
   Eye,
   Plus,
-  Target
+  Target,
+  ArrowRight
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 import NovaCautelaForm from './NovaCautelaForm';
+import TransferenciaPolicialModal from './TransferenciaPolicialModal';
 
 interface Cautela {
   id: string;
@@ -70,6 +72,7 @@ const GerenciarCautelas = () => {
   const [tipoFiltro, setTipoFiltro] = useState('todos');
   const [cautelaDetalhes, setCautelaDetalhes] = useState<Cautela | null>(null);
   const [showNovaForm, setShowNovaForm] = useState(false);
+  const [cautelaTransferencia, setCautelaTransferencia] = useState<Cautela | null>(null);
 
   useEffect(() => {
     loadCautelas();
@@ -435,14 +438,24 @@ const GerenciarCautelas = () => {
                         </Button>
 
                         {cautela.status === 'ativa' && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => finalizarCautela(cautela.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setCautelaTransferencia(cautela)}
+                              title="Transferir Policial"
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => finalizarCautela(cautela.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </TableCell>
@@ -583,6 +596,16 @@ const GerenciarCautelas = () => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Modal de Transferência */}
+      {cautelaTransferencia && (
+        <TransferenciaPolicialModal
+          cautela={cautelaTransferencia}
+          open={!!cautelaTransferencia}
+          onClose={() => setCautelaTransferencia(null)}
+          onSuccess={loadCautelas}
+        />
       )}
     </div>
   );

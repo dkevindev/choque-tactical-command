@@ -270,3 +270,168 @@ appCautela.post('/', async (req, res) => {
 });
 
 exports.gerarCautelaDocx = functions.https.onRequest(appCautela);
+
+// ----------------- FUNÇÃO BAIXA DE CAUTELA -----------------
+const appBaixaCautela = express();
+appBaixaCautela.use(cors({ origin: true }));
+appBaixaCautela.use(express.json());
+
+appBaixaCautela.post('/', async (req, res) => {
+    let tempFilePath;
+    try {
+        const data = req.body;
+
+        if (!data.policial || !data.numeroOficio || !data.transferidoPara || !data.publicacao) {
+            return res.status(400).send('Dados incompletos para baixa de cautela.');
+        }
+
+        const bucket = admin.storage().bucket();
+        const templatePath = 'templates/template-baixa-cautela.docx';
+        tempFilePath = path.join('/tmp', `template-baixa-cautela-${Date.now()}.docx`);
+        await bucket.file(templatePath).download({ destination: tempFilePath });
+
+        const content = fs.readFileSync(tempFilePath, 'binary');
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+        const pistola = `${data.pistola.fabricante} ${data.pistola.modelo} ${data.pistola.calibre}`.trim();
+
+        const templateData = {
+            grad: data.policial.grad || '',
+            nomedopolicial: data.policial.nome || '',
+            matricula: data.policial.matricula || '',
+            dataatual: data.dataAtual || new Date().toLocaleDateString('pt-BR'),
+            numerooficio: data.numeroOficio || '',
+            transferidopara: data.transferidoPara || '',
+            publicacao: data.publicacao || '',
+            pistola: pistola,
+            nserie: data.numeroSerie || '',
+            ncautela: data.numeroCautela || ''
+        };
+
+        doc.render(templateData);
+        const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+        const nomeArquivo = `Baixa-Cautela-${data.policial.nome.replace(/\s+/g, '_')}.docx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Erro ao gerar baixa de cautela:', error);
+        res.status(500).send('Erro ao gerar documento de baixa de cautela.');
+    } finally {
+        try { if (tempFilePath) fs.unlinkSync(tempFilePath); } 
+        catch (err) { console.warn('Não foi possível excluir o arquivo temporário:', err); }
+    }
+});
+
+exports.gerarBaixaCautelaDocx = functions.https.onRequest(appBaixaCautela);
+
+// ----------------- FUNÇÃO TRANSFERÊNCIA DE CAUTELA -----------------
+const appTransferenciaCautela = express();
+appTransferenciaCautela.use(cors({ origin: true }));
+appTransferenciaCautela.use(express.json());
+
+appTransferenciaCautela.post('/', async (req, res) => {
+    let tempFilePath;
+    try {
+        const data = req.body;
+
+        if (!data.policial || !data.numeroOficio || !data.transferidoPara || !data.publicacao) {
+            return res.status(400).send('Dados incompletos para transferência de cautela.');
+        }
+
+        const bucket = admin.storage().bucket();
+        const templatePath = 'templates/template-transferencia-cautela.docx';
+        tempFilePath = path.join('/tmp', `template-transferencia-cautela-${Date.now()}.docx`);
+        await bucket.file(templatePath).download({ destination: tempFilePath });
+
+        const content = fs.readFileSync(tempFilePath, 'binary');
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+        const pistola = `${data.pistola.fabricante} ${data.pistola.modelo} ${data.pistola.calibre}`.trim();
+
+        const templateData = {
+            grad: data.policial.grad || '',
+            nomedopolicial: data.policial.nome || '',
+            matricula: data.policial.matricula || '',
+            dataatual: data.dataAtual || new Date().toLocaleDateString('pt-BR'),
+            numerooficio: data.numeroOficio || '',
+            transferidopara: data.transferidoPara || '',
+            publicacao: data.publicacao || '',
+            pistola: pistola,
+            nserie: data.numeroSerie || '',
+            ncautela: data.numeroCautela || ''
+        };
+
+        doc.render(templateData);
+        const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+        const nomeArquivo = `Transferencia-Cautela-${data.policial.nome.replace(/\s+/g, '_')}.docx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Erro ao gerar transferência de cautela:', error);
+        res.status(500).send('Erro ao gerar documento de transferência de cautela.');
+    } finally {
+        try { if (tempFilePath) fs.unlinkSync(tempFilePath); } 
+        catch (err) { console.warn('Não foi possível excluir o arquivo temporário:', err); }
+    }
+});
+
+exports.gerarTransferenciaCautelaDocx = functions.https.onRequest(appTransferenciaCautela);
+
+// ----------------- FUNÇÃO TERMO DE ENTREGA -----------------
+const appTermoEntrega = express();
+appTermoEntrega.use(cors({ origin: true }));
+appTermoEntrega.use(express.json());
+
+appTermoEntrega.post('/', async (req, res) => {
+    let tempFilePath;
+    try {
+        const data = req.body;
+
+        if (!data.policial || !data.numeroTermo || !data.transferidoPara || !data.publicacao) {
+            return res.status(400).send('Dados incompletos para termo de entrega.');
+        }
+
+        const bucket = admin.storage().bucket();
+        const templatePath = 'templates/template-termo-entrega.docx';
+        tempFilePath = path.join('/tmp', `template-termo-entrega-${Date.now()}.docx`);
+        await bucket.file(templatePath).download({ destination: tempFilePath });
+
+        const content = fs.readFileSync(tempFilePath, 'binary');
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+        const templateData = {
+            grad: data.policial.grad || '',
+            nomedopolicial: data.policial.nome || '',
+            matricula: data.policial.matricula || '',
+            dataatual: data.dataAtual || new Date().toLocaleDateString('pt-BR'),
+            numerotermo: data.numeroTermo || '',
+            transferidopara: data.transferidoPara || '',
+            publicacao: data.publicacao || '',
+            materiais: data.materiais || [],
+            itensadicionais: data.itensAdicionais || []
+        };
+
+        doc.render(templateData);
+        const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+        const nomeArquivo = `Termo-Entrega-${data.policial.nome.replace(/\s+/g, '_')}.docx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Erro ao gerar termo de entrega:', error);
+        res.status(500).send('Erro ao gerar termo de entrega.');
+    } finally {
+        try { if (tempFilePath) fs.unlinkSync(tempFilePath); } 
+        catch (err) { console.warn('Não foi possível excluir o arquivo temporário:', err); }
+    }
+});
+
+exports.gerarTermoEntregaDocx = functions.https.onRequest(appTermoEntrega);

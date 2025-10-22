@@ -7,7 +7,10 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
-import NovaOSForm from './motorizado/NovaOSForm'; // Componente que vamos criar
+import NovaOSForm from './motorizado/NovaOSForm';
+import GerarBaixaCautelaForm from './admin-belico/documentos/GerarBaixaCautelaForm';
+import GerarTransferenciaCautelaForm from './admin-belico/documentos/GerarTransferenciaCautelaForm';
+import GerarTermoEntregaForm from './admin-belico/documentos/GerarTermoEntregaForm';
 
 interface DocumentosPageProps {
   locationState?: any;
@@ -16,6 +19,7 @@ interface DocumentosPageProps {
 const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
   const [subsection, setSubsection] = useState<'menu' | 'nova-os'>('menu');
   const [activeTab, setActiveTab] = useState('belico');
+  const [belicoSubsection, setBelicoSubsection] = useState<'menu' | 'baixa-cautela' | 'transferencia-cautela' | 'termo-entrega'>('menu');
 
   useEffect(() => {
     if (locationState?.subSection === 'motorizado') {
@@ -41,7 +45,49 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
           </TabsList>
 
           <TabsContent value="belico">
-            <p className="text-muted-foreground">Documentos relacionados ao controle bélico.</p>
+            {belicoSubsection === 'menu' && (
+              <div className="space-y-4">
+                <p className="text-muted-foreground mb-2">Selecione o tipo de documento:</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button variant="outline" onClick={() => setBelicoSubsection('baixa-cautela')}>
+                    Baixa de Cautela
+                  </Button>
+                  <Button variant="outline" onClick={() => setBelicoSubsection('transferencia-cautela')}>
+                    Transferência de Cautela
+                  </Button>
+                  <Button variant="outline" onClick={() => setBelicoSubsection('termo-entrega')}>
+                    Termo de Entrega
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {belicoSubsection === 'baixa-cautela' && (
+              <div>
+                <Button variant="ghost" onClick={() => setBelicoSubsection('menu')} className="mb-4">
+                  ← Voltar
+                </Button>
+                <GerarBaixaCautelaForm />
+              </div>
+            )}
+
+            {belicoSubsection === 'transferencia-cautela' && (
+              <div>
+                <Button variant="ghost" onClick={() => setBelicoSubsection('menu')} className="mb-4">
+                  ← Voltar
+                </Button>
+                <GerarTransferenciaCautelaForm />
+              </div>
+            )}
+
+            {belicoSubsection === 'termo-entrega' && (
+              <div>
+                <Button variant="ghost" onClick={() => setBelicoSubsection('menu')} className="mb-4">
+                  ← Voltar
+                </Button>
+                <GerarTermoEntregaForm />
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="motorizado">
