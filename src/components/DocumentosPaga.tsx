@@ -11,6 +11,7 @@ import NovaOSForm from './motorizado/NovaOSForm';
 import GerarBaixaCautelaForm from './admin-belico/documentos/GerarBaixaCautelaForm';
 import GerarTransferenciaCautelaForm from './admin-belico/documentos/GerarTransferenciaCautelaForm';
 import GerarTermoEntregaForm from './admin-belico/documentos/GerarTermoEntregaForm';
+import GerarNadaConstaForm from './admin-belico/documentos/GerarNadaConstaForm';
 
 interface DocumentosPageProps {
   locationState?: any;
@@ -19,7 +20,7 @@ interface DocumentosPageProps {
 const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
   const [subsection, setSubsection] = useState<'menu' | 'nova-os'>('menu');
   const [activeTab, setActiveTab] = useState('belico');
-  const [belicoSubsection, setBelicoSubsection] = useState<'menu' | 'baixa-cautela' | 'transferencia-cautela' | 'termo-entrega'>('menu');
+  const [belicoSubsection, setBelicoSubsection] = useState<'menu' | 'baixa-cautela' | 'transferencia-cautela' | 'termo-entrega' | 'nada-consta'>('menu');
 
   useEffect(() => {
     if (locationState?.subSection === 'motorizado') {
@@ -58,6 +59,9 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
                   <Button variant="outline" onClick={() => setBelicoSubsection('termo-entrega')}>
                     Termo de Entrega
                   </Button>
+                  <Button variant="outline" onClick={() => setBelicoSubsection('nada-consta')}>
+                    Nada Consta
+                  </Button>
                 </div>
               </div>
             )}
@@ -86,6 +90,15 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
                   ← Voltar
                 </Button>
                 <GerarTermoEntregaForm />
+              </div>
+            )}
+
+            {belicoSubsection === 'nada-consta' && (
+              <div>
+                <Button variant="ghost" onClick={() => setBelicoSubsection('menu')} className="mb-4">
+                  ← Voltar
+                </Button>
+                <GerarNadaConstaForm />
               </div>
             )}
           </TabsContent>
