@@ -72,43 +72,44 @@ const GerarTermoEntregaForm = () => {
   };
 
   const adicionarItemPredefinido = (item: string, tamanho?: string) => {
-    let descricao = '';
+    let descricao = '- ';
     switch (item) {
       case 'botas':
-        descricao = tamanho ? `01 (um) par de botas tamanho ${tamanho}` : '01 (um) par de botas';
+        descricao += tamanho ? `01 (um) par de botas tamanho ${tamanho}` : '01 (um) par de botas';
         break;
       case 'esporas':
-        descricao = '01 (um) par de esporas';
+        descricao += '01 (um) par de esporas';
         break;
       case 'capacete-antitumulto':
-        descricao = '01 (um) capacete antitumulto';
+        descricao += '01 (um) capacete antitumulto';
         break;
       case 'capacete-pomont':
-        descricao = '01 (um) capacete de POMont';
+        descricao += '01 (um) capacete de POMont';
         break;
       case 'calca':
-        descricao = tamanho
+        descricao += tamanho
           ? `01 (uma) calça camuflado digital tamanho ${tamanho}`
           : '01 (uma) calça camuflado digital';
         break;
       case 'gandola':
-        descricao = tamanho
+        descricao += tamanho
           ? `01 (uma) gandola camuflado digital tamanho ${tamanho}`
           : '01 (uma) gandola camuflado digital';
         break;
       case 'exosqueleto':
-        descricao = '01 (um) exosqueleto';
+        descricao += '01 (um) exosqueleto';
         break;
       case 'joelheira':
-        descricao = '01 (um) par de joelheira';
+        descricao += '01 (um) par de joelheira';
         break;
       case 'cotoveleira':
-        descricao = '01 (um) par de cotoveleira';
+        descricao += '01 (um) par de cotoveleira';
         break;
       case 'kit-manutencao':
-        descricao = 'caixa com kit manutenção';
+        descricao += 'caixa com kit manutenção';
         break;
     }
+    descricao += '\n\n';
     setItensAdicionais([...itensAdicionais, { descricao }]);
   };
 
@@ -118,7 +119,7 @@ const GerarTermoEntregaForm = () => {
 
   const adicionarItemCustomizado = () => {
     if (itemCustomizado.trim()) {
-      setItensAdicionais([...itensAdicionais, { descricao: itemCustomizado }]);
+      setItensAdicionais([...itensAdicionais, { descricao: `- ${itemCustomizado}\n\n` }]);
       setItemCustomizado('');
       setShowModalItem(false);
     }
@@ -143,7 +144,7 @@ const GerarTermoEntregaForm = () => {
     try {
       // Formatar materiais
       const materiais = transferencia.materiaisDevolvidos.map((m, index) => {
-        let descricaoCompleta = `item ${index + 1}) `;
+        let descricaoCompleta = `- `;
 
         if (m.categoria === 'Armamento') {
           descricaoCompleta += `${m.nome || 'Pistola'}, Marca: ${m.fabricante || 'N/D'}, Modelo: ${
@@ -167,7 +168,7 @@ const GerarTermoEntregaForm = () => {
           }`;
         }
 
-        return { descricaoCompleta };
+        return { descricaoCompleta: descricaoCompleta + '\n\n' };
       });
 
       const response = await fetch('https://gerartermoentregadocx-owvlmrnsjq-uc.a.run.app', {
