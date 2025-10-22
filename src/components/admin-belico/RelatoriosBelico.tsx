@@ -1,428 +1,354 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  FileText, 
-  Download, 
-  Calendar,
-  BarChart3,
-  PieChart,
-  TrendingUp,
-  FileSpreadsheet,
-  Printer
-} from 'lucide-react';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Search, Filter } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 
-interface RelatorioConfig {
-  tipo: string;
-  titulo: string;
-  descricao: string;
-  dataInicio: string;
-  dataFim: string;
-  formato: 'pdf' | 'excel' | 'csv';
-  filtros?: {
-    categoria?: string;
-    status?: string;
-    policial?: string;
-  };
+interface Material {
+  id: string;
+  nome: string;
+  categoria: string;
+  numeroSerie?: string;
+  modelo?: string;
+  fabricante?: string;
+  local: string;
+  disponivel: boolean;
+  cautelado?: boolean;
+  cauteladoPara?: string;
+  policialAssociadoNome?: string;
+  // Campos específicos para coletes
+  sexo?: string;
+  vencimento?: string;
+  tamanhoColete?: string;
+  termoEntrega?: string;
+  // Campos específicos para armas
+  tipoArma?: string;
+  calibre?: string;
+  numeroSIARM?: string;
+  quantidadeCarregadores?: number;
+  quantidadeMunicoes?: number;
+  [key: string]: any;
+}
+
+interface Filtros {
+  numeroSerie: string;
+  categoria: string;
+  tipoArma: string;
+  modelo: string;
+  local: string;
+  status: string;
 }
 
 const RelatoriosBelico = () => {
-  const [relatorioConfig, setRelatorioConfig] = useState<RelatorioConfig>({
-    tipo: 'estoque-geral',
-    titulo: 'Relatório de Estoque Geral',
-    descricao: 'Relatório completo do estoque de materiais bélicos',
-    dataInicio: new Date().toISOString().split('T')[0],
-    dataFim: new Date().toISOString().split('T')[0],
-    formato: 'pdf'
+  const [materiais, setMateriais] = useState<Material[]>([]);
+  const [materiaisFiltrados, setMateriaisFiltrados] = useState<Material[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filtros, setFiltros] = useState<Filtros>({
+    numeroSerie: '',
+    categoria: 'todas',
+    tipoArma: 'todas',
+    modelo: '',
+    local: 'todas',
+    status: 'todas'
   });
-
-  const [estatisticasGerais, setEstatisticasGerais] = useState({
-    totalMateriais: 0,
-    materiaisDisponiveis: 0,
-    materiaisCautelados: 0,
-    materiaisManutencao: 0,
-    totalCautelas: 0,
-    cautelasAtivas: 0
-  });
-
-  const tiposRelatorio = [
-    {
-      id: 'estoque-geral',
-      titulo: 'Estoque Geral',
-      descricao: 'Relatório completo do estoque de materiais bélicos',
-      icone: BarChart3
-    },
-    {
-      id: 'materiais-categoria',
-      titulo: 'Materiais por Categoria',
-      descricao: 'Distribuição de materiais por categoria',
-      icone: PieChart
-    },
-    {
-      id: 'cautelas-ativas',
-      titulo: 'Cautelas Ativas',
-      descricao: 'Lista de todas as cautelas em andamento',
-      icone: FileText
-    },
-    {
-      id: 'movimentacoes',
-      titulo: 'Movimentações',
-      descricao: 'Histórico de movimentações por período',
-      icone: TrendingUp
-    },
-    {
-      id: 'auditoria',
-      titulo: 'Auditoria',
-      descricao: 'Relatório de auditoria e conformidade',
-      icone: FileSpreadsheet
-    }
-  ];
 
   useEffect(() => {
-    loadEstatisticasGerais();
+    loadMateriais();
   }, []);
 
-  const loadEstatisticasGerais = async () => {
+  useEffect(() => {
+    aplicarFiltros();
+  }, [filtros, materiais]);
+
+  const loadMateriais = async () => {
     try {
-      // Load materials statistics
+      setLoading(true);
       const materiaisSnapshot = await getDocs(collection(db, 'materiais_belicos'));
-      const materiais = materiaisSnapshot.docs.map(doc => doc.data());
+      const materiaisData = materiaisSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Material));
 
-      // Load cautelas statistics
-      const cautelasSnapshot = await getDocs(collection(db, 'cautelas_permanentes'));
-      const cautelas = cautelasSnapshot.docs.map(doc => doc.data());
-
-      setEstatisticasGerais({
-        totalMateriais: materiais.length,
-        materiaisDisponiveis: materiais.filter(m => m.disponivel && !m.cautelado).length,
-        materiaisCautelados: materiais.filter(m => m.cautelado).length,
-        materiaisManutencao: materiais.filter(m => m.statusManutencao === 'manutencao').length,
-        totalCautelas: cautelas.length,
-        cautelasAtivas: cautelas.filter(c => c.status === 'ativa').length
-      });
+      setMateriais(materiaisData);
     } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
-      // Mock data for development
-      setEstatisticasGerais({
-        totalMateriais: 156,
-        materiaisDisponiveis: 89,
-        materiaisCautelados: 45,
-        materiaisManutencao: 12,
-        totalCautelas: 67,
-        cautelasAtivas: 23
-      });
+      console.error('Erro ao carregar materiais:', error);
+      toast.error('Erro ao carregar materiais');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleTipoChange = (tipo: string) => {
-    const tipoInfo = tiposRelatorio.find(t => t.id === tipo);
-    if (tipoInfo) {
-      setRelatorioConfig(prev => ({
-        ...prev,
-        tipo,
-        titulo: `Relatório de ${tipoInfo.titulo}`,
-        descricao: tipoInfo.descricao
-      }));
+  const aplicarFiltros = () => {
+    let resultado = [...materiais];
+
+    // Filtro por número de série
+    if (filtros.numeroSerie) {
+      resultado = resultado.filter(m => 
+        m.numeroSerie?.toLowerCase().includes(filtros.numeroSerie.toLowerCase())
+      );
     }
-  };
 
-  const gerarRelatorio = async () => {
-    try {
-      toast.info('Gerando relatório...');
-      
-      // Here you would implement the actual report generation
-      // This could involve:
-      // 1. Fetching data based on the configuration
-      // 2. Generating the document (PDF, Excel, CSV)
-      // 3. Downloading or displaying the report
-
-      // Simulate report generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast.success(`Relatório "${relatorioConfig.titulo}" gerado com sucesso!`);
-      
-      // Simulate download
-      const filename = `${relatorioConfig.tipo}_${new Date().toISOString().split('T')[0]}.${relatorioConfig.formato}`;
-      console.log(`Downloading: ${filename}`);
-      
-    } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
-      toast.error('Erro ao gerar relatório');
+    // Filtro por categoria
+    if (filtros.categoria !== 'todas') {
+      resultado = resultado.filter(m => m.categoria === filtros.categoria);
     }
+
+    // Filtro por tipo de arma
+    if (filtros.tipoArma !== 'todas') {
+      resultado = resultado.filter(m => m.tipoArma === filtros.tipoArma);
+    }
+
+    // Filtro por modelo
+    if (filtros.modelo) {
+      resultado = resultado.filter(m => 
+        m.modelo?.toLowerCase().includes(filtros.modelo.toLowerCase())
+      );
+    }
+
+    // Filtro por local
+    if (filtros.local !== 'todas') {
+      resultado = resultado.filter(m => m.local === filtros.local);
+    }
+
+    // Filtro por status
+    if (filtros.status !== 'todas') {
+      if (filtros.status === 'cautelada') {
+        resultado = resultado.filter(m => m.cautelado === true);
+      } else if (filtros.status === 'reserva') {
+        resultado = resultado.filter(m => !m.cautelado && m.disponivel);
+      }
+    }
+
+    setMateriaisFiltrados(resultado);
   };
 
-  const visualizarPreview = () => {
-    toast.info('Carregando preview do relatório...');
-    // Here you would show a preview of the report
+  const limparFiltros = () => {
+    setFiltros({
+      numeroSerie: '',
+      categoria: 'todas',
+      tipoArma: 'todas',
+      modelo: '',
+      local: 'todas',
+      status: 'todas'
+    });
   };
 
-  const agendarRelatorio = () => {
-    toast.info('Funcionalidade de agendamento em desenvolvimento...');
-    // Here you would implement report scheduling
+  const getStatusBadge = (material: Material) => {
+    if (material.cautelado) {
+      return <Badge variant="default">Cautelada</Badge>;
+    }
+    if (material.disponivel) {
+      return <Badge variant="outline">Reserva de Armamento</Badge>;
+    }
+    return <Badge variant="secondary">Indisponível</Badge>;
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Relatórios Bélicos</h3>
-        <p className="text-sm text-muted-foreground">Gere relatórios detalhados sobre materiais e movimentações</p>
+        <h3 className="text-lg font-semibold text-foreground">Consulta de Materiais Bélicos</h3>
+        <p className="text-sm text-muted-foreground">Pesquise e filtre materiais por diversos critérios</p>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-3 text-center">
-            <p className="text-lg font-bold text-foreground">{estatisticasGerais.totalMateriais}</p>
-            <p className="text-xs text-muted-foreground">Total Materiais</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-card border-border">
-          <CardContent className="p-3 text-center">
-            <p className="text-lg font-bold text-green-600">{estatisticasGerais.materiaisDisponiveis}</p>
-            <p className="text-xs text-muted-foreground">Disponíveis</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-card border-border">
-          <CardContent className="p-3 text-center">
-            <p className="text-lg font-bold text-blue-600">{estatisticasGerais.materiaisCautelados}</p>
-            <p className="text-xs text-muted-foreground">Cautelados</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-card border-border">
-          <CardContent className="p-3 text-center">
-            <p className="text-lg font-bold text-yellow-600">{estatisticasGerais.materiaisManutencao}</p>
-            <p className="text-xs text-muted-foreground">Manutenção</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-card border-border">
-          <CardContent className="p-3 text-center">
-            <p className="text-lg font-bold text-foreground">{estatisticasGerais.totalCautelas}</p>
-            <p className="text-xs text-muted-foreground">Total Cautelas</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-card border-border">
-          <CardContent className="p-3 text-center">
-            <p className="text-lg font-bold text-primary">{estatisticasGerais.cautelasAtivas}</p>
-            <p className="text-xs text-muted-foreground">Cautelas Ativas</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Report Types */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">Tipos de Relatório</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {tiposRelatorio.map(tipo => (
-                <div
-                  key={tipo.id}
-                  className={`p-3 border rounded cursor-pointer transition-colors ${
-                    relatorioConfig.tipo === tipo.id
-                      ? 'bg-primary/10 border-primary'
-                      : 'bg-muted hover:bg-accent border-border'
-                  }`}
-                  onClick={() => handleTipoChange(tipo.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    <tipo.icone className="h-5 w-5 text-primary" />
-                    <div>
-                      <h4 className="font-medium text-foreground">{tipo.titulo}</h4>
-                      <p className="text-sm text-muted-foreground">{tipo.descricao}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Report Configuration */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">Configurações do Relatório</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="titulo">Título do Relatório</Label>
+      {/* Filtros */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filtros de Pesquisa
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {/* Filtro Número de Série */}
+            <div>
+              <Label htmlFor="numeroSerie">Número de Série</Label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="titulo"
-                  value={relatorioConfig.titulo}
-                  onChange={(e) => setRelatorioConfig(prev => ({ ...prev, titulo: e.target.value }))}
+                  id="numeroSerie"
+                  placeholder="Buscar..."
+                  className="pl-8"
+                  value={filtros.numeroSerie}
+                  onChange={(e) => setFiltros(prev => ({ ...prev, numeroSerie: e.target.value }))}
                 />
               </div>
-
-              <div>
-                <Label htmlFor="descricao">Descrição</Label>
-                <Input
-                  id="descricao"
-                  value={relatorioConfig.descricao}
-                  onChange={(e) => setRelatorioConfig(prev => ({ ...prev, descricao: e.target.value }))}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="dataInicio">Data Início</Label>
-                  <Input
-                    id="dataInicio"
-                    type="date"
-                    value={relatorioConfig.dataInicio}
-                    onChange={(e) => setRelatorioConfig(prev => ({ ...prev, dataInicio: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dataFim">Data Fim</Label>
-                  <Input
-                    id="dataFim"
-                    type="date"
-                    value={relatorioConfig.dataFim}
-                    onChange={(e) => setRelatorioConfig(prev => ({ ...prev, dataFim: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label>Formato de Saída</Label>
-                <Select 
-                  value={relatorioConfig.formato} 
-                  onValueChange={(value: 'pdf' | 'excel' | 'csv') => 
-                    setRelatorioConfig(prev => ({ ...prev, formato: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pdf">PDF</SelectItem>
-                    <SelectItem value="excel">Excel (.xlsx)</SelectItem>
-                    <SelectItem value="csv">CSV</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Additional filters based on report type */}
-              {relatorioConfig.tipo === 'materiais-categoria' && (
-                <div>
-                  <Label>Categoria</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todas">Todas as categorias</SelectItem>
-                      <SelectItem value="armamento">Armamento</SelectItem>
-                      <SelectItem value="epi">EPI</SelectItem>
-                      <SelectItem value="municao">Munição</SelectItem>
-                      <SelectItem value="acessorio">Acessório</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {relatorioConfig.tipo === 'cautelas-ativas' && (
-                <div>
-                  <Label>Status</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todas">Todas</SelectItem>
-                      <SelectItem value="ativa">Ativa</SelectItem>
-                      <SelectItem value="vencida">Vencida</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Action Buttons */}
-      <Card className="bg-primary/10 border-primary">
-        <CardContent className="p-6">
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={gerarRelatorio} className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Gerar e Baixar Relatório
-            </Button>
+            {/* Filtro Categoria */}
+            <div>
+              <Label>Categoria</Label>
+              <Select value={filtros.categoria} onValueChange={(value) => setFiltros(prev => ({ ...prev, categoria: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  <SelectItem value="Colete Balístico">Colete Balístico</SelectItem>
+                  <SelectItem value="Armamento">Armamento</SelectItem>
+                  <SelectItem value="Munição">Munição</SelectItem>
+                  <SelectItem value="EPI">EPI</SelectItem>
+                  <SelectItem value="Acessório">Acessório</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Button variant="outline" onClick={visualizarPreview} className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Visualizar Preview
-            </Button>
+            {/* Filtro Tipo de Arma */}
+            <div>
+              <Label>Tipo de Arma</Label>
+              <Select value={filtros.tipoArma} onValueChange={(value) => setFiltros(prev => ({ ...prev, tipoArma: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  <SelectItem value="Arma Curta">Arma Curta</SelectItem>
+                  <SelectItem value="Arma Longa">Arma Longa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Button variant="outline" onClick={agendarRelatorio} className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Agendar Relatório
-            </Button>
+            {/* Filtro Modelo */}
+            <div>
+              <Label htmlFor="modelo">Modelo</Label>
+              <Input
+                id="modelo"
+                placeholder="Buscar modelo..."
+                value={filtros.modelo}
+                onChange={(e) => setFiltros(prev => ({ ...prev, modelo: e.target.value }))}
+              />
+            </div>
 
-            <Button variant="outline" className="flex items-center gap-2">
-              <Printer className="h-4 w-4" />
-              Imprimir
-            </Button>
+            {/* Filtro Local */}
+            <div>
+              <Label>Local</Label>
+              <Select value={filtros.local} onValueChange={(value) => setFiltros(prev => ({ ...prev, local: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  <SelectItem value="Fortaleza">Fortaleza</SelectItem>
+                  <SelectItem value="Crato">Crato</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Filtro Status */}
+            <div>
+              <Label>Status</Label>
+              <Select value={filtros.status} onValueChange={(value) => setFiltros(prev => ({ ...prev, status: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  <SelectItem value="cautelada">Cautelada</SelectItem>
+                  <SelectItem value="reserva">Reserva de Armamento</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="mt-4 p-3 bg-muted rounded">
-            <p className="text-sm text-muted-foreground">
-              <strong>Relatório selecionado:</strong> {relatorioConfig.titulo}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              <strong>Período:</strong> {relatorioConfig.dataInicio} até {relatorioConfig.dataFim}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              <strong>Formato:</strong> {relatorioConfig.formato.toUpperCase()}
-            </p>
+          <div className="flex gap-2 mt-4">
+            <Badge variant="outline" className="text-sm">
+              {materiaisFiltrados.length} resultado(s) encontrado(s)
+            </Badge>
+            {(filtros.numeroSerie || filtros.categoria !== 'todas' || filtros.tipoArma !== 'todas' || 
+              filtros.modelo || filtros.local !== 'todas' || filtros.status !== 'todas') && (
+              <button
+                onClick={limparFiltros}
+                className="text-sm text-primary hover:underline"
+              >
+                Limpar filtros
+              </button>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Recent Reports */}
+      {/* Tabela de Resultados */}
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-foreground">Relatórios Recentes</CardTitle>
+          <CardTitle className="text-foreground">Resultados</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {[
-              { nome: 'Relatório de Estoque Geral', data: '2024-01-15', formato: 'PDF', status: 'Concluído' },
-              { nome: 'Cautelas Ativas - Janeiro', data: '2024-01-10', formato: 'Excel', status: 'Concluído' },
-              { nome: 'Movimentações Mensais', data: '2024-01-05', formato: 'CSV', status: 'Concluído' }
-            ].map((relatorio, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-muted rounded">
-                <div>
-                  <h4 className="font-medium text-foreground">{relatorio.nome}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {relatorio.data} • {relatorio.formato}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-green-600 font-medium">{relatorio.status}</span>
-                  <Button variant="ghost" size="icon">
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">Carregando materiais...</div>
+          ) : materiaisFiltrados.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">Nenhum material encontrado</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Número de Série</TableHead>
+                    <TableHead>Modelo</TableHead>
+                    <TableHead>Fabricante</TableHead>
+                    <TableHead>Local</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Detalhes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {materiaisFiltrados.map((material) => (
+                    <TableRow key={material.id}>
+                      <TableCell>
+                        <Badge variant="secondary">{material.categoria}</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{material.nome}</TableCell>
+                      <TableCell>{material.numeroSerie || '-'}</TableCell>
+                      <TableCell>{material.modelo || '-'}</TableCell>
+                      <TableCell>{material.fabricante || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{material.local}</Badge>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(material)}</TableCell>
+                      <TableCell>
+                        {/* Detalhes específicos por categoria */}
+                        {material.categoria === 'Colete Balístico' && (
+                          <div className="text-sm space-y-1">
+                            {material.sexo && <div><span className="font-semibold">Sexo:</span> {material.sexo}</div>}
+                            {material.tamanhoColete && <div><span className="font-semibold">Tamanho:</span> {material.tamanhoColete}</div>}
+                            {material.vencimento && <div><span className="font-semibold">Vencimento:</span> {new Date(material.vencimento).toLocaleDateString()}</div>}
+                            {material.termoEntrega && <div><span className="font-semibold">Termo:</span> {material.termoEntrega}</div>}
+                          </div>
+                        )}
+                        {material.categoria === 'Armamento' && (
+                          <div className="text-sm space-y-1">
+                            {material.tipoArma && <div><span className="font-semibold">Tipo:</span> {material.tipoArma}</div>}
+                            {material.calibre && <div><span className="font-semibold">Calibre:</span> {material.calibre}</div>}
+                            {material.numeroSIARM && <div><span className="font-semibold">SIARM:</span> {material.numeroSIARM}</div>}
+                            {material.quantidadeCarregadores && <div><span className="font-semibold">Carregadores:</span> {material.quantidadeCarregadores}</div>}
+                            {material.quantidadeMunicoes && <div><span className="font-semibold">Munições:</span> {material.quantidadeMunicoes}</div>}
+                          </div>
+                        )}
+                        {material.cautelado && material.policialAssociadoNome && (
+                          <div className="text-sm mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-800">
+                            <span className="font-semibold">Cautelada para:</span> {material.policialAssociadoNome}
+                          </div>
+                        )}
+                        {!material.cautelado && material.disponivel && (
+                          <div className="text-sm mt-2 p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-800">
+                            <span className="font-semibold">Na Reserva de Armamento</span>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
