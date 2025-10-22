@@ -27,6 +27,9 @@ interface MaterialEstoque {
   dataUltimaMovimentacao?: Date;
   statusManutencao?: 'ok' | 'manutencao' | 'baixa';
   observacoes?: string;
+  transferido?: boolean;
+  localTransferencia?: string;
+  dataTransferencia?: Date;
 }
 
 interface EstatisticasEstoque {
@@ -59,11 +62,13 @@ const ControleEstoque = () => {
   const loadDadosEstoque = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'materiais_belicos'));
-      const materiaisData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        dataUltimaMovimentacao: doc.data().dataUltimaMovimentacao?.toDate()
-      } as MaterialEstoque));
+      const materiaisData = querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          dataUltimaMovimentacao: doc.data().dataUltimaMovimentacao?.toDate()
+        } as MaterialEstoque))
+        .filter(m => !m.transferido); // Não mostrar materiais transferidos na carga
 
       setMateriais(materiaisData);
       calcularEstatisticas(materiaisData);
@@ -175,8 +180,8 @@ const ControleEstoque = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Controle de Estoque</h3>
-        <p className="text-sm text-muted-foreground">Visualize o status de todos os materiais bélicos</p>
+        <h3 className="text-lg font-semibold text-foreground">Controle de Carga</h3>
+        <p className="text-sm text-muted-foreground">Visualize o status de todos os materiais bélicos da unidade</p>
       </div>
 
       {/* Statistics Cards */}
@@ -312,7 +317,7 @@ const ControleEstoque = () => {
       {/* Materials Table */}
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-foreground">Materiais em Estoque</CardTitle>
+          <CardTitle className="text-foreground">Materiais na Carga</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">

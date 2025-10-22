@@ -22,6 +22,9 @@ interface Material {
   cautelado?: boolean;
   cauteladoPara?: string;
   policialAssociadoNome?: string;
+  transferido?: boolean;
+  localTransferencia?: string;
+  dataTransferencia?: Date;
   // Campos específicos para coletes
   sexo?: string;
   vencimento?: string;
@@ -119,10 +122,15 @@ const RelatoriosBelico = () => {
     // Filtro por status
     if (filtros.status !== 'todas') {
       if (filtros.status === 'cautelada') {
-        resultado = resultado.filter(m => m.cautelado === true);
-      } else if (filtros.status === 'reserva') {
-        resultado = resultado.filter(m => !m.cautelado && m.disponivel);
+        resultado = resultado.filter(m => m.cautelado === true && !m.transferido);
+      } else if (filtros.status === 'carga') {
+        resultado = resultado.filter(m => !m.cautelado && m.disponivel && !m.transferido);
+      } else if (filtros.status === 'transferido') {
+        resultado = resultado.filter(m => m.transferido === true);
       }
+    } else {
+      // Por padrão, não mostrar transferidos
+      resultado = resultado.filter(m => !m.transferido);
     }
 
     setMateriaisFiltrados(resultado);
@@ -140,11 +148,14 @@ const RelatoriosBelico = () => {
   };
 
   const getStatusBadge = (material: Material) => {
+    if (material.transferido) {
+      return <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700">Transferido</Badge>;
+    }
     if (material.cautelado) {
       return <Badge variant="default">Cautelada</Badge>;
     }
     if (material.disponivel) {
-      return <Badge variant="outline">Reserva de Armamento</Badge>;
+      return <Badge variant="outline">Carga Disponível</Badge>;
     }
     return <Badge variant="secondary">Indisponível</Badge>;
   };
@@ -249,9 +260,10 @@ const RelatoriosBelico = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
+                  <SelectItem value="todas">Todas (exceto transferidos)</SelectItem>
                   <SelectItem value="cautelada">Cautelada</SelectItem>
-                  <SelectItem value="reserva">Reserva de Armamento</SelectItem>
+                  <SelectItem value="carga">Carga Disponível</SelectItem>
+                  <SelectItem value="transferido">Materiais Transferidos</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -371,14 +383,19 @@ const RelatoriosBelico = () => {
                             </div>
                           )}
                           {/* Status de cautela */}
-                          {material.cautelado && material.policialAssociadoNome && (
+                          {material.transferido && (
+                            <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700">
+                              Transferido para: {material.localTransferencia}
+                            </Badge>
+                          )}
+                          {material.cautelado && material.policialAssociadoNome && !material.transferido && (
                             <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700">
                               Cautelada: {material.policialAssociadoNome}
                             </Badge>
                           )}
-                          {!material.cautelado && material.disponivel && (
+                          {!material.cautelado && material.disponivel && !material.transferido && (
                             <Badge className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700">
-                              Reserva de Armamento
+                              Carga Disponível
                             </Badge>
                           )}
                         </div>

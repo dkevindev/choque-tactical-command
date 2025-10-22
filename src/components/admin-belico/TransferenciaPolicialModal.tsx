@@ -142,10 +142,15 @@ const TransferenciaPolicialModal = ({ cautela, open, onClose, onSuccess }: Props
         }
       }
 
-      // Atualizar histórico dos materiais levados
+      // Atualizar materiais levados (marcar como transferidos)
       for (const material of materiaisLevados) {
         try {
           await updateDoc(doc(db, 'materiais_belicos', material.materialId), {
+            transferido: true,
+            localTransferencia: localDestino,
+            dataTransferencia: Timestamp.fromDate(new Date(dataTransferencia)),
+            cautelado: false,
+            disponivel: false,
             historicoTransferencias: [
               {
                 transferidoEm: Timestamp.fromDate(new Date(dataTransferencia)),
