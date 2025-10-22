@@ -39,19 +39,22 @@ interface EstatisticasEstoque {
     armasCurtasReserva: number;
     armasCurtasCauteladas: number;
     armasLongas: number;
-    coletes: number;
+    coletesReserva: number;
+    coletesCautelados: number;
   };
   fortaleza: {
     armasCurtasReserva: number;
     armasCurtasCauteladas: number;
     armasLongas: number;
-    coletes: number;
+    coletesReserva: number;
+    coletesCautelados: number;
   };
   crato: {
     armasCurtasReserva: number;
     armasCurtasCauteladas: number;
     armasLongas: number;
-    coletes: number;
+    coletesReserva: number;
+    coletesCautelados: number;
   };
   porCategoria: Record<string, { total: number; disponiveis: number; cautelados: number }>;
 }
@@ -63,19 +66,22 @@ const ControleEstoque = () => {
       armasCurtasReserva: 0,
       armasCurtasCauteladas: 0,
       armasLongas: 0,
-      coletes: 0
+      coletesReserva: 0,
+      coletesCautelados: 0
     },
     fortaleza: {
       armasCurtasReserva: 0,
       armasCurtasCauteladas: 0,
       armasLongas: 0,
-      coletes: 0
+      coletesReserva: 0,
+      coletesCautelados: 0
     },
     crato: {
       armasCurtasReserva: 0,
       armasCurtasCauteladas: 0,
       armasLongas: 0,
-      coletes: 0
+      coletesReserva: 0,
+      coletesCautelados: 0
     },
     porCategoria: {}
   });
@@ -170,19 +176,22 @@ const ControleEstoque = () => {
         armasCurtasReserva: armasCurtasTotal.filter(m => m.disponivel && !m.cautelado).length,
         armasCurtasCauteladas: armasCurtasTotal.filter(m => m.cautelado).length,
         armasLongas: armasLongasTotal.length,
-        coletes: coletesTotal.length
+        coletesReserva: coletesTotal.filter(m => m.disponivel && !m.cautelado).length,
+        coletesCautelados: coletesTotal.filter(m => m.cautelado).length
       },
       fortaleza: {
         armasCurtasReserva: armasCurtasFortaleza.filter(m => m.disponivel && !m.cautelado).length,
         armasCurtasCauteladas: armasCurtasFortaleza.filter(m => m.cautelado).length,
         armasLongas: armasLongasFortaleza.length,
-        coletes: coletesFortaleza.length
+        coletesReserva: coletesFortaleza.filter(m => m.disponivel && !m.cautelado).length,
+        coletesCautelados: coletesFortaleza.filter(m => m.cautelado).length
       },
       crato: {
         armasCurtasReserva: armasCurtasCrato.filter(m => m.disponivel && !m.cautelado).length,
         armasCurtasCauteladas: armasCurtasCrato.filter(m => m.cautelado).length,
         armasLongas: armasLongasCrato.length,
-        coletes: coletesCrato.length
+        coletesReserva: coletesCrato.filter(m => m.disponivel && !m.cautelado).length,
+        coletesCautelados: coletesCrato.filter(m => m.cautelado).length
       },
       porCategoria: {}
     };
@@ -251,72 +260,84 @@ const ControleEstoque = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* TOTAL */}
-            <div className="space-y-3">
-              <h4 className="font-bold text-foreground text-base uppercase tracking-wide border-b pb-2">TOTAL</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                  <span className="text-sm font-medium text-green-700 dark:text-green-400">Armas Curtas na Reserva</span>
-                  <span className="text-xl font-bold text-green-700 dark:text-green-400">{estatisticas.total.armasCurtasReserva}</span>
+            <div className="space-y-2">
+              <h4 className="font-bold text-foreground text-sm uppercase tracking-wide border-b pb-1">TOTAL</h4>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-900">
+                  <span className="text-xs font-medium text-green-700 dark:text-green-400">Armas Curtas Reserva</span>
+                  <span className="text-lg font-bold text-green-700 dark:text-green-400">{estatisticas.total.armasCurtasReserva}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Armas Curtas Cauteladas</span>
-                  <span className="text-xl font-bold text-blue-700 dark:text-blue-400">{estatisticas.total.armasCurtasCauteladas}</span>
+                <div className="flex justify-between items-center p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-900">
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Armas Curtas Cauteladas</span>
+                  <span className="text-lg font-bold text-blue-700 dark:text-blue-400">{estatisticas.total.armasCurtasCauteladas}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900">
-                  <span className="text-sm font-medium text-purple-700 dark:text-purple-400">Armas Longas</span>
-                  <span className="text-xl font-bold text-purple-700 dark:text-purple-400">{estatisticas.total.armasLongas}</span>
+                <div className="flex justify-between items-center p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-900">
+                  <span className="text-xs font-medium text-purple-700 dark:text-purple-400">Armas Longas</span>
+                  <span className="text-lg font-bold text-purple-700 dark:text-purple-400">{estatisticas.total.armasLongas}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
-                  <span className="text-sm font-medium text-orange-700 dark:text-orange-400">Coletes</span>
-                  <span className="text-xl font-bold text-orange-700 dark:text-orange-400">{estatisticas.total.coletes}</span>
+                <div className="flex justify-between items-center p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-900">
+                  <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Coletes Reserva</span>
+                  <span className="text-lg font-bold text-amber-700 dark:text-amber-400">{estatisticas.total.coletesReserva}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-orange-50 dark:bg-orange-950/20 rounded border border-orange-200 dark:border-orange-900">
+                  <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Coletes Cautelados</span>
+                  <span className="text-lg font-bold text-orange-700 dark:text-orange-400">{estatisticas.total.coletesCautelados}</span>
                 </div>
               </div>
             </div>
 
             {/* FORTALEZA */}
-            <div className="space-y-3">
-              <h4 className="font-bold text-foreground text-base uppercase tracking-wide border-b pb-2">FORTALEZA</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                  <span className="text-sm font-medium text-green-700 dark:text-green-400">Armas Curtas na Reserva</span>
-                  <span className="text-xl font-bold text-green-700 dark:text-green-400">{estatisticas.fortaleza.armasCurtasReserva}</span>
+            <div className="space-y-2">
+              <h4 className="font-bold text-foreground text-sm uppercase tracking-wide border-b pb-1">FORTALEZA</h4>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-900">
+                  <span className="text-xs font-medium text-green-700 dark:text-green-400">Armas Curtas Reserva</span>
+                  <span className="text-lg font-bold text-green-700 dark:text-green-400">{estatisticas.fortaleza.armasCurtasReserva}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Armas Curtas Cauteladas</span>
-                  <span className="text-xl font-bold text-blue-700 dark:text-blue-400">{estatisticas.fortaleza.armasCurtasCauteladas}</span>
+                <div className="flex justify-between items-center p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-900">
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Armas Curtas Cauteladas</span>
+                  <span className="text-lg font-bold text-blue-700 dark:text-blue-400">{estatisticas.fortaleza.armasCurtasCauteladas}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900">
-                  <span className="text-sm font-medium text-purple-700 dark:text-purple-400">Armas Longas</span>
-                  <span className="text-xl font-bold text-purple-700 dark:text-purple-400">{estatisticas.fortaleza.armasLongas}</span>
+                <div className="flex justify-between items-center p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-900">
+                  <span className="text-xs font-medium text-purple-700 dark:text-purple-400">Armas Longas</span>
+                  <span className="text-lg font-bold text-purple-700 dark:text-purple-400">{estatisticas.fortaleza.armasLongas}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
-                  <span className="text-sm font-medium text-orange-700 dark:text-orange-400">Coletes</span>
-                  <span className="text-xl font-bold text-orange-700 dark:text-orange-400">{estatisticas.fortaleza.coletes}</span>
+                <div className="flex justify-between items-center p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-900">
+                  <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Coletes Reserva</span>
+                  <span className="text-lg font-bold text-amber-700 dark:text-amber-400">{estatisticas.fortaleza.coletesReserva}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-orange-50 dark:bg-orange-950/20 rounded border border-orange-200 dark:border-orange-900">
+                  <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Coletes Cautelados</span>
+                  <span className="text-lg font-bold text-orange-700 dark:text-orange-400">{estatisticas.fortaleza.coletesCautelados}</span>
                 </div>
               </div>
             </div>
 
             {/* CRATO */}
-            <div className="space-y-3">
-              <h4 className="font-bold text-foreground text-base uppercase tracking-wide border-b pb-2">CRATO</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                  <span className="text-sm font-medium text-green-700 dark:text-green-400">Armas Curtas na Reserva</span>
-                  <span className="text-xl font-bold text-green-700 dark:text-green-400">{estatisticas.crato.armasCurtasReserva}</span>
+            <div className="space-y-2">
+              <h4 className="font-bold text-foreground text-sm uppercase tracking-wide border-b pb-1">CRATO</h4>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-900">
+                  <span className="text-xs font-medium text-green-700 dark:text-green-400">Armas Curtas Reserva</span>
+                  <span className="text-lg font-bold text-green-700 dark:text-green-400">{estatisticas.crato.armasCurtasReserva}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Armas Curtas Cauteladas</span>
-                  <span className="text-xl font-bold text-blue-700 dark:text-blue-400">{estatisticas.crato.armasCurtasCauteladas}</span>
+                <div className="flex justify-between items-center p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-900">
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Armas Curtas Cauteladas</span>
+                  <span className="text-lg font-bold text-blue-700 dark:text-blue-400">{estatisticas.crato.armasCurtasCauteladas}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900">
-                  <span className="text-sm font-medium text-purple-700 dark:text-purple-400">Armas Longas</span>
-                  <span className="text-xl font-bold text-purple-700 dark:text-purple-400">{estatisticas.crato.armasLongas}</span>
+                <div className="flex justify-between items-center p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-900">
+                  <span className="text-xs font-medium text-purple-700 dark:text-purple-400">Armas Longas</span>
+                  <span className="text-lg font-bold text-purple-700 dark:text-purple-400">{estatisticas.crato.armasLongas}</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
-                  <span className="text-sm font-medium text-orange-700 dark:text-orange-400">Coletes</span>
-                  <span className="text-xl font-bold text-orange-700 dark:text-orange-400">{estatisticas.crato.coletes}</span>
+                <div className="flex justify-between items-center p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-900">
+                  <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Coletes Reserva</span>
+                  <span className="text-lg font-bold text-amber-700 dark:text-amber-400">{estatisticas.crato.coletesReserva}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-orange-50 dark:bg-orange-950/20 rounded border border-orange-200 dark:border-orange-900">
+                  <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Coletes Cautelados</span>
+                  <span className="text-lg font-bold text-orange-700 dark:text-orange-400">{estatisticas.crato.coletesCautelados}</span>
                 </div>
               </div>
             </div>
