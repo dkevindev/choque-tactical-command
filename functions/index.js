@@ -435,3 +435,66 @@ appTermoEntrega.post('/', async (req, res) => {
 });
 
 exports.gerarTermoEntregaDocx = functions.https.onRequest(appTermoEntrega);
+
+// ----------------- FUNÇÃO NADA CONSTA -----------------
+const appNadaConsta = express();
+appNadaConsta.use(cors({ origin: true }));
+appNadaConsta.use(express.json());
+
+appNadaConsta.post('/', async (req, res) => {
+    let tempFilePath;
+    try {
+        const data = req.body;
+
+        if (!data.grad || !data.nomedopolicial || !data.matricula || !data.numerondconsta || !data.transferidopara || !data.publicacao) {
+            return res.status(400).send('Dados incompletos para nada consta.');
+        }
+
+        const bucket = admin.storage().bucket();
+        const templatePath = 'templates/template-nada-consta.docx';
+        tempFilePath = path.join('/tmp', `template-nada-consta-${Date.now()}.docx`);
+        await bucket.file(templatePath).download({ destination: tempFilePath });
+
+        const content = fs.readFileSync(tempFilePath, 'binary');
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+        const templateData = {
+            grad: data.grad || '',
+            nomedopolicial: data.nomedopolicial || '',
+            matricula: data.matricula || '',
+            dataatual: data.dataatual || new Date().toLocaleDateString('pt-BR'),
+            numerondconsta: data.numerondconsta || '',
+            transferidopara: data.transferidopara || '',
+            publicacao: data.publicacao || ''
+        };
+
+        console.log('Dados para o template Nada Consta:', templateData);
+
+        doc.render(templateData);
+        const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+        const nomeArquivo = `Nada-Consta-${data.nomedopolicial.replace(/\s+/g, '_')}.docx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Erro ao gerar nada consta:', error);
+        if (error.properties) {
+            const e = {
+                message: error.message,
+                name: error.name,
+                stack: error.stack,
+                properties: error.properties,
+            };
+            console.error('Erro detalhado do Docxtemplater:', JSON.stringify(e, null, 2));
+            return res.status(500).send(`Erro ao preencher o template: ${error.message}. Verifique os placeholders no template.`);
+        }
+        res.status(500).send('Erro ao gerar documento de nada consta.');
+    } finally {
+        try { if (tempFilePath) fs.unlinkSync(tempFilePath); } 
+        catch (err) { console.warn('Não foi possível excluir o arquivo temporário:', err); }
+    }
+});
+
+exports.gerarNadaConstaDocx = functions.https.onRequest(appNadaConsta);
