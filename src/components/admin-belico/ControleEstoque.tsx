@@ -30,6 +30,8 @@ interface MaterialEstoque {
   transferido?: boolean;
   localTransferencia?: string;
   dataTransferencia?: Date;
+  local?: string; // Fortaleza ou Crato
+  tipoArma?: string; // Arma Curta ou Arma Longa
 }
 
 interface EstatisticasEstoque {
@@ -38,6 +40,10 @@ interface EstatisticasEstoque {
   cautelados: number;
   manutencao: number;
   baixados: number;
+  armasCurtas: number;
+  armasLongas: number;
+  fortaleza: number;
+  crato: number;
   porCategoria: Record<string, { total: number; disponiveis: number; cautelados: number }>;
 }
 
@@ -49,6 +55,10 @@ const ControleEstoque = () => {
     cautelados: 0,
     manutencao: 0,
     baixados: 0,
+    armasCurtas: 0,
+    armasLongas: 0,
+    fortaleza: 0,
+    crato: 0,
     porCategoria: {}
   });
   const [filtro, setFiltro] = useState('');
@@ -126,6 +136,10 @@ const ControleEstoque = () => {
       cautelados: materiaisData.filter(m => m.cautelado).length,
       manutencao: materiaisData.filter(m => m.statusManutencao === 'manutencao').length,
       baixados: materiaisData.filter(m => m.statusManutencao === 'baixa').length,
+      armasCurtas: materiaisData.filter(m => m.tipoArma === 'Arma Curta').length,
+      armasLongas: materiaisData.filter(m => m.tipoArma === 'Arma Longa').length,
+      fortaleza: materiaisData.filter(m => m.local === 'Fortaleza').length,
+      crato: materiaisData.filter(m => m.local === 'Crato').length,
       porCategoria: {}
     };
 
@@ -184,84 +198,89 @@ const ControleEstoque = () => {
         <p className="text-sm text-muted-foreground">Visualize o status de todos os materiais bélicos da unidade</p>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 text-center">
-            <Package className="h-8 w-8 text-primary mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{estatisticas.totalMateriais}</p>
-            <p className="text-xs text-muted-foreground">Total</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 text-center">
-            <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{estatisticas.disponiveis}</p>
-            <p className="text-xs text-muted-foreground">Disponíveis</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 text-center">
-            <TrendingUp className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{estatisticas.cautelados}</p>
-            <p className="text-xs text-muted-foreground">Cautelados</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 text-center">
-            <AlertTriangle className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{estatisticas.manutencao}</p>
-            <p className="text-xs text-muted-foreground">Manutenção</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 text-center">
-            <TrendingDown className="h-8 w-8 text-red-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{estatisticas.baixados}</p>
-            <p className="text-xs text-muted-foreground">Baixados</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Category Statistics */}
+      {/* Estatísticas Detalhadas */}
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-foreground flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Estatísticas por Categoria
+            Estatísticas da Carga
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Object.entries(estatisticas.porCategoria).map(([categoria, dados]) => (
-              <div key={categoria} className="p-4 bg-muted rounded-lg">
-                <h4 className="font-semibold text-foreground mb-2">{categoria}</h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total:</span>
-                    <span className="font-medium text-foreground">{dados.total}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Disponíveis:</span>
-                    <span className="font-medium text-green-600">{dados.disponiveis}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Cautelados:</span>
-                    <span className="font-medium text-blue-600">{dados.cautelados}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full" 
-                      style={{ width: `${(dados.disponiveis / dados.total) * 100}%` }}
-                    ></div>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Status Geral */}
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">Status Geral</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                  <span className="text-sm text-muted-foreground">Total</span>
+                  <span className="font-bold text-foreground">{estatisticas.totalMateriais}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-green-50 dark:bg-green-950/20 rounded">
+                  <span className="text-sm text-green-700 dark:text-green-400">Disponíveis</span>
+                  <span className="font-bold text-green-700 dark:text-green-400">{estatisticas.disponiveis}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-blue-50 dark:bg-blue-950/20 rounded">
+                  <span className="text-sm text-blue-700 dark:text-blue-400">Cautelados</span>
+                  <span className="font-bold text-blue-700 dark:text-blue-400">{estatisticas.cautelados}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-yellow-50 dark:bg-yellow-950/20 rounded">
+                  <span className="text-sm text-yellow-700 dark:text-yellow-400">Manutenção</span>
+                  <span className="font-bold text-yellow-700 dark:text-yellow-400">{estatisticas.manutencao}</span>
                 </div>
               </div>
-            ))}
+            </div>
+
+            {/* Armamentos */}
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">Armamentos</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                  <span className="text-sm text-muted-foreground">Total Armas</span>
+                  <span className="font-bold text-foreground">{estatisticas.armasCurtas + estatisticas.armasLongas}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-purple-50 dark:bg-purple-950/20 rounded">
+                  <span className="text-sm text-purple-700 dark:text-purple-400">Armas Curtas</span>
+                  <span className="font-bold text-purple-700 dark:text-purple-400">{estatisticas.armasCurtas}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-indigo-50 dark:bg-indigo-950/20 rounded">
+                  <span className="text-sm text-indigo-700 dark:text-indigo-400">Armas Longas</span>
+                  <span className="font-bold text-indigo-700 dark:text-indigo-400">{estatisticas.armasLongas}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Localização */}
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">Localização</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 bg-orange-50 dark:bg-orange-950/20 rounded">
+                  <span className="text-sm text-orange-700 dark:text-orange-400">Fortaleza</span>
+                  <span className="font-bold text-orange-700 dark:text-orange-400">{estatisticas.fortaleza}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-cyan-50 dark:bg-cyan-950/20 rounded">
+                  <span className="text-sm text-cyan-700 dark:text-cyan-400">Crato</span>
+                  <span className="font-bold text-cyan-700 dark:text-cyan-400">{estatisticas.crato}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Por Categoria */}
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">Por Categoria</h4>
+              <div className="space-y-2">
+                {Object.entries(estatisticas.porCategoria).slice(0, 4).map(([categoria, dados]) => (
+                  <div key={categoria} className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                    <span className="text-sm text-muted-foreground truncate">{categoria}</span>
+                    <div className="flex gap-2 items-center">
+                      <span className="text-xs text-green-600 dark:text-green-400">{dados.disponiveis}</span>
+                      <span className="text-xs text-muted-foreground">/</span>
+                      <span className="font-bold text-foreground">{dados.total}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
