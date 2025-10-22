@@ -5,52 +5,61 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileDown } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 
-interface Policial {
+interface Transferencia {
   id: string;
-  'Post/Grad': string;
-  NOME: string;
-  Matrícula: string;
+  policialNome: string;
+  policialPatente: string;
+  policialMatricula: string;
+  dataTransferencia: Date;
+  localDestino: string;
+  publicacao: string;
+  numeroCautelaOriginal: string;
 }
 
 const GerarNadaConstaForm = () => {
-  const [policiais, setPoliciais] = useState<Policial[]>([]);
-  const [policialId, setPolicialId] = useState('');
+  const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
+  const [transferenciaId, setTransferenciaId] = useState('');
   const [numeroNadaConsta, setNumeroNadaConsta] = useState('');
-  const [transferidoPara, setTransferidoPara] = useState('');
-  const [publicacao, setPublicacao] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadPoliciais();
+    loadTransferencias();
   }, []);
 
-  const loadPoliciais = async () => {
+  const loadTransferencias = async () => {
     try {
-      const snapshot = await getDocs(collection(db, 'policiais'));
+      const q = query(collection(db, 'transferencias_policiais'));
+      const snapshot = await getDocs(q);
+      
       const data = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
-      })) as Policial[];
+        ...doc.data(),
+        dataTransferencia: doc.data().dataTransferencia?.toDate() || new Date()
+      })) as Transferencia[];
       
-      setPoliciais(data.sort((a, b) => a.NOME.localeCompare(b.NOME)));
+      setTransferencias(data);
+      
+      if (data.length === 0) {
+        toast.info('Nenhuma transferência encontrada');
+      }
     } catch (error) {
-      console.error('Erro ao carregar policiais:', error);
-      toast.error('Erro ao carregar policiais');
+      console.error('Erro ao carregar transferências:', error);
+      toast.error('Erro ao carregar transferências');
     }
   };
 
   const handleGerar = async () => {
-    if (!policialId || !numeroNadaConsta || !transferidoPara || !publicacao) {
+    if (!transferenciaId || !numeroNadaConsta) {
       toast.error('Preencha todos os campos');
       return;
     }
 
-    const policial = policiais.find((p) => p.id === policialId);
-    if (!policial) return;
+    const transferencia = transferencias.find((t) => t.id === transferenciaId);
+    if (!transferencia) return;
 
     setLoading(true);
 
@@ -59,13 +68,13 @@ const GerarNadaConstaForm = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          grad: policial['Post/Grad'],
-          nomedopolicial: policial.NOME,
-          matricula: policial.Matrícula,
+          grad: transferencia.policialPatente,
+          nomedopolicial: transferencia.policialNome,
+          matricula: transferencia.policialMatricula,
           dataatual: new Date().toLocaleDateString('pt-BR'),
           numerondconsta: numeroNadaConsta,
-          transferidopara: transferidoPara,
-          publicacao: publicacao
+          transferidopara: transferencia.localDestino,
+          publicacao: transferencia.publicacao
         })
       });
 
@@ -75,14 +84,22 @@ const GerarNadaConstaForm = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Nada-Consta-${policial.NOME.replace(/\s+/g, '_')}.docx`;
+      link.download = `Nada-Consta-${transferencia.policialNome.replace(/\s+/g, '_')}.docx`;
       link.click();
+
+      // Atualizar registro
+      await updateDoc(doc(db, 'transferencias_policiais', transferenciaId), {
+        'documentosGerados.nadaConsta': {
+          gerado: true,
+          numeroNadaConsta,
+          dataGeracao: new Date()
+        }
+      });
 
       toast.success('Documento gerado com sucesso!');
       setNumeroNadaConsta('');
-      setTransferidoPara('');
-      setPublicacao('');
-      setPolicialId('');
+      setTransferenciaId('');
+      loadTransferencias();
     } catch (error) {
       console.error('Erro ao gerar documento:', error);
       toast.error('Erro ao gerar documento');
@@ -91,7 +108,7 @@ const GerarNadaConstaForm = () => {
     }
   };
 
-  const selectedPolicial = policiais.find((p) => p.id === policialId);
+  const selectedTransferencia = transferencias.find((t) => t.id === transferenciaId);
 
   return (
     <Card>
@@ -103,33 +120,47 @@ const GerarNadaConstaForm = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Documento para atestar que o policial nada tem em seu poder
+          Documento para atestar que o policial transferido nada tem em seu poder
         </p>
 
         <div>
-          <Label>Selecionar Policial</Label>
-          <Select value={policialId} onValueChange={setPolicialId}>
+          <Label>Selecionar Policial Transferido</Label>
+          <Select value={transferenciaId} onValueChange={setTransferenciaId} disabled={transferencias.length === 0}>
             <SelectTrigger>
-              <SelectValue placeholder="Selecione um policial..." />
+              <SelectValue placeholder={transferencias.length === 0 ? "Nenhuma transferência disponível" : "Selecione..."} />
             </SelectTrigger>
             <SelectContent>
-              {policiais.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p['Post/Grad']} {p.NOME} - {p.Matrícula}
+              {transferencias.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.policialPatente} {t.policialNome} - {t.localDestino} ({t.dataTransferencia.toLocaleDateString()})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {transferencias.length === 0 && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Primeiro é necessário realizar uma transferência de policial
+            </p>
+          )}
         </div>
 
-        {selectedPolicial && (
+        {selectedTransferencia && (
           <>
             <div className="p-4 bg-muted rounded-lg space-y-2">
               <p className="text-sm">
-                <strong>Policial:</strong> {selectedPolicial['Post/Grad']} {selectedPolicial.NOME}
+                <strong>Policial:</strong> {selectedTransferencia.policialPatente} {selectedTransferencia.policialNome}
               </p>
               <p className="text-sm">
-                <strong>Matrícula:</strong> {selectedPolicial.Matrícula}
+                <strong>Matrícula:</strong> {selectedTransferencia.policialMatricula}
+              </p>
+              <p className="text-sm">
+                <strong>Transferido para:</strong> {selectedTransferencia.localDestino}
+              </p>
+              <p className="text-sm">
+                <strong>Publicação:</strong> {selectedTransferencia.publicacao}
+              </p>
+              <p className="text-sm">
+                <strong>Cautela Original:</strong> {selectedTransferencia.numeroCautelaOriginal}
               </p>
             </div>
 
@@ -137,29 +168,9 @@ const GerarNadaConstaForm = () => {
               <Label htmlFor="numeroNadaConsta">Número do Nada Consta</Label>
               <Input
                 id="numeroNadaConsta"
-                placeholder="Ex: 001/2024"
+                placeholder="Ex: 001/2024-CPCHOQUE"
                 value={numeroNadaConsta}
                 onChange={(e) => setNumeroNadaConsta(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="transferidoPara">Transferido Para</Label>
-              <Input
-                id="transferidoPara"
-                placeholder="Ex: 1º BPM"
-                value={transferidoPara}
-                onChange={(e) => setTransferidoPara(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="publicacao">Publicação</Label>
-              <Input
-                id="publicacao"
-                placeholder="Ex: Boletim Geral nº 001/2024"
-                value={publicacao}
-                onChange={(e) => setPublicacao(e.target.value)}
               />
             </div>
 
