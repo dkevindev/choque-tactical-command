@@ -43,6 +43,8 @@ const GerarBaixaCautelaForm = () => {
     try {
       const q = query(collection(db, 'transferencias_policiais'));
       const snapshot = await getDocs(q);
+      console.log('Total de transferências encontradas:', snapshot.docs.length);
+      
       const data = snapshot.docs
         .map((doc) => ({
           id: doc.id,
@@ -51,9 +53,20 @@ const GerarBaixaCautelaForm = () => {
         }))
         .filter((t: any) => {
           // Apenas transferências com armas devolvidas
-          return t.materiaisDevolvidos?.some((m: any) => m.categoria === 'Armamento');
+          const hasArmaDevolvida = t.materiaisDevolvidos?.some((m: any) => m.categoria === 'Armamento');
+          console.log(`Transferência ${t.policialNome}:`, { 
+            hasArmaDevolvida,
+            materiaisDevolvidos: t.materiaisDevolvidos 
+          });
+          return hasArmaDevolvida;
         }) as Transferencia[];
+      
+      console.log('Transferências com armas devolvidas:', data.length);
       setTransferencias(data);
+      
+      if (data.length === 0) {
+        toast.info('Nenhuma transferência com arma devolvida encontrada');
+      }
     } catch (error) {
       console.error('Erro ao carregar transferências:', error);
       toast.error('Erro ao carregar transferências');
@@ -148,9 +161,9 @@ const GerarBaixaCautelaForm = () => {
 
         <div>
           <Label>Selecionar Policial Transferido</Label>
-          <Select value={transferenciaId} onValueChange={setTransferenciaId}>
+          <Select value={transferenciaId} onValueChange={setTransferenciaId} disabled={transferencias.length === 0}>
             <SelectTrigger>
-              <SelectValue placeholder="Selecione..." />
+              <SelectValue placeholder={transferencias.length === 0 ? "Nenhuma transferência disponível" : "Selecione..."} />
             </SelectTrigger>
             <SelectContent>
               {transferencias.map((t) => (
@@ -161,6 +174,11 @@ const GerarBaixaCautelaForm = () => {
               ))}
             </SelectContent>
           </Select>
+          {transferencias.length === 0 && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Primeiro é necessário realizar uma transferência de policial com devolução de arma
+            </p>
+          )}
         </div>
 
         {selectedTransferencia && (
