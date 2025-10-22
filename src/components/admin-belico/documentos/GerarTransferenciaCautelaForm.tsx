@@ -26,6 +26,7 @@ interface Transferencia {
     modelo?: string;
     calibre?: string;
     numeroSerie?: string;
+    numeroSIARM?: string;
   }>;
 }
 
@@ -97,7 +98,7 @@ const GerarTransferenciaCautelaForm = () => {
             calibre: armaLevada.calibre || ''
           },
           numeroSerie: armaLevada.numeroSerie || '',
-          numeroCautela: transferencia.numeroCautelaOriginal
+          numeroCautela: armaLevada.numeroSIARM || ''
         })
       });
 
@@ -187,7 +188,7 @@ const GerarTransferenciaCautelaForm = () => {
                 .map((arma, i) => (
                   <p key={i} className="text-sm">
                     <strong>Arma:</strong> {arma.fabricante} {arma.modelo} {arma.calibre} - N/S:{' '}
-                    {arma.numeroSerie}
+                    {arma.numeroSerie} - SIARM: {arma.numeroSIARM}
                   </p>
                 ))}
             </div>
