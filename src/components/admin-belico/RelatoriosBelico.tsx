@@ -289,23 +289,24 @@ const RelatoriosBelico = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Categoria</TableHead>
                     <TableHead>Nome</TableHead>
                     <TableHead>Número de Série</TableHead>
                     <TableHead>Modelo</TableHead>
                     <TableHead>Fabricante</TableHead>
                     <TableHead>Local</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Detalhes</TableHead>
+                    <TableHead className="min-w-[300px]">Informações Adicionais</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {materiaisFiltrados.map((material) => (
                     <TableRow key={material.id}>
                       <TableCell>
-                        <Badge variant="secondary">{material.categoria}</Badge>
+                        <div>
+                          <div className="font-medium">{material.nome}</div>
+                          <Badge variant="secondary" className="mt-1">{material.categoria}</Badge>
+                        </div>
                       </TableCell>
-                      <TableCell className="font-medium">{material.nome}</TableCell>
                       <TableCell>{material.numeroSerie || '-'}</TableCell>
                       <TableCell>{material.modelo || '-'}</TableCell>
                       <TableCell>{material.fabricante || '-'}</TableCell>
@@ -314,34 +315,73 @@ const RelatoriosBelico = () => {
                       </TableCell>
                       <TableCell>{getStatusBadge(material)}</TableCell>
                       <TableCell>
-                        {/* Detalhes específicos por categoria */}
-                        {material.categoria === 'Colete Balístico' && (
-                          <div className="text-sm space-y-1">
-                            {material.sexo && <div><span className="font-semibold">Sexo:</span> {material.sexo}</div>}
-                            {material.tamanhoColete && <div><span className="font-semibold">Tamanho:</span> {material.tamanhoColete}</div>}
-                            {material.vencimento && <div><span className="font-semibold">Vencimento:</span> {new Date(material.vencimento).toLocaleDateString()}</div>}
-                            {material.termoEntrega && <div><span className="font-semibold">Termo:</span> {material.termoEntrega}</div>}
-                          </div>
-                        )}
-                        {material.categoria === 'Armamento' && (
-                          <div className="text-sm space-y-1">
-                            {material.tipoArma && <div><span className="font-semibold">Tipo:</span> {material.tipoArma}</div>}
-                            {material.calibre && <div><span className="font-semibold">Calibre:</span> {material.calibre}</div>}
-                            {material.numeroSIARM && <div><span className="font-semibold">SIARM:</span> {material.numeroSIARM}</div>}
-                            {material.quantidadeCarregadores && <div><span className="font-semibold">Carregadores:</span> {material.quantidadeCarregadores}</div>}
-                            {material.quantidadeMunicoes && <div><span className="font-semibold">Munições:</span> {material.quantidadeMunicoes}</div>}
-                          </div>
-                        )}
-                        {material.cautelado && material.policialAssociadoNome && (
-                          <div className="text-sm mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-800">
-                            <span className="font-semibold">Cautelada para:</span> {material.policialAssociadoNome}
-                          </div>
-                        )}
-                        {!material.cautelado && material.disponivel && (
-                          <div className="text-sm mt-2 p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-800">
-                            <span className="font-semibold">Na Reserva de Armamento</span>
-                          </div>
-                        )}
+                        <div className="space-y-2">
+                          {/* Detalhes específicos por categoria */}
+                          {material.categoria === 'Colete Balístico' && (
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              {material.sexo && (
+                                <Badge variant="outline" className="font-normal">
+                                  Sexo: {material.sexo}
+                                </Badge>
+                              )}
+                              {material.tamanhoColete && (
+                                <Badge variant="outline" className="font-normal">
+                                  Tamanho: {material.tamanhoColete}
+                                </Badge>
+                              )}
+                              {material.vencimento && (
+                                <Badge variant="outline" className="font-normal">
+                                  Venc: {new Date(material.vencimento).toLocaleDateString('pt-BR')}
+                                </Badge>
+                              )}
+                              {material.termoEntrega && (
+                                <Badge variant="outline" className="font-normal">
+                                  Termo: {material.termoEntrega}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          {material.categoria === 'Armamento' && (
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              {material.tipoArma && (
+                                <Badge variant="outline" className="font-normal">
+                                  {material.tipoArma}
+                                </Badge>
+                              )}
+                              {material.calibre && (
+                                <Badge variant="outline" className="font-normal">
+                                  Cal: {material.calibre}
+                                </Badge>
+                              )}
+                              {material.numeroSIARM && (
+                                <Badge variant="outline" className="font-normal">
+                                  SIARM: {material.numeroSIARM}
+                                </Badge>
+                              )}
+                              {material.quantidadeCarregadores && (
+                                <Badge variant="outline" className="font-normal">
+                                  {material.quantidadeCarregadores} Carr.
+                                </Badge>
+                              )}
+                              {material.quantidadeMunicoes && (
+                                <Badge variant="outline" className="font-normal">
+                                  {material.quantidadeMunicoes} Mun.
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          {/* Status de cautela */}
+                          {material.cautelado && material.policialAssociadoNome && (
+                            <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700">
+                              Cautelada: {material.policialAssociadoNome}
+                            </Badge>
+                          )}
+                          {!material.cautelado && material.disponivel && (
+                            <Badge className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700">
+                              Reserva de Armamento
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
