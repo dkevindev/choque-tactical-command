@@ -360,7 +360,7 @@ const BelicoContent = () => {
               <TabsTrigger value="cautelas">Cautelas</TabsTrigger>
               <TabsTrigger value="transferencias">Transferências</TabsTrigger>
               <TabsTrigger value="materiais">Materiais</TabsTrigger>
-              <TabsTrigger value="estoque">Estoque</TabsTrigger>
+              <TabsTrigger value="estoque">Carga</TabsTrigger>
               <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
             </TabsList>
 

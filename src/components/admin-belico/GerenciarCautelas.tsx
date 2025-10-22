@@ -283,41 +283,6 @@ const GerenciarCautelas = () => {
         />
       )}
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 text-center">
-            <FileText className="h-8 w-8 text-primary mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{estatisticas.total}</p>
-            <p className="text-xs text-muted-foreground">Total</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 text-center">
-            <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{estatisticas.ativas}</p>
-            <p className="text-xs text-muted-foreground">Ativas</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 text-center">
-            <Clock className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{estatisticas.finalizadas}</p>
-            <p className="text-xs text-muted-foreground">Finalizadas</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border">
-          <CardContent className="p-4 text-center">
-            <AlertCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{estatisticas.vencidas}</p>
-            <p className="text-xs text-muted-foreground">Vencidas</p>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Filters */}
       <Card className="bg-card border-border">
         <CardContent className="p-4">
