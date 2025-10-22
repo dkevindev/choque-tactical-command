@@ -109,7 +109,7 @@ const GerarTermoEntregaForm = () => {
         descricao += 'caixa com kit manutenção';
         break;
     }
-    descricao += '\n\n';
+    descricao += '\n';
     setItensAdicionais([...itensAdicionais, { descricao }]);
   };
 
@@ -119,7 +119,7 @@ const GerarTermoEntregaForm = () => {
 
   const adicionarItemCustomizado = () => {
     if (itemCustomizado.trim()) {
-      setItensAdicionais([...itensAdicionais, { descricao: `- ${itemCustomizado}\n\n` }]);
+      setItensAdicionais([...itensAdicionais, { descricao: `- ${itemCustomizado}\n` }]);
       setItemCustomizado('');
       setShowModalItem(false);
     }
@@ -168,7 +168,7 @@ const GerarTermoEntregaForm = () => {
           }`;
         }
 
-        return { descricaoCompleta: descricaoCompleta + '\n\n' };
+        return { descricaoCompleta: descricaoCompleta + '\n' };
       });
 
       const response = await fetch('https://gerartermoentregadocx-owvlmrnsjq-uc.a.run.app', {
