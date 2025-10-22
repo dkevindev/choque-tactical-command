@@ -52,7 +52,7 @@ interface Cautela {
   }>;
   dataInicio: Date;
   dataFim?: Date;
-  status: 'ativa' | 'finalizada' | 'vencida';
+  status: 'ativa' | 'finalizada' | 'vencida' | 'transferida';
   tipoDocumento: 'permanente' | 'temporaria';
   assinatura: {
     matricula: string;
@@ -82,16 +82,18 @@ const GerenciarCautelas = () => {
     try {
       const q = query(collection(db, 'cautelas_permanentes'), orderBy('dataInicio', 'desc'));
       const querySnapshot = await getDocs(q);
-      const cautelasData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        dataInicio: doc.data().dataInicio?.toDate() || new Date(),
-        dataFim: doc.data().dataFim?.toDate(),
-        assinatura: {
-          ...doc.data().assinatura,
-          timestamp: doc.data().assinatura?.timestamp?.toDate() || new Date()
-        }
-      } as Cautela));
+      const cautelasData = querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          dataInicio: doc.data().dataInicio?.toDate() || new Date(),
+          dataFim: doc.data().dataFim?.toDate(),
+          assinatura: {
+            ...doc.data().assinatura,
+            timestamp: doc.data().assinatura?.timestamp?.toDate() || new Date()
+          }
+        } as Cautela))
+        .filter(cautela => cautela.status !== 'transferida'); // Excluir cautelas transferidas
       setCautelas(cautelasData);
     } catch (error) {
       console.error('Erro ao carregar cautelas:', error);
