@@ -206,15 +206,12 @@ const TransferenciaPolicialModal = ({ cautela, open, onClose, onSuccess }: Props
 
             <div>
               <Label htmlFor="localDestino">Local de Destino *</Label>
-              <Select value={localDestino} onValueChange={setLocalDestino}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Fortaleza">Fortaleza</SelectItem>
-                  <SelectItem value="Crato">Crato</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                id="localDestino"
+                placeholder="Ex: 1º BPChoque, BPRAIO, etc."
+                value={localDestino}
+                onChange={(e) => setLocalDestino(e.target.value)}
+              />
             </div>
 
             <div>
