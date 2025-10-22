@@ -38,11 +38,15 @@ interface Material {
   modelo?: string;
   observacoes?: string;
   createdAt: Date;
+  local: string; // Fortaleza ou Crato
   // Campos específicos para armas
+  tipoArma?: string; // Arma Curta ou Arma Longa
   quantidadeCarregadores?: number;
   quantidadeMunicoes?: number;
   calibreMunicao?: string;
   numeroSIARM?: string;
+  // Campos específicos para coletes
+  termoEntrega?: string;
 }
 
 const CadastroMateriais = () => {
@@ -62,15 +66,18 @@ const CadastroMateriais = () => {
     fabricante: '',
     modelo: '',
     observacoes: '',
+    local: 'Fortaleza',
     tamanhoColete: '',
     vencimento: '',
     dataFabricacao: '',
     anosValidade: '',
     sexo: '',
+    termoEntrega: '',
     // Campos para cautela
     policialAssociadoId: '',
     policialAssociadoNome: '',
     // Campos específicos para armas
+    tipoArma: '',
     quantidadeCarregadores: '',
     quantidadeMunicoes: '',
     calibreMunicao: '',
@@ -174,6 +181,7 @@ const CadastroMateriais = () => {
           numeroSerie: 'BR001',
           disponivel: true,
           fabricante: 'Taurus',
+          local: 'Fortaleza',
           createdAt: new Date()
         },
         {
@@ -185,6 +193,7 @@ const CadastroMateriais = () => {
           quantidade: 500,
           disponivel: true,
           fabricante: 'CBC',
+          local: 'Fortaleza',
           createdAt: new Date()
         },
         {
@@ -194,6 +203,7 @@ const CadastroMateriais = () => {
           quantidade: 10,
           disponivel: true,
           fabricante: 'Proteção',
+          local: 'Fortaleza',
           createdAt: new Date()
         }
       ]);
@@ -212,13 +222,16 @@ const CadastroMateriais = () => {
       fabricante: '',
       modelo: '',
       observacoes: '',
+      local: 'Fortaleza',
       tamanhoColete: '',
       vencimento: '',
       dataFabricacao: '',
       anosValidade: '',
       sexo: '',
+      termoEntrega: '',
       policialAssociadoId: '',
       policialAssociadoNome: '',
+      tipoArma: '',
       quantidadeCarregadores: '',
       quantidadeMunicoes: '',
       calibreMunicao: '',
@@ -264,6 +277,12 @@ const CadastroMateriais = () => {
       }
     }
 
+    // Validação específica para Armamento
+    if (formData.categoria === 'Armamento' && !formData.tipoArma) {
+      toast.error('Selecione o tipo de arma (Curta ou Longa)');
+      return;
+    }
+
     try {
       // Calcular vencimento automaticamente para Colete Balístico
       let vencimentoCalculado = formData.vencimento;
@@ -281,6 +300,7 @@ const CadastroMateriais = () => {
         categoria: formData.categoria,
         disponivel: formData.policialAssociadoId ? false : true,
         cautelado: formData.policialAssociadoId ? true : false,
+        local: formData.local,
         createdAt: new Date()
       };
 
@@ -299,6 +319,8 @@ const CadastroMateriais = () => {
       if (formData.tamanhoColete) materialDataBase.tamanhoColete = formData.tamanhoColete;
       if (formData.dataFabricacao) materialDataBase.dataFabricacao = formData.dataFabricacao;
       if (formData.sexo) materialDataBase.sexo = formData.sexo;
+      if (formData.termoEntrega) materialDataBase.termoEntrega = formData.termoEntrega;
+      if (formData.tipoArma) materialDataBase.tipoArma = formData.tipoArma;
       if (formData.quantidadeCarregadores) materialDataBase.quantidadeCarregadores = parseInt(formData.quantidadeCarregadores);
       if (formData.quantidadeMunicoes) materialDataBase.quantidadeMunicoes = parseInt(formData.quantidadeMunicoes);
       if (formData.calibreMunicao) materialDataBase.calibreMunicao = formData.calibreMunicao;
@@ -443,13 +465,16 @@ const CadastroMateriais = () => {
       fabricante: material.fabricante || '',
       modelo: material.modelo || '',
       observacoes: material.observacoes || '',
+      local: material.local || 'Fortaleza',
       tamanhoColete: (material as any).tamanhoColete || '',
       vencimento: (material as any).vencimento || '',
       dataFabricacao: (material as any).dataFabricacao || '',
       anosValidade: (material as any).anosValidade?.toString() || '',
       sexo: (material as any).sexo || '',
+      termoEntrega: (material as any).termoEntrega || '',
       policialAssociadoId: material.policialAssociadoId || '',
       policialAssociadoNome: material.policialAssociadoNome || '',
+      tipoArma: material.tipoArma || '',
       quantidadeCarregadores: material.quantidadeCarregadores?.toString() || '',
       quantidadeMunicoes: material.quantidadeMunicoes?.toString() || '',
       calibreMunicao: material.calibreMunicao || '',
@@ -582,6 +607,19 @@ const CadastroMateriais = () => {
                   </Select>
                 </div>
 
+                <div>
+                  <Label htmlFor="local">Local *</Label>
+                  <Select value={formData.local} onValueChange={(value) => setFormData(prev => ({ ...prev, local: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o local" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Fortaleza">Fortaleza</SelectItem>
+                      <SelectItem value="Crato">Crato</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {formData.categoria !== 'Colete Balístico' && (
                   <div>
                     <Label htmlFor="calibre">Calibre</Label>
@@ -705,7 +743,16 @@ const CadastroMateriais = () => {
                         min="1"
                       />
                     </div>
-                    <div className="md:col-span-2">
+                    <div>
+                      <Label htmlFor="termoEntrega">Termo de Entrega</Label>
+                      <Input
+                        id="termoEntrega"
+                        value={formData.termoEntrega}
+                        onChange={(e) => setFormData(prev => ({ ...prev, termoEntrega: e.target.value }))}
+                        placeholder="Ex: Termo 2024/001"
+                      />
+                    </div>
+                    <div>
                       <Label htmlFor="vencimento">Vencimento (calculado automaticamente)</Label>
                       <Input
                         id="vencimento"
@@ -731,6 +778,18 @@ const CadastroMateriais = () => {
                 {/* Campos específicos para Armamento */}
                 {formData.categoria === 'Armamento' && (
                   <>
+                    <div>
+                      <Label htmlFor="tipoArma">Tipo de Arma *</Label>
+                      <Select value={formData.tipoArma} onValueChange={(value) => setFormData(prev => ({ ...prev, tipoArma: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Arma Curta">Arma Curta</SelectItem>
+                          <SelectItem value="Arma Longa">Arma Longa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div>
                       <Label htmlFor="quantidadeCarregadores">Quantidade de Carregadores</Label>
                       <Input
