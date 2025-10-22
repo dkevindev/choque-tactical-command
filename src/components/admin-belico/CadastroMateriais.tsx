@@ -125,11 +125,13 @@ const CadastroMateriais = () => {
     try {
       const q = query(collection(db, 'materiais_belicos'), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      let materiaisData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date()
-      } as Material));
+      let materiaisData = querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date()
+        } as Material))
+        .filter((m: any) => !m.transferido); // Excluir materiais transferidos
 
       // Carregar cautelas ativas para sincronizar status dos materiais
       const cautelasQuery = query(collection(db, 'cautelas_permanentes'));
