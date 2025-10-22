@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import TacticalSidebar from '@/components/TacticalSidebar';
 import ViaturaTable from '@/components/ViaturaTable';
 import PolicialTable from '@/components/PolicialTable';
@@ -26,6 +27,8 @@ import GerenciarCategorias from '@/components/admin-belico/GerenciarCategorias';
 import ControleEstoque from '@/components/admin-belico/ControleEstoque';
 import GerenciarCautelas from '@/components/admin-belico/GerenciarCautelas';
 import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
+import { db } from '@/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -83,39 +86,201 @@ const AdminDashboard = () => {
 };
 
 const DashboardOverview = () => {
-  const stats = [
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Array<{
+    title: string;
+    value: string;
+    icon: any;
+    status: 'operational' | 'warning';
+    description: string;
+  }>>([
     {
       title: 'EFETIVO ATIVO',
-      value: '1,247',
+      value: '0',
       icon: Users,
       status: 'operational',
       description: 'Policiais em serviço'
     },
     {
       title: 'VIATURAS ATIVAS',
-      value: '89',
+      value: '0',
       icon: Truck,
       status: 'operational',
       description: 'Frota operacional'
     },
     {
       title: 'ARMAMENTOS',
-      value: '2,156',
+      value: '0',
       icon: Target,
-      status: 'warning',
+      status: 'operational',
       description: 'Itens bélicos registrados'
     },
     {
       title: 'EQUIPAMENTOS',
-      value: '3,421',
+      value: '0',
       icon: Shield,
       status: 'operational',
       description: 'Patrimônio total'
     }
-  ];
+  ]);
+  
+  const [coletesVencidos, setColetesVencidos] = useState<any[]>([]);
+  const [coletesVencendo, setColetesVencendo] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Buscar policiais
+      const policiaisSnapshot = await getDocs(collection(db, 'policiais'));
+      const totalPoliciais = policiaisSnapshot.size;
+
+      // Buscar viaturas
+      const viaturasSnapshot = await getDocs(collection(db, 'frota'));
+      const totalViaturas = viaturasSnapshot.size;
+
+      // Buscar materiais bélicos
+      const materiaisSnapshot = await getDocs(collection(db, 'materiais_belicos'));
+      const materiais = materiaisSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Contar armamentos (excluindo coletes)
+      const armamentos = materiais.filter((m: any) => 
+        m.categoria && m.categoria !== 'Colete Balístico'
+      );
+      
+      // Total de equipamentos (todos os materiais)
+      const totalEquipamentos = materiais.length;
+
+      // Verificar coletes vencidos e vencendo
+      const hoje = new Date();
+      const seisAPartir = new Date();
+      seisAPartir.setMonth(seisAPartir.getMonth() + 6);
+
+      const coletes = materiais.filter((m: any) => m.categoria === 'Colete Balístico');
+      
+      const vencidos = coletes.filter((c: any) => {
+        if (!c.vencimento) return false;
+        const dataVencimento = new Date(c.vencimento);
+        return dataVencimento < hoje;
+      });
+
+      const vencendo = coletes.filter((c: any) => {
+        if (!c.vencimento) return false;
+        const dataVencimento = new Date(c.vencimento);
+        return dataVencimento >= hoje && dataVencimento <= seisAPartir;
+      });
+
+      setColetesVencidos(vencidos);
+      setColetesVencendo(vencendo);
+
+      // Atualizar stats
+      setStats([
+        {
+          title: 'EFETIVO ATIVO',
+          value: totalPoliciais.toString(),
+          icon: Users,
+          status: 'operational',
+          description: 'Policiais em serviço'
+        },
+        {
+          title: 'VIATURAS ATIVAS',
+          value: totalViaturas.toString(),
+          icon: Truck,
+          status: 'operational',
+          description: 'Frota operacional'
+        },
+        {
+          title: 'ARMAMENTOS',
+          value: armamentos.length.toString(),
+          icon: Target,
+          status: vencidos.length > 0 ? 'warning' : 'operational',
+          description: 'Itens bélicos registrados'
+        },
+        {
+          title: 'EQUIPAMENTOS',
+          value: totalEquipamentos.toString(),
+          icon: Shield,
+          status: 'operational',
+          description: 'Patrimônio total'
+        }
+      ]);
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Erro ao buscar dados do dashboard:', error);
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="bg-card border-border shadow-tactical">
+              <CardContent className="p-6">
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 bg-muted rounded w-24"></div>
+                  <div className="h-8 bg-muted rounded w-16"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Alertas de Coletes */}
+      {coletesVencidos.length > 0 && (
+        <Alert variant="destructive" className="border-red-500">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Coletes Balísticos Vencidos</AlertTitle>
+          <AlertDescription>
+            {coletesVencidos.length} colete(s) balístico(s) com validade vencida. 
+            <ul className="mt-2 space-y-1">
+              {coletesVencidos.slice(0, 3).map((colete: any) => (
+                <li key={colete.id} className="text-sm">
+                  • {colete.numeroSerie || 'S/N'} - Vencimento: {new Date(colete.vencimento).toLocaleDateString('pt-BR')}
+                  {colete.policialAssociadoNome && ` (Cautelado: ${colete.policialAssociadoNome})`}
+                </li>
+              ))}
+              {coletesVencidos.length > 3 && (
+                <li className="text-sm font-medium">+ {coletesVencidos.length - 3} outros coletes vencidos</li>
+              )}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {coletesVencendo.length > 0 && (
+        <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
+          <Clock className="h-4 w-4" />
+          <AlertTitle>Coletes Vencendo nos Próximos 6 Meses</AlertTitle>
+          <AlertDescription>
+            {coletesVencendo.length} colete(s) balístico(s) vencendo em breve.
+            <ul className="mt-2 space-y-1">
+              {coletesVencendo.slice(0, 3).map((colete: any) => (
+                <li key={colete.id} className="text-sm">
+                  • {colete.numeroSerie || 'S/N'} - Vencimento: {new Date(colete.vencimento).toLocaleDateString('pt-BR')}
+                  {colete.policialAssociadoNome && ` (Cautelado: ${colete.policialAssociadoNome})`}
+                </li>
+              ))}
+              {coletesVencendo.length > 3 && (
+                <li className="text-sm font-medium">+ {coletesVencendo.length - 3} outros coletes vencendo</li>
+              )}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
           <Card key={index} className="bg-card border-border shadow-tactical">
@@ -146,6 +311,7 @@ const DashboardOverview = () => {
         ))}
       </div>
 
+      {/* Frota - Viaturas com Alertas */}
       <Card className="bg-card border-border shadow-tactical">
         <CardHeader>
           <CardTitle className="text-foreground flex items-center gap-2">
@@ -155,33 +321,6 @@ const DashboardOverview = () => {
         </CardHeader>
         <CardContent>
           <ViaturaTable />
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card border-border shadow-tactical mt-6">
-        <CardHeader>
-          <CardTitle className="text-foreground flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            ATIVIDADES RECENTES
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[
-              { action: 'Cadastro de novo equipamento', user: 'Sgt. Silva', time: '15:45' },
-              { action: 'Atualização de dados - Policial', user: 'Cb. Santos', time: '14:20' },
-              { action: 'Relatório de manutenção enviado', user: 'Ten. Oliveira', time: '13:30' }
-            ].map((activity, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-muted rounded">
-                <CheckCircle className="h-4 w-4 text-primary" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{activity.action}</p>
-                  <p className="text-xs text-muted-foreground">por {activity.user}</p>
-                </div>
-                <span className="text-xs text-muted-foreground">{activity.time}</span>
-              </div>
-            ))}
-          </div>
         </CardContent>
       </Card>
     </div>
