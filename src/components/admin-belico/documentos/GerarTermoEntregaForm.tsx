@@ -141,32 +141,66 @@ const GerarTermoEntregaForm = () => {
     setLoading(true);
 
     try {
-      // Formatar materiais - cada item em uma linha separada
+      // Formatar materiais - separar em grupos (arma + carregadores + munições)
       const materiais: Array<{ descricaoCompleta: string }> = [];
+      const processedIndices = new Set<number>();
 
-      transferencia.materiaisDevolvidos.forEach((m) => {
+      transferencia.materiaisDevolvidos.forEach((m, index) => {
+        if (processedIndices.has(index)) return;
+
         if (m.categoria === 'Armamento') {
           // 1. Adicionar a arma principal
+          const calibreArma = m.calibre || m.nome?.match(/\.?\d{2,3}/)?.[0] || 'N/D';
           materiais.push({
             descricaoCompleta: `${m.nome || 'Pistola'}, Marca: ${m.fabricante || 'N/D'}, Modelo: ${
               m.modelo || 'N/D'
-            }, Calibre: ${m.calibre || 'N/D'}, Nº Série: ${m.numeroSerie || 'N/D'}`
+            }, Calibre: ${calibreArma}, Nº Série: ${m.numeroSerie || 'N/D'}`
           });
+          processedIndices.add(index);
 
-          // 2. Adicionar carregadores em linha separada
-          if (m.quantidadeCarregadores && m.quantidadeCarregadores > 0) {
-            const carregadorDesc = `${m.quantidadeCarregadores} carregador${m.quantidadeCarregadores > 1 ? 'es' : ''} ${m.fabricante || ''} ${
-              m.modelo || ''
-            } Calibre ${m.calibre || 'N/D'}`.trim().replace(/\s+/g, ' ');
+          // 2. Buscar carregadores relacionados (mesma arma/calibre)
+          const carregadores = transferencia.materiaisDevolvidos.filter((item, idx) => 
+            !processedIndices.has(idx) &&
+            item.categoria === 'Acessório' &&
+            item.nome?.toLowerCase().includes('carregador') &&
+            (item.fabricante === m.fabricante || item.modelo?.includes(m.modelo || ''))
+          );
+
+          if (carregadores.length > 0) {
+            const totalCarregadores = carregadores.length;
+            carregadores.forEach((_, idx) => processedIndices.add(transferencia.materiaisDevolvidos.indexOf(carregadores[idx])));
+            
             materiais.push({
-              descricaoCompleta: carregadorDesc
+              descricaoCompleta: `${totalCarregadores} carregador${totalCarregadores > 1 ? 'es' : ''} ${m.fabricante || ''} ${m.modelo || ''} Calibre ${calibreArma}`.trim().replace(/\s+/g, ' ')
+            });
+          } else if (m.quantidadeCarregadores && m.quantidadeCarregadores > 0) {
+            // Fallback: usar dados da arma se existirem
+            materiais.push({
+              descricaoCompleta: `${m.quantidadeCarregadores} carregador${m.quantidadeCarregadores > 1 ? 'es' : ''} ${m.fabricante || ''} ${m.modelo || ''} Calibre ${calibreArma}`.trim().replace(/\s+/g, ' ')
             });
           }
 
-          // 3. Adicionar munições em linha separada
-          if (m.quantidadeMunicoes && m.quantidadeMunicoes > 0) {
+          // 3. Buscar munições relacionadas (mesmo calibre)
+          const municoes = transferencia.materiaisDevolvidos.filter((item, idx) => 
+            !processedIndices.has(idx) &&
+            item.categoria === 'Munição' &&
+            (item.nome?.includes(calibreArma) || item.calibre === calibreArma)
+          );
+
+          if (municoes.length > 0) {
+            const totalMunicoes = municoes.reduce((sum, mun) => {
+              const qty = parseInt(mun.nome?.match(/\d+/)?.[0] || '1');
+              return sum + qty;
+            }, 0);
+            municoes.forEach((_, idx) => processedIndices.add(transferencia.materiaisDevolvidos.indexOf(municoes[idx])));
+            
             materiais.push({
-              descricaoCompleta: `${m.quantidadeMunicoes} Munições calibre ${m.calibre || 'N/D'}`
+              descricaoCompleta: `${totalMunicoes} Munições calibre ${calibreArma}`
+            });
+          } else if (m.quantidadeMunicoes && m.quantidadeMunicoes > 0) {
+            // Fallback: usar dados da arma se existirem
+            materiais.push({
+              descricaoCompleta: `${m.quantidadeMunicoes} Munições calibre ${calibreArma}`
             });
           }
         } else if (m.categoria === 'Colete Balístico') {
@@ -177,12 +211,15 @@ const GerarTermoEntregaForm = () => {
               m.vencimento || 'N/D'
             }`
           });
-        } else {
+          processedIndices.add(index);
+        } else if (!processedIndices.has(index)) {
+          // Outros materiais que não foram agrupados
           materiais.push({
             descricaoCompleta: `${m.nome}, Marca: ${m.fabricante || 'N/D'}, Nº Série: ${
               m.numeroSerie || 'N/D'
             }`
           });
+          processedIndices.add(index);
         }
       });
 
