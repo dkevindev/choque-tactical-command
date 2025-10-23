@@ -141,33 +141,49 @@ const GerarTermoEntregaForm = () => {
     setLoading(true);
 
     try {
-      // Formatar materiais
-      const materiais = transferencia.materiaisDevolvidos.map((m, index) => {
-        let descricaoCompleta = '';
+      // Formatar materiais - cada item em uma linha separada
+      const materiais: Array<{ descricaoCompleta: string }> = [];
 
+      transferencia.materiaisDevolvidos.forEach((m) => {
         if (m.categoria === 'Armamento') {
-          descricaoCompleta += `${m.nome || 'Pistola'}, Marca: ${m.fabricante || 'N/D'}, Modelo: ${
-            m.modelo || 'N/D'
-          }, Calibre: ${m.calibre || 'N/D'}, Nº Série: ${m.numeroSerie || 'N/D'}`;
-          if (m.quantidadeCarregadores) {
-            descricaoCompleta += `, com ${m.quantidadeCarregadores} carregador(es)`;
+          // 1. Adicionar a arma principal
+          materiais.push({
+            descricaoCompleta: `${m.nome || 'Pistola'}, Marca: ${m.fabricante || 'N/D'}, Modelo: ${
+              m.modelo || 'N/D'
+            }, Calibre: ${m.calibre || 'N/D'}, Nº Série: ${m.numeroSerie || 'N/D'}`
+          });
+
+          // 2. Adicionar carregadores em linha separada
+          if (m.quantidadeCarregadores && m.quantidadeCarregadores > 0) {
+            const carregadorDesc = `${m.quantidadeCarregadores} carregador${m.quantidadeCarregadores > 1 ? 'es' : ''} ${m.fabricante || ''} ${
+              m.modelo || ''
+            } Calibre ${m.calibre || 'N/D'}`.trim().replace(/\s+/g, ' ');
+            materiais.push({
+              descricaoCompleta: carregadorDesc
+            });
           }
-          if (m.quantidadeMunicoes) {
-            descricaoCompleta += ` e ${m.quantidadeMunicoes} munição(ões)`;
+
+          // 3. Adicionar munições em linha separada
+          if (m.quantidadeMunicoes && m.quantidadeMunicoes > 0) {
+            materiais.push({
+              descricaoCompleta: `${m.quantidadeMunicoes} Munições calibre ${m.calibre || 'N/D'}`
+            });
           }
         } else if (m.categoria === 'Colete Balístico') {
-          descricaoCompleta += `Colete Balístico, Marca: ${m.fabricante || 'N/D'}, Nº Série: ${
-            m.numeroSerie || 'N/D'
-          }, Tamanho: ${m.tamanhoColete || 'N/D'}, Gênero: ${m.sexo || 'N/D'}, Vencimento: ${
-            m.vencimento || 'N/D'
-          }`;
+          materiais.push({
+            descricaoCompleta: `Colete Balístico, Marca: ${m.fabricante || 'N/D'}, Nº Série: ${
+              m.numeroSerie || 'N/D'
+            }, Tamanho: ${m.tamanhoColete || 'N/D'}, Gênero: ${m.sexo || 'N/D'}, Vencimento: ${
+              m.vencimento || 'N/D'
+            }`
+          });
         } else {
-          descricaoCompleta += `${m.nome}, Marca: ${m.fabricante || 'N/D'}, Nº Série: ${
-            m.numeroSerie || 'N/D'
-          }`;
+          materiais.push({
+            descricaoCompleta: `${m.nome}, Marca: ${m.fabricante || 'N/D'}, Nº Série: ${
+              m.numeroSerie || 'N/D'
+            }`
+          });
         }
-
-        return { descricaoCompleta };
       });
 
       const response = await fetch('https://gerartermoentregadocx-owvlmrnsjq-uc.a.run.app', {
