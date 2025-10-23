@@ -285,6 +285,22 @@ const CadastroMateriais = () => {
       return;
     }
 
+    // Validação obrigatória para armamentos
+    if (formData.categoria === 'Armamento') {
+      if (!formData.calibre) {
+        toast.error('Calibre é obrigatório para armamentos');
+        return;
+      }
+      if (!formData.quantidadeCarregadores || parseInt(formData.quantidadeCarregadores) === 0) {
+        toast.error('Quantidade de carregadores é obrigatória para armamentos');
+        return;
+      }
+      if (!formData.quantidadeMunicoes || parseInt(formData.quantidadeMunicoes) === 0) {
+        toast.error('Quantidade de munições é obrigatória para armamentos');
+        return;
+      }
+    }
+
     try {
       // Calcular vencimento automaticamente para Colete Balístico
       let vencimentoCalculado = formData.vencimento;
@@ -376,29 +392,40 @@ const CadastroMateriais = () => {
         if (materialData.modelo) itemPrincipal.modelo = materialData.modelo;
         if (materialData.numeroSIARM) itemPrincipal.numeroSIARM = materialData.numeroSIARM;
         
+        // Para armamentos, adicionar calibre e quantidades na arma principal
+        if (materialData.categoria === 'Armamento') {
+          itemPrincipal.calibre = materialData.calibre;
+          itemPrincipal.quantidadeCarregadores = parseInt(materialData.quantidadeCarregadores) || 0;
+          itemPrincipal.quantidadeMunicoes = parseInt(materialData.quantidadeMunicoes) || 0;
+        }
+        
         materiaisParaCautela.push(itemPrincipal);
         
-        // Se for armamento, adicionar carregadores e munições como itens separados
+        // Se for armamento, adicionar carregadores e munições como itens separados COM DADOS COMPLETOS
         if (materialData.categoria === 'Armamento') {
-          if (materialData.quantidadeCarregadores && materialData.quantidadeCarregadores > 0) {
+          if (materialData.quantidadeCarregadores && parseInt(materialData.quantidadeCarregadores) > 0) {
             materiaisParaCautela.push({
               materialId: `${materialId}_carregadores`,
               nome: `Carregadores - ${materialData.nome}`,
               categoria: 'Acessório',
-              quantidade: materialData.quantidadeCarregadores,
-              fabricante: materialData.fabricante,
-              modelo: materialData.modelo
+              quantidade: parseInt(materialData.quantidadeCarregadores),
+              fabricante: materialData.fabricante || 'N/D',
+              modelo: materialData.modelo || 'N/D',
+              calibre: materialData.calibre,
+              numeroSerie: 'N/D'
             });
           }
           
-          if (materialData.quantidadeMunicoes && materialData.quantidadeMunicoes > 0) {
+          if (materialData.quantidadeMunicoes && parseInt(materialData.quantidadeMunicoes) > 0) {
             materiaisParaCautela.push({
               materialId: `${materialId}_municoes`,
-              nome: `Munição ${materialData.calibreMunicao || materialData.calibre || ''}`,
+              nome: `Munição ${materialData.calibre}`,
               categoria: 'Munição',
               subcategoria: 'Letal',
-              quantidade: materialData.quantidadeMunicoes,
-              calibre: materialData.calibreMunicao || materialData.calibre
+              quantidade: parseInt(materialData.quantidadeMunicoes),
+              calibre: materialData.calibre,
+              numeroSerie: 'N/D',
+              fabricante: 'N/D'
             });
           }
         }
@@ -793,25 +820,27 @@ const CadastroMateriais = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="quantidadeCarregadores">Quantidade de Carregadores</Label>
+                      <Label htmlFor="quantidadeCarregadores">Quantidade de Carregadores *</Label>
                       <Input
                         id="quantidadeCarregadores"
                         type="number"
                         value={formData.quantidadeCarregadores}
                         onChange={(e) => setFormData(prev => ({ ...prev, quantidadeCarregadores: e.target.value }))}
                         placeholder="Ex: 3"
-                        min="0"
+                        min="1"
+                        required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="quantidadeMunicoes">Quantidade de Munições</Label>
+                      <Label htmlFor="quantidadeMunicoes">Quantidade de Munições *</Label>
                       <Input
                         id="quantidadeMunicoes"
                         type="number"
                         value={formData.quantidadeMunicoes}
                         onChange={(e) => setFormData(prev => ({ ...prev, quantidadeMunicoes: e.target.value }))}
                         placeholder="Ex: 50"
-                        min="0"
+                        min="1"
+                        required
                       />
                     </div>
                     <div>

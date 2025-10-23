@@ -141,85 +141,53 @@ const GerarTermoEntregaForm = () => {
     setLoading(true);
 
     try {
-      // Formatar materiais - separar em grupos (arma + carregadores + munições)
+      // Formatar materiais - agora com dados completos no banco
       const materiais: Array<{ descricaoCompleta: string }> = [];
-      const processedIndices = new Set<number>();
 
-      transferencia.materiaisDevolvidos.forEach((m, index) => {
-        if (processedIndices.has(index)) return;
-
+      transferencia.materiaisDevolvidos.forEach((m) => {
         if (m.categoria === 'Armamento') {
-          // 1. Adicionar a arma principal
-          const calibreArma = m.calibre || m.nome?.match(/\.?\d{2,3}/)?.[0] || 'N/D';
+          // 1. Arma principal
           materiais.push({
             descricaoCompleta: `${m.nome || 'Pistola'}, Marca: ${m.fabricante || 'N/D'}, Modelo: ${
               m.modelo || 'N/D'
-            }, Calibre: ${calibreArma}, Nº Série: ${m.numeroSerie || 'N/D'}`
+            }, Calibre: ${m.calibre || 'N/D'}, Nº Série: ${m.numeroSerie || 'N/D'}`
           });
-          processedIndices.add(index);
 
-          // 2. Buscar carregadores relacionados (mesma arma/calibre)
-          const carregadores = transferencia.materiaisDevolvidos.filter((item, idx) => 
-            !processedIndices.has(idx) &&
-            item.categoria === 'Acessório' &&
-            item.nome?.toLowerCase().includes('carregador') &&
-            (item.fabricante === m.fabricante || item.modelo?.includes(m.modelo || ''))
-          );
-
-          if (carregadores.length > 0) {
-            const totalCarregadores = carregadores.length;
-            carregadores.forEach((_, idx) => processedIndices.add(transferencia.materiaisDevolvidos.indexOf(carregadores[idx])));
-            
+          // 2. Carregadores (usando dados da arma)
+          if (m.quantidadeCarregadores && m.quantidadeCarregadores > 0) {
             materiais.push({
-              descricaoCompleta: `${totalCarregadores} carregador${totalCarregadores > 1 ? 'es' : ''} ${m.fabricante || ''} ${m.modelo || ''} Calibre ${calibreArma}`.trim().replace(/\s+/g, ' ')
-            });
-          } else if (m.quantidadeCarregadores && m.quantidadeCarregadores > 0) {
-            // Fallback: usar dados da arma se existirem
-            materiais.push({
-              descricaoCompleta: `${m.quantidadeCarregadores} carregador${m.quantidadeCarregadores > 1 ? 'es' : ''} ${m.fabricante || ''} ${m.modelo || ''} Calibre ${calibreArma}`.trim().replace(/\s+/g, ' ')
+              descricaoCompleta: `${m.quantidadeCarregadores} carregador${m.quantidadeCarregadores > 1 ? 'es' : ''} ${m.fabricante || ''} ${m.modelo || ''} Calibre ${m.calibre || 'N/D'}`.trim().replace(/\s+/g, ' ')
             });
           }
 
-          // 3. Buscar munições relacionadas (mesmo calibre)
-          const municoes = transferencia.materiaisDevolvidos.filter((item, idx) => 
-            !processedIndices.has(idx) &&
-            item.categoria === 'Munição' &&
-            (item.nome?.includes(calibreArma) || item.calibre === calibreArma)
-          );
-
-          if (municoes.length > 0) {
-            const totalMunicoes = municoes.reduce((sum, mun) => {
-              const qty = parseInt(mun.nome?.match(/\d+/)?.[0] || '1');
-              return sum + qty;
-            }, 0);
-            municoes.forEach((_, idx) => processedIndices.add(transferencia.materiaisDevolvidos.indexOf(municoes[idx])));
-            
+          // 3. Munições (usando dados da arma)
+          if (m.quantidadeMunicoes && m.quantidadeMunicoes > 0) {
             materiais.push({
-              descricaoCompleta: `${totalMunicoes} Munições calibre ${calibreArma}`
-            });
-          } else if (m.quantidadeMunicoes && m.quantidadeMunicoes > 0) {
-            // Fallback: usar dados da arma se existirem
-            materiais.push({
-              descricaoCompleta: `${m.quantidadeMunicoes} Munições calibre ${calibreArma}`
+              descricaoCompleta: `${m.quantidadeMunicoes} Munições calibre ${m.calibre || 'N/D'}`
             });
           }
+        } else if (m.categoria === 'Acessório' && m.nome?.toLowerCase().includes('carregador')) {
+          // Carregador separado (fallback para dados antigos)
+          materiais.push({
+            descricaoCompleta: `${m.quantidade} carregador${m.quantidade > 1 ? 'es' : ''} ${m.fabricante || ''} ${m.modelo || ''} Calibre ${m.calibre || 'N/D'}`.trim().replace(/\s+/g, ' ')
+          });
+        } else if (m.categoria === 'Munição') {
+          // Munição separada (fallback para dados antigos)
+          materiais.push({
+            descricaoCompleta: `${m.quantidade} Munições calibre ${m.calibre || 'N/D'}`
+          });
         } else if (m.categoria === 'Colete Balístico') {
           materiais.push({
-            descricaoCompleta: `Colete Balístico, Marca: ${m.fabricante || 'N/D'}, Nº Série: ${
-              m.numeroSerie || 'N/D'
-            }, Tamanho: ${m.tamanhoColete || 'N/D'}, Gênero: ${m.sexo || 'N/D'}, Vencimento: ${
+            descricaoCompleta: `${m.nome}, Tamanho: ${m.tamanhoColete || 'N/D'}, Vencimento: ${
               m.vencimento || 'N/D'
             }`
           });
-          processedIndices.add(index);
-        } else if (!processedIndices.has(index)) {
-          // Outros materiais que não foram agrupados
+        } else {
           materiais.push({
             descricaoCompleta: `${m.nome}, Marca: ${m.fabricante || 'N/D'}, Nº Série: ${
               m.numeroSerie || 'N/D'
             }`
           });
-          processedIndices.add(index);
         }
       });
 
