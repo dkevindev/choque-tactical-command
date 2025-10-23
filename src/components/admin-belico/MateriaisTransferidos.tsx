@@ -77,7 +77,7 @@ const MateriaisTransferidos = () => {
 
   const transferenciasFiltradas = transferencias.filter((t) => {
     const matchNome = t.policialNome?.toLowerCase().includes(filtro.toLowerCase());
-    const matchMatricula = t.policialMatricula?.includes(filtro);
+    const matchMatricula = t.policialMatricula?.toString().includes(filtro);
     const matchLocal = localFiltro === 'todos' || t.localDestino === localFiltro;
     const matchStatus = statusFiltro === 'todos' || t.status === statusFiltro;
     return (matchNome || matchMatricula) && matchLocal && matchStatus;
