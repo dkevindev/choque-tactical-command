@@ -242,7 +242,7 @@ const GerenciarCautelas = () => {
 
   const cautelasFiltradas = cautelas.filter(cautela => {
     const matchNome = cautela.policialNome?.toLowerCase().includes(filtro.toLowerCase()) || false;
-    const matchMatricula = cautela.policialMatricula?.includes(filtro) || false;
+    const matchMatricula = cautela.policialMatricula?.toString().includes(filtro) || false;
     const matchStatus = statusFiltro === 'todos' || statusFiltro === '' || cautela.status === statusFiltro;
     const matchTipo = tipoFiltro === 'todos' || tipoFiltro === '' || cautela.tipoDocumento === tipoFiltro;
     
