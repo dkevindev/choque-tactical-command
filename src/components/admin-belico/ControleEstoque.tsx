@@ -157,19 +157,28 @@ const ControleEstoque = () => {
     // Calcular para TOTAL
     const armasCurtasTotal = materiaisData.filter(m => m.tipoArma === 'Arma Curta');
     const armasLongasTotal = materiaisData.filter(m => m.tipoArma === 'Arma Longa');
-    const coletesTotal = materiaisData.filter(m => m.categoria === 'Colete Balístico' || m.categoria === 'EPI' && m.nome?.toLowerCase().includes('colete'));
+    const coletesTotal = materiaisData.filter(m => 
+      m.categoria === 'Colete Balístico' || 
+      (m.categoria === 'EPI' && m.nome && typeof m.nome === 'string' && m.nome.toLowerCase().includes('colete'))
+    );
 
     // Calcular para FORTALEZA
     const materiaisFortaleza = materiaisData.filter(m => m.local === 'Fortaleza');
     const armasCurtasFortaleza = materiaisFortaleza.filter(m => m.tipoArma === 'Arma Curta');
     const armasLongasFortaleza = materiaisFortaleza.filter(m => m.tipoArma === 'Arma Longa');
-    const coletesFortaleza = materiaisFortaleza.filter(m => m.categoria === 'Colete Balístico' || m.categoria === 'EPI' && m.nome?.toLowerCase().includes('colete'));
+    const coletesFortaleza = materiaisFortaleza.filter(m => 
+      m.categoria === 'Colete Balístico' || 
+      (m.categoria === 'EPI' && m.nome && typeof m.nome === 'string' && m.nome.toLowerCase().includes('colete'))
+    );
 
     // Calcular para CRATO
     const materiaisCrato = materiaisData.filter(m => m.local === 'Crato');
     const armasCurtasCrato = materiaisCrato.filter(m => m.tipoArma === 'Arma Curta');
     const armasLongasCrato = materiaisCrato.filter(m => m.tipoArma === 'Arma Longa');
-    const coletesCrato = materiaisCrato.filter(m => m.categoria === 'Colete Balístico' || m.categoria === 'EPI' && m.nome?.toLowerCase().includes('colete'));
+    const coletesCrato = materiaisCrato.filter(m => 
+      m.categoria === 'Colete Balístico' || 
+      (m.categoria === 'EPI' && m.nome && typeof m.nome === 'string' && m.nome.toLowerCase().includes('colete'))
+    );
 
     const stats: EstatisticasEstoque = {
       total: {
