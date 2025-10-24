@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoveRight, Users, AlertTriangle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MoveRight, Users, AlertTriangle, UserPlus } from 'lucide-react';
 import { doc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
@@ -29,11 +30,25 @@ interface MovimentacoesTabProps {
 }
 
 const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate }) => {
+  // Estados para transferência
   const [selectedPolicial, setSelectedPolicial] = useState<string>('');
   const [destino, setDestino] = useState('');
   const [publicacao, setPublicacao] = useState('');
   const [loading, setLoading] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  
+  // Estados para chegada
+  const [novoPolicial, setNovoPolicial] = useState({
+    nome: '',
+    postGrad: '',
+    matricula: '',
+    unidadeOrigem: '',
+    publicacao: '',
+    funcao: 'POLICIAL',
+    situacao: 'MONTADO - POLICIAMENTO OSTENSIVO'
+  });
+  const [showChegadaDialog, setShowChegadaDialog] = useState(false);
+  
   const { toast } = useToast();
 
   const handleTransferirPolicial = async () => {
@@ -93,11 +108,85 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
     }
   };
 
+  const handleAdicionarChegada = async () => {
+    if (!novoPolicial.nome || !novoPolicial.postGrad || !novoPolicial.unidadeOrigem) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Adicionar policial na coleção principal
+      const novoPolicialData = {
+        NOME: novoPolicial.nome.toUpperCase(),
+        'Post/Grad': novoPolicial.postGrad,
+        Matrícula: novoPolicial.matricula,
+        'FUNÇÃO': novoPolicial.funcao,
+        SITUAÇÃO: novoPolicial.situacao,
+        Unidade: 'CPCHOQUE',
+        dataChegada: new Date().toISOString()
+      };
+
+      const policialRef = await addDoc(collection(db, 'policiais'), novoPolicialData);
+
+      // Criar alerta de chegada
+      await addDoc(collection(db, 'alertas_chegada'), {
+        policialId: policialRef.id,
+        policialNome: novoPolicial.nome.toUpperCase(),
+        policialPostGrad: novoPolicial.postGrad,
+        policialMatricula: novoPolicial.matricula,
+        unidadeOrigem: novoPolicial.unidadeOrigem,
+        publicacao: novoPolicial.publicacao,
+        dataChegada: new Date().toISOString(),
+        status: 'pendente',
+        materiaisAdicionados: false
+      });
+
+      toast({
+        title: "Sucesso",
+        description: `${novoPolicial.postGrad} ${novoPolicial.nome} adicionado com sucesso!`
+      });
+
+      // Reset form
+      setNovoPolicial({
+        nome: '',
+        postGrad: '',
+        matricula: '',
+        unidadeOrigem: '',
+        publicacao: '',
+        funcao: 'POLICIAL',
+        situacao: 'MONTADO - POLICIAMENTO OSTENSIVO'
+      });
+      setShowChegadaDialog(false);
+      onUpdate();
+    } catch (error) {
+      console.error('Erro ao adicionar policial:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao adicionar policial",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const selectedPolicialData = policiais.find(p => p.id === selectedPolicial);
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Tabs defaultValue="transferencia" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="transferencia">Transferências (Saída)</TabsTrigger>
+          <TabsTrigger value="chegada">Chegadas (Entrada)</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transferencia" className="space-y-6">
+          <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MoveRight className="h-5 w-5" />
@@ -298,6 +387,170 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="chegada" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5" />
+                Registro de Chegada de Policial
+              </CardTitle>
+              <CardDescription>
+                Registrar policial que está chegando de outra unidade
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="nome">Nome Completo *</Label>
+                    <Input
+                      id="nome"
+                      placeholder="Nome do policial"
+                      value={novoPolicial.nome}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, nome: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="postGrad">Posto/Graduação *</Label>
+                    <Select 
+                      value={novoPolicial.postGrad} 
+                      onValueChange={(value) => setNovoPolicial({...novoPolicial, postGrad: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CEL">CEL</SelectItem>
+                        <SelectItem value="TEN CEL">TEN CEL</SelectItem>
+                        <SelectItem value="MAJ">MAJ</SelectItem>
+                        <SelectItem value="CAP">CAP</SelectItem>
+                        <SelectItem value="1º TEN">1º TEN</SelectItem>
+                        <SelectItem value="2º TEN">2º TEN</SelectItem>
+                        <SelectItem value="SUB TEN">SUB TEN</SelectItem>
+                        <SelectItem value="1º SGT">1º SGT</SelectItem>
+                        <SelectItem value="2º SGT">2º SGT</SelectItem>
+                        <SelectItem value="3º SGT">3º SGT</SelectItem>
+                        <SelectItem value="CB">CB</SelectItem>
+                        <SelectItem value="SD">SD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="matricula">Matrícula</Label>
+                    <Input
+                      id="matricula"
+                      placeholder="Número da matrícula"
+                      value={novoPolicial.matricula}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, matricula: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="unidadeOrigem">Unidade de Origem *</Label>
+                    <Input
+                      id="unidadeOrigem"
+                      placeholder="Ex: 1º BPM, 2º BPM, etc."
+                      value={novoPolicial.unidadeOrigem}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, unidadeOrigem: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="publicacaoChegada">Publicação</Label>
+                    <Input
+                      id="publicacaoChegada"
+                      placeholder="Ex: Portaria nº 123/2024"
+                      value={novoPolicial.publicacao}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, publicacao: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="funcao">Função</Label>
+                    <Input
+                      id="funcao"
+                      placeholder="Função do policial"
+                      value={novoPolicial.funcao}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, funcao: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <UserPlus className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-blue-800">Alerta de Chegada</h4>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Ao registrar a chegada, será criado um alerta no Sistema de Gestão para que 
+                      você possa adicionar os materiais bélicos que o policial trouxe (arma, colete, etc.). 
+                      O alerta permanecerá até que seja marcado como "sem alteração".
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                onClick={() => setShowChegadaDialog(true)}
+                disabled={!novoPolicial.nome || !novoPolicial.postGrad || !novoPolicial.unidadeOrigem || loading}
+                className="w-full"
+              >
+                Registrar Chegada
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Dialog de Confirmação Chegada */}
+          <Dialog open={showChegadaDialog} onOpenChange={setShowChegadaDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 text-green-500" />
+                  Confirmar Registro de Chegada
+                </DialogTitle>
+                <DialogDescription>
+                  Confirme os dados do policial que está chegando
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="my-4 p-4 bg-muted rounded-lg">
+                <h4 className="font-medium mb-2">Dados do Policial:</h4>
+                <div className="space-y-1 text-sm">
+                  <p><span className="font-medium">Nome:</span> {novoPolicial.nome}</p>
+                  <p><span className="font-medium">Post/Grad:</span> {novoPolicial.postGrad}</p>
+                  <p><span className="font-medium">Matrícula:</span> {novoPolicial.matricula || 'Não informada'}</p>
+                  <p><span className="font-medium">Unidade de Origem:</span> {novoPolicial.unidadeOrigem}</p>
+                  <p><span className="font-medium">Função:</span> {novoPolicial.funcao}</p>
+                  {novoPolicial.publicacao && <p><span className="font-medium">Publicação:</span> {novoPolicial.publicacao}</p>}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowChegadaDialog(false)}
+                  disabled={loading}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleAdicionarChegada}
+                  disabled={loading}
+                >
+                  {loading ? "Registrando..." : "Confirmar Chegada"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

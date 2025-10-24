@@ -14,7 +14,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  TrendingUp
+  TrendingUp,
+  UserPlus
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FrotaPage from '@/components/FrotaPage';
@@ -29,7 +30,8 @@ import GerenciarCautelas from '@/components/admin-belico/GerenciarCautelas';
 import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferidos';
 import { db } from '@/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import { Button } from '@/components/ui/button';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -127,6 +129,7 @@ const DashboardOverview = () => {
   
   const [coletesVencidos, setColetesVencidos] = useState<any[]>([]);
   const [coletesVencendo, setColetesVencendo] = useState<any[]>([]);
+  const [alertasChegada, setAlertasChegada] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -178,6 +181,13 @@ const DashboardOverview = () => {
       setColetesVencidos(vencidos);
       setColetesVencendo(vencendo);
 
+      // Buscar alertas de chegada pendentes
+      const alertasSnapshot = await getDocs(
+        query(collection(db, 'alertas_chegada'), where('status', '==', 'pendente'))
+      );
+      const alertasData = alertasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAlertasChegada(alertasData);
+
       // Atualizar stats
       setStats([
         {
@@ -217,6 +227,21 @@ const DashboardOverview = () => {
     }
   };
 
+  const handleMarcarSemAlteracao = async (alertaId: string) => {
+    try {
+      await updateDoc(doc(db, 'alertas_chegada', alertaId), {
+        status: 'sem_alteracao',
+        dataResolucao: new Date().toISOString()
+      });
+      
+      setAlertasChegada(prev => prev.filter(a => a.id !== alertaId));
+      
+      // Toast de sucesso seria bom aqui
+    } catch (error) {
+      console.error('Erro ao marcar como sem alteração:', error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -238,6 +263,44 @@ const DashboardOverview = () => {
 
   return (
     <div className="space-y-6">
+      {/* Alertas de Chegada de Policiais */}
+      {alertasChegada.length > 0 && (
+        <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950">
+          <UserPlus className="h-4 w-4" />
+          <AlertTitle>Novos Policiais Chegaram</AlertTitle>
+          <AlertDescription>
+            {alertasChegada.length} policial(is) recém-chegado(s) aguardando registro de materiais bélicos.
+            <div className="mt-3 space-y-3">
+              {alertasChegada.map((alerta: any) => (
+                <div key={alerta.id} className="bg-white dark:bg-gray-900 p-3 rounded-lg border border-blue-200">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="font-medium">{alerta.policialPostGrad} {alerta.policialNome}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Origem: {alerta.unidadeOrigem} • Chegada: {new Date(alerta.dataChegada).toLocaleDateString('pt-BR')}
+                      </p>
+                      {alerta.policialMatricula && (
+                        <p className="text-sm text-muted-foreground">Matrícula: {alerta.policialMatricula}</p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleMarcarSemAlteracao(alerta.id)}
+                    >
+                      Sem Alteração
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs mt-3 font-medium">
+              💡 Vá até o Controle Bélico para adicionar os materiais que o policial trouxe (arma, colete, etc.)
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Alertas de Coletes */}
       {coletesVencidos.length > 0 && (
         <Alert variant="destructive" className="border-red-500">
