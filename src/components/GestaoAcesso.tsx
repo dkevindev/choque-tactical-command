@@ -35,6 +35,7 @@ interface Policial {
     guardaQuartel?: boolean;
     gestaoLogistica?: boolean;
     cavbot?: boolean;
+    gestaoPessoas?: boolean;
   };
 }
 
@@ -81,6 +82,13 @@ const GestaoAcesso = () => {
       descricao: 'Assistente virtual inteligente',
       icon: Bot,
       cor: 'bg-purple-500'
+    },
+    {
+      id: 'gestaoPessoas',
+      nome: 'GESTÃO DE PESSOAS',
+      descricao: 'Sistema de gerenciamento de recursos humanos',
+      icon: Users,
+      cor: 'bg-orange-500'
     }
   ];
 
@@ -109,7 +117,8 @@ const GestaoAcesso = () => {
                 reservaArmamento: false,
                 guardaQuartel: false,
                 gestaoLogistica: false,
-                cavbot: false
+                cavbot: false,
+                gestaoPessoas: false
               }
             });
           } else {
