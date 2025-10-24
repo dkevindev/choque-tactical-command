@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MoveRight, Users, AlertTriangle, UserPlus } from 'lucide-react';
 import { doc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -63,6 +64,11 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
     publicacao: ''
   });
   const [showChegadaDialog, setShowChegadaDialog] = useState(false);
+  const [materiaisTrazidos, setMateriaisTrazidos] = useState({
+    pistola: false,
+    colete: false,
+    municao: false
+  });
   
   const { toast } = useToast();
 
@@ -184,7 +190,12 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
         publicacao: novoPolicial.publicacao,
         dataChegada: new Date().toISOString(),
         status: 'pendente',
-        materiaisAdicionados: false
+        materiaisAdicionados: false,
+        materiaisTrazidos: {
+          pistola: materiaisTrazidos.pistola,
+          colete: materiaisTrazidos.colete,
+          municao: materiaisTrazidos.municao
+        }
       });
 
       toast({
@@ -218,6 +229,7 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
         publicacao: ''
       });
       setShowChegadaDialog(false);
+      setMateriaisTrazidos({ pistola: false, colete: false, municao: false });
       onUpdate();
     } catch (error) {
       console.error('Erro ao adicionar policial:', error);
@@ -776,6 +788,44 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
                   {novoPolicial.telefone && <p><span className="font-medium">Telefone:</span> {novoPolicial.telefone}</p>}
                   {novoPolicial.email && <p><span className="font-medium">E-mail:</span> {novoPolicial.email}</p>}
                   {novoPolicial.publicacao && <p className="col-span-2"><span className="font-medium">Publicação:</span> {novoPolicial.publicacao}</p>}
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3">Materiais Trazidos</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <Checkbox 
+                      id="pistola"
+                      checked={materiaisTrazidos.pistola}
+                      onCheckedChange={(checked) => 
+                        setMateriaisTrazidos({...materiaisTrazidos, pistola: checked as boolean})
+                      }
+                    />
+                    <Label htmlFor="pistola" className="cursor-pointer">Pistola</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <Checkbox 
+                      id="colete"
+                      checked={materiaisTrazidos.colete}
+                      onCheckedChange={(checked) => 
+                        setMateriaisTrazidos({...materiaisTrazidos, colete: checked as boolean})
+                      }
+                    />
+                    <Label htmlFor="colete" className="cursor-pointer">Colete Balístico</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <Checkbox 
+                      id="municao"
+                      checked={materiaisTrazidos.municao}
+                      onCheckedChange={(checked) => 
+                        setMateriaisTrazidos({...materiaisTrazidos, municao: checked as boolean})
+                      }
+                    />
+                    <Label htmlFor="municao" className="cursor-pointer">Munição</Label>
+                  </div>
                 </div>
               </div>
 

@@ -282,6 +282,19 @@ const DashboardOverview = () => {
                       {alerta.policialMatricula && (
                         <p className="text-sm text-muted-foreground">Matrícula: {alerta.policialMatricula}</p>
                       )}
+                      {alerta.materiaisTrazidos && (
+                        <div className="mt-2 flex gap-2">
+                          {alerta.materiaisTrazidos.pistola && (
+                            <Badge variant="secondary" className="text-xs">Pistola</Badge>
+                          )}
+                          {alerta.materiaisTrazidos.colete && (
+                            <Badge variant="secondary" className="text-xs">Colete</Badge>
+                          )}
+                          {alerta.materiaisTrazidos.municao && (
+                            <Badge variant="secondary" className="text-xs">Munição</Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <Button
                       size="sm"
