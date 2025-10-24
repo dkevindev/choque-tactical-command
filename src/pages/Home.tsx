@@ -49,7 +49,7 @@ const Home = () => {
       route: '/gestao-pessoas',
       acessoKey: 'gestaoPessoas',
       cor: 'bg-blue-600',
-      requiresLogin: false
+      requiresLogin: true
     },
     {
       id: 'acesso-policial',

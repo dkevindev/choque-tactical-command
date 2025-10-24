@@ -22,6 +22,7 @@ import FrotaPage from '@/components/FrotaPage';
 import DocumentosPage from './DocumentosPaga';
 import OrdemServicoPage from '@/components/OrdemServicoPage';
 import GestaoAcesso from '@/components/GestaoAcesso';
+import GestaoAcessosPessoas from '@/components/GestaoAcessosPessoas';
 import ServicosPage from '@/components/frota/ServicosPage';
 import CadastroMateriais from '@/components/admin-belico/CadastroMateriais';
 import GerenciarCategorias from '@/components/admin-belico/GerenciarCategorias';
@@ -55,6 +56,8 @@ const AdminDashboard = () => {
         return <PolicialContent />;
       case 'gestao':
         return <GestaoContent />;
+      case 'gestao-pessoas':
+        return <GestaoAcessosPessoas />;
       case 'documentos':
         return <DocumentosContent locationState={location.state} />;
       case 'ordens-servico': // <--- Adicione este novo case

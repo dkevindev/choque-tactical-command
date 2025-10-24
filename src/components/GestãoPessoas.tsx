@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Users, UserCheck, UserX, TrendingUp, AlertTriangle } from 'lucide-react';
+import { CalendarDays, Users, UserCheck, UserX, TrendingUp, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { format, startOfMonth, endOfMonth, isWithinInterval, addDays, parseISO } from 'date-fns';
@@ -33,13 +35,34 @@ interface Policial {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 const GestãoPessoas: React.FC = () => {
+  const navigate = useNavigate();
   const [policiais, setPoliciais] = useState<Policial[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
+    // Verificar autenticação
+    const user = localStorage.getItem('user');
+    if (!user) {
+      navigate('/');
+      return;
+    }
+
+    // Verificar se tem acesso ao sistema de gestão de pessoas
+    try {
+      const userData = JSON.parse(user);
+      if (!userData.acessos?.gestaoPessoas) {
+        navigate('/');
+        return;
+      }
+    } catch (error) {
+      console.error('Erro ao verificar acesso:', error);
+      navigate('/');
+      return;
+    }
+
     fetchPoliciais();
-  }, []);
+  }, [navigate]);
 
   const fetchPoliciais = async () => {
     try {
@@ -140,9 +163,18 @@ const GestãoPessoas: React.FC = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Gestão de Pessoas</h1>
-          <p className="text-muted-foreground">Sistema completo de gestão do efetivo policial</p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Gestão de Pessoas</h1>
+            <p className="text-muted-foreground">Sistema completo de gestão do efetivo policial</p>
+          </div>
         </div>
         <Badge variant="outline" className="px-3 py-1">
           Total: {policiais.length} policiais

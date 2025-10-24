@@ -10,6 +10,7 @@ import CAVBot from "./components/CAVBot";
 import AdminDashboard from "./components/AdminDashboard";
 import UserDashboard from "./components/UserDashboard";
 import ReservaArmamentoSystem from "./components/reserva-armamento/ReservaArmamentoSystem";
+import GestaoAcessosPessoas from "./components/GestaoAcessosPessoas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/user-dashboard" element={<UserDashboard />} />
           <Route path="/reserva-armamento/*" element={<ReservaArmamentoSystem />} />
+          <Route path="/gestao-acessos-pessoas" element={<GestaoAcessosPessoas />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

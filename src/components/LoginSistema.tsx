@@ -44,6 +44,7 @@ interface Policial {
     reservaArmamento?: boolean;
     guardaQuartel?: boolean;
     gestaoLogistica?: boolean;
+    gestaoPessoas?: boolean;
     cavbot?: boolean;
   };
 }
@@ -209,6 +210,9 @@ const LoginSistema = ({ sistema, onClose }: LoginSistemaProps) => {
     
     // Gestão e logística = admin
     if (sistemaKey === 'gestaoLogistica') return policial.acessos?.gestaoLogistica || false;
+    
+    // Gestão de pessoas
+    if (sistemaKey === 'gestaoPessoas') return policial.acessos?.gestaoPessoas || false;
     
     // Outros sistemas - verificar se acessos existe
     return policial.acessos?.[sistemaKey as keyof typeof policial.acessos] || false;
