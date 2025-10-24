@@ -40,12 +40,27 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
   // Estados para chegada
   const [novoPolicial, setNovoPolicial] = useState({
     nome: '',
+    nomeGuerra: '',
+    nomeGuerra1: '',
+    cpf: '',
+    dataNascimento: '',
     postGrad: '',
     matricula: '',
-    unidadeOrigem: '',
-    publicacao: '',
+    numeral: '',
     funcao: 'POLICIAL',
-    situacao: 'MONTADO - POLICIAMENTO OSTENSIVO'
+    unidade: 'CPCHOQUE',
+    situacao: 'MONTADO - POLICIAMENTO OSTENSIVO',
+    dataUltimaPromocao: '',
+    previsaoFerias2024: '',
+    telefone: '',
+    email: '',
+    endereco: '',
+    bairro: '',
+    banco: '',
+    agencia: '',
+    conta: '',
+    unidadeOrigem: '',
+    publicacao: ''
   });
   const [showChegadaDialog, setShowChegadaDialog] = useState(false);
   
@@ -109,10 +124,10 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
   };
 
   const handleAdicionarChegada = async () => {
-    if (!novoPolicial.nome || !novoPolicial.postGrad || !novoPolicial.unidadeOrigem) {
+    if (!novoPolicial.nome || !novoPolicial.postGrad || !novoPolicial.unidadeOrigem || !novoPolicial.cpf) {
       toast({
         title: "Erro",
-        description: "Preencha todos os campos obrigatórios",
+        description: "Preencha todos os campos obrigatórios (Nome, CPF, Posto/Grad, Unidade de Origem)",
         variant: "destructive"
       });
       return;
@@ -120,14 +135,40 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
 
     setLoading(true);
     try {
+      // Calcular idade se data de nascimento fornecida
+      let idade = null;
+      let mesAniversario = null;
+      if (novoPolicial.dataNascimento) {
+        const dataNasc = new Date(novoPolicial.dataNascimento);
+        const hoje = new Date();
+        idade = hoje.getFullYear() - dataNasc.getFullYear();
+        mesAniversario = dataNasc.getMonth() + 1;
+      }
+
       // Adicionar policial na coleção principal
       const novoPolicialData = {
         NOME: novoPolicial.nome.toUpperCase(),
+        'Nome de Guerra': novoPolicial.nomeGuerra.toUpperCase(),
+        'Nome de Guerra 1': novoPolicial.nomeGuerra1.toUpperCase(),
+        CPF: novoPolicial.cpf,
+        'Data de Nascimento': novoPolicial.dataNascimento,
+        Idade: idade,
+        'Mês Aniversário': mesAniversario,
         'Post/Grad': novoPolicial.postGrad,
         Matrícula: novoPolicial.matricula,
+        Numeral: novoPolicial.numeral || 'N/A',
         'FUNÇÃO': novoPolicial.funcao,
+        Unidade: novoPolicial.unidade,
         SITUAÇÃO: novoPolicial.situacao,
-        Unidade: 'CPCHOQUE',
+        'Última Promoção': novoPolicial.dataUltimaPromocao,
+        'PREVISAO FÉRIAS - AQUISITIVO 2024': novoPolicial.previsaoFerias2024,
+        Telefone: novoPolicial.telefone,
+        'E-mail': novoPolicial.email,
+        Endereço: novoPolicial.endereco,
+        Bairro: novoPolicial.bairro,
+        Banco: novoPolicial.banco,
+        Agência: novoPolicial.agencia,
+        Conta: novoPolicial.conta,
         dataChegada: new Date().toISOString()
       };
 
@@ -154,12 +195,27 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
       // Reset form
       setNovoPolicial({
         nome: '',
+        nomeGuerra: '',
+        nomeGuerra1: '',
+        cpf: '',
+        dataNascimento: '',
         postGrad: '',
         matricula: '',
-        unidadeOrigem: '',
-        publicacao: '',
+        numeral: '',
         funcao: 'POLICIAL',
-        situacao: 'MONTADO - POLICIAMENTO OSTENSIVO'
+        unidade: 'CPCHOQUE',
+        situacao: 'MONTADO - POLICIAMENTO OSTENSIVO',
+        dataUltimaPromocao: '',
+        previsaoFerias2024: '',
+        telefone: '',
+        email: '',
+        endereco: '',
+        bairro: '',
+        banco: '',
+        agencia: '',
+        conta: '',
+        unidadeOrigem: '',
+        publicacao: ''
       });
       setShowChegadaDialog(false);
       onUpdate();
@@ -400,16 +456,82 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
                 Registrar policial que está chegando de outra unidade
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-4">
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Dados Pessoais</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="nome">Nome Completo *</Label>
                     <Input
                       id="nome"
-                      placeholder="Nome do policial"
+                      placeholder="Nome completo do policial"
                       value={novoPolicial.nome}
                       onChange={(e) => setNovoPolicial({...novoPolicial, nome: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="nomeGuerra">Nome de Guerra</Label>
+                    <Input
+                      id="nomeGuerra"
+                      placeholder="Ex: LIBERATO"
+                      value={novoPolicial.nomeGuerra}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, nomeGuerra: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="nomeGuerra1">Nome de Guerra 1</Label>
+                    <Input
+                      id="nomeGuerra1"
+                      placeholder="Ex: TENCEL LIBERATO"
+                      value={novoPolicial.nomeGuerra1}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, nomeGuerra1: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cpf">CPF *</Label>
+                    <Input
+                      id="cpf"
+                      placeholder="000.000.000-00"
+                      value={novoPolicial.cpf}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, cpf: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="dataNascimento">Data de Nascimento</Label>
+                    <Input
+                      id="dataNascimento"
+                      type="date"
+                      value={novoPolicial.dataNascimento}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, dataNascimento: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Dados Profissionais</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="matricula">Matrícula</Label>
+                    <Input
+                      id="matricula"
+                      placeholder="Número da matrícula"
+                      value={novoPolicial.matricula}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, matricula: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="numeral">Numeral</Label>
+                    <Input
+                      id="numeral"
+                      placeholder="Numeral"
+                      value={novoPolicial.numeral}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, numeral: e.target.value})}
                     />
                   </div>
 
@@ -424,12 +546,12 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="CEL">CEL</SelectItem>
-                        <SelectItem value="TEN CEL">TEN CEL</SelectItem>
+                        <SelectItem value="TENCEL">TENCEL</SelectItem>
                         <SelectItem value="MAJ">MAJ</SelectItem>
                         <SelectItem value="CAP">CAP</SelectItem>
                         <SelectItem value="1º TEN">1º TEN</SelectItem>
                         <SelectItem value="2º TEN">2º TEN</SelectItem>
-                        <SelectItem value="SUB TEN">SUB TEN</SelectItem>
+                        <SelectItem value="SUBTEN">SUBTEN</SelectItem>
                         <SelectItem value="1º SGT">1º SGT</SelectItem>
                         <SelectItem value="2º SGT">2º SGT</SelectItem>
                         <SelectItem value="3º SGT">3º SGT</SelectItem>
@@ -440,22 +562,74 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
                   </div>
 
                   <div>
-                    <Label htmlFor="matricula">Matrícula</Label>
+                    <Label htmlFor="funcao">Função</Label>
                     <Input
-                      id="matricula"
-                      placeholder="Número da matrícula"
-                      value={novoPolicial.matricula}
-                      onChange={(e) => setNovoPolicial({...novoPolicial, matricula: e.target.value})}
+                      id="funcao"
+                      placeholder="Ex: CMT RPMONT, POLICIAL"
+                      value={novoPolicial.funcao}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, funcao: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="unidade">Unidade Atual</Label>
+                    <Input
+                      id="unidade"
+                      placeholder="CPCHOQUE"
+                      value={novoPolicial.unidade}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, unidade: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="situacao">Situação</Label>
+                    <Select 
+                      value={novoPolicial.situacao} 
+                      onValueChange={(value) => setNovoPolicial({...novoPolicial, situacao: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MONTADO - POLICIAMENTO OSTENSIVO">MONTADO - POLICIAMENTO OSTENSIVO</SelectItem>
+                        <SelectItem value="OFICIAL">OFICIAL</SelectItem>
+                        <SelectItem value="ATIVO">ATIVO</SelectItem>
+                        <SelectItem value="FÉRIAS">FÉRIAS</SelectItem>
+                        <SelectItem value="LICENÇA TRATAMENTO">LICENÇA TRATAMENTO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="dataUltimaPromocao">Última Promoção</Label>
+                    <Input
+                      id="dataUltimaPromocao"
+                      type="date"
+                      value={novoPolicial.dataUltimaPromocao}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, dataUltimaPromocao: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="previsaoFerias2024">Previsão Férias 2024</Label>
+                    <Input
+                      id="previsaoFerias2024"
+                      placeholder="Ex: DEZEMBRO"
+                      value={novoPolicial.previsaoFerias2024}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, previsaoFerias2024: e.target.value})}
                     />
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-4">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Transferência</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="unidadeOrigem">Unidade de Origem *</Label>
                     <Input
                       id="unidadeOrigem"
-                      placeholder="Ex: 1º BPM, 2º BPM, etc."
+                      placeholder="Ex: 1º BPM, RPMONT, etc."
                       value={novoPolicial.unidadeOrigem}
                       onChange={(e) => setNovoPolicial({...novoPolicial, unidadeOrigem: e.target.value})}
                     />
@@ -470,14 +644,80 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
                       onChange={(e) => setNovoPolicial({...novoPolicial, publicacao: e.target.value})}
                     />
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Contato e Dados Bancários</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="telefone">Telefone</Label>
+                    <Input
+                      id="telefone"
+                      placeholder="(85) 98876-2147"
+                      value={novoPolicial.telefone}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, telefone: e.target.value})}
+                    />
+                  </div>
 
                   <div>
-                    <Label htmlFor="funcao">Função</Label>
+                    <Label htmlFor="email">E-mail</Label>
                     <Input
-                      id="funcao"
-                      placeholder="Função do policial"
-                      value={novoPolicial.funcao}
-                      onChange={(e) => setNovoPolicial({...novoPolicial, funcao: e.target.value})}
+                      id="email"
+                      type="email"
+                      placeholder="email@exemplo.com"
+                      value={novoPolicial.email}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, email: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="endereco">Endereço</Label>
+                    <Input
+                      id="endereco"
+                      placeholder="Rua, número"
+                      value={novoPolicial.endereco}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, endereco: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bairro">Bairro</Label>
+                    <Input
+                      id="bairro"
+                      placeholder="Nome do bairro"
+                      value={novoPolicial.bairro}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, bairro: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="banco">Banco</Label>
+                    <Input
+                      id="banco"
+                      placeholder="Ex: BRADESCO, CAIXA"
+                      value={novoPolicial.banco}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, banco: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="agencia">Agência</Label>
+                    <Input
+                      id="agencia"
+                      placeholder="Número da agência"
+                      value={novoPolicial.agencia}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, agencia: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="conta">Conta</Label>
+                    <Input
+                      id="conta"
+                      placeholder="Número da conta"
+                      value={novoPolicial.conta}
+                      onChange={(e) => setNovoPolicial({...novoPolicial, conta: e.target.value})}
                     />
                   </div>
                 </div>
@@ -499,7 +739,7 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
 
               <Button
                 onClick={() => setShowChegadaDialog(true)}
-                disabled={!novoPolicial.nome || !novoPolicial.postGrad || !novoPolicial.unidadeOrigem || loading}
+                disabled={!novoPolicial.nome || !novoPolicial.postGrad || !novoPolicial.unidadeOrigem || !novoPolicial.cpf || loading}
                 className="w-full"
               >
                 Registrar Chegada
@@ -520,15 +760,22 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="my-4 p-4 bg-muted rounded-lg">
+              <div className="my-4 p-4 bg-muted rounded-lg max-h-96 overflow-y-auto">
                 <h4 className="font-medium mb-2">Dados do Policial:</h4>
-                <div className="space-y-1 text-sm">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                   <p><span className="font-medium">Nome:</span> {novoPolicial.nome}</p>
+                  <p><span className="font-medium">CPF:</span> {novoPolicial.cpf}</p>
                   <p><span className="font-medium">Post/Grad:</span> {novoPolicial.postGrad}</p>
-                  <p><span className="font-medium">Matrícula:</span> {novoPolicial.matricula || 'Não informada'}</p>
-                  <p><span className="font-medium">Unidade de Origem:</span> {novoPolicial.unidadeOrigem}</p>
+                  <p><span className="font-medium">Matrícula:</span> {novoPolicial.matricula || 'N/A'}</p>
+                  {novoPolicial.nomeGuerra && <p><span className="font-medium">Nome de Guerra:</span> {novoPolicial.nomeGuerra}</p>}
+                  {novoPolicial.dataNascimento && <p><span className="font-medium">Nascimento:</span> {new Date(novoPolicial.dataNascimento).toLocaleDateString('pt-BR')}</p>}
                   <p><span className="font-medium">Função:</span> {novoPolicial.funcao}</p>
-                  {novoPolicial.publicacao && <p><span className="font-medium">Publicação:</span> {novoPolicial.publicacao}</p>}
+                  <p><span className="font-medium">Unidade:</span> {novoPolicial.unidade}</p>
+                  <p><span className="font-medium">Situação:</span> {novoPolicial.situacao}</p>
+                  <p><span className="font-medium">Origem:</span> {novoPolicial.unidadeOrigem}</p>
+                  {novoPolicial.telefone && <p><span className="font-medium">Telefone:</span> {novoPolicial.telefone}</p>}
+                  {novoPolicial.email && <p><span className="font-medium">E-mail:</span> {novoPolicial.email}</p>}
+                  {novoPolicial.publicacao && <p className="col-span-2"><span className="font-medium">Publicação:</span> {novoPolicial.publicacao}</p>}
                 </div>
               </div>
 
