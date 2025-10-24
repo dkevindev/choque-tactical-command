@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Edit, Search, Filter } from 'lucide-react';
+import { Edit, Search, Filter, Eye, User, Phone, MapPin, CreditCard, Mail, Building, TrendingUp } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,8 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
   const [filterSituacao, setFilterSituacao] = useState('ALL_SITUATIONS');
   const [filterPostGrad, setFilterPostGrad] = useState('ALL_GRADUATIONS');
   const [editingPolicial, setEditingPolicial] = useState<Policial | null>(null);
+  const [viewingPolicial, setViewingPolicial] = useState<Policial | null>(null);
+  const [showPromocaoDialog, setShowPromocaoDialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -105,14 +107,27 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
     }
   };
 
+  const formatDate = (dateValue: number | undefined) => {
+    if (!dateValue) return 'N/A';
+    const excelEpoch = new Date(1900, 0, 1);
+    const jsDate = new Date(excelEpoch.getTime() + (dateValue - 2) * 24 * 60 * 60 * 1000);
+    return jsDate.toLocaleDateString('pt-BR');
+  };
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Efetivo Total ({filteredPoliciais.length} de {policiais.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Efetivo Total ({filteredPoliciais.length} de {policiais.length})
+            </CardTitle>
+            <Button onClick={() => setShowPromocaoDialog(true)}>
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Gerenciar Promoções
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Filtros */}
@@ -214,33 +229,42 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
                     <TableCell>{policial['FUNÇÃO']}</TableCell>
                     <TableCell>{policial.Unidade}</TableCell>
                     <TableCell>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setEditingPolicial(policial)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        {editingPolicial?.id === policial.id && (
-                          <DialogContent className="max-w-2xl">
-                            <DialogHeader>
-                              <DialogTitle>Editar Policial</DialogTitle>
-                              <DialogDescription>
-                                Edite os dados de {policial['Post/Grad']} {policial.NOME}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <EditPolicialForm
-                              policial={editingPolicial}
-                              onSave={handleEditPolicial}
-                              onCancel={() => setEditingPolicial(null)}
-                              loading={loading}
-                            />
-                          </DialogContent>
-                        )}
-                      </Dialog>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setViewingPolicial(policial)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setEditingPolicial(policial)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          {editingPolicial?.id === policial.id && (
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle>Editar Policial</DialogTitle>
+                                <DialogDescription>
+                                  Edite os dados de {policial['Post/Grad']} {policial.NOME}
+                                </DialogDescription>
+                              </DialogHeader>
+                              <EditPolicialForm
+                                policial={editingPolicial}
+                                onSave={handleEditPolicial}
+                                onCancel={() => setEditingPolicial(null)}
+                                loading={loading}
+                              />
+                            </DialogContent>
+                          )}
+                        </Dialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -255,6 +279,179 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog de Visualização Completa */}
+      <Dialog open={!!viewingPolicial} onOpenChange={(open) => !open && setViewingPolicial(null)}>
+        <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Informações Completas do Policial</DialogTitle>
+          </DialogHeader>
+          {viewingPolicial && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Dados Pessoais */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Dados Pessoais
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <span className="font-semibold">Nome:</span>
+                    <p>{viewingPolicial.NOME || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Nome de Guerra:</span>
+                    <p>{viewingPolicial['NOME DE GUERRA'] || viewingPolicial.nomeGuerra || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Nome de Guerra 1:</span>
+                    <p>{viewingPolicial['NOME DE GUERRA1'] || viewingPolicial.nomeGuerra1 || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">CPF:</span>
+                    <p>{viewingPolicial.CPF || viewingPolicial.cpf || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Idade:</span>
+                    <p>{viewingPolicial.IDADE || viewingPolicial.idade || 'N/A'} anos</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Nascimento:</span>
+                    <p>{formatDate(viewingPolicial.NASCIMENTO) || (viewingPolicial.dataNascimento ? new Date(viewingPolicial.dataNascimento).toLocaleDateString('pt-BR') : 'N/A')}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Mês Aniversário:</span>
+                    <p>{viewingPolicial['MÊS ANIVERSARIO'] || viewingPolicial.mesAniversario || 'N/A'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Dados Profissionais */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Building className="h-5 w-5" />
+                    Dados Profissionais
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <span className="font-semibold">Matrícula:</span>
+                    <p>{viewingPolicial.Matrícula || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Numeral:</span>
+                    <p>{viewingPolicial.NUMERAL || viewingPolicial.numeral || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Posto/Graduação:</span>
+                    <p>{viewingPolicial['Post/Grad'] || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Função:</span>
+                    <p>{viewingPolicial['FUNÇÃO'] || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Unidade:</span>
+                    <p>{viewingPolicial.Unidade || viewingPolicial.unidade || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Situação:</span>
+                    <div className="mt-1">
+                      <Badge variant={
+                        viewingPolicial.SITUAÇÃO?.includes('FÉRIAS') ? 'secondary' :
+                        viewingPolicial.SITUAÇÃO?.includes('LICENÇA') ? 'destructive' :
+                        'default'
+                      }>
+                        {viewingPolicial.SITUAÇÃO || 'N/A'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Inclusão:</span>
+                    <p>{formatDate(viewingPolicial.inclusão) || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Última Promoção:</span>
+                    <p>{formatDate(viewingPolicial['ULTIMA PROMOÇÃO']) || (viewingPolicial.dataUltimaPromocao ? new Date(viewingPolicial.dataUltimaPromocao).toLocaleDateString('pt-BR') : 'N/A')}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Previsão Férias 2024:</span>
+                    <p>{viewingPolicial['PREVISAO FÉRIAS - AQUISITIVO 2024'] || viewingPolicial.previsaoFerias2024 || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Mudança Comportamento:</span>
+                    <p>{viewingPolicial['MUDANÇA COMPORTAMENTO'] || 'N/A'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Contato e Dados Bancários */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Phone className="h-5 w-5" />
+                    Contato e Dados Bancários
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <span className="font-semibold flex items-center gap-1">
+                      <Phone className="h-4 w-4" />
+                      Telefone:
+                    </span>
+                    <p>{viewingPolicial.telefone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold flex items-center gap-1">
+                      <Mail className="h-4 w-4" />
+                      E-mail:
+                    </span>
+                    <p>{viewingPolicial['E-MAIL'] || viewingPolicial.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      Endereço:
+                    </span>
+                    <p>{viewingPolicial.Endereço || viewingPolicial.endereco || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Bairro:</span>
+                    <p>{viewingPolicial.Bairro || viewingPolicial.bairro || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold flex items-center gap-1">
+                      <CreditCard className="h-4 w-4" />
+                      Banco:
+                    </span>
+                    <p>{viewingPolicial.BANCO || viewingPolicial.banco || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Agência:</span>
+                    <p>{viewingPolicial.AGÊNCIA || viewingPolicial.agencia || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold">Conta:</span>
+                    <p>{viewingPolicial.CONTA || viewingPolicial.conta || 'N/A'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Promoções */}
+      {showPromocaoDialog && (
+        <PromocaoDialog
+          policiais={policiais}
+          onClose={() => setShowPromocaoDialog(false)}
+          onUpdate={onUpdate}
+        />
+      )}
     </div>
   );
 };
@@ -344,5 +541,8 @@ const EditPolicialForm: React.FC<{
     </form>
   );
 };
+
+// Importar componente de promoções
+import PromocaoDialog from './PromocaoDialog';
 
 export default EfetivoTab;
