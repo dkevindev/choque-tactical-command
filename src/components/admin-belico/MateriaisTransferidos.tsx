@@ -105,26 +105,6 @@ const MateriaisTransferidos = () => {
         </p>
       </div>
 
-      {/* Estatísticas */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <ArrowRight className="h-8 w-8 text-primary mx-auto mb-2" />
-            <p className="text-2xl font-bold">{transferencias.length}</p>
-            <p className="text-xs text-muted-foreground">Total</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold">
-              {transferencias.filter((t) => t.status === 'finalizado').length}
-            </p>
-            <p className="text-xs text-muted-foreground">Finalizadas</p>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
