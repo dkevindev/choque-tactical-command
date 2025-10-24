@@ -464,78 +464,263 @@ const EditPolicialForm: React.FC<{
   loading: boolean;
 }> = ({ policial, onSave, onCancel, loading }) => {
   const [formData, setFormData] = useState({
+    // Dados Pessoais
     NOME: policial.NOME || '',
+    'NOME DE GUERRA': policial['NOME DE GUERRA'] || policial.nomeGuerra || '',
+    'NOME DE GUERRA1': policial['NOME DE GUERRA1'] || policial.nomeGuerra1 || '',
+    CPF: policial.CPF || policial.cpf || '',
+    dataNascimento: policial.dataNascimento || '',
+    
+    // Dados Profissionais
+    Matrícula: policial.Matrícula || '',
+    NUMERAL: policial.NUMERAL || policial.numeral || '',
     'Post/Grad': policial['Post/Grad'] || '',
-    SITUAÇÃO: policial.SITUAÇÃO || '',
     'FUNÇÃO': policial['FUNÇÃO'] || '',
-    Unidade: policial.Unidade || '',
-    Matrícula: policial.Matrícula || ''
+    Unidade: policial.Unidade || policial.unidade || '',
+    SITUAÇÃO: policial.SITUAÇÃO || '',
+    'PREVISAO FÉRIAS - AQUISITIVO 2024': policial['PREVISAO FÉRIAS - AQUISITIVO 2024'] || policial.previsaoFerias2024 || '',
+    'MUDANÇA COMPORTAMENTO': policial['MUDANÇA COMPORTAMENTO'] || '',
+    
+    // Contato e Dados Bancários
+    telefone: policial.telefone || '',
+    'E-MAIL': policial['E-MAIL'] || policial.email || '',
+    Endereço: policial.Endereço || policial.endereco || '',
+    Bairro: policial.Bairro || policial.bairro || '',
+    BANCO: policial.BANCO || policial.banco || '',
+    AGÊNCIA: policial.AGÊNCIA || policial.agencia || '',
+    CONTA: policial.CONTA || policial.conta || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // Calcular idade e mês de aniversário se data de nascimento foi alterada
+    let updateData: any = { ...formData };
+    
+    if (formData.dataNascimento) {
+      const dataNasc = new Date(formData.dataNascimento);
+      const hoje = new Date();
+      let idade = hoje.getFullYear() - dataNasc.getFullYear();
+      const mesAtual = hoje.getMonth();
+      const mesNasc = dataNasc.getMonth();
+      
+      if (mesAtual < mesNasc || (mesAtual === mesNasc && hoje.getDate() < dataNasc.getDate())) {
+        idade--;
+      }
+      
+      updateData.IDADE = idade;
+      updateData['MÊS ANIVERSARIO'] = mesNasc + 1;
+      updateData.idade = idade;
+      updateData.mesAniversario = mesNasc + 1;
+    }
+    
+    onSave(updateData);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="nome">Nome</Label>
-          <Input
-            id="nome"
-            value={formData.NOME}
-            onChange={(e) => setFormData(prev => ({ ...prev, NOME: e.target.value }))}
-          />
+    <form onSubmit={handleSubmit} className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+      {/* Dados Pessoais */}
+      <div className="space-y-4">
+        <h3 className="font-semibold text-lg flex items-center gap-2">
+          <User className="h-5 w-5" />
+          Dados Pessoais
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <Label htmlFor="nome">Nome Completo</Label>
+            <Input
+              id="nome"
+              value={formData.NOME}
+              onChange={(e) => setFormData(prev => ({ ...prev, NOME: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="nomeGuerra">Nome de Guerra</Label>
+            <Input
+              id="nomeGuerra"
+              value={formData['NOME DE GUERRA']}
+              onChange={(e) => setFormData(prev => ({ ...prev, 'NOME DE GUERRA': e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="nomeGuerra1">Nome de Guerra 1</Label>
+            <Input
+              id="nomeGuerra1"
+              value={formData['NOME DE GUERRA1']}
+              onChange={(e) => setFormData(prev => ({ ...prev, 'NOME DE GUERRA1': e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="cpf">CPF</Label>
+            <Input
+              id="cpf"
+              value={formData.CPF}
+              onChange={(e) => setFormData(prev => ({ ...prev, CPF: e.target.value }))}
+              placeholder="000.000.000-00"
+            />
+          </div>
+          <div>
+            <Label htmlFor="dataNascimento">Data de Nascimento</Label>
+            <Input
+              id="dataNascimento"
+              type="date"
+              value={formData.dataNascimento}
+              onChange={(e) => setFormData(prev => ({ ...prev, dataNascimento: e.target.value }))}
+            />
+          </div>
         </div>
-        <div>
-          <Label htmlFor="postgrad">Post/Graduação</Label>
-          <Input
-            id="postgrad"
-            value={formData['Post/Grad']}
-            onChange={(e) => setFormData(prev => ({ ...prev, 'Post/Grad': e.target.value }))}
-          />
+      </div>
+
+      {/* Dados Profissionais */}
+      <div className="space-y-4 border-t pt-4">
+        <h3 className="font-semibold text-lg flex items-center gap-2">
+          <Building className="h-5 w-5" />
+          Dados Profissionais
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="matricula">Matrícula</Label>
+            <Input
+              id="matricula"
+              value={formData.Matrícula}
+              onChange={(e) => setFormData(prev => ({ ...prev, Matrícula: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="numeral">Numeral</Label>
+            <Input
+              id="numeral"
+              value={formData.NUMERAL}
+              onChange={(e) => setFormData(prev => ({ ...prev, NUMERAL: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="postgrad">Posto/Graduação</Label>
+            <Input
+              id="postgrad"
+              value={formData['Post/Grad']}
+              onChange={(e) => setFormData(prev => ({ ...prev, 'Post/Grad': e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="situacao">Situação</Label>
+            <Input
+              id="situacao"
+              value={formData.SITUAÇÃO}
+              onChange={(e) => setFormData(prev => ({ ...prev, SITUAÇÃO: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="funcao">Função</Label>
+            <Input
+              id="funcao"
+              value={formData['FUNÇÃO']}
+              onChange={(e) => setFormData(prev => ({ ...prev, 'FUNÇÃO': e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="unidade">Unidade</Label>
+            <Input
+              id="unidade"
+              value={formData.Unidade}
+              onChange={(e) => setFormData(prev => ({ ...prev, Unidade: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="previsaoFerias">Previsão Férias 2024</Label>
+            <Input
+              id="previsaoFerias"
+              value={formData['PREVISAO FÉRIAS - AQUISITIVO 2024']}
+              onChange={(e) => setFormData(prev => ({ ...prev, 'PREVISAO FÉRIAS - AQUISITIVO 2024': e.target.value }))}
+              placeholder="Ex: DEZEMBRO"
+            />
+          </div>
+          <div>
+            <Label htmlFor="mudancaComportamento">Mudança Comportamento</Label>
+            <Input
+              id="mudancaComportamento"
+              value={formData['MUDANÇA COMPORTAMENTO']}
+              onChange={(e) => setFormData(prev => ({ ...prev, 'MUDANÇA COMPORTAMENTO': e.target.value }))}
+            />
+          </div>
         </div>
-        <div>
-          <Label htmlFor="situacao">Situação</Label>
-          <Input
-            id="situacao"
-            value={formData.SITUAÇÃO}
-            onChange={(e) => setFormData(prev => ({ ...prev, SITUAÇÃO: e.target.value }))}
-          />
-        </div>
-        <div>
-          <Label htmlFor="funcao">Função</Label>
-          <Input
-            id="funcao"
-            value={formData['FUNÇÃO']}
-            onChange={(e) => setFormData(prev => ({ ...prev, 'FUNÇÃO': e.target.value }))}
-          />
-        </div>
-        <div>
-          <Label htmlFor="unidade">Unidade</Label>
-          <Input
-            id="unidade"
-            value={formData.Unidade}
-            onChange={(e) => setFormData(prev => ({ ...prev, Unidade: e.target.value }))}
-          />
-        </div>
-        <div>
-          <Label htmlFor="matricula">Matrícula</Label>
-          <Input
-            id="matricula"
-            value={formData.Matrícula}
-            onChange={(e) => setFormData(prev => ({ ...prev, Matrícula: e.target.value }))}
-          />
+      </div>
+
+      {/* Contato e Dados Bancários */}
+      <div className="space-y-4 border-t pt-4">
+        <h3 className="font-semibold text-lg flex items-center gap-2">
+          <Phone className="h-5 w-5" />
+          Contato e Dados Bancários
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="telefone">Telefone</Label>
+            <Input
+              id="telefone"
+              value={formData.telefone}
+              onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))}
+              placeholder="(00) 00000-0000"
+            />
+          </div>
+          <div>
+            <Label htmlFor="email">E-mail</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData['E-MAIL']}
+              onChange={(e) => setFormData(prev => ({ ...prev, 'E-MAIL': e.target.value }))}
+              placeholder="exemplo@email.com"
+            />
+          </div>
+          <div className="col-span-2">
+            <Label htmlFor="endereco">Endereço</Label>
+            <Input
+              id="endereco"
+              value={formData.Endereço}
+              onChange={(e) => setFormData(prev => ({ ...prev, Endereço: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="bairro">Bairro</Label>
+            <Input
+              id="bairro"
+              value={formData.Bairro}
+              onChange={(e) => setFormData(prev => ({ ...prev, Bairro: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="banco">Banco</Label>
+            <Input
+              id="banco"
+              value={formData.BANCO}
+              onChange={(e) => setFormData(prev => ({ ...prev, BANCO: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="agencia">Agência</Label>
+            <Input
+              id="agencia"
+              value={formData.AGÊNCIA}
+              onChange={(e) => setFormData(prev => ({ ...prev, AGÊNCIA: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="conta">Conta</Label>
+            <Input
+              id="conta"
+              value={formData.CONTA}
+              onChange={(e) => setFormData(prev => ({ ...prev, CONTA: e.target.value }))}
+            />
+          </div>
         </div>
       </div>
       
-      <DialogFooter>
+      <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? "Salvando..." : "Salvar"}
+          {loading ? "Salvando..." : "Salvar Alterações"}
         </Button>
       </DialogFooter>
     </form>
