@@ -23,6 +23,7 @@ import ModalDetalhesViatura from '@/components/ModalDetalhesViatura';
 import GestaoSaldos from './GestaoSaldos';
 import { Viatura } from '@/bot/types';
 import { isFroteLeve, isFrotePesada, buscarViaturasLeves, buscarViaturasPesadas, limparCacheViaturas } from '@/lib/viaturaUtils';
+import AtualizarKmOleoDialog from '../gestao-pessoas/AtualizarKmOleoDialog';
 
 interface OrdemServico {
   id: string;
@@ -55,6 +56,7 @@ const FrotaDashboard = () => {
   const [saldoFroteLeveMes, setSaldoFroteLeveMes] = useState(0);
   const [gastoFrotePesadaMes, setGastoFrotePesadaMes] = useState(0);
   const [totalOSMes, setTotalOSMes] = useState(0);
+  const [kmDialogOpen, setKmDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -537,6 +539,14 @@ const FrotaDashboard = () => {
         </div>
         <div className="flex gap-2">
           <Button
+            variant="default"
+            onClick={() => setKmDialogOpen(true)}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Atualizar KM e Óleo
+          </Button>
+          <Button
             onClick={handleAtualizarSaldos}
             disabled={isUpdatingSaldos}
             variant="secondary"
@@ -713,6 +723,12 @@ const FrotaDashboard = () => {
       <GestaoSaldos
         isOpen={gestaoSaldosAberto}
         onClose={() => setGestaoSaldosAberto(false)}
+      />
+
+      {/* Modal de Atualizar KM e Óleo */}
+      <AtualizarKmOleoDialog 
+        open={kmDialogOpen} 
+        onOpenChange={setKmDialogOpen}
       />
     </div>
   );
