@@ -21,8 +21,25 @@ import {
 } from '@/components/ui/table';
 import { Edit, AlertTriangle } from 'lucide-react';
 
+const VIATURAS_MONITORADAS = [
+  'CAV - 04',
+  'CAV - 05',
+  'CAV - 06',
+  'CAV - 08',
+  'CAV - 11',
+  'CAV - 12',
+  'CAV - 13',
+  'TA - 01',
+  'TA - 02',
+  'TA - 03',
+  'TP',
+  '6398',
+  'DUSTER'
+];
+
 interface Viatura {
   id: string;
+  CADASTRO?: string;
   MODELO: string;
   PLACA: string;
   KM: number;
@@ -167,8 +184,11 @@ const ViaturaTable = () => {
     }));
   };
 
-  // 🔴 Aqui filtramos apenas viaturas com problemas
+  // 🔴 Aqui filtramos apenas viaturas monitoradas com problemas
   const viaturasFiltradas = viaturas.filter((v) => {
+    // Verificar se é uma viatura monitorada
+    if (!VIATURAS_MONITORADAS.includes(v.CADASTRO || '')) return false;
+    
     const kmRestante = (v.KMOLEO ?? 0) - (v.KM ?? 0);
     return kmRestante <= 3000 || (v.SALDO ?? 0) < 2000;
   });

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Users, UserCheck, UserX, TrendingUp, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { CalendarDays, Users, UserCheck, UserX, TrendingUp, AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { format, startOfMonth, endOfMonth, isWithinInterval, addDays, parseISO } from 'date-fns';
@@ -16,6 +16,7 @@ import MovimentacoesTab from './gestao-pessoas/MovimentacoesTab';
 import SituacaoTab from './gestao-pessoas/SituacaoTab';
 import FuncaoTab from './gestao-pessoas/FuncaoTab';
 import TransferidosTab from './gestao-pessoas/TransferidosTab';
+import AtualizarKmOleoDialog from './gestao-pessoas/AtualizarKmOleoDialog';
 
 interface Policial {
   id: string;
@@ -39,6 +40,7 @@ const GestãoPessoas: React.FC = () => {
   const [policiais, setPoliciais] = useState<Policial[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [kmDialogOpen, setKmDialogOpen] = useState(false);
 
   useEffect(() => {
     // Verificar autenticação
@@ -176,9 +178,19 @@ const GestãoPessoas: React.FC = () => {
             <p className="text-muted-foreground">Sistema completo de gestão do efetivo policial</p>
           </div>
         </div>
-        <Badge variant="outline" className="px-3 py-1">
-          Total: {policiais.length} policiais
-        </Badge>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="default" 
+            onClick={() => setKmDialogOpen(true)}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Atualizar KM e Óleo
+          </Button>
+          <Badge variant="outline" className="px-3 py-1">
+            Total: {policiais.length} policiais
+          </Badge>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -377,6 +389,11 @@ const GestãoPessoas: React.FC = () => {
           <TransferidosTab policiais={policiais} onUpdate={fetchPoliciais} />
         </TabsContent>
       </Tabs>
+
+      <AtualizarKmOleoDialog 
+        open={kmDialogOpen} 
+        onOpenChange={setKmDialogOpen} 
+      />
     </div>
   );
 };
