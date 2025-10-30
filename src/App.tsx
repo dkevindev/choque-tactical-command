@@ -11,6 +11,7 @@ import AdminDashboard from "./components/AdminDashboard";
 import UserDashboard from "./components/UserDashboard";
 import ReservaArmamentoSystem from "./components/reserva-armamento/ReservaArmamentoSystem";
 import LivroGuardaPage from "./components/guarda-quartel/LivroGuardaPage";
+import HistoricoLivrosGuardaPage from "./components/guarda-quartel/HistoricoLivrosGuardaPage";
 
 import NotFound from "./pages/NotFound";
 
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/user-dashboard" element={<UserDashboard />} />
           <Route path="/reserva-armamento/*" element={<ReservaArmamentoSystem />} />
           <Route path="/guarda-quartel" element={<LivroGuardaPage />} />
+          <Route path="/guarda-quartel/historico" element={<HistoricoLivrosGuardaPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -8,7 +8,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import FuncaoCard from './FuncaoCard';
-import { FuncaoServico } from './LivroGuardaPage';
+import { FuncaoServico } from './types';
 import {
   Dialog,
   DialogContent,

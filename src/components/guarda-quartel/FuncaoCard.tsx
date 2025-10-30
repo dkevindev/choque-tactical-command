@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import PolicialSearchCombobox, { PolicialData } from './PolicialSearchCombobox';
-import { FuncaoServico, PolicialEscalado } from './LivroGuardaPage';
+import { FuncaoServico, PolicialEscalado } from './types';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface FuncaoCardProps {

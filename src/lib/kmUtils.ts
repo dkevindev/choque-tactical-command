@@ -56,21 +56,22 @@ export const VIATURAS_CONTROLE_KM = [
 ];
 
 /**
- * Mapa de conversão entre nome de exibição e campo CADASTRO no Firebase
+ * Mapa de conversão entre nome de exibição e possíveis valores no Firebase
+ * Cada viatura pode ser encontrada por CADASTRO ou PLACA
  */
-export const MAPA_VIATURAS_CADASTRO: { [key: string]: string } = {
-  'CAV 05': 'CAV - 05',
-  'CAV 06': 'CAV - 06',
-  'CAV 08': 'CAV - 08',
-  'CAV 11': 'CAV - 11',
-  'CAV 12': 'CAV - 12',
-  'CAV 13': 'CAV - 13',
-  'T/A 01': 'TA - 01',
-  'T/A 02': 'TA - 02',
-  'TL 75': 'TA - 03',
-  'TP/ÔNIBUS': 'TP',
-  'OII 6398': '6398',
-  'PNK 8927': 'PNK 8927',
-  'PMF 8020': 'PMF 8020',
-  'PMN 9507': 'PMN 9507',
+export const MAPA_VIATURAS_CADASTRO: { [key: string]: string[] } = {
+  'CAV 05': ['CAV - 05'],
+  'CAV 06': ['CAV - 06'],
+  'CAV 08': ['CAV - 08', 'ORZ3930'],
+  'CAV 11': ['CAV - 11'],
+  'CAV 12': ['CAV - 12'],
+  'CAV 13': ['CAV - 13'],
+  'T/A 01': ['TA-01', 'TA - 01', 'PMH7342'],
+  'T/A 02': ['TA-02', 'TA - 02', 'PMH6432'],
+  'TL 75': ['TL 75', 'TA - 03'],
+  'TP/ÔNIBUS': ['TP'],
+  'OII 6398': ['6398', 'OII 6398'],
+  'PNK 8927': ['DUSTER', 'PNK8927', 'PNK 8927'],
+  'PMF 8020': ['COD20', 'PMF8020', 'PMF 8020'],
+  'PMN 9507': ['COD20', 'PNM9507', 'PMN 9507'],
 };

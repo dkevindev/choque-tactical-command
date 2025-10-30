@@ -60,13 +60,23 @@ const Secao05ControleKmForm = ({
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           const cadastro = data.CADASTRO;
+          const placa = data.PLACA;
           
-          // Verificar se o cadastro corresponde a alguma viatura monitorada
+          // Verificar se o cadastro ou placa corresponde a alguma viatura monitorada
           const placaExibicao = Object.keys(MAPA_VIATURAS_CADASTRO).find(
-            key => MAPA_VIATURAS_CADASTRO[key] === cadastro
+            key => {
+              const variacoes = MAPA_VIATURAS_CADASTRO[key];
+              return variacoes.some(variacao => 
+                variacao === cadastro || 
+                variacao === placa ||
+                variacao.replace(/\s/g, '') === (cadastro || '').replace(/\s/g, '') ||
+                variacao.replace(/\s/g, '') === (placa || '').replace(/\s/g, '')
+              );
+            }
           );
           
           if (placaExibicao) {
+            console.log(`✅ Viatura encontrada: ${placaExibicao} -> CADASTRO: ${cadastro}, PLACA: ${placa}, KM: ${data.KM}`);
             kmAnteriorMap[placaExibicao] = {
               km: data.KM || 0,
               docId: doc.id
