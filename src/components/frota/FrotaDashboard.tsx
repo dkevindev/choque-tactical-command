@@ -575,7 +575,7 @@ const FrotaDashboard = () => {
         ];
         const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
         const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
-        return isMonitorada && kmRestante <= 200 && kmRestante > 0;
+        return isMonitorada && kmRestante <= 500 && kmRestante > 0;
       }).length > 0 && (
         <Card className="border-orange-500 bg-orange-500/5">
           <CardHeader>
@@ -595,7 +595,7 @@ const FrotaDashboard = () => {
                   ];
                   const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
                   const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
-                  return isMonitorada && kmRestante <= 200 && kmRestante > 0;
+                  return isMonitorada && kmRestante <= 500 && kmRestante > 0;
                 })
                 .map(v => {
                   const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
@@ -695,7 +695,7 @@ const FrotaDashboard = () => {
               return (
                 <Card
                   key={viatura.id}
-                  className={`cursor-pointer transition-all hover:shadow-md ${statusInfo.cor} ${isSelected ? 'ring-2 ring-primary' : ''
+                  className={`cursor-pointer transition-all hover:shadow-md ${isSelected ? 'ring-2 ring-primary' : ''
                     }`}
                   onClick={() => handleViaturaClick(viatura.id)}
                 >
@@ -731,10 +731,6 @@ const FrotaDashboard = () => {
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Próximo Óleo:</span>
                           <span className="font-medium">{viatura.KMOLEO.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Saldo:</span>
-                          <span className="font-medium">R$ {(viatura.SALDO / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">OS Total:</span>

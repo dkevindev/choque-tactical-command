@@ -32,6 +32,7 @@ import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferid
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
+import { Car, Droplet } from 'lucide-react';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -388,18 +389,13 @@ const DashboardOverview = () => {
         ))}
       </div>
 
-      {/* Frota - Viaturas com Alertas */}
-      <Card className="bg-card border-border shadow-tactical">
-        <CardHeader>
-          <CardTitle className="text-foreground flex items-center gap-2">
-            <Truck className="h-5 w-5" />
-            FROTA - VIATURAS COM ALERTAS
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ViaturaTable />
-        </CardContent>
-      </Card>
+      {/* Dashboard Rico com Múltiplas Informações */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Alerta de Troca de Óleo */}
+        <AlertaTrocaOleo />
+        
+        {/* Cards de Informações Adicionais podem ser adicionados aqui */}
+      </div>
     </div>
   );
 };
@@ -488,5 +484,77 @@ const DocumentosContent = ({ locationState }: { locationState?: any }) => (
 const GestaoContent = () => (
   <GestaoAcesso />
 );
+
+const AlertaTrocaOleo = () => {
+  const [viaturasAlerta, setViaturasAlerta] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchViaturasAlerta();
+  }, []);
+
+  const fetchViaturasAlerta = async () => {
+    try {
+      const VIATURAS_MONITORADAS = [
+        'CAV - 04', 'CAV - 05', 'CAV - 06', 'CAV - 08', 'CAV - 11', 
+        'CAV - 12', 'CAV - 13', 'TA - 01', 'TA - 02', 'TA - 03', 
+        'TP', '6398', 'DUSTER'
+      ];
+
+      const viaturasSnapshot = await getDocs(collection(db, 'frota'));
+      const todasViaturas = viaturasSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+
+      const viaturasComAlerta = todasViaturas.filter(v => {
+        const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
+        const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
+        return isMonitorada && kmRestante <= 500 && kmRestante > 0;
+      });
+
+      setViaturasAlerta(viaturasComAlerta);
+    } catch (error) {
+      console.error('Erro ao buscar viaturas com alerta:', error);
+    }
+  };
+
+  if (viaturasAlerta.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card className="border-orange-500 bg-orange-500/5">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-orange-600">
+          <Droplet className="h-5 w-5" />
+          Alerta de Troca de Óleo
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {viaturasAlerta.map(v => {
+            const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
+            return (
+              <div key={v.id} className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Car className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <span className="font-medium">{v.CADASTRO}</span>
+                    <span className="text-sm text-muted-foreground ml-2">({v.PLACA})</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-medium text-orange-600">
+                    Faltam {kmRestante.toLocaleString()} km
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default AdminDashboard;
