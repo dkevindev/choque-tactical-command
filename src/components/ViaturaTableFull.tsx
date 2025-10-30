@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Edit, AlertTriangle } from 'lucide-react';
+import { Edit } from 'lucide-react';
 
 interface Viatura {
   id: string;
@@ -27,7 +27,6 @@ interface Viatura {
   PLACA: string;
   KM: number;
   KMOLEO: number;
-  SALDO: number;
 }
 
 const ViaturaTableFull = () => {
@@ -35,10 +34,9 @@ const ViaturaTableFull = () => {
   const [selectedViatura, setSelectedViatura] = useState<Viatura | null>(null);
   const [newKm, setNewKm] = useState('');
   const [newKmOleo, setNewKmOleo] = useState('');
-  const [newSaldo, setNewSaldo] = useState('');
   const [isEditingAll, setIsEditingAll] = useState(false);
   const [editValues, setEditValues] = useState<{
-    [id: string]: { KM: number; KMOLEO: number; SALDO: number };
+    [id: string]: { KM: number; KMOLEO: number };
   }>({});
 
   useEffect(() => {
@@ -53,12 +51,11 @@ const ViaturaTableFull = () => {
         setViaturas(viaturasFirebase);
 
         // Inicializa os valores de edição para edição em massa
-        const initialEditValues: { [id: string]: { KM: number; KMOLEO: number; SALDO: number } } = {};
+        const initialEditValues: { [id: string]: { KM: number; KMOLEO: number } } = {};
         viaturasFirebase.forEach((v) => {
           initialEditValues[v.id] = {
             KM: v.KM,
             KMOLEO: v.KMOLEO,
-            SALDO: v.SALDO,
           };
         });
         setEditValues(initialEditValues);
@@ -73,25 +70,24 @@ const ViaturaTableFull = () => {
   const getStatusBadge = (viatura: Viatura) => {
     const kmRestante = (viatura.KMOLEO ?? 0) - (viatura.KM ?? 0);
 
-    if (kmRestante <= 1000 || (viatura.SALDO ?? 0) < 1000) {
+    if (kmRestante <= 1000) {
       return <Badge variant="destructive">CRÍTICO</Badge>;
-    } else if (kmRestante <= 3000 || (viatura.SALDO ?? 0) < 2000) {
+    } else if (kmRestante <= 3000) {
       return <Badge variant="secondary">ATENÇÃO</Badge>;
     }
     return <Badge variant="default">OK</Badge>;
   };
 
   const handleUpdateSingle = async () => {
-    if (!selectedViatura || !newKm || !newKmOleo || !newSaldo) return;
+    if (!selectedViatura || !newKm || !newKmOleo) return;
 
     const updatedKm = parseInt(newKm);
     const updatedKmOleo = parseInt(newKmOleo);
-    const updatedSaldo = parseFloat(newSaldo);
 
     setViaturas((prev) =>
       prev.map((v) =>
         v.id === selectedViatura.id
-          ? { ...v, KM: updatedKm, KMOLEO: updatedKmOleo, SALDO: updatedSaldo }
+          ? { ...v, KM: updatedKm, KMOLEO: updatedKmOleo }
           : v
       )
     );
@@ -101,7 +97,6 @@ const ViaturaTableFull = () => {
       await updateDoc(viaturaRef, {
         KM: updatedKm,
         KMOLEO: updatedKmOleo,
-        SALDO: updatedSaldo,
       });
     } catch (error) {
       console.error('Erro ao atualizar dados no Firestore:', error);
@@ -110,7 +105,6 @@ const ViaturaTableFull = () => {
     setSelectedViatura(null);
     setNewKm('');
     setNewKmOleo('');
-    setNewSaldo('');
   };
 
   // Edição em massa
@@ -122,14 +116,12 @@ const ViaturaTableFull = () => {
           if (
             edited &&
             (edited.KM !== v.KM ||
-              edited.KMOLEO !== v.KMOLEO ||
-              edited.SALDO !== v.SALDO)
+              edited.KMOLEO !== v.KMOLEO)
           ) {
             const viaturaRef = doc(db, 'frota', v.id);
             await updateDoc(viaturaRef, {
               KM: edited.KM,
               KMOLEO: edited.KMOLEO,
-              SALDO: edited.SALDO,
             });
           }
         })
@@ -140,7 +132,6 @@ const ViaturaTableFull = () => {
           ...v,
           KM: editValues[v.id]?.KM ?? v.KM,
           KMOLEO: editValues[v.id]?.KMOLEO ?? v.KMOLEO,
-          SALDO: editValues[v.id]?.SALDO ?? v.SALDO,
         }))
       );
 
@@ -152,16 +143,11 @@ const ViaturaTableFull = () => {
 
   const handleEditValueChange = (
     id: string,
-    field: 'KM' | 'KMOLEO' | 'SALDO',
+    field: 'KM' | 'KMOLEO',
     value: string
   ) => {
-    let parsedValue: number;
-    if (field === 'SALDO') {
-      parsedValue = parseFloat(value);
-    } else {
-      parsedValue = parseInt(value);
-    }
-    if (isNaN(parsedValue)) parsedValue = 0;
+    const parsedValue = parseInt(value);
+    if (isNaN(parsedValue)) return;
 
     setEditValues((prev) => ({
       ...prev,
@@ -184,21 +170,13 @@ const ViaturaTableFull = () => {
             <TableHead>PLACA</TableHead>
             <TableHead>KM ATUAL</TableHead>
             <TableHead>TROCA ÓLEO</TableHead>
-            <TableHead>SALDO</TableHead>
             <TableHead>STATUS</TableHead>
             <TableHead>AÇÕES</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {viaturas.map((viatura) => (
-            <TableRow
-              key={viatura.id}
-              className={
-                ((viatura.KMOLEO ?? 0) - (viatura.KM ?? 0) <= 3000 ||
-                  (viatura.SALDO ?? 0) < 2000) &&
-                'bg-destructive/10 border-destructive/20'
-              }
-            >
+            <TableRow key={viatura.id}>
               <TableCell className="font-medium">{viatura.MODELO}</TableCell>
               <TableCell>{viatura.PLACA}</TableCell>
 
@@ -212,12 +190,7 @@ const ViaturaTableFull = () => {
                     }
                   />
                 ) : (
-                  <div className="flex items-center gap-2">
-                    {viatura.KM.toLocaleString()} km
-                    {(viatura.KMOLEO - viatura.KM <= 3000) && (
-                      <AlertTriangle className="h-4 w-4 text-destructive" />
-                    )}
-                  </div>
+                  `${viatura.KM.toLocaleString()} km`
                 )}
               </TableCell>
 
@@ -235,25 +208,6 @@ const ViaturaTableFull = () => {
                 )}
               </TableCell>
 
-              <TableCell>
-                {isEditingAll ? (
-                  <Input
-                    type="number"
-                    value={editValues[viatura.id]?.SALDO ?? ''}
-                    onChange={(e) =>
-                      handleEditValueChange(viatura.id, 'SALDO', e.target.value)
-                    }
-                  />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    R$ {viatura.SALDO.toLocaleString()}
-                    {viatura.SALDO < 2000 && (
-                      <AlertTriangle className="h-4 w-4 text-destructive" />
-                    )}
-                  </div>
-                )}
-              </TableCell>
-
               <TableCell>{getStatusBadge(viatura)}</TableCell>
 
               <TableCell>
@@ -266,7 +220,6 @@ const ViaturaTableFull = () => {
                         setSelectedViatura(viatura);
                         setNewKm(viatura.KM.toString());
                         setNewKmOleo(viatura.KMOLEO.toString());
-                        setNewSaldo(viatura.SALDO.toString());
                       }}
                     >
                       <Edit className="h-4 w-4 mr-1" />
@@ -297,15 +250,6 @@ const ViaturaTableFull = () => {
                           value={newKmOleo}
                           onChange={(e) => setNewKmOleo(e.target.value)}
                           placeholder="Ex: 120000"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Saldo disponível (R$):</label>
-                        <Input
-                          type="number"
-                          value={newSaldo}
-                          onChange={(e) => setNewSaldo(e.target.value)}
-                          placeholder="Ex: 2500"
                         />
                       </div>
                       <div className="flex justify-end gap-2">

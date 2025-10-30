@@ -566,6 +566,59 @@ const FrotaDashboard = () => {
         </div>
       </div>
 
+      {/* Alerta de Troca de Óleo */}
+      {viaturas.filter(v => {
+        const VIATURAS_MONITORADAS = [
+          'CAV - 04', 'CAV - 05', 'CAV - 06', 'CAV - 08', 'CAV - 11', 
+          'CAV - 12', 'CAV - 13', 'TA - 01', 'TA - 02', 'TA - 03', 
+          'TP', '6398', 'DUSTER'
+        ];
+        const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
+        const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
+        return isMonitorada && kmRestante <= 200 && kmRestante > 0;
+      }).length > 0 && (
+        <Card className="border-orange-500 bg-orange-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="h-5 w-5" />
+              Alerta de Troca de Óleo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {viaturas
+                .filter(v => {
+                  const VIATURAS_MONITORADAS = [
+                    'CAV - 04', 'CAV - 05', 'CAV - 06', 'CAV - 08', 'CAV - 11', 
+                    'CAV - 12', 'CAV - 13', 'TA - 01', 'TA - 02', 'TA - 03', 
+                    'TP', '6398', 'DUSTER'
+                  ];
+                  const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
+                  const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
+                  return isMonitorada && kmRestante <= 200 && kmRestante > 0;
+                })
+                .map(v => {
+                  const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
+                  return (
+                    <div key={v.id} className="flex items-center justify-between p-3 bg-background rounded-lg border">
+                      <div className="flex items-center gap-2">
+                        <Car className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{v.CADASTRO}</span>
+                        <span className="text-sm text-muted-foreground">({v.PLACA})</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-medium text-orange-600">
+                          Faltam {kmRestante.toLocaleString()} km para troca de óleo
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Métricas Gerais - 4 Quadros Solicitados */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

@@ -76,10 +76,23 @@ const AtualizarKmOleoDialog = ({ open, onOpenChange }: AtualizarKmOleoDialogProp
         ...doc.data()
       })) as Viatura[];
 
+      console.log('Buscando viaturas monitoradas. Todas as viaturas:', todasViaturas.map(v => v.CADASTRO));
+
       const viaturasOrdenadas = VIATURAS_MONITORADAS
-        .map(cadastro => todasViaturas.find(v => v.CADASTRO === cadastro))
+        .map(cadastro => {
+          // Buscar com e sem espaços para garantir compatibilidade
+          const viatura = todasViaturas.find(v => 
+            v.CADASTRO === cadastro || 
+            v.CADASTRO?.replace(/\s/g, '') === cadastro.replace(/\s/g, '')
+          );
+          if (!viatura) {
+            console.log(`Viatura não encontrada: ${cadastro}`);
+          }
+          return viatura;
+        })
         .filter(v => v !== undefined) as Viatura[];
 
+      console.log('Viaturas encontradas:', viaturasOrdenadas.map(v => v.CADASTRO));
       setViaturas(viaturasOrdenadas);
     } catch (error) {
       console.error('Erro ao buscar viaturas:', error);
