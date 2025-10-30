@@ -288,7 +288,72 @@ const LivroGuardaPage = () => {
   };
 
   const handleGerarDocumento = async () => {
-    toast.info('Função de geração de documento será implementada em breve');
+    if (!livroId) {
+      toast.error('Salve o rascunho antes de gerar o documento');
+      return;
+    }
+
+    setGerando(true);
+    try {
+      // Preparar dados para o template
+      const dadosLivro = {
+        data: dataRelatorio,
+        escalaServicoInterno,
+        escalaServicoExterno,
+        escalaPermanencia,
+        escalaRonda,
+        controleKm,
+        viaturasForaEscala,
+        consumoServicos,
+        alimentacaoSolipedes,
+        documentosAnexo,
+        cavalhada,
+        substituicoesSolipede,
+        permutasServico,
+        remanejamentosServico,
+        atividadesOperacionais,
+        ocorrencias,
+        passagemServico,
+      };
+
+      console.log('📄 Gerando documento com dados:', dadosLivro);
+
+      // Chamar Firebase Function
+      const response = await fetch(
+        'https://us-central1-cpchoque-frota-dev.cloudfunctions.net/gerarLivroGuarda',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(dadosLivro),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Erro na resposta:', errorText);
+        throw new Error('Erro ao gerar documento');
+      }
+
+      // Receber o arquivo DOCX
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Livro_Guarda_${dataRelatorio}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Documento gerado com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao gerar documento:', error);
+      toast.error('Erro ao gerar documento. Verifique os dados e tente novamente.');
+    } finally {
+      setGerando(false);
+    }
   };
 
   return (
@@ -334,6 +399,14 @@ const LivroGuardaPage = () => {
               >
                 <Save className="h-4 w-4 mr-2" />
                 {salvando ? 'Salvando...' : 'Salvar Rascunho'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleGerarDocumento}
+                disabled={gerando || !livroId}
+              >
+                <FileDown className="h-4 w-4 mr-2" />
+                {gerando ? 'Gerando...' : 'Gerar Documento'}
               </Button>
               <Button
                 variant="default"
