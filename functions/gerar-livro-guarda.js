@@ -102,28 +102,24 @@ function prepararDadosParaTemplate(data) {
     const getMesNome = (mes) => mesesNome[parseInt(mes) - 1];
 
     // Formatar escala de serviço interno
-    const escalaServicoInterno = data.escalaServicoInterno
+    const escalaServicoInterno = (data.escalaServicoInterno || [])
         .filter(funcao => funcao.policiais && funcao.policiais.length > 0)
         .map(funcao => {
             const policiais = funcao.policiais.map(p => {
                 let linha = `${p.posto}`;
                 
-                // Adicionar matrícula se existir
                 if (p.matricula) {
                     linha += ` ${p.matricula}`;
                 }
                 
-                // Adicionar nome de guerra
                 linha += ` ${p.nomeGuerra}`;
                 
-                // Adicionar horário se existir
                 if (p.horario && p.horario.trim()) {
                     linha += `. (${p.horario})`;
                 } else {
                     linha += '.';
                 }
                 
-                // Adicionar observação se existir
                 if (p.observacao && p.observacao.trim()) {
                     linha += ` ${p.observacao}`;
                 }
@@ -146,10 +142,155 @@ function prepararDadosParaTemplate(data) {
         ano: ano,
         mes: getMesNome(mes),
         dia: dia,
+        
+        // Seção 01
         escalaServicoInterno: escalaServicoInterno,
-        // TODO: Adicionar demais seções quando forem implementadas
+        
+        // Seção 02
         escalaServicoExterno: data.escalaServicoExterno || 'Conforme escala anexa.',
-        // ... outras seções ...
+        
+        // Seção 03
+        escalaPermanencia: (data.escalaPermanencia || []).map(p => ({
+            posto: p.posto,
+            numeral: p.numeral,
+            nomeGuerra: p.nomeGuerra,
+            funcao: p.funcao,
+            horario: p.horario || '',
+            observacao: p.observacao || ''
+        })),
+        
+        // Seção 04
+        escalaRonda: (data.escalaRonda || []).map(p => ({
+            posto: p.posto,
+            numeral: p.numeral,
+            nomeGuerra: p.nomeGuerra,
+            funcao: p.funcao,
+            horario: p.horario || '',
+            observacao: p.observacao || ''
+        })),
+        
+        // Seção 05
+        controleKm: (data.controleKm || []).map(v => ({
+            placa: v.placa,
+            kmAtual: v.kmAtual || '-',
+            kmAnterior: v.kmAnterior || '-',
+            kmRodada: v.kmRodada !== null && v.kmRodada !== undefined ? v.kmRodada : '-',
+            valorAbastecimento: v.valorAbastecimento || '',
+            litros: v.litros || '',
+            motoristaNome: v.motorista ? `${v.motorista.posto} ${v.motorista.numeral} ${v.motorista.nomeGuerra}` : ''
+        })),
+        
+        // Seção 06
+        viaturasForaEscala: (data.viaturasForaEscala || []).map(v => ({
+            viatura: v.viatura,
+            motorista: v.motorista ? {
+                posto: v.motorista.posto,
+                numeral: v.motorista.numeral,
+                nomeGuerra: v.motorista.nomeGuerra
+            } : {},
+            horarioSaida: v.horarioSaida || '',
+            horarioChegada: v.horarioChegada || '',
+            destino: v.destino || ''
+        })),
+        
+        // Seção 07
+        consumoServicos: (data.consumoServicos || []).map(c => ({
+            nomeServico: c.nomeServico,
+            leituraFinal: c.leituraFinal,
+            leituraInicial: c.leituraInicial,
+            consumo: c.consumo
+        })),
+        
+        // Seção 08
+        alimentacaoSolipedes: (data.alimentacaoSolipedes || []).map(a => ({
+            tipoAlimentacao: a.tipoAlimentacao,
+            entrada: a.entrada || '-',
+            saida: a.saida || '-',
+            saldoAnterior: a.saldoAnterior || 0,
+            consumo: a.consumo || 0,
+            saldoAtual: a.saldoAtual || 0
+        })),
+        
+        // Seção 09
+        documentosAnexo: data.documentosAnexo || '',
+        
+        // Seção 10
+        cavalhada: data.cavalhada || '',
+        
+        // Seção 11
+        substituicoesSolipede: (data.substituicoesSolipede || []).map(s => ({
+            horario: s.horario,
+            local: s.local,
+            solipedeSubstituido: s.solipedeSubstituido,
+            solipedeSubstituto: s.solipedeSubstituto
+        })),
+        
+        // Seção 12
+        permutasServico: (data.permutasServico || []).map(p => ({
+            horario: p.horario,
+            local: p.local,
+            pmSubstituido: p.pmSubstituido ? {
+                posto: p.pmSubstituido.posto,
+                numeral: p.pmSubstituido.numeral,
+                nomeGuerra: p.pmSubstituido.nomeGuerra
+            } : {},
+            pmSubstituto: p.pmSubstituto ? {
+                posto: p.pmSubstituto.posto,
+                numeral: p.pmSubstituto.numeral,
+                nomeGuerra: p.pmSubstituto.nomeGuerra
+            } : {},
+            autorizadoPor: p.autorizadoPor ? {
+                posto: p.autorizadoPor.posto,
+                numeral: p.autorizadoPor.numeral,
+                nomeGuerra: p.autorizadoPor.nomeGuerra
+            } : {}
+        })),
+        
+        // Seção 13
+        remanejamentosServico: (data.remanejamentosServico || []).map(r => ({
+            policial: r.policial ? {
+                posto: r.policial.posto,
+                numeral: r.policial.numeral,
+                nomeGuerra: r.policial.nomeGuerra
+            } : {},
+            horarioAnterior: r.horarioAnterior,
+            servicoAnterior: r.servicoAnterior,
+            horarioAtual: r.horarioAtual,
+            servicoAtual: r.servicoAtual
+        })),
+        
+        // Seção 14
+        atividadesOperacionais: (data.atividadesOperacionais || []).map(a => ({
+            ordem: a.ordem,
+            localHorario: a.localHorario,
+            tipoOcorrencia: a.tipoOcorrencia,
+            quantidade: a.quantidade
+        })),
+        
+        // Seção 15
+        ocorrencias: (data.ocorrencias || []).map(o => ({
+            numero: o.numero,
+            descricao: o.descricao,
+            despacho: o.despacho || ''
+        })),
+        
+        // Seção 16
+        passagemServico: data.passagemServico && data.passagemServico.oficialSubstituto ? {
+            texto: data.passagemServico.texto,
+            dataPassagem: data.passagemServico.dataPassagem,
+            oficialSubstituto: {
+                posto: data.passagemServico.oficialSubstituto.posto,
+                nome: data.passagemServico.oficialSubstituto.nome || data.passagemServico.oficialSubstituto.nomeGuerra
+            }
+        } : {},
+        
+        // Assinatura
+        assinatura: data.assinatura && data.assinatura.policial ? {
+            nome: data.assinatura.policial.NOME || data.assinatura.policial['NOME DE GUERRA1'],
+            posto: data.assinatura.policial['Post/Grad'],
+            matricula: data.assinatura.policial.Matrícula || data.assinatura.policial.matricula,
+            funcao: data.assinatura.funcao
+        } : {}
     };
 }
 

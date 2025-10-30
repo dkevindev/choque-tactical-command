@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, FileDown, CheckCircle, History } from 'lucide-react';
+import { ArrowLeft, Save, FileDown, CheckCircle, History, FileSignature } from 'lucide-react';
 import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 import { isNumeric } from '@/lib/kmUtils';
 import Secao01EscalaInternoForm from './Secao01EscalaInternoForm';
-import { FuncaoServico, PolicialEscalado } from './types';
+import { FuncaoServico, PolicialEscalado, PassagemServico } from './types';
 import Secao02EscalaExternoForm from './Secao02EscalaExternoForm';
 import Secao03PermanenciaForm, { PolicialPermanencia } from './Secao03PermanenciaForm';
 import Secao04RondaForm, { PolicialRonda } from './Secao04RondaForm';
@@ -25,6 +25,8 @@ import Secao12PermutasServicoForm, { PermutaServico } from './Secao12PermutasSer
 import Secao13RemanejamentosServicoForm, { RemanejamentoServico } from './Secao13RemanejamentosServicoForm';
 import Secao14AtividadesOperacionaisForm, { AtividadeOperacional } from './Secao14AtividadesOperacionaisForm';
 import Secao15OcorrenciasForm, { Ocorrencia } from './Secao15OcorrenciasForm';
+import Secao16PassagemServicoForm from './Secao16PassagemServicoForm';
+import ModalAssinaturaLivroGuarda from './ModalAssinaturaLivroGuarda';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,14 +65,37 @@ const LivroGuardaPage = () => {
   const [atividadesOperacionais, setAtividadesOperacionais] = useState<AtividadeOperacional[]>([]);
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
   
+  // Estado da seção 16
+  const [passagemServico, setPassagemServico] = useState<PassagemServico>({
+    oficialSubstituto: null,
+    texto: '',
+    dataPassagem: ''
+  });
+  
+  // Estados de assinatura e modais
+  const [assinatura, setAssinatura] = useState<{
+    policial: any;
+    funcao: string;
+  } | null>(null);
+  const [modalAssinaturaAberto, setModalAssinaturaAberto] = useState(false);
+  
   const [salvando, setSalvando] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [showConcluirDialog, setShowConcluirDialog] = useState(false);
 
   const limparCamposVazios = (obj: any): any => {
     if (Array.isArray(obj)) {
-      return obj.length > 0 ? obj : undefined;
+      const arrayLimpo = obj
+        .map(item => limparCamposVazios(item))
+        .filter(item => {
+          if (item === null || item === undefined || item === '') return false;
+          if (typeof item === 'object' && Object.keys(item).length === 0) return false;
+          return true;
+        });
+      
+      return arrayLimpo.length > 0 ? arrayLimpo : undefined;
     }
+    
     if (typeof obj === 'object' && obj !== null) {
       const limpo: any = {};
       Object.keys(obj).forEach(key => {
@@ -81,9 +106,11 @@ const LivroGuardaPage = () => {
       });
       return Object.keys(limpo).length > 0 ? limpo : undefined;
     }
+    
     if (obj === '' || obj === null || obj === undefined) {
       return undefined;
     }
+    
     return obj;
   };
 
@@ -143,6 +170,8 @@ const LivroGuardaPage = () => {
         remanejamentosServico,
         atividadesOperacionais,
         ocorrencias,
+        passagemServico,
+        assinatura,
       };
 
       Object.entries(camposOpcionais).forEach(([key, value]) => {
@@ -244,6 +273,14 @@ const LivroGuardaPage = () => {
               >
                 <History className="h-4 w-4 mr-2" />
                 Histórico
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setModalAssinaturaAberto(true)}
+              >
+                <FileSignature className="h-4 w-4 mr-2" />
+                Assinar Documento
               </Button>
               <Button
                 variant="outline"
@@ -368,7 +405,24 @@ const LivroGuardaPage = () => {
           ocorrencias={ocorrencias}
           setOcorrencias={setOcorrencias}
         />
+
+        <Secao16PassagemServicoForm
+          passagemServico={passagemServico}
+          setPassagemServico={setPassagemServico}
+          dataRelatorio={dataRelatorio}
+        />
       </main>
+
+      {/* Modal de Assinatura */}
+      <ModalAssinaturaLivroGuarda
+        isOpen={modalAssinaturaAberto}
+        onClose={() => setModalAssinaturaAberto(false)}
+        onConfirm={(assinaturaData) => {
+          setAssinatura(assinaturaData);
+          setModalAssinaturaAberto(false);
+          toast.success('Assinatura adicionada com sucesso!');
+        }}
+      />
 
       {/* Dialog de Confirmação */}
       <AlertDialog open={showConcluirDialog} onOpenChange={setShowConcluirDialog}>

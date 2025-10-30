@@ -152,6 +152,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     'Comandante do RPMON',
     'Subcomandante do RPMONT',
     'Respondendo pelo Comando do RPMONT',
+    'Oficial de Operações',
     'Chefe do P1',
     'Chefe do P3',
     'Chefe do P4',

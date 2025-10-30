@@ -15,3 +15,17 @@ export interface FuncaoServico {
   removivel: boolean;
   preDefinida: boolean;
 }
+
+export interface PassagemServico {
+  oficialSubstituto: {
+    id: string;
+    posto: string;
+    numeral: string;
+    nomeGuerra: string;
+    nome: string;
+    cpf?: string;
+    matricula?: string;
+  } | null;
+  texto: string;
+  dataPassagem: string;
+}
