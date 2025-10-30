@@ -498,3 +498,7 @@ appNadaConsta.post('/', async (req, res) => {
 });
 
 exports.gerarNadaConstaDocx = functions.https.onRequest(appNadaConsta);
+
+// ----------------- FUNÇÃO LIVRO DA GUARDA -----------------
+const { gerarLivroGuardaDocx } = require('./gerar-livro-guarda');
+exports.gerarLivroGuardaDocx = gerarLivroGuardaDocx;

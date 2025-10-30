@@ -54,6 +54,8 @@ const AdminDashboard = () => {
         return <FrotaContent />;
       case 'policial':
         return <PolicialContent />;
+      case 'guarda-quartel':
+        return <GuardaQuartelContent />;
       case 'gestao':
         return <GestaoContent />;
       case 'documentos':
@@ -554,6 +556,70 @@ const AlertaTrocaOleo = () => {
         </div>
       </CardContent>
     </Card>
+  );
+};
+
+const GuardaQuartelContent = () => {
+  const navigate = (path: string) => {
+    window.location.href = path;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-2">GUARDA DO QUARTEL</h2>
+        <p className="text-muted-foreground">
+          Sistema de controle e registro das atividades da guarda
+        </p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-primary"
+          onClick={() => navigate('/guarda-quartel')}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-6 w-6 text-primary" />
+              Novo Livro da Guarda
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Criar novo relatório do oficial de operações (24h) com todas as escalas e ocorrências do dia
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-dashed opacity-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-muted-foreground">
+              <Shield className="h-6 w-6" />
+              Histórico de Livros
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Em breve: Consultar e imprimir livros anteriores
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-dashed opacity-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-6 w-6" />
+              Escalas de Serviço
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Em breve: Gerenciar escalas de serviço interno e externo
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 };
 
