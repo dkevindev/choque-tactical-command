@@ -10,15 +10,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Car } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { toast } from 'sonner';
 import {
   VIATURAS_CONTROLE_KM,
+  MAPA_VIATURAS_CADASTRO,
   isNumeric,
   calcularKmRodada,
   calcularLitrosPorKm,
   formatarValorOuTraco,
 } from '@/lib/kmUtils';
+import PolicialSearchCombobox from './PolicialSearchCombobox';
 
 export interface ControleKmViatura {
   placa: string;
@@ -28,6 +31,9 @@ export interface ControleKmViatura {
   valorAbastecimento?: number;
   litros?: number;
   motorista?: string;
+  motoristaId?: string;
+  motoristaNome?: string;
+  docIdFrota?: string;
 }
 
 interface Secao05ControleKmFormProps {
@@ -47,31 +53,47 @@ const Secao05ControleKmForm = ({
       setLoading(true);
       try {
         const viaturasRef = collection(db, 'frota');
-        const q = query(viaturasRef, where('PLACA', 'in', VIATURAS_CONTROLE_KM));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await getDocs(viaturasRef);
 
-        const kmAnteriorMap: { [placa: string]: number } = {};
+        const kmAnteriorMap: { [placa: string]: { km: number, docId: string } } = {};
+        
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          const placa = data.PLACA;
-          const km = data.KM || 0;
-          kmAnteriorMap[placa] = km;
+          const cadastro = data.CADASTRO;
+          
+          // Verificar se o cadastro corresponde a alguma viatura monitorada
+          const placaExibicao = Object.keys(MAPA_VIATURAS_CADASTRO).find(
+            key => MAPA_VIATURAS_CADASTRO[key] === cadastro
+          );
+          
+          if (placaExibicao) {
+            kmAnteriorMap[placaExibicao] = {
+              km: data.KM || 0,
+              docId: doc.id
+            };
+          }
         });
+
+        console.log('KM Anterior carregado:', kmAnteriorMap);
 
         // Inicializar controleKm com todas as viaturas
         const controleInicial: ControleKmViatura[] = VIATURAS_CONTROLE_KM.map((placa) => ({
           placa,
           kmAtual: '',
-          kmAnterior: kmAnteriorMap[placa] || 0,
+          kmAnterior: kmAnteriorMap[placa]?.km || 0,
           kmRodada: null,
           valorAbastecimento: undefined,
           litros: undefined,
           motorista: '',
+          motoristaId: '',
+          motoristaNome: '',
+          docIdFrota: kmAnteriorMap[placa]?.docId || '',
         }));
 
         setControleKm(controleInicial);
       } catch (error) {
         console.error('Erro ao carregar KM anterior das viaturas:', error);
+        toast.error('Erro ao carregar dados das viaturas');
       } finally {
         setLoading(false);
       }
@@ -193,14 +215,23 @@ const Secao05ControleKmForm = ({
                   <TableCell className="text-muted-foreground">
                     {calcularLKm(viatura)}
                   </TableCell>
-                  <TableCell>
-                    <Input
-                      placeholder="Nome do motorista"
-                      value={viatura.motorista || ''}
-                      onChange={(e) => atualizarViatura(viatura.placa, 'motorista', e.target.value)}
-                      className="h-8"
-                    />
-                  </TableCell>
+                <TableCell>
+                  <PolicialSearchCombobox
+                    value={viatura.motoristaId || ''}
+                    onSelect={(policialData) => {
+                      if (policialData) {
+                        atualizarViatura(viatura.placa, 'motoristaId', policialData.id);
+                        atualizarViatura(viatura.placa, 'motoristaNome', 
+                          `${policialData.posto} ${policialData.numeral} ${policialData.nomeGuerra}`.trim()
+                        );
+                      } else {
+                        atualizarViatura(viatura.placa, 'motoristaId', '');
+                        atualizarViatura(viatura.placa, 'motoristaNome', '');
+                      }
+                    }}
+                    placeholder="Selecionar motorista..."
+                  />
+                </TableCell>
                 </TableRow>
               ))}
             </TableBody>

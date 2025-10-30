@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react';
@@ -69,17 +70,42 @@ const FuncaoCard = ({ funcao, onUpdate, onRemove }: FuncaoCardProps) => {
           <div className="flex items-start justify-between gap-2">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" className="flex-1 justify-start p-0 h-auto hover:bg-transparent">
-                <div className="flex items-center gap-2">
-                  {isOpen ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <CardTitle className="text-base">{funcao.nome}</CardTitle>
-                  {funcao.policiais.length > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      ({funcao.policiais.length} {funcao.policiais.length === 1 ? 'policial' : 'policiais'})
-                    </span>
+                <div className="flex flex-col gap-1.5 items-start w-full">
+                  <div className="flex items-center gap-2">
+                    {isOpen ? (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <CardTitle className="text-base">{funcao.nome}</CardTitle>
+                  </div>
+                  {!isOpen && funcao.policiais.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 ml-6">
+                      {funcao.policiais
+                        .filter(p => p.id)
+                        .map((policial, index) => {
+                          const cores = [
+                            'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+                            'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                            'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+                            'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+                          ];
+                          return (
+                            <Badge 
+                              key={index} 
+                              variant="secondary"
+                              className={`text-xs font-normal ${cores[index % cores.length]}`}
+                            >
+                              {policial.posto} {policial.numeral} {policial.nomeGuerra}
+                              {policial.horario && (
+                                <span className="ml-1 text-[10px] opacity-75">
+                                  ({policial.horario})
+                                </span>
+                              )}
+                            </Badge>
+                          );
+                        })}
+                    </div>
                   )}
                 </div>
               </Button>

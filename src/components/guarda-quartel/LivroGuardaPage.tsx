@@ -8,6 +8,7 @@ import { ArrowLeft, Save, FileDown, BookOpen } from 'lucide-react';
 import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
+import { isNumeric } from '@/lib/kmUtils';
 import Secao01EscalaInternoForm from './Secao01EscalaInternoForm';
 import Secao02EscalaExternoForm from './Secao02EscalaExternoForm';
 import Secao03PermanenciaForm, { PolicialPermanencia } from './Secao03PermanenciaForm';
@@ -60,9 +61,46 @@ const LivroGuardaPage = () => {
   const [salvando, setSalvando] = useState(false);
   const [gerando, setGerando] = useState(false);
 
+  const atualizarKmViaturas = async (controleKm: ControleKmViatura[]) => {
+    const atualizacoes: Promise<void>[] = [];
+    
+    for (const viatura of controleKm) {
+      // Verificar se kmAtual é numérico
+      if (isNumeric(viatura.kmAtual) && viatura.docIdFrota) {
+        const kmNovo = typeof viatura.kmAtual === 'number' 
+          ? viatura.kmAtual 
+          : parseFloat(viatura.kmAtual as string);
+        
+        // Atualizar apenas se o KM novo for maior que o anterior
+        if (kmNovo > viatura.kmAnterior) {
+          const docRef = doc(db, 'frota', viatura.docIdFrota);
+          atualizacoes.push(
+            updateDoc(docRef, { KM: kmNovo })
+              .then(() => {
+                console.log(`✅ KM atualizado: ${viatura.placa} → ${kmNovo}km`);
+              })
+              .catch((error) => {
+                console.error(`❌ Erro ao atualizar KM de ${viatura.placa}:`, error);
+              })
+          );
+        } else {
+          console.warn(`⚠️ KM não atualizado para ${viatura.placa}: novo KM (${kmNovo}) não é maior que o anterior (${viatura.kmAnterior})`);
+        }
+      } else if (!isNumeric(viatura.kmAtual) && viatura.kmAtual !== '') {
+        console.log(`ℹ️ KM não numérico para ${viatura.placa}: "${viatura.kmAtual}" (não será atualizado no banco)`);
+      }
+    }
+    
+    // Executar todas as atualizações em paralelo
+    await Promise.all(atualizacoes);
+  };
+
   const handleSalvarRascunho = async () => {
     setSalvando(true);
     try {
+      // Atualizar KM das viaturas ANTES de salvar o documento
+      await atualizarKmViaturas(controleKm);
+      
       const livroData: Omit<LivroGuarda, 'id'> = {
         data: dataRelatorio,
         dataCriacao: Timestamp.now(),
