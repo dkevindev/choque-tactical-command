@@ -1,19 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
 
@@ -39,10 +36,10 @@ const PolicialSearchCombobox = ({
   placeholder = "Buscar policial...",
   disabled = false,
 }: PolicialSearchComboboxProps) => {
-  const [open, setOpen] = useState(false);
   const [policiais, setPoliciais] = useState<PolicialData[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     loadPoliciais();
@@ -84,7 +81,7 @@ const PolicialSearchCombobox = ({
     }
   };
 
-  const filteredPoliciais = (policiais || []).filter((p) => {
+  const filteredPoliciais = policiais.filter((p) => {
     if (!p) return false;
     const termo = (searchTerm || '').toLowerCase();
     return (
@@ -98,55 +95,53 @@ const PolicialSearchCombobox = ({
 
   const selectedPolicial = policiais.find((p) => p.id === value);
 
+  const handleSelect = (policialId: string) => {
+    const selected = policiais.find((p) => p.id === policialId);
+    onSelect(selected || null);
+    setIsOpen(false);
+    setSearchTerm('');
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
-          disabled={disabled}
-        >
-          <span className="flex items-center gap-2 truncate">
-            <Search className="h-4 w-4 shrink-0 opacity-50" />
-            {selectedPolicial
-              ? formatarPolicialParaExibicao(selectedPolicial)
-              : placeholder}
-          </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
+    <Select
+      value={value}
+      onValueChange={handleSelect}
+      disabled={disabled}
+      open={isOpen}
+      onOpenChange={setIsOpen}
+    >
+      <SelectTrigger className="w-full">
+        <div className="flex items-center gap-2 w-full">
+          <Search className="h-4 w-4 shrink-0 opacity-50" />
+          <SelectValue placeholder={placeholder}>
+            {selectedPolicial ? formatarPolicialParaExibicao(selectedPolicial) : placeholder}
+          </SelectValue>
+        </div>
+      </SelectTrigger>
+      <SelectContent className="w-[400px]">
+        <div className="p-2 border-b">
+          <Input
             placeholder="Digite nome, matrícula ou numeral..."
             value={searchTerm}
-            onValueChange={setSearchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="h-9"
+            autoFocus
           />
-          {filteredPoliciais.length === 0 ? (
-            <div className="py-6 text-center text-sm text-muted-foreground">
-              {loading ? 'Carregando...' : 'Nenhum policial encontrado.'}
-            </div>
-          ) : (
-            <CommandGroup className="max-h-[300px] overflow-auto">
-              {filteredPoliciais.map((policial) => (
-                <CommandItem
-                  key={policial.id}
-                  value={policial.id}
-                  onSelect={(currentValue) => {
-                    const selected = policiais.find((p) => p.id === currentValue);
-                    onSelect(selected || null);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      value === policial.id ? 'opacity-100' : 'opacity-0'
-                    )}
-                  />
-                  <div className="flex flex-col">
+        </div>
+        <ScrollArea className="h-[300px]">
+          <SelectGroup>
+            {loading ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                Carregando...
+              </div>
+            ) : filteredPoliciais.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                Nenhum policial encontrado
+              </div>
+            ) : (
+              filteredPoliciais.map((policial) => (
+                <SelectItem key={policial.id} value={policial.id}>
+                  <div className="flex flex-col py-1">
                     <span className="font-medium">
                       {formatarPolicialParaExibicao(policial)}
                     </span>
@@ -154,13 +149,13 @@ const PolicialSearchCombobox = ({
                       {policial.nome}
                     </span>
                   </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          )}
-        </Command>
-      </PopoverContent>
-    </Popover>
+                </SelectItem>
+              ))
+            )}
+          </SelectGroup>
+        </ScrollArea>
+      </SelectContent>
+    </Select>
   );
 };
 
