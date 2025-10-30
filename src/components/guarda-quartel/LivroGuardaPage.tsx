@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Save, FileDown, CheckCircle, History } from 'lucide-react';
-import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 import { isNumeric } from '@/lib/kmUtils';
@@ -39,11 +39,15 @@ import {
 
 const LivroGuardaPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const livroIdParam = searchParams.get('id');
+  
   const [dataRelatorio, setDataRelatorio] = useState(() => {
     const hoje = new Date();
     return hoje.toISOString().split('T')[0];
   });
-  const [livroId, setLivroId] = useState<string | null>(null);
+  const [livroId, setLivroId] = useState<string | null>(livroIdParam);
+  const [carregando, setCarregando] = useState(!!livroIdParam);
   
   // Estados das seções 01-05
   const [escalaServicoInterno, setEscalaServicoInterno] = useState<FuncaoServico[]>([]);
@@ -74,6 +78,56 @@ const LivroGuardaPage = () => {
   const [salvando, setSalvando] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [showConcluirDialog, setShowConcluirDialog] = useState(false);
+
+  // Carregar rascunho salvo se houver ID na URL
+  useEffect(() => {
+    const carregarLivro = async () => {
+      if (!livroIdParam) {
+        setCarregando(false);
+        return;
+      }
+
+      try {
+        const livroDoc = await getDoc(doc(db, 'livros_guarda', livroIdParam));
+        
+        if (livroDoc.exists()) {
+          const data = livroDoc.data();
+          console.log('📖 Carregando livro:', data);
+          
+          // Restaurar todos os campos
+          if (data.data) setDataRelatorio(data.data);
+          if (data.escalaServicoInterno) setEscalaServicoInterno(data.escalaServicoInterno);
+          if (data.escalaServicoExterno) setEscalaServicoExterno(data.escalaServicoExterno);
+          if (data.escalaPermanencia) setEscalaPermanencia(data.escalaPermanencia);
+          if (data.escalaRonda) setEscalaRonda(data.escalaRonda);
+          if (data.controleKm) setControleKm(data.controleKm);
+          if (data.viaturasForaEscala) setViaturasForaEscala(data.viaturasForaEscala);
+          if (data.consumoServicos) setConsumoServicos(data.consumoServicos);
+          if (data.alimentacaoSolipedes) setAlimentacaoSolipedes(data.alimentacaoSolipedes);
+          if (data.documentosAnexo) setDocumentosAnexo(data.documentosAnexo);
+          if (data.cavalhada) setCavalhada(data.cavalhada);
+          if (data.substituicoesSolipede) setSubstituicoesSolipede(data.substituicoesSolipede);
+          if (data.permutasServico) setPermutasServico(data.permutasServico);
+          if (data.remanejamentosServico) setRemanejamentosServico(data.remanejamentosServico);
+          if (data.atividadesOperacionais) setAtividadesOperacionais(data.atividadesOperacionais);
+          if (data.ocorrencias) setOcorrencias(data.ocorrencias);
+          if (data.passagemServico) setPassagemServico(data.passagemServico);
+          
+          toast.success('Rascunho carregado com sucesso!');
+        } else {
+          toast.error('Livro não encontrado');
+          navigate('/guarda-quartel');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar livro:', error);
+        toast.error('Erro ao carregar rascunho');
+      } finally {
+        setCarregando(false);
+      }
+    };
+
+    carregarLivro();
+  }, [livroIdParam]);
 
   const limparCamposVazios = (obj: any): any => {
     if (Array.isArray(obj)) {
@@ -178,6 +232,8 @@ const LivroGuardaPage = () => {
       } else {
         const docRef = await addDoc(collection(db, 'livros_guarda'), livroData);
         setLivroId(docRef.id);
+        // Atualizar URL com o ID do livro
+        window.history.replaceState(null, '', `/guarda-quartel?id=${docRef.id}`);
         toast.success('Rascunho salvo com sucesso!');
       }
     } catch (error) {
@@ -237,6 +293,12 @@ const LivroGuardaPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {carregando && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground py-2 px-4 text-center">
+          <p className="text-sm">Carregando rascunho...</p>
+        </div>
+      )}
+      
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">

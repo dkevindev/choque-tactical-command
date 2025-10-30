@@ -1,6 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { FileText, AlertCircle } from 'lucide-react';
+import { FileText, AlertCircle, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/firebase';
+import { toast } from 'sonner';
 import PolicialSearchCombobox from './PolicialSearchCombobox';
 import { PassagemServico, FuncaoServico } from './types';
 
@@ -17,28 +22,73 @@ const Secao16PassagemServicoForm = ({
   dataRelatorio,
   escalaServicoInterno
 }: Secao16PassagemServicoFormProps) => {
+  const [atualizando, setAtualizando] = useState(false);
+  const [oficialDiaCompleto, setOficialDiaCompleto] = useState<any>(null);
   
-  // Buscar Oficial de Dia automaticamente da Seção 01
-  const buscarOficialDia = (): any | null => {
-    console.log('🔍 Buscando Oficial de Dia...', { escalaServicoInterno });
-    
+  // Buscar Oficial de Dia da Seção 01
+  const buscarOficialDiaEscala = (): any | null => {
     const funcaoOficialDia = escalaServicoInterno.find(
       f => f.nome === 'Oficial de Dia/Operações' && f.policiais && f.policiais.length > 0
     );
     
-    console.log('📋 Função encontrada:', funcaoOficialDia);
-    
     if (funcaoOficialDia && funcaoOficialDia.policiais.length > 0) {
-      const oficial = funcaoOficialDia.policiais[0];
-      console.log('👮 Oficial encontrado:', oficial);
-      return oficial;
+      return funcaoOficialDia.policiais[0];
     }
     
-    console.log('⚠️ Nenhum oficial encontrado');
     return null;
   };
 
-  const oficialDia = buscarOficialDia();
+  // Buscar dados completos do policial no Firebase
+  const buscarDadosCompletosPolicial = async (oficialEscala: any) => {
+    if (!oficialEscala) return null;
+
+    try {
+      setAtualizando(true);
+      console.log('🔍 Buscando dados completos do policial:', oficialEscala);
+
+      const policiaisRef = collection(db, 'policiais');
+      const q = query(
+        policiaisRef,
+        where('NOME DE GUERRA1', '==', oficialEscala.nomeGuerra)
+      );
+      
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        const policialData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+        console.log('✅ Policial encontrado:', policialData);
+        return policialData;
+      } else {
+        console.log('⚠️ Policial não encontrado no banco');
+        toast.error('Dados completos do oficial não encontrados no sistema');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar policial:', error);
+      toast.error('Erro ao buscar dados do oficial');
+      return null;
+    } finally {
+      setAtualizando(false);
+    }
+  };
+
+  const handleAtualizarAssinatura = async () => {
+    const oficialEscala = buscarOficialDiaEscala();
+    
+    if (!oficialEscala) {
+      toast.error('Nenhum Oficial de Dia escalado na Seção 01');
+      return;
+    }
+
+    const oficialCompleto = await buscarDadosCompletosPolicial(oficialEscala);
+    
+    if (oficialCompleto) {
+      setOficialDiaCompleto(oficialCompleto);
+      toast.success('Assinatura atualizada com sucesso!');
+    }
+  };
+
+  const oficialEscala = buscarOficialDiaEscala();
   
   const formatarDataPassagem = (dataISO: string): string => {
     const meses = [
@@ -97,13 +147,25 @@ const Secao16PassagemServicoForm = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <Label>Oficial de Operações Substituto</Label>
-          <PolicialSearchCombobox
-            value={passagemServico.oficialSubstituto?.id || ''}
-            onSelect={handleSelecionarOficial}
-            placeholder="Buscar oficial substituto..."
-          />
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <Label>Oficial de Operações Substituto</Label>
+            <PolicialSearchCombobox
+              value={passagemServico.oficialSubstituto?.id || ''}
+              onSelect={handleSelecionarOficial}
+              placeholder="Buscar oficial substituto..."
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAtualizarAssinatura}
+            disabled={atualizando || !oficialEscala}
+            className="mt-6"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${atualizando ? 'animate-spin' : ''}`} />
+            {atualizando ? 'Atualizando...' : 'Atualizar Assinatura'}
+          </Button>
         </div>
 
         {passagemServico.oficialSubstituto && (
@@ -118,17 +180,29 @@ const Secao16PassagemServicoForm = ({
               </p>
             </div>
 
-            {oficialDia ? (
+            {oficialDiaCompleto ? (
               <div className="pt-2 space-y-1">
                 <p className="text-sm font-medium text-foreground">
-                  {oficialDia.NOME} - {oficialDia['NOME DE GUERRA1']} - {oficialDia['Post/Grad']}
+                  {oficialDiaCompleto.NOME} - {oficialDiaCompleto['NOME DE GUERRA1']} - {oficialDiaCompleto['Post/Grad']}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Oficial de Operações
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  MF.: {oficialDia.Matrícula}
+                  MF.: {oficialDiaCompleto.Matrícula}
                 </p>
+              </div>
+            ) : oficialEscala ? (
+              <div className="pt-2 flex items-center gap-2 text-amber-600">
+                <AlertCircle className="h-4 w-4" />
+                <div className="flex-1">
+                  <p className="text-sm">
+                    Oficial escalado: {oficialEscala.posto} {oficialEscala.nomeGuerra}
+                  </p>
+                  <p className="text-xs">
+                    Clique em "Atualizar Assinatura" para buscar os dados completos do oficial.
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="pt-2 flex items-center gap-2 text-amber-600">
