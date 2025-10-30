@@ -84,14 +84,15 @@ const PolicialSearchCombobox = ({
     }
   };
 
-  const filteredPoliciais = policiais.filter((p) => {
-    const termo = searchTerm.toLowerCase();
+  const filteredPoliciais = (policiais || []).filter((p) => {
+    if (!p) return false;
+    const termo = (searchTerm || '').toLowerCase();
     return (
-      p.nome.toLowerCase().includes(termo) ||
-      p.nomeGuerra.toLowerCase().includes(termo) ||
-      p.matricula.includes(termo) ||
+      (p.nome || '').toLowerCase().includes(termo) ||
+      (p.nomeGuerra || '').toLowerCase().includes(termo) ||
+      (p.matricula || '').includes(termo) ||
       (p.numeral && String(p.numeral).includes(termo)) ||
-      p.posto.toLowerCase().includes(termo)
+      (p.posto || '').toLowerCase().includes(termo)
     );
   });
 
@@ -117,7 +118,7 @@ const PolicialSearchCombobox = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] p-0" align="start">
-        <Command>
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder="Digite nome, matrícula ou numeral..."
             value={searchTerm}
@@ -127,32 +128,34 @@ const PolicialSearchCombobox = ({
             {loading ? 'Carregando...' : 'Nenhum policial encontrado.'}
           </CommandEmpty>
           <CommandGroup className="max-h-[300px] overflow-auto">
-            {filteredPoliciais.map((policial) => (
-              <CommandItem
-                key={policial.id}
-                value={policial.id}
-                onSelect={(currentValue) => {
-                  const selected = policiais.find((p) => p.id === currentValue);
-                  onSelect(selected || null);
-                  setOpen(false);
-                }}
-              >
-                <Check
-                  className={cn(
-                    'mr-2 h-4 w-4',
-                    value === policial.id ? 'opacity-100' : 'opacity-0'
-                  )}
-                />
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    {formatarPolicialParaExibicao(policial)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {policial.nome}
-                  </span>
-                </div>
-              </CommandItem>
-            ))}
+            {filteredPoliciais.length > 0 ? (
+              filteredPoliciais.map((policial) => (
+                <CommandItem
+                  key={policial.id}
+                  value={policial.id}
+                  onSelect={(currentValue) => {
+                    const selected = policiais.find((p) => p.id === currentValue);
+                    onSelect(selected || null);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      value === policial.id ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {formatarPolicialParaExibicao(policial)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {policial.nome}
+                    </span>
+                  </div>
+                </CommandItem>
+              ))
+            ) : null}
           </CommandGroup>
         </Command>
       </PopoverContent>
