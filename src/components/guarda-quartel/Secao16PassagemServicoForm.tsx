@@ -1,30 +1,37 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { FileText } from 'lucide-react';
+import { FileText, AlertCircle } from 'lucide-react';
 import PolicialSearchCombobox from './PolicialSearchCombobox';
-import { PassagemServico } from './types';
+import { PassagemServico, FuncaoServico } from './types';
 
 interface Secao16PassagemServicoFormProps {
   passagemServico: PassagemServico;
   setPassagemServico: (value: PassagemServico) => void;
   dataRelatorio: string;
-  oficialResponsavel?: {
-    posto: string;
-    nome: string;
-    matricula: string;
-  };
+  escalaServicoInterno: FuncaoServico[];
 }
 
 const Secao16PassagemServicoForm = ({
   passagemServico,
   setPassagemServico,
   dataRelatorio,
-  oficialResponsavel = {
-    posto: '1º Tenente QOPM',
-    nome: 'ROBERTO Barbosa de AZEVEDO',
-    matricula: '843.989-6-9'
-  }
+  escalaServicoInterno
 }: Secao16PassagemServicoFormProps) => {
+  
+  // Buscar Oficial de Dia automaticamente da Seção 01
+  const buscarOficialDia = (): any | null => {
+    const funcaoOficialDia = escalaServicoInterno.find(
+      f => f.nome === 'Oficial de Dia/Operações' && f.policiais && f.policiais.length > 0
+    );
+    
+    if (funcaoOficialDia && funcaoOficialDia.policiais.length > 0) {
+      return funcaoOficialDia.policiais[0];
+    }
+    
+    return null;
+  };
+
+  const oficialDia = buscarOficialDia();
   
   const formatarDataPassagem = (dataISO: string): string => {
     const meses = [
@@ -104,17 +111,26 @@ const Secao16PassagemServicoForm = ({
               </p>
             </div>
 
-            <div className="pt-2 space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                {oficialResponsavel.nome} - {oficialResponsavel.posto}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Oficial de Operações
-              </p>
-              <p className="text-xs text-muted-foreground">
-                MF.: {oficialResponsavel.matricula}
-              </p>
-            </div>
+            {oficialDia ? (
+              <div className="pt-2 space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  {oficialDia.NOME} - {oficialDia['NOME DE GUERRA1']} - {oficialDia['Post/Grad']}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Oficial de Operações
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  MF.: {oficialDia.Matrícula}
+                </p>
+              </div>
+            ) : (
+              <div className="pt-2 flex items-center gap-2 text-amber-600">
+                <AlertCircle className="h-4 w-4" />
+                <p className="text-sm">
+                  Nenhum Oficial de Dia escalado na Seção 01. Escale um oficial para gerar a assinatura automaticamente.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

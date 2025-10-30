@@ -270,8 +270,7 @@ function prepararDadosParaTemplate(data) {
         // Seção 15
         ocorrencias: (data.ocorrencias || []).map(o => ({
             numero: o.numero,
-            descricao: o.descricao,
-            despacho: o.despacho || ''
+            descricao: o.descricao
         })),
         
         // Seção 16

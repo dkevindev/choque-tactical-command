@@ -9,7 +9,6 @@ export interface Ocorrencia {
   id: string;
   numero: number;
   descricao: string;
-  despacho: string;
 }
 
 interface Secao15OcorrenciasFormProps {
@@ -28,7 +27,6 @@ const Secao15OcorrenciasForm = ({
       id: Date.now().toString(),
       numero: ocorrencias.length + 1,
       descricao: '',
-      despacho: '',
     };
     setOcorrencias([...ocorrencias, novaOcorrencia]);
     setOpenItems({ ...openItems, [novaOcorrencia.id]: true });
@@ -107,19 +105,6 @@ const Secao15OcorrenciasForm = ({
                           onChange={(e) => atualizarOcorrencia(ocorrencia.id, 'descricao', e.target.value)}
                           placeholder="Descreva a ocorrência..."
                           rows={4}
-                          className="mt-1 resize-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-foreground">
-                          DESPACHO DO SUB CMT DO RPMONT:
-                        </label>
-                        <Textarea
-                          value={ocorrencia.despacho}
-                          onChange={(e) => atualizarOcorrencia(ocorrencia.id, 'despacho', e.target.value)}
-                          placeholder="Digite o despacho..."
-                          rows={3}
                           className="mt-1 resize-none"
                         />
                       </div>

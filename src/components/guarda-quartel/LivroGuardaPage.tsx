@@ -410,6 +410,7 @@ const LivroGuardaPage = () => {
           passagemServico={passagemServico}
           setPassagemServico={setPassagemServico}
           dataRelatorio={dataRelatorio}
+          escalaServicoInterno={escalaServicoInterno}
         />
       </main>
 

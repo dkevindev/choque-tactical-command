@@ -268,9 +268,6 @@ Serviço Atual: 16h00-00h00 - Ronda
 {#ocorrencias}
 {numero}. {descricao}
 
-DESPACHO DO SUB CMT DO RPMONT:
-{despacho}
-
 {/ocorrencias}
 ```
 
@@ -278,13 +275,7 @@ DESPACHO DO SUB CMT DO RPMONT:
 ```
 01. A Cb PM 29098 Lorena, escalada na VTR CAV-11, no horário de 16h00 às 02h00, faltou o serviço ao qual estava escalada e que enviaria o atestado posteriormente.
 
-DESPACHO DO SUB CMT DO RPMONT:
-Cientifique-se o policial e aguarde apresentação do atestado médico.
-
 02. Por volta das 10h30, o senhor Francisco Sigisnaldo da Rocha, CPF: 62249050376, da oficina A Projetar Auto Center veio a este quartel para dar manutenção no TA-01. Vale informar que foi feita a retirada de ar do sistema de combustível.
-
-DESPACHO DO SUB CMT DO RPMONT:
-Ciente. Mantenha registro da manutenção realizada.
 ```
 
 ---
