@@ -320,7 +320,7 @@ const LivroGuardaPage = () => {
 
       // Chamar Firebase Function
       const response = await fetch(
-        'https://us-central1-cpchoque-frota-dev.cloudfunctions.net/gerarLivroGuarda',
+        'https://us-central1-finkevin-fbd9a.cloudfunctions.net/gerarLivroGuardaDocx',
         {
           method: 'POST',
           headers: {
