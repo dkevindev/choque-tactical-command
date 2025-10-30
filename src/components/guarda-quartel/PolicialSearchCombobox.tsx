@@ -28,6 +28,8 @@ interface PolicialSearchComboboxProps {
   onSelect: (policial: PolicialData | null) => void;
   placeholder?: string;
   disabled?: boolean;
+  compact?: boolean;
+  className?: string;
 }
 
 const PolicialSearchCombobox = ({
@@ -35,6 +37,8 @@ const PolicialSearchCombobox = ({
   onSelect,
   placeholder = "Buscar policial...",
   disabled = false,
+  compact = false,
+  className = "",
 }: PolicialSearchComboboxProps) => {
   const [policiais, setPoliciais] = useState<PolicialData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -110,13 +114,17 @@ const PolicialSearchCombobox = ({
       open={isOpen}
       onOpenChange={setIsOpen}
     >
-      <SelectTrigger className="w-full">
-        <div className="flex items-center gap-2 w-full">
-          <Search className="h-4 w-4 shrink-0 opacity-50" />
-          <SelectValue placeholder={placeholder}>
-            {selectedPolicial ? formatarPolicialParaExibicao(selectedPolicial) : placeholder}
-          </SelectValue>
-        </div>
+      <SelectTrigger className={compact ? `h-8 w-8 p-0 ${className}` : `w-full ${className}`}>
+        {compact ? (
+          <Search className="h-4 w-4" />
+        ) : (
+          <div className="flex items-center gap-2 w-full">
+            <Search className="h-4 w-4 shrink-0 opacity-50" />
+            <SelectValue placeholder={placeholder}>
+              {selectedPolicial ? formatarPolicialParaExibicao(selectedPolicial) : placeholder}
+            </SelectValue>
+          </div>
+        )}
       </SelectTrigger>
       <SelectContent className="w-[400px]">
         <div className="p-2 border-b">

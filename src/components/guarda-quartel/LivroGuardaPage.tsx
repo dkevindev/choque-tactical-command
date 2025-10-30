@@ -101,17 +101,28 @@ const LivroGuardaPage = () => {
       // Atualizar KM das viaturas ANTES de salvar o documento
       await atualizarKmViaturas(controleKm);
       
-      const livroData: Omit<LivroGuarda, 'id'> = {
+      // Remover campos undefined para evitar erro do Firebase
+      const livroData: any = {
         data: dataRelatorio,
         dataCriacao: Timestamp.now(),
         status: 'em_andamento',
         oficialResponsavel: 'current_user_id', // TODO: Pegar do contexto de auth
         escalaServicoInterno,
-        escalaServicoExterno,
-        escalaPermanencia,
-        escalaRonda,
-        controleKm,
       };
+
+      // Adicionar campos opcionais apenas se tiverem valores
+      if (escalaServicoExterno && escalaServicoExterno.trim() !== '') {
+        livroData.escalaServicoExterno = escalaServicoExterno;
+      }
+      if (escalaPermanencia && escalaPermanencia.length > 0) {
+        livroData.escalaPermanencia = escalaPermanencia;
+      }
+      if (escalaRonda && escalaRonda.length > 0) {
+        livroData.escalaRonda = escalaRonda;
+      }
+      if (controleKm && controleKm.length > 0) {
+        livroData.controleKm = controleKm;
+      }
 
       if (livroId) {
         // Atualizar existente

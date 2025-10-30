@@ -216,21 +216,28 @@ const Secao05ControleKmForm = ({
                     {calcularLKm(viatura)}
                   </TableCell>
                 <TableCell>
-                  <PolicialSearchCombobox
-                    value={viatura.motoristaId || ''}
-                    onSelect={(policialData) => {
-                      if (policialData) {
-                        atualizarViatura(viatura.placa, 'motoristaId', policialData.id);
-                        atualizarViatura(viatura.placa, 'motoristaNome', 
-                          `${policialData.posto} ${policialData.numeral} ${policialData.nomeGuerra}`.trim()
-                        );
-                      } else {
-                        atualizarViatura(viatura.placa, 'motoristaId', '');
-                        atualizarViatura(viatura.placa, 'motoristaNome', '');
-                      }
-                    }}
-                    placeholder="Selecionar motorista..."
-                  />
+                  <div className="flex items-center gap-2">
+                    <PolicialSearchCombobox
+                      value={viatura.motoristaId || ''}
+                      onSelect={(policialData) => {
+                        if (policialData) {
+                          atualizarViatura(viatura.placa, 'motoristaId', policialData.id);
+                          atualizarViatura(viatura.placa, 'motoristaNome', 
+                            `${policialData.posto} ${policialData.numeral} ${policialData.nomeGuerra}`.trim()
+                          );
+                        } else {
+                          atualizarViatura(viatura.placa, 'motoristaId', '');
+                          atualizarViatura(viatura.placa, 'motoristaNome', '');
+                        }
+                      }}
+                      compact
+                    />
+                    {viatura.motoristaNome && (
+                      <span className="text-sm font-medium text-foreground">
+                        {viatura.motoristaNome}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
                 </TableRow>
               ))}
