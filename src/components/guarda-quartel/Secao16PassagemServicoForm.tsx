@@ -20,14 +20,21 @@ const Secao16PassagemServicoForm = ({
   
   // Buscar Oficial de Dia automaticamente da Seção 01
   const buscarOficialDia = (): any | null => {
+    console.log('🔍 Buscando Oficial de Dia...', { escalaServicoInterno });
+    
     const funcaoOficialDia = escalaServicoInterno.find(
       f => f.nome === 'Oficial de Dia/Operações' && f.policiais && f.policiais.length > 0
     );
     
+    console.log('📋 Função encontrada:', funcaoOficialDia);
+    
     if (funcaoOficialDia && funcaoOficialDia.policiais.length > 0) {
-      return funcaoOficialDia.policiais[0];
+      const oficial = funcaoOficialDia.policiais[0];
+      console.log('👮 Oficial encontrado:', oficial);
+      return oficial;
     }
     
+    console.log('⚠️ Nenhum oficial encontrado');
     return null;
   };
 

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, FileDown, CheckCircle, History, FileSignature } from 'lucide-react';
+import { ArrowLeft, Save, FileDown, CheckCircle, History } from 'lucide-react';
 import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
@@ -26,7 +26,6 @@ import Secao13RemanejamentosServicoForm, { RemanejamentoServico } from './Secao1
 import Secao14AtividadesOperacionaisForm, { AtividadeOperacional } from './Secao14AtividadesOperacionaisForm';
 import Secao15OcorrenciasForm, { Ocorrencia } from './Secao15OcorrenciasForm';
 import Secao16PassagemServicoForm from './Secao16PassagemServicoForm';
-import ModalAssinaturaLivroGuarda from './ModalAssinaturaLivroGuarda';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,13 +70,6 @@ const LivroGuardaPage = () => {
     texto: '',
     dataPassagem: ''
   });
-  
-  // Estados de assinatura e modais
-  const [assinatura, setAssinatura] = useState<{
-    policial: any;
-    funcao: string;
-  } | null>(null);
-  const [modalAssinaturaAberto, setModalAssinaturaAberto] = useState(false);
   
   const [salvando, setSalvando] = useState(false);
   const [gerando, setGerando] = useState(false);
@@ -171,7 +163,6 @@ const LivroGuardaPage = () => {
         atividadesOperacionais,
         ocorrencias,
         passagemServico,
-        assinatura,
       };
 
       Object.entries(camposOpcionais).forEach(([key, value]) => {
@@ -273,14 +264,6 @@ const LivroGuardaPage = () => {
               >
                 <History className="h-4 w-4 mr-2" />
                 Histórico
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setModalAssinaturaAberto(true)}
-              >
-                <FileSignature className="h-4 w-4 mr-2" />
-                Assinar Documento
               </Button>
               <Button
                 variant="outline"
@@ -413,17 +396,6 @@ const LivroGuardaPage = () => {
           escalaServicoInterno={escalaServicoInterno}
         />
       </main>
-
-      {/* Modal de Assinatura */}
-      <ModalAssinaturaLivroGuarda
-        isOpen={modalAssinaturaAberto}
-        onClose={() => setModalAssinaturaAberto(false)}
-        onConfirm={(assinaturaData) => {
-          setAssinatura(assinaturaData);
-          setModalAssinaturaAberto(false);
-          toast.success('Assinatura adicionada com sucesso!');
-        }}
-      />
 
       {/* Dialog de Confirmação */}
       <AlertDialog open={showConcluirDialog} onOpenChange={setShowConcluirDialog}>
