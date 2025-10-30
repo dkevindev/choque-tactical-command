@@ -21,7 +21,7 @@ const FuncaoCard = ({ funcao, onUpdate, onRemove }: FuncaoCardProps) => {
     const novoPolicialVazio: PolicialEscalado = {
       id: '',
       posto: '',
-      matricula: '',
+      numeral: '',
       nomeGuerra: '',
       horario: '',
       observacao: '',
@@ -56,7 +56,7 @@ const FuncaoCard = ({ funcao, onUpdate, onRemove }: FuncaoCardProps) => {
       atualizarPolicial(index, {
         id: policialData.id,
         posto: policialData.posto,
-        matricula: policialData.matricula,
+        numeral: policialData.numeral ? String(policialData.numeral) : '',
         nomeGuerra: policialData.nomeGuerra,
       });
     }
@@ -139,7 +139,7 @@ const FuncaoCard = ({ funcao, onUpdate, onRemove }: FuncaoCardProps) => {
                     {policial.id && (
                       <div className="p-3 bg-muted rounded-md">
                         <p className="text-sm font-medium">
-                          {policial.posto} {policial.matricula} {policial.nomeGuerra}
+                          {policial.posto} {policial.numeral} {policial.nomeGuerra}
                         </p>
                       </div>
                     )}

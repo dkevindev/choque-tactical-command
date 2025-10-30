@@ -72,10 +72,10 @@ const PolicialSearchCombobox = ({
   };
 
   const formatarPolicialParaExibicao = (policial: PolicialData): string => {
-    const { posto, matricula, nomeGuerra } = policial;
+    const { posto, numeral, nomeGuerra } = policial;
     
-    if (matricula) {
-      return `${posto} ${matricula} ${nomeGuerra}`.trim();
+    if (numeral) {
+      return `${posto} ${numeral} ${nomeGuerra}`.trim();
     } else {
       return `${posto} ${nomeGuerra}`.trim();
     }

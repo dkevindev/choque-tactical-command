@@ -9,11 +9,15 @@ import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestor
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 import Secao01EscalaInternoForm from './Secao01EscalaInternoForm';
+import Secao02EscalaExternoForm from './Secao02EscalaExternoForm';
+import Secao03PermanenciaForm, { PolicialPermanencia } from './Secao03PermanenciaForm';
+import Secao04RondaForm, { PolicialRonda } from './Secao04RondaForm';
+import Secao05ControleKmForm, { ControleKmViatura } from './Secao05ControleKmForm';
 
 export interface PolicialEscalado {
   id: string;
   posto: string;
-  matricula: string;
+  numeral: string;
   nomeGuerra: string;
   horario?: string;
   observacao?: string;
@@ -35,6 +39,10 @@ export interface LivroGuarda {
   status: 'em_andamento' | 'finalizado';
   oficialResponsavel: string;
   escalaServicoInterno: FuncaoServico[];
+  escalaServicoExterno?: string;
+  escalaPermanencia?: PolicialPermanencia[];
+  escalaRonda?: PolicialRonda[];
+  controleKm?: ControleKmViatura[];
 }
 
 const LivroGuardaPage = () => {
@@ -45,6 +53,10 @@ const LivroGuardaPage = () => {
   });
   const [livroId, setLivroId] = useState<string | null>(null);
   const [escalaServicoInterno, setEscalaServicoInterno] = useState<FuncaoServico[]>([]);
+  const [escalaServicoExterno, setEscalaServicoExterno] = useState<string>('');
+  const [escalaPermanencia, setEscalaPermanencia] = useState<PolicialPermanencia[]>([]);
+  const [escalaRonda, setEscalaRonda] = useState<PolicialRonda[]>([]);
+  const [controleKm, setControleKm] = useState<ControleKmViatura[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [gerando, setGerando] = useState(false);
 
@@ -57,6 +69,10 @@ const LivroGuardaPage = () => {
         status: 'em_andamento',
         oficialResponsavel: 'current_user_id', // TODO: Pegar do contexto de auth
         escalaServicoInterno,
+        escalaServicoExterno,
+        escalaPermanencia,
+        escalaRonda,
+        controleKm,
       };
 
       if (livroId) {
@@ -198,14 +214,38 @@ const LivroGuardaPage = () => {
           setEscalaServicoInterno={setEscalaServicoInterno}
         />
 
-        {/* TODO: Adicionar demais seções aqui */}
-        <Card className="mt-6 border-dashed">
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">
-              Demais seções do livro da guarda serão implementadas em breve
-            </p>
-          </CardContent>
-        </Card>
+        {/* Seção 02 - Escala de Serviço Externo */}
+        <div className="mt-6">
+          <Secao02EscalaExternoForm
+            dataRelatorio={dataRelatorio}
+            texto={escalaServicoExterno}
+            setTexto={setEscalaServicoExterno}
+          />
+        </div>
+
+        {/* Seção 03 - Escala de Permanência */}
+        <div className="mt-6">
+          <Secao03PermanenciaForm
+            escalaPermanencia={escalaPermanencia}
+            setEscalaPermanencia={setEscalaPermanencia}
+          />
+        </div>
+
+        {/* Seção 04 - Escala de Ronda */}
+        <div className="mt-6">
+          <Secao04RondaForm
+            escalaRonda={escalaRonda}
+            setEscalaRonda={setEscalaRonda}
+          />
+        </div>
+
+        {/* Seção 05 - Controle de Quilometragem */}
+        <div className="mt-6">
+          <Secao05ControleKmForm
+            controleKm={controleKm}
+            setControleKm={setControleKm}
+          />
+        </div>
       </main>
     </div>
   );

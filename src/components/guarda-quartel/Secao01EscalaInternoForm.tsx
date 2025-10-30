@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, ClipboardList } from 'lucide-react';
+import { Plus, ClipboardList, ChevronDown } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import FuncaoCard from './FuncaoCard';
 import { FuncaoServico } from './LivroGuardaPage';
 import {
@@ -41,6 +46,7 @@ const Secao01EscalaInternoForm = ({
 }: Secao01EscalaInternoFormProps) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [nomeFuncaoCustomizada, setNomeFuncaoCustomizada] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
 
   // Inicializar com funções pré-definidas na primeira vez
   useEffect(() => {
@@ -85,17 +91,24 @@ const Secao01EscalaInternoForm = ({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ClipboardList className="h-5 w-5" />
-          01. ESCALA DE SERVIÇO INTERNO (24h)
-        </CardTitle>
-        <CardDescription>
-          Selecione os policiais escalados para cada função do serviço interno
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                01. ESCALA DE SERVIÇO INTERNO (24h)
+              </div>
+              <ChevronDown className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </CardTitle>
+            <CardDescription>
+              Selecione os policiais escalados para cada função do serviço interno
+            </CardDescription>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="space-y-4 pt-6">
         {escalaServicoInterno.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-muted-foreground mb-4">Nenhuma função cadastrada</p>
@@ -153,8 +166,10 @@ const Secao01EscalaInternoForm = ({
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </CardContent>
-    </Card>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 };
 
