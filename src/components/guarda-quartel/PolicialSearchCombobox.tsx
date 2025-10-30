@@ -124,12 +124,13 @@ const PolicialSearchCombobox = ({
             value={searchTerm}
             onValueChange={setSearchTerm}
           />
-          <CommandEmpty>
-            {loading ? 'Carregando...' : 'Nenhum policial encontrado.'}
-          </CommandEmpty>
-          <CommandGroup className="max-h-[300px] overflow-auto">
-            {filteredPoliciais.length > 0 ? (
-              filteredPoliciais.map((policial) => (
+          {filteredPoliciais.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              {loading ? 'Carregando...' : 'Nenhum policial encontrado.'}
+            </div>
+          ) : (
+            <CommandGroup className="max-h-[300px] overflow-auto">
+              {filteredPoliciais.map((policial) => (
                 <CommandItem
                   key={policial.id}
                   value={policial.id}
@@ -154,9 +155,9 @@ const PolicialSearchCombobox = ({
                     </span>
                   </div>
                 </CommandItem>
-              ))
-            ) : null}
-          </CommandGroup>
+              ))}
+            </CommandGroup>
+          )}
         </Command>
       </PopoverContent>
     </Popover>
