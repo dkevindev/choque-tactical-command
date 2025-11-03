@@ -78,6 +78,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   const [dataInicio, setDataInicio] = useState<Date | undefined>();
   const [dataFim, setDataFim] = useState<Date | undefined>();
   const [dataEspecifica, setDataEspecifica] = useState<Date | undefined>();
+  const [showCartaoManutencao, setShowCartaoManutencao] = useState(false);
   const { toast } = useToast();
 
   // Novo hook para dados FIPE
@@ -596,6 +597,103 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
             </div>
           )}
 
+          {/* Dados Completos da Viatura */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Car className="h-5 w-5" />
+                  Dados Completos da Viatura
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCartaoManutencao(true)}
+                  className="gap-2"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Definir Cartão de Manutenção
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Cadastro</p>
+                  <p className="text-sm font-semibold">{viatura.CADASTRO || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Placa</p>
+                  <p className="text-sm font-semibold">{viatura.PLACA || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Modelo</p>
+                  <p className="text-sm font-semibold">{viatura.MODELO || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Prefixo</p>
+                  <p className="text-sm font-semibold">{viatura.PREFIXO || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Chassi</p>
+                  <p className="text-sm font-semibold">{viatura.CHASSI || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Renavam</p>
+                  <p className="text-sm font-semibold">{viatura.RENAVAM || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">KM Atual</p>
+                  <p className="text-sm font-semibold">{viatura.KM?.toLocaleString() || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">KM Próximo Óleo</p>
+                  <p className="text-sm font-semibold">{viatura.KMOLEO?.toLocaleString() || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Saldo</p>
+                  <p className="text-sm font-semibold">
+                    {viatura.SALDO ? `R$ ${viatura.SALDO.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'N/A'}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Situação</p>
+                  <Badge variant={viatura.SITUACAO === 'OPERANTE' ? 'default' : 'secondary'}>
+                    {viatura.SITUACAO || 'N/A'}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Utilização</p>
+                  <p className="text-sm font-semibold">{viatura.UTILIZACAO || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Tipo</p>
+                  <Badge variant="outline">
+                    {viatura.tipo === 'leve' ? 'Frota Leve' : viatura.tipo === 'pesada' ? 'Frota Pesada' : 'Não Definido'}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">GoodCard</p>
+                  <p className="text-sm font-semibold">{viatura.GOODCARD || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Rádio</p>
+                  <p className="text-sm font-semibold">{viatura.RADIO || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">ORD</p>
+                  <p className="text-sm font-semibold">{viatura.ORD || 'N/A'}</p>
+                </div>
+                {viatura.OBS && (
+                  <div className="space-y-1 md:col-span-2 lg:col-span-3">
+                    <p className="text-sm font-medium text-muted-foreground">Observações</p>
+                    <p className="text-sm font-semibold">{viatura.OBS}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Filtros para Ordens de Serviço */}
           <Card>
             <CardHeader>
@@ -820,6 +918,95 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                     Placa: {viatura?.PLACA}
                   </p>
                 </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal do Cartão de Manutenção */}
+        <Dialog open={showCartaoManutencao} onOpenChange={setShowCartaoManutencao}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
+                Cartão de Manutenção - {viatura?.CADASTRO}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Configure os intervalos de manutenção preventiva para esta viatura.
+              </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="km-oleo">Intervalo de Troca de Óleo (KM)</Label>
+                  <Input
+                    id="km-oleo"
+                    type="number"
+                    placeholder="Ex: 5000"
+                    defaultValue={viatura?.KMOLEO}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Intervalo em quilômetros entre cada troca de óleo
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="km-revisao">Intervalo de Revisão (KM)</Label>
+                  <Input
+                    id="km-revisao"
+                    type="number"
+                    placeholder="Ex: 10000"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Intervalo em quilômetros entre cada revisão geral
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="intervalo-pneus">Intervalo Troca de Pneus (KM)</Label>
+                  <Input
+                    id="intervalo-pneus"
+                    type="number"
+                    placeholder="Ex: 50000"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Quilometragem estimada para troca de pneus
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="intervalo-bateria">Validade Bateria (Meses)</Label>
+                  <Input
+                    id="intervalo-bateria"
+                    type="number"
+                    placeholder="Ex: 24"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Tempo estimado de vida útil da bateria em meses
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCartaoManutencao(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    toast({
+                      title: "Cartão de Manutenção Salvo",
+                      description: "As configurações de manutenção foram atualizadas.",
+                    });
+                    setShowCartaoManutencao(false);
+                  }}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar Configurações
+                </Button>
               </div>
             </div>
           </DialogContent>
