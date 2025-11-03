@@ -79,6 +79,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   const [dataFim, setDataFim] = useState<Date | undefined>();
   const [dataEspecifica, setDataEspecifica] = useState<Date | undefined>();
   const [showCartaoManutencao, setShowCartaoManutencao] = useState(false);
+  const [numeroCartaoManutencao, setNumeroCartaoManutencao] = useState('');
   const { toast } = useToast();
 
   // Novo hook para dados FIPE
@@ -92,6 +93,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         modelo: viatura.MODELO || '',
         placa: viatura.PLACA || ''
       });
+      setNumeroCartaoManutencao((viatura as any).cartaoManutencao || '');
     }
   }, [viatura, isOpen]);
 
@@ -479,123 +481,6 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
             )}
           </div>
 
-          {/* Informações da Viatura */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Car className="h-6 w-6 text-primary" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Modelo</p>
-                      {isEditing ? (
-                        <Input
-                          value={editData.modelo}
-                          onChange={(e) => setEditData(prev => ({ ...prev, modelo: e.target.value }))}
-                          className="h-6 text-sm font-semibold"
-                        />
-                      ) : (
-                        <p className="font-semibold">{viatura.MODELO}</p>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsEditing(!isEditing)}
-                  >
-                    {isEditing ? <X className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Eye className="h-6 w-6 text-purple-500" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Cadastro</p>
-                      {isEditing ? (
-                        <Input
-                          value={editData.cadastro}
-                          onChange={(e) => setEditData(prev => ({ ...prev, cadastro: e.target.value }))}
-                          className="h-6 text-sm font-semibold"
-                        />
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          className="p-0 h-auto font-semibold hover:bg-transparent"
-                          onClick={() => setShowCadastroModal(true)}
-                        >
-                          {viatura.CADASTRO || 'N/A'}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Fuel className="h-6 w-6 text-blue-500" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">KM Atual</p>
-                    <p className="font-semibold">{viatura.KM.toLocaleString()}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Wrench className="h-6 w-6 text-orange-500" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Próximo Óleo</p>
-                    <p className="font-semibold">{viatura.KMOLEO.toLocaleString()}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="h-6 w-6 text-green-500" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Placa</p>
-                      {isEditing ? (
-                        <Input
-                          value={editData.placa}
-                          onChange={(e) => setEditData(prev => ({ ...prev, placa: e.target.value }))}
-                          className="h-6 text-sm font-semibold"
-                        />
-                      ) : (
-                        <p className="font-semibold">{viatura.PLACA}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {isEditing && (
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleEditViatura}>
-                <Save className="h-4 w-4 mr-2" />
-                Salvar Alterações
-              </Button>
-            </div>
-          )}
 
           {/* Dados Completos da Viatura */}
           <Card>
@@ -683,6 +568,10 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">ORD</p>
                   <p className="text-sm font-semibold">{viatura.ORD || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Cartão de Manutenção</p>
+                  <p className="text-sm font-semibold">{(viatura as any).cartaoManutencao || 'N/A'}</p>
                 </div>
                 {viatura.OBS && (
                   <div className="space-y-1 md:col-span-2 lg:col-span-3">
@@ -925,7 +814,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
 
         {/* Modal do Cartão de Manutenção */}
         <Dialog open={showCartaoManutencao} onOpenChange={setShowCartaoManutencao}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Wrench className="h-5 w-5" />
@@ -934,58 +823,21 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Configure os intervalos de manutenção preventiva para esta viatura.
+                Cadastre o número do cartão de manutenção desta viatura.
               </p>
               
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="km-oleo">Intervalo de Troca de Óleo (KM)</Label>
-                  <Input
-                    id="km-oleo"
-                    type="number"
-                    placeholder="Ex: 5000"
-                    defaultValue={viatura?.KMOLEO}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Intervalo em quilômetros entre cada troca de óleo
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="km-revisao">Intervalo de Revisão (KM)</Label>
-                  <Input
-                    id="km-revisao"
-                    type="number"
-                    placeholder="Ex: 10000"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Intervalo em quilômetros entre cada revisão geral
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="intervalo-pneus">Intervalo Troca de Pneus (KM)</Label>
-                  <Input
-                    id="intervalo-pneus"
-                    type="number"
-                    placeholder="Ex: 50000"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Quilometragem estimada para troca de pneus
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="intervalo-bateria">Validade Bateria (Meses)</Label>
-                  <Input
-                    id="intervalo-bateria"
-                    type="number"
-                    placeholder="Ex: 24"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Tempo estimado de vida útil da bateria em meses
-                  </p>
-                </div>
+              <div>
+                <Label htmlFor="numero-cartao">Número do Cartão</Label>
+                <Input
+                  id="numero-cartao"
+                  type="text"
+                  placeholder="Ex: 123456"
+                  value={numeroCartaoManutencao}
+                  onChange={(e) => setNumeroCartaoManutencao(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Digite o número identificador do cartão de manutenção
+                </p>
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
@@ -996,16 +848,32 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   Cancelar
                 </Button>
                 <Button
-                  onClick={() => {
-                    toast({
-                      title: "Cartão de Manutenção Salvo",
-                      description: "As configurações de manutenção foram atualizadas.",
-                    });
-                    setShowCartaoManutencao(false);
+                  onClick={async () => {
+                    if (!viatura) return;
+                    
+                    try {
+                      const docRef = doc(db, 'frota', viatura.id);
+                      await updateDoc(docRef, {
+                        cartaoManutencao: numeroCartaoManutencao
+                      });
+                      
+                      toast({
+                        title: "Cartão de Manutenção Salvo",
+                        description: "O número do cartão foi cadastrado com sucesso.",
+                      });
+                      setShowCartaoManutencao(false);
+                    } catch (error) {
+                      console.error('Erro ao salvar cartão:', error);
+                      toast({
+                        title: "Erro",
+                        description: "Erro ao salvar o número do cartão.",
+                        variant: "destructive",
+                      });
+                    }
                   }}
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  Salvar Configurações
+                  Salvar
                 </Button>
               </div>
             </div>
