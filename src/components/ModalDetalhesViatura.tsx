@@ -496,15 +496,43 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <Car className="h-5 w-5" />
                   Dados Completos da Viatura
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowCartaoManutencao(true)}
-                  className="gap-2"
-                >
-                  <Wrench className="h-4 w-4" />
-                  Definir Cartão de Manutenção
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!numeroCartaoManutencao || !bandeiraCartao || !nomeCondutor || !matriculaCondutor) {
+                        toast({
+                          title: "Dados Incompletos",
+                          description: "Configure o cartão de manutenção primeiro.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      const textoWhatsApp = `${viatura?.CADASTRO} - ${viatura?.PLACA}\nCartão: ${numeroCartaoManutencao} - ${bandeiraCartao}\nCondutor: ${nomeCondutor}\nMatrícula: ${matriculaCondutor}`;
+                      const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(textoWhatsApp)}`;
+                      window.open(urlWhatsApp, '_blank');
+                      
+                      toast({
+                        title: "Cartão Exportado",
+                        description: "Mensagem preparada para WhatsApp.",
+                      });
+                    }}
+                    className="gap-2"
+                  >
+                    Exportar Cartão
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCartaoManutencao(true)}
+                    className="gap-2"
+                  >
+                    <Wrench className="h-4 w-4" />
+                    Definir Cartão
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -863,7 +891,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Volus">Volus</SelectItem>
-                    <SelectItem value="TicketLog">TicketLog</SelectItem>
+                    <SelectItem value="Prime">Prime</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -890,27 +918,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                 />
               </div>
 
-              <div className="flex justify-between gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (!numeroCartaoManutencao || !bandeiraCartao || !nomeCondutor || !matriculaCondutor) {
-                      toast({
-                        title: "Dados Incompletos",
-                        description: "Preencha todos os campos antes de exportar.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-
-                    const textoWhatsApp = `${viatura?.CADASTRO} - ${viatura?.PLACA}\nCartão: ${numeroCartaoManutencao} - ${bandeiraCartao}\nCondutor: ${nomeCondutor}\nMatrícula: ${matriculaCondutor}`;
-                    const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(textoWhatsApp)}`;
-                    window.open(urlWhatsApp, '_blank');
-                  }}
-                  className="flex-1"
-                >
-                  Exportar Cartão
-                </Button>
+              <div className="flex justify-end gap-2 pt-4">
                 <Button
                   variant="outline"
                   onClick={() => setShowCartaoManutencao(false)}

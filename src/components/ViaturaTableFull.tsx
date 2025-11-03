@@ -67,15 +67,9 @@ const ViaturaTableFull = () => {
     fetchViaturas();
   }, []);
 
-  const getStatusBadge = (viatura: Viatura) => {
+  const getKmRestante = (viatura: Viatura) => {
     const kmRestante = (viatura.KMOLEO ?? 0) - (viatura.KM ?? 0);
-
-    if (kmRestante <= 1000) {
-      return <Badge variant="destructive">CRÍTICO</Badge>;
-    } else if (kmRestante <= 3000) {
-      return <Badge variant="secondary">ATENÇÃO</Badge>;
-    }
-    return <Badge variant="default">OK</Badge>;
+    return `${kmRestante.toLocaleString()} km`;
   };
 
   const handleUpdateSingle = async () => {
@@ -163,54 +157,59 @@ const ViaturaTableFull = () => {
         </Button>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>MODELO</TableHead>
-            <TableHead>PLACA</TableHead>
-            <TableHead>KM ATUAL</TableHead>
-            <TableHead>TROCA ÓLEO</TableHead>
-            <TableHead>STATUS</TableHead>
-            <TableHead>AÇÕES</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {viaturas.map((viatura) => (
-            <TableRow key={viatura.id}>
-              <TableCell className="font-medium">{viatura.MODELO}</TableCell>
-              <TableCell>{viatura.PLACA}</TableCell>
+      <div className="rounded-lg border border-border/50 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="font-semibold">MODELO</TableHead>
+              <TableHead className="font-semibold">PLACA</TableHead>
+              <TableHead className="font-semibold">KM ATUAL</TableHead>
+              <TableHead className="font-semibold">TROCA ÓLEO</TableHead>
+              <TableHead className="font-semibold">KM RESTANTE</TableHead>
+              <TableHead className="font-semibold text-right">AÇÕES</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {viaturas.map((viatura) => (
+              <TableRow key={viatura.id} className="hover:bg-muted/30 transition-colors">
+                <TableCell className="font-medium">{viatura.MODELO}</TableCell>
+                <TableCell className="font-mono">{viatura.PLACA}</TableCell>
 
-              <TableCell>
-                {isEditingAll ? (
-                  <Input
-                    type="number"
-                    value={editValues[viatura.id]?.KM ?? ''}
-                    onChange={(e) =>
-                      handleEditValueChange(viatura.id, 'KM', e.target.value)
-                    }
-                  />
-                ) : (
-                  `${viatura.KM.toLocaleString()} km`
-                )}
-              </TableCell>
+                <TableCell>
+                  {isEditingAll ? (
+                    <Input
+                      type="number"
+                      value={editValues[viatura.id]?.KM ?? ''}
+                      onChange={(e) =>
+                        handleEditValueChange(viatura.id, 'KM', e.target.value)
+                      }
+                      className="max-w-[140px]"
+                    />
+                  ) : (
+                    <span className="text-primary font-medium">{viatura.KM.toLocaleString()} km</span>
+                  )}
+                </TableCell>
 
-              <TableCell>
-                {isEditingAll ? (
-                  <Input
-                    type="number"
-                    value={editValues[viatura.id]?.KMOLEO ?? ''}
-                    onChange={(e) =>
-                      handleEditValueChange(viatura.id, 'KMOLEO', e.target.value)
-                    }
-                  />
-                ) : (
-                  `${viatura.KMOLEO.toLocaleString()} km`
-                )}
-              </TableCell>
+                <TableCell>
+                  {isEditingAll ? (
+                    <Input
+                      type="number"
+                      value={editValues[viatura.id]?.KMOLEO ?? ''}
+                      onChange={(e) =>
+                        handleEditValueChange(viatura.id, 'KMOLEO', e.target.value)
+                      }
+                      className="max-w-[140px]"
+                    />
+                  ) : (
+                    <span className="font-medium">{viatura.KMOLEO.toLocaleString()} km</span>
+                  )}
+                </TableCell>
 
-              <TableCell>{getStatusBadge(viatura)}</TableCell>
+                <TableCell>
+                  <span className="text-muted-foreground">{getKmRestante(viatura)}</span>
+                </TableCell>
 
-              <TableCell>
+                <TableCell className="text-right">
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button
@@ -273,8 +272,9 @@ const ViaturaTableFull = () => {
               </TableCell>
             </TableRow>
           ))}
-        </TableBody>
-      </Table>
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 };
