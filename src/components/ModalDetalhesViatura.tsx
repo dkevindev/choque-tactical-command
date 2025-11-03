@@ -80,6 +80,9 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   const [dataEspecifica, setDataEspecifica] = useState<Date | undefined>();
   const [showCartaoManutencao, setShowCartaoManutencao] = useState(false);
   const [numeroCartaoManutencao, setNumeroCartaoManutencao] = useState('');
+  const [bandeiraCartao, setBandeiraCartao] = useState('');
+  const [nomeCondutor, setNomeCondutor] = useState('');
+  const [matriculaCondutor, setMatriculaCondutor] = useState('');
   const { toast } = useToast();
 
   // Novo hook para dados FIPE
@@ -94,6 +97,9 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         placa: viatura.PLACA || ''
       });
       setNumeroCartaoManutencao((viatura as any).cartaoManutencao || '');
+      setBandeiraCartao((viatura as any).bandeiraCartao || '');
+      setNomeCondutor((viatura as any).nomeCondutor || '');
+      setMatriculaCondutor((viatura as any).matriculaCondutor || '');
     }
   }, [viatura, isOpen]);
 
@@ -573,6 +579,18 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <p className="text-sm font-medium text-muted-foreground">Cartão de Manutenção</p>
                   <p className="text-sm font-semibold">{(viatura as any).cartaoManutencao || 'N/A'}</p>
                 </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Bandeira do Cartão</p>
+                  <p className="text-sm font-semibold">{(viatura as any).bandeiraCartao || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Condutor</p>
+                  <p className="text-sm font-semibold">{(viatura as any).nomeCondutor || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Matrícula do Condutor</p>
+                  <p className="text-sm font-semibold">{(viatura as any).matriculaCondutor || 'N/A'}</p>
+                </div>
                 {viatura.OBS && (
                   <div className="space-y-1 md:col-span-2 lg:col-span-3">
                     <p className="text-sm font-medium text-muted-foreground">Observações</p>
@@ -823,7 +841,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Cadastre o número do cartão de manutenção desta viatura.
+                Cadastre as informações do cartão de manutenção desta viatura.
               </p>
               
               <div>
@@ -835,12 +853,64 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   value={numeroCartaoManutencao}
                   onChange={(e) => setNumeroCartaoManutencao(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Digite o número identificador do cartão de manutenção
-                </p>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4">
+              <div>
+                <Label htmlFor="bandeira-cartao">Bandeira</Label>
+                <Select value={bandeiraCartao} onValueChange={setBandeiraCartao}>
+                  <SelectTrigger id="bandeira-cartao">
+                    <SelectValue placeholder="Selecione a bandeira" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Volus">Volus</SelectItem>
+                    <SelectItem value="TicketLog">TicketLog</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="nome-condutor">Nome do Condutor</Label>
+                <Input
+                  id="nome-condutor"
+                  type="text"
+                  placeholder="Nome completo"
+                  value={nomeCondutor}
+                  onChange={(e) => setNomeCondutor(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="matricula-condutor">Matrícula</Label>
+                <Input
+                  id="matricula-condutor"
+                  type="text"
+                  placeholder="Número da matrícula"
+                  value={matriculaCondutor}
+                  onChange={(e) => setMatriculaCondutor(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-between gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (!numeroCartaoManutencao || !bandeiraCartao || !nomeCondutor || !matriculaCondutor) {
+                      toast({
+                        title: "Dados Incompletos",
+                        description: "Preencha todos os campos antes de exportar.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    const textoWhatsApp = `${viatura?.CADASTRO} - ${viatura?.PLACA}\nCartão: ${numeroCartaoManutencao} - ${bandeiraCartao}\nCondutor: ${nomeCondutor}\nMatrícula: ${matriculaCondutor}`;
+                    const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(textoWhatsApp)}`;
+                    window.open(urlWhatsApp, '_blank');
+                  }}
+                  className="flex-1"
+                >
+                  Exportar Cartão
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setShowCartaoManutencao(false)}
@@ -854,19 +924,22 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                     try {
                       const docRef = doc(db, 'frota', viatura.id);
                       await updateDoc(docRef, {
-                        cartaoManutencao: numeroCartaoManutencao
+                        cartaoManutencao: numeroCartaoManutencao,
+                        bandeiraCartao: bandeiraCartao,
+                        nomeCondutor: nomeCondutor,
+                        matriculaCondutor: matriculaCondutor
                       });
                       
                       toast({
                         title: "Cartão de Manutenção Salvo",
-                        description: "O número do cartão foi cadastrado com sucesso.",
+                        description: "Os dados do cartão foram cadastrados com sucesso.",
                       });
                       setShowCartaoManutencao(false);
                     } catch (error) {
                       console.error('Erro ao salvar cartão:', error);
                       toast({
                         title: "Erro",
-                        description: "Erro ao salvar o número do cartão.",
+                        description: "Erro ao salvar os dados do cartão.",
                         variant: "destructive",
                       });
                     }
