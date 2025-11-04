@@ -21,6 +21,9 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
   const [diasSelecionados, setDiasSelecionados] = useState<string[]>([]);
   const [turnosPorDia, setTurnosPorDia] = useState(1);
   const [maxInstrutores, setMaxInstrutores] = useState(2);
+  const [turnosNomeclatura, setTurnosNomeclatura] = useState<string[]>(['Manhã', 'Tarde']);
+  const [usaTurmas, setUsaTurmas] = useState(false);
+  const [usaFrequencia, setUsaFrequencia] = useState(true);
   const [instrutores, setInstrutores] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -46,6 +49,9 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
         setDiasSelecionados(config.diasSemana || []);
         setTurnosPorDia(config.turnosPorDia || 1);
         setMaxInstrutores(config.maxInstrutoresPorTurno || 2);
+        setTurnosNomeclatura(config.turnosNomeclatura || ['Manhã', 'Tarde', 'Noite', 'Noturno'].slice(0, config.turnosPorDia || 2));
+        setUsaTurmas(config.usaTurmas || false);
+        setUsaFrequencia(config.usaFrequencia !== undefined ? config.usaFrequencia : true);
       }
     } catch (error) {
       console.error('Erro ao carregar configuração:', error);
@@ -96,6 +102,12 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
     }
   };
 
+  const atualizarNomeTurno = (index: number, nome: string) => {
+    const novaNomeclatura = [...turnosNomeclatura];
+    novaNomeclatura[index] = nome;
+    setTurnosNomeclatura(novaNomeclatura);
+  };
+
   const salvarConfiguracao = async () => {
     try {
       setLoading(true);
@@ -103,6 +115,9 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
         diasSemana: diasSelecionados,
         turnosPorDia,
         maxInstrutoresPorTurno: maxInstrutores,
+        turnosNomeclatura: turnosNomeclatura.slice(0, turnosPorDia),
+        usaTurmas,
+        usaFrequencia,
         duracaoAula: 3
       };
       
@@ -204,12 +219,64 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
               min="1"
               max="4"
               value={turnosPorDia}
-              onChange={(e) => setTurnosPorDia(Number(e.target.value))}
+              onChange={(e) => {
+                const novosT = Number(e.target.value);
+                setTurnosPorDia(novosT);
+                // Ajustar array de nomenclatura
+                const nomes = ['Manhã', 'Tarde', 'Noite', 'Noturno'];
+                setTurnosNomeclatura(nomes.slice(0, novosT));
+              }}
               className="max-w-xs"
             />
             <p className="text-sm text-muted-foreground mt-1">
               Quantidade de turnos que terão aula por dia
             </p>
+          </div>
+
+          {/* Nomenclatura dos Turnos */}
+          <div>
+            <Label className="mb-3 block">Nome dos Turnos</Label>
+            <div className="space-y-3">
+              {Array.from({ length: turnosPorDia }, (_, i) => (
+                <div key={i}>
+                  <Label htmlFor={`turno-${i}`} className="text-sm">Turno {i + 1}</Label>
+                  <Input
+                    id={`turno-${i}`}
+                    value={turnosNomeclatura[i] || ''}
+                    onChange={(e) => atualizarNomeTurno(i, e.target.value)}
+                    placeholder={`Ex: ${['Manhã', 'Tarde', 'Noite', 'Noturno'][i]}`}
+                    className="max-w-xs"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Opções Avançadas */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-medium">Opções Avançadas</h3>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="usaTurmas"
+                checked={usaTurmas}
+                onCheckedChange={(checked) => setUsaTurmas(checked as boolean)}
+              />
+              <Label htmlFor="usaTurmas" className="cursor-pointer">
+                Usar sistema de turmas (dividir alunos em grupos)
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="usaFrequencia"
+                checked={usaFrequencia}
+                onCheckedChange={(checked) => setUsaFrequencia(checked as boolean)}
+              />
+              <Label htmlFor="usaFrequencia" className="cursor-pointer">
+                Controlar frequência de alunos
+              </Label>
+            </div>
           </div>
 
           {/* Max Instrutores */}

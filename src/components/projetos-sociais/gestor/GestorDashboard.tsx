@@ -8,6 +8,7 @@ import ConfiguracaoProjetoTab from './ConfiguracaoProjetoTab';
 import CadastroAlunosTab from './CadastroAlunosTab';
 import VisualizarAulasTab from './VisualizarAulasTab';
 import RelatoriosGestorTab from './RelatoriosGestorTab';
+import TurmasTab from './TurmasTab';
 
 interface GestorDashboardProps {
   projetos: any[];
@@ -113,10 +114,13 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
         </header>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className={`grid w-full ${projetoSelecionado?.configuracao?.usaTurmas ? 'grid-cols-6' : 'grid-cols-5'}`}>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="configuracao">Configuração</TabsTrigger>
             <TabsTrigger value="alunos">Alunos</TabsTrigger>
+            {projetoSelecionado?.configuracao?.usaTurmas && (
+              <TabsTrigger value="turmas">Turmas</TabsTrigger>
+            )}
             <TabsTrigger value="aulas">Aulas</TabsTrigger>
             <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
           </TabsList>
@@ -188,6 +192,12 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
           <TabsContent value="alunos">
             <CadastroAlunosTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
           </TabsContent>
+
+          {projetoSelecionado?.configuracao?.usaTurmas && (
+            <TabsContent value="turmas">
+              <TurmasTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
+            </TabsContent>
+          )}
 
           <TabsContent value="aulas">
             <VisualizarAulasTab projeto={projetoSelecionado} />

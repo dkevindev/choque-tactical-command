@@ -19,15 +19,20 @@ interface WizardProps {
 const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps) => {
   const [etapa, setEtapa] = useState(1);
   const [turnoSelecionado, setTurnoSelecionado] = useState<number | null>(null);
+  const [turmaSelecionada, setTurmaSelecionada] = useState<string | null>(null);
   const [instrutoresSelecionados, setInstrutoresSelecionados] = useState<string[]>([policialLogado?.id || policialLogado]);
   const [alunosPresentes, setAlunosPresentes] = useState<string[]>([]);
   const [instrutoresDisponiveis, setInstrutoresDisponiveis] = useState<any[]>([]);
+  const [turmas, setTurmas] = useState<any[]>([]);
   const [alunos, setAlunos] = useState<any[]>([]);
   const [searchAluno, setSearchAluno] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const projeto = projetos[0]; // Por enquanto, pega o primeiro projeto
+  const projeto = projetos[0];
   const config = projeto?.configuracao || {};
+  const usaTurmas = config.usaTurmas || false;
+  const usaFrequencia = config.usaFrequencia !== undefined ? config.usaFrequencia : true;
+  const turnosNomeclatura = config.turnosNomeclatura || ['Manhã', 'Tarde', 'Noite', 'Noturno'];
   const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
   const hoje = new Date();
   const diaAtual = diasSemana[hoje.getDay()];
@@ -37,12 +42,32 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
   console.log('Dia atual:', diaAtual);
 
   useEffect(() => {
-    if (etapa === 2) {
+    if (etapa === 2 && usaTurmas) {
+      carregarTurmas();
+    } else if ((etapa === 2 && !usaTurmas) || etapa === 3) {
       carregarInstrutores();
-    } else if (etapa === 3) {
+    } else if (etapa === (usaTurmas ? 4 : 3) && usaFrequencia) {
       carregarAlunos();
     }
   }, [etapa]);
+
+  const carregarTurmas = async () => {
+    try {
+      const q = query(
+        collection(db, 'projetos_turmas'),
+        where('projetoId', '==', projeto.id),
+        where('ativo', '==', true)
+      );
+      const snapshot = await getDocs(q);
+      const turmasData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setTurmas(turmasData);
+    } catch (error) {
+      console.error('Erro ao carregar turmas:', error);
+    }
+  };
 
   const carregarInstrutores = async () => {
     try {
@@ -82,17 +107,49 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
 
   const carregarAlunos = async () => {
     try {
-      const q = query(
-        collection(db, 'projetos_alunos'),
-        where('projetoId', '==', projeto.id),
-        where('ativo', '==', true)
-      );
-      const snapshot = await getDocs(q);
-      const alunosData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setAlunos(alunosData);
+      let q;
+      
+      if (usaTurmas && turmaSelecionada) {
+        // Buscar turma e seus alunos
+        const turmaDoc = await getDocs(
+          query(collection(db, 'projetos_turmas'), where('__name__', '==', turmaSelecionada))
+        );
+        
+        if (!turmaDoc.empty) {
+          const turmaData = turmaDoc.docs[0].data();
+          const alunosIds = turmaData.alunos || [];
+          
+          // Buscar detalhes dos alunos
+          const alunosPromises = alunosIds.map(async (alunoId: string) => {
+            const alunoSnap = await getDocs(
+              query(collection(db, 'projetos_alunos'), where('__name__', '==', alunoId))
+            );
+            if (!alunoSnap.empty) {
+              return {
+                id: alunoSnap.docs[0].id,
+                ...alunoSnap.docs[0].data()
+              };
+            }
+            return null;
+          });
+          
+          const alunosData = (await Promise.all(alunosPromises)).filter(a => a !== null);
+          setAlunos(alunosData);
+        }
+      } else {
+        // Buscar todos os alunos ativos
+        q = query(
+          collection(db, 'projetos_alunos'),
+          where('projetoId', '==', projeto.id),
+          where('ativo', '==', true)
+        );
+        const snapshot = await getDocs(q);
+        const alunosData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...(doc.data() as any)
+        }));
+        setAlunos(alunosData);
+      }
     } catch (error) {
       console.error('Erro ao carregar alunos:', error);
     }
@@ -100,7 +157,8 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
 
   const validarEtapa = () => {
     if (etapa === 1 && turnoSelecionado === null) return false;
-    if (etapa === 2 && instrutoresSelecionados.length === 0) return false;
+    if (etapa === 2 && usaTurmas && turmaSelecionada === null) return false;
+    if ((etapa === 2 && !usaTurmas || etapa === 3) && instrutoresSelecionados.length === 0) return false;
     return true;
   };
 
@@ -134,18 +192,28 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
     try {
       setLoading(true);
 
-      const aulaData = {
+      const aulaData: any = {
         projetoId: projeto.id,
         data: new Date(),
         turno: turnoSelecionado,
+        turnoNome: turnosNomeclatura[turnoSelecionado! - 1] || `Turno ${turnoSelecionado}`,
         instrutores: instrutoresSelecionados,
         instrutoresCompleto: instrutoresSelecionados.length === config.maxInstrutoresPorTurno,
-        alunosPresentes,
+        maxInstrutores: config.maxInstrutoresPorTurno,
         status: 'em_andamento',
         horaInicio: new Date(),
         horaFim: null,
-        observacoes: ''
+        observacoes: '',
+        historico: []
       };
+
+      if (usaTurmas && turmaSelecionada) {
+        aulaData.turmaId = turmaSelecionada;
+      }
+
+      if (usaFrequencia) {
+        aulaData.alunosPresentes = alunosPresentes;
+      }
 
       await addDoc(collection(db, 'projetos_aulas'), aulaData);
       
@@ -181,7 +249,7 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
     <div className="space-y-6 p-6">
       {/* Progress Bar */}
       <div className="flex items-center justify-center gap-2">
-        {[1, 2, 3].map((step) => (
+        {Array.from({ length: usaTurmas ? (usaFrequencia ? 4 : 3) : (usaFrequencia ? 3 : 2) }, (_, i) => i + 1).map((step) => (
           <div
             key={step}
             className={`h-2 flex-1 rounded-full ${
@@ -208,7 +276,7 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
                   <div>
                     <p className="text-xl font-bold">Turno {turno}</p>
                     <p className="text-sm text-muted-foreground">
-                      {turno === 1 ? 'Manhã' : turno === 2 ? 'Tarde' : 'Noite'}
+                      {turnosNomeclatura[turno - 1] || `Turno ${turno}`}
                     </p>
                   </div>
                   <ChevronRight className="h-8 w-8" />
@@ -219,8 +287,44 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
         </div>
       )}
 
-      {/* Etapa 2: Selecionar Instrutores */}
-      {etapa === 2 && (
+      {/* Etapa 2: Selecionar Turma (Se usar turmas) */}
+      {etapa === 2 && usaTurmas && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold">Selecione a Turma</h2>
+          <div className="space-y-3">
+            {turmas.map((turma) => (
+              <Card
+                key={turma.id}
+                className={`p-6 cursor-pointer hover:border-primary transition-all ${
+                  turmaSelecionada === turma.id ? 'border-primary border-2' : ''
+                }`}
+                onClick={() => setTurmaSelecionada(turma.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xl font-bold">{turma.nome}</p>
+                    {turma.descricao && (
+                      <p className="text-sm text-muted-foreground">{turma.descricao}</p>
+                    )}
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {turma.alunos?.length || 0} aluno(s)
+                    </p>
+                  </div>
+                  <ChevronRight className="h-8 w-8" />
+                </div>
+              </Card>
+            ))}
+            {turmas.length === 0 && (
+              <p className="text-center text-muted-foreground">
+                Nenhuma turma cadastrada ainda
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Etapa: Selecionar Instrutores */}
+      {((etapa === 2 && !usaTurmas) || (etapa === 3 && usaTurmas)) && (
         <div className="space-y-4">
           <h2 className="text-2xl font-bold">Instrutores</h2>
           <Alert>
@@ -258,8 +362,8 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
         </div>
       )}
 
-      {/* Etapa 3: Chamada dos Alunos */}
-      {etapa === 3 && (
+      {/* Etapa: Chamada dos Alunos (Se usar frequência) */}
+      {usaFrequencia && ((etapa === 3 && !usaTurmas) || (etapa === 4 && usaTurmas)) && (
         <div className="space-y-4">
           <h2 className="text-2xl font-bold">Chamada</h2>
           
@@ -320,11 +424,29 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
         <Button
           size="lg"
           className="flex-1"
-          onClick={etapa === 3 ? iniciarAula : proximaEtapa}
+          onClick={() => {
+            // Calcular última etapa dinamicamente
+            const ultimaEtapa = usaTurmas ? (usaFrequencia ? 4 : 3) : (usaFrequencia ? 3 : 2);
+            
+            if (etapa === ultimaEtapa) {
+              iniciarAula();
+            } else {
+              proximaEtapa();
+            }
+          }}
           disabled={!validarEtapa() || loading}
         >
-          {etapa === 3 ? (loading ? 'Iniciando...' : 'Iniciar Aula') : 'Próximo'}
-          {etapa < 3 && <ArrowRight className="ml-2" />}
+          {(() => {
+            const ultimaEtapa = usaTurmas ? (usaFrequencia ? 4 : 3) : (usaFrequencia ? 3 : 2);
+            if (etapa === ultimaEtapa) {
+              return loading ? 'Iniciando...' : 'Iniciar Aula';
+            }
+            return 'Próximo';
+          })()}
+          {(() => {
+            const ultimaEtapa = usaTurmas ? (usaFrequencia ? 4 : 3) : (usaFrequencia ? 3 : 2);
+            return etapa < ultimaEtapa && <ArrowRight className="ml-2" />;
+          })()}
         </Button>
       </div>
     </div>
