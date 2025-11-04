@@ -39,20 +39,24 @@ const PolicialCombobox = ({ onSelect, value, disabled }: PolicialComboboxProps) 
   };
 
   const getPolicialNome = (policialId: string) => {
-    const policial = policiais.find(p => p.id === policialId);
+    if (!policialId) return 'Selecionar policial...';
+    const policial = policiais.find(p => p?.id === policialId);
     if (!policial) return 'Selecionar policial...';
-    return `${policial.postGrad || ''} ${policial.numeral || ''} ${policial.nome || policial.nomeGuerra || ''}`.trim();
+    const nome = policial.nome || policial.nomeGuerra || '';
+    const parts = [policial.postGrad, policial.numeral, nome].filter(Boolean);
+    return parts.join(' ') || 'Policial';
   };
 
   const getSearchValue = (policial: any) => {
+    if (!policial) return 'policial';
     const parts = [
-      policial.postGrad || '',
-      policial.numeral || '',
-      policial.nome || '',
-      policial.nomeGuerra || '',
-      policial.matricula || ''
-    ];
-    return parts.filter(p => p).join(' ').toLowerCase();
+      policial.postGrad,
+      policial.numeral,
+      policial.nome,
+      policial.nomeGuerra,
+      policial.matricula
+    ].filter(Boolean);
+    return parts.join(' ').toLowerCase() || 'policial';
   };
 
   return (
@@ -74,34 +78,40 @@ const PolicialCombobox = ({ onSelect, value, disabled }: PolicialComboboxProps) 
           <CommandInput placeholder="Buscar policial..." />
           <CommandEmpty>Nenhum policial encontrado.</CommandEmpty>
           <CommandGroup className="max-h-64 overflow-auto">
-            {policiais.map((policial) => (
-              <CommandItem
-                key={policial.id}
-                value={getSearchValue(policial)}
-                onSelect={() => {
-                  setSelectedValue(policial.id);
-                  onSelect(policial);
-                  setOpen(false);
-                }}
-              >
-                <Check
-                  className={cn(
-                    'mr-2 h-4 w-4',
-                    selectedValue === policial.id ? 'opacity-100' : 'opacity-0'
-                  )}
-                />
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    {policial.postGrad || ''} {policial.numeral || ''} {policial.nome || policial.nomeGuerra || ''}
-                  </span>
-                  {policial.matricula && (
-                    <span className="text-xs text-muted-foreground">
-                      Matrícula: {policial.matricula}
+            {policiais.filter(p => p?.id).map((policial) => {
+              const searchValue = getSearchValue(policial);
+              const displayNome = policial.nome || policial.nomeGuerra || 'Sem nome';
+              const displayParts = [policial.postGrad, policial.numeral, displayNome].filter(Boolean);
+              
+              return (
+                <CommandItem
+                  key={policial.id}
+                  value={searchValue}
+                  onSelect={() => {
+                    setSelectedValue(policial.id);
+                    onSelect(policial);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      selectedValue === policial.id ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {displayParts.join(' ')}
                     </span>
-                  )}
-                </div>
-              </CommandItem>
-            ))}
+                    {policial.matricula && (
+                      <span className="text-xs text-muted-foreground">
+                        Matrícula: {policial.matricula}
+                      </span>
+                    )}
+                  </div>
+                </CommandItem>
+              );
+            })}
           </CommandGroup>
         </Command>
       </PopoverContent>
