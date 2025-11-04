@@ -49,7 +49,8 @@ export default function InstrutorSystem() {
             id: data.projetoId,
             nome: projetoData?.nome || '',
             descricao: projetoData?.descricao || '',
-            ativo: projetoData?.ativo || false
+            ativo: projetoData?.ativo || false,
+            configuracao: projetoData?.configuracao || {} // ✅ Incluir configuração completa
           };
         })
       );
@@ -99,5 +100,8 @@ export default function InstrutorSystem() {
     );
   }
 
-  return <InstrutorDashboard projetos={projetosVinculados} policialLogado={localStorage.getItem('usuarioId') || ''} />;
+  // Buscar dados completos do policial do localStorage
+  const policialData = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  return <InstrutorDashboard projetos={projetosVinculados} policialLogado={policialData} />;
 }

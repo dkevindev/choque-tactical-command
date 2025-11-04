@@ -19,7 +19,7 @@ interface WizardProps {
 const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps) => {
   const [etapa, setEtapa] = useState(1);
   const [turnoSelecionado, setTurnoSelecionado] = useState<number | null>(null);
-  const [instrutoresSelecionados, setInstrutoresSelecionados] = useState<string[]>([policialLogado.id]);
+  const [instrutoresSelecionados, setInstrutoresSelecionados] = useState<string[]>([policialLogado?.id || policialLogado]);
   const [alunosPresentes, setAlunosPresentes] = useState<string[]>([]);
   const [instrutoresDisponiveis, setInstrutoresDisponiveis] = useState<any[]>([]);
   const [alunos, setAlunos] = useState<any[]>([]);
@@ -72,7 +72,8 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
         return null;
       });
 
-      const instrutores = (await Promise.all(instrutoresPromises)).filter(i => i !== null && i.id !== policialLogado.id);
+      const policialIdAtual = policialLogado?.id || policialLogado;
+      const instrutores = (await Promise.all(instrutoresPromises)).filter(i => i !== null && i.id !== policialIdAtual);
       setInstrutoresDisponiveis(instrutores);
     } catch (error) {
       console.error('Erro ao carregar instrutores:', error);
