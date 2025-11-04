@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, MessageSquare, Truck, Target, Users, FileText, Bot } from 'lucide-react';
+import { Shield, MessageSquare, Truck, Target, Users, FileText, Bot, GraduationCap, UserCog } from 'lucide-react';
 import cpchoqueLogo from '@/assets/cpchoque-logo.png';
 import LoginSistema from '@/components/LoginSistema';
 
@@ -70,6 +70,26 @@ const Home = () => {
       acessoKey: 'cavbot',
       cor: 'bg-purple-500',
       requiresLogin: false
+    },
+    {
+      id: 'projetos-sociais-instrutor',
+      title: 'INSTRUTORES - PROJETOS',
+      description: 'Sistema para instrutores',
+      icon: GraduationCap,
+      route: '/projetos-sociais/instrutor',
+      acessoKey: 'projetosSociais',
+      cor: 'bg-orange-500',
+      requiresLogin: true
+    },
+    {
+      id: 'projetos-sociais-gestor',
+      title: 'GESTORES - PROJETOS',
+      description: 'Sistema para gestores',
+      icon: UserCog,
+      route: '/projetos-sociais/gestor',
+      acessoKey: 'projetosSociais',
+      cor: 'bg-teal-500',
+      requiresLogin: true
     }
   ];
 

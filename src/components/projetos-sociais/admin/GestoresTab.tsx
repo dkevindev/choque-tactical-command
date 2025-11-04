@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, query, where, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
-import PolicialCombobox from '../shared/PolicialCombobox';
+import PolicialSearchCombobox from '@/components/guarda-quartel/PolicialSearchCombobox';
 
 interface Projeto {
   id: string;
@@ -30,7 +30,7 @@ export default function GestoresTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProjeto, setSelectedProjeto] = useState('');
-  const [selectedPolicial, setSelectedPolicial] = useState<any>(null);
+  const [selectedPolicialId, setSelectedPolicialId] = useState('');
 
   useEffect(() => {
     carregarDados();
@@ -76,14 +76,14 @@ export default function GestoresTab() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedProjeto || !selectedPolicial) {
+    if (!selectedProjeto || !selectedPolicialId) {
       toast.error('Selecione um projeto e um policial');
       return;
     }
 
     // Verificar se já existe
     const jaExiste = gestores.some(
-      g => g.projetoId === selectedProjeto && g.policialId === selectedPolicial.id
+      g => g.projetoId === selectedProjeto && g.policialId === selectedPolicialId
     );
 
     if (jaExiste) {
@@ -92,16 +92,23 @@ export default function GestoresTab() {
     }
 
     try {
+      // Adicionar vínculo de gestor
       await addDoc(collection(db, 'projetos_gestores'), {
         projetoId: selectedProjeto,
-        policialId: selectedPolicial.id,
+        policialId: selectedPolicialId,
         dataAtribuicao: new Date()
       });
+
+      // Liberar acesso ao sistema de projetos sociais
+      const policialRef = doc(db, 'policiais', selectedPolicialId);
+      await updateDoc(policialRef, {
+        'acessos.projetosSociais': true
+      });
       
-      toast.success('Gestor atribuído com sucesso');
+      toast.success('Gestor atribuído e acesso liberado com sucesso');
       setDialogOpen(false);
       setSelectedProjeto('');
-      setSelectedPolicial(null);
+      setSelectedPolicialId('');
       carregarDados();
     } catch (error) {
       console.error('Erro ao atribuir gestor:', error);
@@ -165,9 +172,10 @@ export default function GestoresTab() {
                 </div>
                 <div className="space-y-2">
                   <Label>Policial (Gestor)</Label>
-                  <PolicialCombobox
-                    value={selectedPolicial?.id}
-                    onSelect={setSelectedPolicial}
+                  <PolicialSearchCombobox
+                    value={selectedPolicialId}
+                    onSelect={(policial) => setSelectedPolicialId(policial.id)}
+                    placeholder="Buscar por nome, numeral ou matrícula"
                   />
                 </div>
               </div>

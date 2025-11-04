@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Save, UserPlus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import PolicialCombobox from '../shared/PolicialCombobox';
+import PolicialSearchCombobox from '@/components/guarda-quartel/PolicialSearchCombobox';
 
 interface ConfiguracaoProjetoTabProps {
   projeto: any;
@@ -30,6 +30,7 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
   const [instrutores, setInstrutores] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedPolicialId, setSelectedPolicialId] = useState('');
 
   useEffect(() => {
     carregarInstrutores();
@@ -95,16 +96,29 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
     }
   };
 
-  const adicionarInstrutor = async (policial: any) => {
+  const adicionarInstrutor = async () => {
+    if (!selectedPolicialId) {
+      toast.error('Selecione um policial');
+      return;
+    }
+
     try {
+      // Adicionar vínculo de instrutor
       await addDoc(collection(db, 'projetos_instrutores'), {
         projetoId: projeto.id,
-        policialId: policial.id,
+        policialId: selectedPolicialId,
         dataAtribuicao: new Date(),
         ativo: true
       });
-      toast.success('Instrutor adicionado com sucesso!');
+
+      // Liberar acesso ao sistema de projetos sociais
+      await updateDoc(doc(db, 'policiais', selectedPolicialId), {
+        'acessos.projetosSociais': true
+      });
+
+      toast.success('Instrutor adicionado e acesso liberado com sucesso!');
       setDialogOpen(false);
+      setSelectedPolicialId('');
       carregarInstrutores();
     } catch (error) {
       console.error('Erro ao adicionar instrutor:', error);
@@ -239,8 +253,16 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
                 <DialogHeader>
                   <DialogTitle>Adicionar Instrutor</DialogTitle>
                 </DialogHeader>
-                <div className="py-4">
-                  <PolicialCombobox onSelect={adicionarInstrutor} />
+                <div className="py-4 space-y-4">
+                  <Label>Selecionar Policial</Label>
+                  <PolicialSearchCombobox
+                    value={selectedPolicialId}
+                    onSelect={(policial) => setSelectedPolicialId(policial.id)}
+                    placeholder="Buscar por nome, numeral ou matrícula"
+                  />
+                  <Button onClick={adicionarInstrutor} className="w-full">
+                    Adicionar
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
