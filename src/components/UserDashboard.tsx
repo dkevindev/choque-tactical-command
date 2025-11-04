@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import TacticalSidebar from '@/components/TacticalSidebar';
 import UserViaturaAvarias from '@/components/UserViaturaAvarias';
+import ProjetosSociaisSystem from '@/components/projetos-sociais/ProjetosSociaisSystem';
 import { 
   User, 
   Calendar,
