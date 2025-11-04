@@ -32,6 +32,8 @@ const UserDashboard = () => {
         return <ReservaArmamento />;
       case 'avarias':
         return <UserViaturaAvarias />;
+      case 'projetos-sociais':
+        return <ProjetosSociaisSystem />;
       default:
         return <DashboardContent />;
     }

@@ -13,7 +13,8 @@ import {
   X,
   ChevronRight,
   FileText,
-  AlertCircle
+  AlertCircle,
+  GraduationCap
 } from 'lucide-react';
 
 interface TacticalSidebarProps {
@@ -37,6 +38,7 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
     { id: 'documentos', label: 'DOCUMENTOS', icon: FileText, badge: null },
     { id: 'ordens-servico', label: 'OS\'s', icon: FileText, badge: null },
     { id: 'servicos', label: 'SERVIÇOS', icon: FileText, badge: null },
+    { id: 'projetos-sociais', label: 'PROJETOS SOCIAIS', icon: GraduationCap, badge: null },
   ];
 
   const userMenuItems = [

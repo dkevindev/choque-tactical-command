@@ -64,6 +64,8 @@ const AdminDashboard = () => {
         return <OrdemServicoPage />; // <--- Renderiza o novo componente
       case 'servicos':
         return <ServicosPage />;
+      case 'projetos-sociais':
+        return <ProjetosSociaisSystem />;
       default:
         return <DashboardOverview />;
     }
