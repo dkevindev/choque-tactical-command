@@ -14,7 +14,8 @@ interface GestorDashboardProps {
   policialLogado: any;
 }
 
-const GestorDashboard = ({ projetos, policialLogado }: GestorDashboardProps) => {
+const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorDashboardProps) => {
+  const [projetos, setProjetos] = useState(projetosIniciais);
   const [stats, setStats] = useState({
     totalAlunos: 0,
     totalInstrutores: 0,
@@ -28,7 +29,27 @@ const GestorDashboard = ({ projetos, policialLogado }: GestorDashboardProps) => 
     if (projetoSelecionado) {
       carregarEstatisticas();
     }
-  }, [projetoSelecionado]);
+  }, [projetoSelecionado?.id]);
+
+  const recarregarProjeto = async () => {
+    try {
+      console.log('Recarregando dados do projeto...');
+      const projetoDoc = await getDocs(
+        query(collection(db, 'projetos_sociais'), where('__name__', '==', projetoSelecionado.id))
+      );
+      
+      if (!projetoDoc.empty) {
+        const projetoAtualizado = {
+          id: projetoDoc.docs[0].id,
+          ...projetoDoc.docs[0].data()
+        };
+        console.log('Projeto recarregado:', projetoAtualizado);
+        setProjetos([projetoAtualizado]);
+      }
+    } catch (error) {
+      console.error('Erro ao recarregar projeto:', error);
+    }
+  };
 
   const carregarEstatisticas = async () => {
     try {
@@ -72,6 +93,11 @@ const GestorDashboard = ({ projetos, policialLogado }: GestorDashboardProps) => 
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
     }
+  };
+
+  const handleUpdate = async () => {
+    await recarregarProjeto();
+    await carregarEstatisticas();
   };
 
   return (
@@ -156,11 +182,11 @@ const GestorDashboard = ({ projetos, policialLogado }: GestorDashboardProps) => 
           </TabsContent>
 
           <TabsContent value="configuracao">
-            <ConfiguracaoProjetoTab projeto={projetoSelecionado} onUpdate={carregarEstatisticas} />
+            <ConfiguracaoProjetoTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
           </TabsContent>
 
           <TabsContent value="alunos">
-            <CadastroAlunosTab projeto={projetoSelecionado} onUpdate={carregarEstatisticas} />
+            <CadastroAlunosTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
           </TabsContent>
 
           <TabsContent value="aulas">

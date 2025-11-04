@@ -18,23 +18,39 @@ interface ConfiguracaoProjetoTabProps {
 
 const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabProps) => {
   const diasSemana = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
-  const [diasSelecionados, setDiasSelecionados] = useState<string[]>(
-    projeto?.configuracao?.diasSemana || []
-  );
-  const [turnosPorDia, setTurnosPorDia] = useState(
-    projeto?.configuracao?.turnosPorDia || 1
-  );
-  const [maxInstrutores, setMaxInstrutores] = useState(
-    projeto?.configuracao?.maxInstrutoresPorTurno || 2
-  );
+  const [diasSelecionados, setDiasSelecionados] = useState<string[]>([]);
+  const [turnosPorDia, setTurnosPorDia] = useState(1);
+  const [maxInstrutores, setMaxInstrutores] = useState(2);
   const [instrutores, setInstrutores] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedPolicialId, setSelectedPolicialId] = useState('');
 
   useEffect(() => {
-    carregarInstrutores();
-  }, [projeto]);
+    if (projeto) {
+      carregarConfiguracaoProjeto();
+      carregarInstrutores();
+    }
+  }, [projeto?.id]);
+
+  const carregarConfiguracaoProjeto = async () => {
+    try {
+      // Buscar configuração atualizada do Firebase
+      const projetoDoc = await getDocs(
+        query(collection(db, 'projetos_sociais'), where('__name__', '==', projeto.id))
+      );
+      
+      if (!projetoDoc.empty) {
+        const config = projetoDoc.docs[0].data().configuracao || {};
+        console.log('Configuração carregada do Firebase:', config);
+        setDiasSelecionados(config.diasSemana || []);
+        setTurnosPorDia(config.turnosPorDia || 1);
+        setMaxInstrutores(config.maxInstrutoresPorTurno || 2);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configuração:', error);
+    }
+  };
 
   const carregarInstrutores = async () => {
     try {
@@ -95,6 +111,9 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
       await updateDoc(doc(db, 'projetos_sociais', projeto.id), {
         configuracao
       });
+      
+      // Recarregar configuração após salvar
+      await carregarConfiguracaoProjeto();
       
       toast.success('Configuração salva com sucesso!');
       onUpdate();
