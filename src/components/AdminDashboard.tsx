@@ -29,7 +29,7 @@ import ControleEstoque from '@/components/admin-belico/ControleEstoque';
 import GerenciarCautelas from '@/components/admin-belico/GerenciarCautelas';
 import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferidos';
-import ProjetosSociaisSystem from '@/components/projetos-sociais/ProjetosSociaisSystem';
+import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -66,7 +66,7 @@ const AdminDashboard = () => {
       case 'servicos':
         return <ServicosPage />;
       case 'projetos-sociais':
-        return <ProjetosSociaisSystem />;
+        return <AdminProjetosSociais />;
       default:
         return <DashboardOverview />;
     }
