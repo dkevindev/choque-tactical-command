@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { GraduationCap } from 'lucide-react';
 import ProjetosTab from './ProjetosTab';
 import GestoresTab from './GestoresTab';
-import InstrutoresTab from './InstrutoresTab';
 
 export default function AdminProjetosSociais() {
   return (
@@ -15,17 +14,16 @@ export default function AdminProjetosSociais() {
             <div>
               <CardTitle className="text-2xl">Administração de Projetos Sociais</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Gerencie projetos, gestores e instrutores
+                Gerencie projetos e atribua gestores
               </p>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="projetos" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="projetos">Projetos</TabsTrigger>
               <TabsTrigger value="gestores">Gestores</TabsTrigger>
-              <TabsTrigger value="instrutores">Instrutores</TabsTrigger>
             </TabsList>
 
             <TabsContent value="projetos">
@@ -34,10 +32,6 @@ export default function AdminProjetosSociais() {
 
             <TabsContent value="gestores">
               <GestoresTab />
-            </TabsContent>
-
-            <TabsContent value="instrutores">
-              <InstrutoresTab />
             </TabsContent>
           </Tabs>
         </CardContent>

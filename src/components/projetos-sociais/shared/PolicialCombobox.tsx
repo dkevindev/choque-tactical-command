@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
@@ -25,11 +25,7 @@ const PolicialCombobox = ({ onSelect, value, disabled }: PolicialComboboxProps) 
 
   const carregarPoliciais = async () => {
     try {
-      const q = query(
-        collection(db, 'policiais'),
-        where('acessos.projetosSociais', '==', true)
-      );
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocs(collection(db, 'policiais'));
       const policiaisData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
