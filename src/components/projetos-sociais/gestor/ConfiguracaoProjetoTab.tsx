@@ -51,10 +51,15 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
           query(collection(db, 'policiais'), where('__name__', '==', data.policialId))
         );
         if (!policialSnap.empty) {
+          const policialData = policialSnap.docs[0].data();
           return {
             id: docSnap.id,
             policialId: data.policialId,
-            ...policialSnap.docs[0].data()
+            postGrad: policialData['Post/Grad'] || policialData.postGrad || '',
+            numeral: policialData.NUMERAL || policialData.numeral || '',
+            nome: policialData.NOME || policialData.nome || '',
+            nomeGuerra: policialData['NOME DE GUERRA'] || policialData.nomeGuerra || '',
+            matricula: policialData.Matrícula || policialData.matricula || ''
           };
         }
         return null;
