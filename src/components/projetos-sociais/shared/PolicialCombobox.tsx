@@ -41,7 +41,18 @@ const PolicialCombobox = ({ onSelect, value, disabled }: PolicialComboboxProps) 
   const getPolicialNome = (policialId: string) => {
     const policial = policiais.find(p => p.id === policialId);
     if (!policial) return 'Selecionar policial...';
-    return `${policial.postGrad || ''} ${policial.numeral || ''} ${policial.nome || policial.nomeGuerra}`.trim();
+    return `${policial.postGrad || ''} ${policial.numeral || ''} ${policial.nome || policial.nomeGuerra || ''}`.trim();
+  };
+
+  const getSearchValue = (policial: any) => {
+    const parts = [
+      policial.postGrad || '',
+      policial.numeral || '',
+      policial.nome || '',
+      policial.nomeGuerra || '',
+      policial.matricula || ''
+    ];
+    return parts.filter(p => p).join(' ').toLowerCase();
   };
 
   return (
@@ -66,7 +77,7 @@ const PolicialCombobox = ({ onSelect, value, disabled }: PolicialComboboxProps) 
             {policiais.map((policial) => (
               <CommandItem
                 key={policial.id}
-                value={`${policial.postGrad} ${policial.numeral} ${policial.nome} ${policial.nomeGuerra} ${policial.matricula}`.toLowerCase()}
+                value={getSearchValue(policial)}
                 onSelect={() => {
                   setSelectedValue(policial.id);
                   onSelect(policial);
@@ -81,7 +92,7 @@ const PolicialCombobox = ({ onSelect, value, disabled }: PolicialComboboxProps) 
                 />
                 <div className="flex flex-col">
                   <span className="font-medium">
-                    {policial.postGrad} {policial.numeral} {policial.nome || policial.nomeGuerra}
+                    {policial.postGrad || ''} {policial.numeral || ''} {policial.nome || policial.nomeGuerra || ''}
                   </span>
                   {policial.matricula && (
                     <span className="text-xs text-muted-foreground">
