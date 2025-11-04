@@ -54,12 +54,23 @@ export default function GestoresTab() {
           const projetoDoc = await getDocs(query(collection(db, 'projetos_sociais'), where('__name__', '==', data.projetoId)));
           const policialDoc = await getDocs(query(collection(db, 'policiais'), where('__name__', '==', data.policialId)));
           
+          const policialData = policialDoc.docs[0]?.data();
+          let policialNome = 'Policial não encontrado';
+          if (policialData) {
+            const partes = [
+              policialData['Post/Grad'] || policialData.postGrad,
+              policialData.NUMERAL || policialData.numeral,
+              policialData.NOME || policialData.nome || policialData['NOME DE GUERRA'] || policialData.nomeGuerra
+            ].filter(Boolean);
+            policialNome = partes.join(' ');
+          }
+          
           return {
             id: docSnap.id,
             projetoId: data.projetoId,
             projetoNome: projetoDoc.docs[0]?.data()?.nome || 'Projeto não encontrado',
             policialId: data.policialId,
-            policialNome: policialDoc.docs[0]?.data()?.nomeCompleto || 'Policial não encontrado',
+            policialNome,
             dataAtribuicao: data.dataAtribuicao?.toDate()
           };
         })

@@ -19,10 +19,14 @@ export default function GestorSystem() {
   const verificarAcesso = async () => {
     try {
       const policialId = localStorage.getItem('usuarioId');
+      
       if (!policialId) {
+        console.log('Nenhum policialId encontrado no localStorage');
         navigate('/');
         return;
       }
+
+      console.log('Verificando acesso para policialId:', policialId);
 
       // Verificar se está vinculado como gestor
       const q = query(
@@ -31,7 +35,10 @@ export default function GestorSystem() {
       );
       const snapshot = await getDocs(q);
 
+      console.log('Vínculos de gestor encontrados:', snapshot.size);
+
       if (snapshot.empty) {
+        console.log('Usuário não está vinculado como gestor');
         setTemAcesso(false);
         setLoading(false);
         return;
@@ -41,10 +48,19 @@ export default function GestorSystem() {
       const projetos = await Promise.all(
         snapshot.docs.map(async (doc) => {
           const data = doc.data();
-          const projetoDoc = await getDocs(
+          console.log('Processando vínculo:', data);
+          const projetoSnapshot = await getDocs(
             query(collection(db, 'projetos_sociais'), where('__name__', '==', data.projetoId))
           );
-          const projetoData = projetoDoc.docs[0]?.data();
+          
+          if (projetoSnapshot.empty) {
+            console.log('Projeto não encontrado:', data.projetoId);
+            return null;
+          }
+
+          const projetoData = projetoSnapshot.docs[0]?.data();
+          console.log('Dados do projeto:', projetoData);
+          
           return {
             id: data.projetoId,
             nome: projetoData?.nome || '',
@@ -54,7 +70,11 @@ export default function GestorSystem() {
         })
       );
 
-      const projetosAtivos = projetos.filter(p => p.ativo);
+      const projetosValidos = projetos.filter(p => p !== null);
+      const projetosAtivos = projetosValidos.filter(p => p.ativo);
+      
+      console.log('Projetos válidos:', projetosValidos.length);
+      console.log('Projetos ativos:', projetosAtivos.length);
       
       if (projetosAtivos.length > 0) {
         setProjetosVinculados(projetosAtivos);
