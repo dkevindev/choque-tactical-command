@@ -32,6 +32,10 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
   const hoje = new Date();
   const diaAtual = diasSemana[hoje.getDay()];
 
+  console.log('Configuração do projeto:', config);
+  console.log('Dias configurados:', config.diasSemana);
+  console.log('Dia atual:', diaAtual);
+
   useEffect(() => {
     if (etapa === 2) {
       carregarInstrutores();
@@ -55,9 +59,14 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
           query(collection(db, 'policiais'), where('__name__', '==', data.policialId))
         );
         if (!policialSnap.empty) {
+          const policialData = policialSnap.docs[0].data();
           return {
             id: data.policialId,
-            ...policialSnap.docs[0].data()
+            postGrad: policialData['Post/Grad'] || policialData.postGrad || '',
+            numeral: policialData.NUMERAL || policialData.numeral || '',
+            nome: policialData.NOME || policialData.nome || '',
+            nomeGuerra: policialData['NOME DE GUERRA'] || policialData.nomeGuerra || '',
+            matricula: policialData.Matrícula || policialData.matricula || ''
           };
         }
         return null;

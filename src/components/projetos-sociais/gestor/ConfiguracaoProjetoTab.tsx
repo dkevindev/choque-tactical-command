@@ -83,14 +83,19 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
   const salvarConfiguracao = async () => {
     try {
       setLoading(true);
+      const configuracao = {
+        diasSemana: diasSelecionados,
+        turnosPorDia,
+        maxInstrutoresPorTurno: maxInstrutores,
+        duracaoAula: 3
+      };
+      
+      console.log('Salvando configuração:', configuracao);
+      
       await updateDoc(doc(db, 'projetos_sociais', projeto.id), {
-        configuracao: {
-          diasSemana: diasSelecionados,
-          turnosPorDia,
-          maxInstrutoresPorTurno: maxInstrutores,
-          duracaoAula: 3
-        }
+        configuracao
       });
+      
       toast.success('Configuração salva com sucesso!');
       onUpdate();
       setLoading(false);

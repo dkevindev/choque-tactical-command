@@ -59,9 +59,14 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
               return dataAula >= primeiroDiaMes;
             });
 
+            // Mapear campos corretamente
+            const postGrad = policial['Post/Grad'] || policial.postGrad || '';
+            const numeral = policial.NUMERAL || policial.numeral || '';
+            const nome = policial.NOME || policial.nome || policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
+
             return {
               id: data.policialId,
-              nome: `${policial.postGrad || ''} ${policial.numeral || ''} ${policial.nomeGuerra || policial.nome}`.trim(),
+              nome: `${postGrad} ${numeral} ${nome}`.trim(),
               aulasMes: aulasMes.length,
               horasMes: aulasMes.length * 3,
               horasTotal: aulasInstrutor.length * 3
