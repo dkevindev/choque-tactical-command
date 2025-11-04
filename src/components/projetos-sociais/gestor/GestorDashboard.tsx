@@ -1,3 +1,6 @@
+import { useState, useEffect } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/firebase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, UserCheck, Calendar, Clock } from 'lucide-react';
@@ -5,9 +8,6 @@ import ConfiguracaoProjetoTab from './ConfiguracaoProjetoTab';
 import CadastroAlunosTab from './CadastroAlunosTab';
 import VisualizarAulasTab from './VisualizarAulasTab';
 import RelatoriosGestorTab from './RelatoriosGestorTab';
-import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/firebase';
 
 interface GestorDashboardProps {
   projetos: any[];
