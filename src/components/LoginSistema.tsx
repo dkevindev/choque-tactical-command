@@ -252,6 +252,7 @@ const LoginSistema = ({ sistema, onClose }: LoginSistemaProps) => {
   const realizarLogin = (policial: Policial) => {
     // Salvar dados do usuário no localStorage ou context
     localStorage.setItem('user', JSON.stringify(policial));
+    localStorage.setItem('usuarioId', policial.id);
     
     toast({
       title: "Login realizado com sucesso",
