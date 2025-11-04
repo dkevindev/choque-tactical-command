@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { Button } from '@/components/ui/button';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Check, ChevronsUpDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface PolicialComboboxProps {
   onSelect: (policial: any) => void;
@@ -14,10 +12,9 @@ interface PolicialComboboxProps {
 }
 
 const PolicialCombobox = ({ onSelect, value, disabled }: PolicialComboboxProps) => {
-  const [open, setOpen] = useState(false);
   const [policiais, setPoliciais] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedValue, setSelectedValue] = useState(value || '');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     carregarPoliciais();
@@ -38,84 +35,75 @@ const PolicialCombobox = ({ onSelect, value, disabled }: PolicialComboboxProps) 
     }
   };
 
-  const getPolicialNome = (policialId: string) => {
-    if (!policialId) return 'Selecionar policial...';
-    const policial = policiais.find(p => p?.id === policialId);
-    if (!policial) return 'Selecionar policial...';
-    const nome = policial.nome || policial.nomeGuerra || '';
-    const parts = [policial.postGrad, policial.numeral, nome].filter(Boolean);
-    return parts.join(' ') || 'Policial';
-  };
-
-  const getSearchValue = (policial: any) => {
-    if (!policial) return 'policial';
+  const getPolicialDisplay = (policial: any) => {
+    if (!policial) return '';
     const parts = [
       policial.postGrad,
       policial.numeral,
-      policial.nome,
-      policial.nomeGuerra,
-      policial.matricula
+      policial.nome || policial.nomeGuerra
     ].filter(Boolean);
-    return parts.join(' ').toLowerCase() || 'policial';
+    return parts.join(' ');
   };
 
+  const filteredPoliciais = policiais.filter(policial => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    const display = getPolicialDisplay(policial).toLowerCase();
+    const matricula = (policial.matricula || '').toLowerCase();
+    return display.includes(searchLower) || matricula.includes(searchLower);
+  });
+
+  const handleSelectChange = (policialId: string) => {
+    const policial = policiais.find(p => p.id === policialId);
+    if (policial) {
+      onSelect(policial);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Select disabled>
+        <SelectTrigger>
+          <SelectValue placeholder="Carregando..." />
+        </SelectTrigger>
+      </Select>
+    );
+  }
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
-          disabled={disabled || loading}
-        >
-          {loading ? 'Carregando...' : getPolicialNome(selectedValue)}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
-        <Command>
-          <CommandInput placeholder="Buscar policial..." />
-          <CommandEmpty>Nenhum policial encontrado.</CommandEmpty>
-          <CommandGroup className="max-h-64 overflow-auto">
-            {policiais.filter(p => p?.id).map((policial) => {
-              const searchValue = getSearchValue(policial);
-              const displayNome = policial.nome || policial.nomeGuerra || 'Sem nome';
-              const displayParts = [policial.postGrad, policial.numeral, displayNome].filter(Boolean);
-              
-              return (
-                <CommandItem
-                  key={policial.id}
-                  value={searchValue}
-                  onSelect={() => {
-                    setSelectedValue(policial.id);
-                    onSelect(policial);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      selectedValue === policial.id ? 'opacity-100' : 'opacity-0'
-                    )}
-                  />
-                  <div className="flex flex-col">
-                    <span className="font-medium">
-                      {displayParts.join(' ')}
+    <div className="space-y-2">
+      <Input
+        placeholder="Buscar por nome, numeral ou matrícula..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        disabled={disabled}
+      />
+      <Select value={value} onValueChange={handleSelectChange} disabled={disabled}>
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione um policial" />
+        </SelectTrigger>
+        <SelectContent>
+          {filteredPoliciais.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              Nenhum policial encontrado
+            </div>
+          ) : (
+            filteredPoliciais.map((policial) => (
+              <SelectItem key={policial.id} value={policial.id}>
+                <div className="flex flex-col">
+                  <span>{getPolicialDisplay(policial)}</span>
+                  {policial.matricula && (
+                    <span className="text-xs text-muted-foreground">
+                      Mat: {policial.matricula}
                     </span>
-                    {policial.matricula && (
-                      <span className="text-xs text-muted-foreground">
-                        Matrícula: {policial.matricula}
-                      </span>
-                    )}
-                  </div>
-                </CommandItem>
-              );
-            })}
-          </CommandGroup>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                  )}
+                </div>
+              </SelectItem>
+            ))
+          )}
+        </SelectContent>
+      </Select>
+    </div>
   );
 };
 
