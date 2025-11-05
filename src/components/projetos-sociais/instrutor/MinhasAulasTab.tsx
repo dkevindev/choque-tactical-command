@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { EditarAulaDialog } from './EditarAulaDialog';
 
 interface MinhasAulasTabProps {
   policialId: string;
@@ -22,6 +23,7 @@ const MinhasAulasTab = ({ policialId, projetos }: MinhasAulasTabProps) => {
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
   const [periodoFim, setPeriodoFim] = useState<Date>(new Date());
+  const [aulaEditando, setAulaEditando] = useState<any>(null);
 
   useEffect(() => {
     carregarAulas();
@@ -58,6 +60,18 @@ const MinhasAulasTab = ({ policialId, projetos }: MinhasAulasTabProps) => {
       return format(dataObj, "dd/MM/yyyy", { locale: ptBR });
     } catch {
       return 'Data inválida';
+    }
+  };
+
+  const calcularHorasCredito = (horaInicio: any, horaFim: any) => {
+    try {
+      const inicio = horaInicio?.toDate ? horaInicio.toDate() : new Date(horaInicio);
+      const fim = horaFim?.toDate ? horaFim.toDate() : new Date(horaFim);
+      const diffMs = fim.getTime() - inicio.getTime();
+      const diffHrs = Math.round(diffMs / (1000 * 60 * 60));
+      return diffHrs;
+    } catch {
+      return 0;
     }
   };
 
@@ -110,6 +124,10 @@ const MinhasAulasTab = ({ policialId, projetos }: MinhasAulasTabProps) => {
         <div className="space-y-3">
           {aulas.map((aula) => {
             const projeto = projetos.find(p => p.id === aula.projetoId);
+            const statusCompleto = aula.status === 'encerrada' && aula.instrutoresCompleto;
+            const vagasRestantes = (aula.maxInstrutores || 1) - (aula.instrutores?.length || 0);
+            const podeAdicionarInstrutor = aula.status === 'encerrada' && vagasRestantes > 0;
+
             return (
               <Card key={aula.id}>
                 <CardContent className="p-4">
@@ -117,7 +135,7 @@ const MinhasAulasTab = ({ policialId, projetos }: MinhasAulasTabProps) => {
                     <div>
                       <p className="font-medium">{formatarData(aula.data)}</p>
                       <p className="text-sm text-muted-foreground">
-                        {projeto?.nome} • Turno {aula.turno}
+                        {projeto?.nome} • {aula.turnoNome || `Turno ${aula.turno + 1}`}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {aula.alunosPresentes?.length || 0} alunos presentes
@@ -127,24 +145,51 @@ const MinhasAulasTab = ({ policialId, projetos }: MinhasAulasTabProps) => {
                       <Badge variant={aula.status === 'encerrada' ? 'default' : 'destructive'}>
                         {aula.status === 'encerrada' ? 'Encerrada' : 'Em Andamento'}
                       </Badge>
-                      {!aula.instrutoresCompleto && (
-                        <Badge variant="outline" className="text-xs">
-                          Incompleto
+                      {statusCompleto ? (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          Completa
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          Incompleta ({vagasRestantes} vaga{vagasRestantes !== 1 ? 's' : ''})
                         </Badge>
                       )}
                     </div>
                   </div>
 
-                  {aula.status === 'encerrada' && (
+                  {aula.status === 'encerrada' && aula.horaInicio && aula.horaFim && (
                     <p className="text-xs text-muted-foreground border-t pt-2">
-                      ✓ 3 horas creditadas
+                      ✓ {calcularHorasCredito(aula.horaInicio, aula.horaFim)} horas creditadas
                     </p>
+                  )}
+
+                  {podeAdicionarInstrutor && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full mt-2"
+                      onClick={() => setAulaEditando(aula)}
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Adicionar Instrutor
+                    </Button>
                   )}
                 </CardContent>
               </Card>
             );
           })}
         </div>
+      )}
+
+      {aulaEditando && (
+        <EditarAulaDialog
+          aula={aulaEditando}
+          projetoId={aulaEditando.projetoId}
+          policialLogado={policialId}
+          open={!!aulaEditando}
+          onOpenChange={(open) => !open && setAulaEditando(null)}
+          onSuccess={carregarAulas}
+        />
       )}
     </div>
   );
