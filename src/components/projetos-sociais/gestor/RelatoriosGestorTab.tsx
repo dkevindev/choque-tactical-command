@@ -4,6 +4,11 @@ import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { format, isSameDay } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
 
 interface RelatoriosGestorTabProps {
   projeto: any;
@@ -13,6 +18,9 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
   const [instrutoresRelatorio, setInstrutoresRelatorio] = useState<any[]>([]);
   const [alunosFrequencia, setAlunosFrequencia] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [todasAulas, setTodasAulas] = useState<any[]>([]);
+  const [dataSelecionada, setDataSelecionada] = useState<Date>();
+  const [mesSelecionado, setMesSelecionado] = useState(new Date());
 
   useEffect(() => {
     carregarDados();
@@ -27,7 +35,11 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
         where('status', '==', 'encerrada')
       );
       const aulasSnapshot = await getDocs(aulasQuery);
-      const aulas = aulasSnapshot.docs.map(doc => doc.data());
+      const aulas = aulasSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+      setTodasAulas(aulas);
 
       // Calcular relatório de instrutores
       const instrutoresQuery = query(
@@ -111,6 +123,24 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
     }
   };
 
+  const diasComAulas = todasAulas.map(aula => {
+    const data = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
+    return data;
+  });
+
+  const aulasNoDia = dataSelecionada 
+    ? todasAulas.filter(aula => {
+        const dataAula = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
+        return isSameDay(dataAula, dataSelecionada);
+      })
+    : [];
+
+  const aulasMes = todasAulas.filter(aula => {
+    const dataAula = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
+    return dataAula.getMonth() === mesSelecionado.getMonth() && 
+           dataAula.getFullYear() === mesSelecionado.getFullYear();
+  });
+
   if (loading) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -121,9 +151,10 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
 
   return (
     <Tabs defaultValue="instrutores" className="space-y-6">
-      <TabsList>
+      <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="instrutores">Por Instrutor</TabsTrigger>
         <TabsTrigger value="frequencia">Frequência Alunos</TabsTrigger>
+        <TabsTrigger value="calendario">Calendário</TabsTrigger>
       </TabsList>
 
       <TabsContent value="instrutores">
@@ -233,6 +264,108 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
             </Table>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="calendario" className="space-y-6">
+        <div className="grid grid-cols-3 gap-4">
+          <Card className="p-4 text-center">
+            <CalendarIcon className="mx-auto h-8 w-8 text-primary mb-2" />
+            <p className="text-3xl font-bold">{aulasMes.length}</p>
+            <p className="text-xs text-muted-foreground">
+              Aulas em {format(mesSelecionado, 'MMMM/yyyy', { locale: ptBR })}
+            </p>
+          </Card>
+          
+          <Card className="p-4 text-center">
+            <CalendarIcon className="mx-auto h-8 w-8 text-primary mb-2" />
+            <p className="text-3xl font-bold">{aulasMes.length * 3}h</p>
+            <p className="text-xs text-muted-foreground">Horas ministradas</p>
+          </Card>
+
+          <Card className="p-4 text-center">
+            <CalendarIcon className="mx-auto h-8 w-8 text-primary mb-2" />
+            <p className="text-3xl font-bold">{todasAulas.length}</p>
+            <p className="text-xs text-muted-foreground">Total de aulas</p>
+          </Card>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Calendário de Aulas</CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <Calendar
+                mode="single"
+                selected={dataSelecionada}
+                onSelect={setDataSelecionada}
+                month={mesSelecionado}
+                onMonthChange={setMesSelecionado}
+                locale={ptBR}
+                modifiers={{
+                  comAula: diasComAulas
+                }}
+                modifiersStyles={{
+                  comAula: {
+                    fontWeight: 'bold',
+                    textDecoration: 'underline',
+                    color: 'hsl(var(--primary))'
+                  }
+                }}
+                className="pointer-events-auto"
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {dataSelecionada 
+                  ? format(dataSelecionada, "dd 'de' MMMM", { locale: ptBR })
+                  : 'Selecione um dia'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!dataSelecionada && (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Clique em um dia no calendário para ver as aulas
+                </p>
+              )}
+              {dataSelecionada && aulasNoDia.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Nenhuma aula neste dia
+                </p>
+              )}
+              {dataSelecionada && aulasNoDia.length > 0 && (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {aulasNoDia.map(aula => (
+                    <div key={aula.id} className="p-3 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="secondary">{aula.turnoNome || aula.turno}</Badge>
+                        <span className="text-xs text-muted-foreground">3h</span>
+                      </div>
+                      {aula.turmaId && (
+                        <p className="text-sm font-medium mb-1">{aula.turmaNome}</p>
+                      )}
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{aula.instrutores?.length || 1} instrutor(es)</span>
+                        {aula.alunosPresentes && (
+                          <span>{aula.alunosPresentes.length} alunos</span>
+                        )}
+                      </div>
+                      <Badge 
+                        variant={aula.instrutoresCompleto ? "default" : "outline"}
+                        className="mt-2"
+                      >
+                        {aula.instrutoresCompleto ? 'Completa' : 'Incompleta'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </TabsContent>
     </Tabs>
   );
