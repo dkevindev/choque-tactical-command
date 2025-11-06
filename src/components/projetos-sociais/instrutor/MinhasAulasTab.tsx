@@ -32,19 +32,28 @@ const MinhasAulasTab = ({ policialId, projetos }: MinhasAulasTabProps) => {
   const carregarAulas = async () => {
     try {
       setLoading(true);
+      
+      // Buscar todas as aulas do instrutor (sem filtros de data para evitar índice composto)
       const q = query(
         collection(db, 'projetos_aulas'),
-        where('instrutores', 'array-contains', policialId),
-        where('data', '>=', periodoInicio),
-        where('data', '<=', periodoFim),
-        orderBy('data', 'desc')
+        where('instrutores', 'array-contains', policialId)
       );
       
       const snapshot = await getDocs(q);
-      const aulasData = snapshot.docs.map(doc => ({
+      const todasAulas = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+
+      // Filtrar por período em memória
+      const aulasData = todasAulas.filter((aula: any) => {
+        const aulaData = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
+        return aulaData >= periodoInicio && aulaData <= periodoFim;
+      }).sort((a: any, b: any) => {
+        const dataA = a.data?.toDate ? a.data.toDate() : new Date(a.data);
+        const dataB = b.data?.toDate ? b.data.toDate() : new Date(b.data);
+        return dataB.getTime() - dataA.getTime(); // Ordem decrescente
+      });
 
       setAulas(aulasData);
       setLoading(false);

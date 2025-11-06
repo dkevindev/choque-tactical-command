@@ -28,39 +28,39 @@ const InstrutorDashboard = ({ projetos, policialLogado }: InstrutorDashboardProp
 
   const carregarDados = async () => {
     try {
-      // Verificar aula em andamento
+      // Buscar TODAS as aulas do instrutor (sem filtro de status para evitar índice composto)
       const aulaQuery = query(
         collection(db, 'projetos_aulas'),
-        where('instrutores', 'array-contains', policialLogado.id),
-        where('status', '==', 'em_andamento')
+        where('instrutores', 'array-contains', policialLogado.id)
       );
       const aulaSnapshot = await getDocs(aulaQuery);
       
-      if (!aulaSnapshot.empty) {
-        const aulaData = {
-          id: aulaSnapshot.docs[0].id,
-          ...aulaSnapshot.docs[0].data()
-        };
-        setAulaEmAndamento(aulaData);
-      }
+      const todasAulas = aulaSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Filtrar aula em andamento em memória
+      const aulaAtiva = todasAulas.find((aula: any) => aula.status === 'em_andamento');
+      setAulaEmAndamento(aulaAtiva || null);
 
       // Calcular horas e aulas do mês
       const hoje = new Date();
       const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
       
-      const aulasQuery = query(
-        collection(db, 'projetos_aulas'),
-        where('instrutores', 'array-contains', policialLogado.id),
-        where('status', '==', 'encerrada'),
-        where('data', '>=', primeiroDiaMes)
-      );
-      const aulasSnapshot = await getDocs(aulasQuery);
+      // Filtrar aulas encerradas do mês em memória
+      const aulasDoMes = todasAulas.filter((aula: any) => {
+        const aulaData = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
+        return aula.status === 'encerrada' && aulaData >= primeiroDiaMes;
+      });
       
-      const totalAulas = aulasSnapshot.size;
+      const totalAulas = aulasDoMes.length;
       const totalHoras = totalAulas * 3; // Cada aula = 3 horas
       
       setAulasMes(totalAulas);
       setHorasMes(totalHoras);
+      
+      console.log('✅ Dados carregados:', { totalAulas, totalHoras, aulaAtiva: !!aulaAtiva });
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     }
