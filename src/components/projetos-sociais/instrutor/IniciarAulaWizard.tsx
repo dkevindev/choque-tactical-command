@@ -20,13 +20,18 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
   const [etapa, setEtapa] = useState(1);
   const [turnoSelecionado, setTurnoSelecionado] = useState<number | null>(null);
   const [turmaSelecionada, setTurmaSelecionada] = useState<string | null>(null);
-  const [instrutoresSelecionados, setInstrutoresSelecionados] = useState<string[]>([policialLogado?.id || policialLogado]);
+  const [instrutoresSelecionados, setInstrutoresSelecionados] = useState<string[]>(() => {
+    const id = policialLogado?.id || policialLogado?.usuarioId || (typeof policialLogado === 'string' ? policialLogado : '');
+    console.log('ID do policial logado:', id);
+    return id ? [id] : [];
+  });
   const [alunosPresentes, setAlunosPresentes] = useState<string[]>([]);
   const [instrutoresDisponiveis, setInstrutoresDisponiveis] = useState<any[]>([]);
   const [turmas, setTurmas] = useState<any[]>([]);
   const [alunos, setAlunos] = useState<any[]>([]);
   const [searchAluno, setSearchAluno] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnosOcupados, setTurnosOcupados] = useState<number[]>([]);
 
   const projeto = projetos[0];
   const config = projeto?.configuracao || {};
@@ -42,6 +47,12 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
   console.log('Dia atual:', diaAtual);
 
   useEffect(() => {
+    if (projeto?.id) {
+      verificarTurnosOcupados();
+    }
+  }, [projeto]);
+
+  useEffect(() => {
     if (etapa === 2 && usaTurmas) {
       carregarTurmas();
     } else if ((etapa === 2 && !usaTurmas) || etapa === 3) {
@@ -50,6 +61,27 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
       carregarAlunos();
     }
   }, [etapa]);
+
+  const verificarTurnosOcupados = async () => {
+    try {
+      const inicioDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0);
+      const fimDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59);
+      
+      const q = query(
+        collection(db, 'projetos_aulas'),
+        where('projetoId', '==', projeto.id),
+        where('data', '>=', inicioDia),
+        where('data', '<=', fimDia)
+      );
+      
+      const snapshot = await getDocs(q);
+      const turnosUsados = snapshot.docs.map(doc => doc.data().turno);
+      setTurnosOcupados(turnosUsados);
+      console.log('Turnos ocupados hoje:', turnosUsados);
+    } catch (error) {
+      console.error('Erro ao verificar turnos ocupados:', error);
+    }
+  };
 
   const carregarTurmas = async () => {
     try {
@@ -192,13 +224,24 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
     try {
       setLoading(true);
 
+      // Validar que os instrutores são IDs válidos (strings)
+      const instrutoresValidos = instrutoresSelecionados.filter(id => typeof id === 'string' && id.length > 0);
+      
+      if (instrutoresValidos.length === 0) {
+        toast.error('Erro: nenhum instrutor válido selecionado');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Instrutores a serem salvos:', instrutoresValidos);
+
       const aulaData: any = {
         projetoId: projeto.id,
         data: new Date(),
         turno: turnoSelecionado,
         turnoNome: turnosNomeclatura[turnoSelecionado! - 1] || `Turno ${turnoSelecionado}`,
-        instrutores: instrutoresSelecionados,
-        instrutoresCompleto: instrutoresSelecionados.length === config.maxInstrutoresPorTurno,
+        instrutores: instrutoresValidos,
+        instrutoresCompleto: instrutoresValidos.length === config.maxInstrutoresPorTurno,
         maxInstrutores: config.maxInstrutoresPorTurno,
         status: 'em_andamento',
         horaInicio: new Date(),
@@ -215,7 +258,9 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
         aulaData.alunosPresentes = alunosPresentes;
       }
 
-      await addDoc(collection(db, 'projetos_aulas'), aulaData);
+      const docRef = await addDoc(collection(db, 'projetos_aulas'), aulaData);
+      console.log('Aula salva com ID:', docRef.id);
+      console.log('Dados salvos:', aulaData);
       
       toast.success('Aula iniciada com sucesso!');
       onSuccess();
@@ -264,25 +309,36 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
         <div className="space-y-4">
           <h2 className="text-2xl font-bold">Selecione o Turno</h2>
           <div className="space-y-3">
-            {Array.from({ length: config.turnosPorDia || 1 }, (_, i) => i + 1).map((turno) => (
-              <Card
-                key={turno}
-                className={`p-6 cursor-pointer hover:border-primary transition-all ${
-                  turnoSelecionado === turno ? 'border-primary border-2' : ''
-                }`}
-                onClick={() => setTurnoSelecionado(turno)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xl font-bold">Turno {turno}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {turnosNomeclatura[turno - 1] || `Turno ${turno}`}
-                    </p>
+            {Array.from({ length: config.turnosPorDia || 1 }, (_, i) => i + 1).map((turno) => {
+              const turnoOcupado = turnosOcupados.includes(turno);
+              
+              return (
+                <Card
+                  key={turno}
+                  className={`p-6 transition-all ${
+                    turnoOcupado 
+                      ? 'opacity-50 cursor-not-allowed' 
+                      : `cursor-pointer hover:border-primary ${turnoSelecionado === turno ? 'border-primary border-2' : ''}`
+                  }`}
+                  onClick={() => !turnoOcupado && setTurnoSelecionado(turno)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xl font-bold">Turno {turno}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {turnosNomeclatura[turno - 1] || `Turno ${turno}`}
+                      </p>
+                      {turnoOcupado && (
+                        <p className="text-sm text-destructive font-medium mt-1">
+                          Aula já iniciada hoje
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className={`h-8 w-8 ${turnoOcupado ? 'opacity-50' : ''}`} />
                   </div>
-                  <ChevronRight className="h-8 w-8" />
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}
