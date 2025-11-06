@@ -4,10 +4,12 @@ import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, TrendingUp, Calendar as CalendarIcon } from 'lucide-react';
+import { Clock, TrendingUp, Calendar as CalendarIcon, FileText } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { AulaDetalhesCard } from './AulaDetalhesCard';
+import { RelatorioMensalCompleto } from './RelatorioMensalCompleto';
 
 interface RelatoriosInstrutorTabProps {
   policialId: string;
@@ -89,9 +91,10 @@ const RelatoriosInstrutorTab = ({ policialId }: RelatoriosInstrutorTabProps) => 
 
   return (
     <Tabs defaultValue="resumo" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-2">
+      <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="resumo">Resumo</TabsTrigger>
         <TabsTrigger value="calendario">Calendário</TabsTrigger>
+        <TabsTrigger value="completo">Relatório</TabsTrigger>
       </TabsList>
 
       <TabsContent value="resumo" className="space-y-6">
@@ -195,24 +198,22 @@ const RelatoriosInstrutorTab = ({ policialId }: RelatoriosInstrutorTabProps) => 
               {dataSelecionada && aulasNoDia.length > 0 && (
                 <div className="space-y-3">
                   {aulasNoDia.map(aula => (
-                    <div key={aula.id} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge variant="secondary">{aula.turnoNome || aula.turno}</Badge>
-                        <span className="text-xs text-muted-foreground">3h</span>
-                      </div>
-                      {aula.turmaId && (
-                        <p className="text-sm font-medium">{aula.turmaNome}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {aula.instrutores?.length || 1} instrutor(es)
-                      </p>
-                    </div>
+                    <AulaDetalhesCard key={aula.id} aula={aula} />
                   ))}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
+      </TabsContent>
+
+      <TabsContent value="completo">
+        <Card className="p-6">
+          <RelatorioMensalCompleto 
+            policialId={policialId} 
+            mesSelecionado={mesSelecionado}
+          />
+        </Card>
       </TabsContent>
     </Tabs>
   );

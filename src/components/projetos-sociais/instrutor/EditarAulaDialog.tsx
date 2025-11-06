@@ -45,16 +45,22 @@ export function EditarAulaDialog({
         snapshot.docs.map(async (docSnap) => {
           const policialId = docSnap.data().policialId;
           
-          // Buscar dados do policial
-          const policialDoc = await getDocs(
-            query(collection(db, "policiais"), where("usuarioId", "==", policialId))
+          // Buscar dados do policial - primeiro por id, depois por usuarioId
+          let policialDoc = await getDocs(
+            query(collection(db, "policiais"), where("id", "==", policialId))
           );
+
+          if (policialDoc.empty) {
+            policialDoc = await getDocs(
+              query(collection(db, "policiais"), where("usuarioId", "==", policialId))
+            );
+          }
 
           if (!policialDoc.empty) {
             const policialData = policialDoc.docs[0].data();
             return {
-              id: policialId,
-              nome: `${policialData.patente} ${policialData.nomeGuerra}`,
+              id: policialData.id || policialDoc.docs[0].id,
+              nome: `${policialData.postGrad || policialData.patente || ''} ${policialData.nomeGuerra}`.trim(),
               nomeCompleto: policialData.nome
             };
           }

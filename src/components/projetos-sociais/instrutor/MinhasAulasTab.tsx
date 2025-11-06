@@ -66,7 +66,7 @@ const MinhasAulasTab = ({ policialId, projetos }: MinhasAulasTabProps) => {
   const formatarData = (data: any) => {
     try {
       const dataObj = data?.toDate ? data.toDate() : new Date(data);
-      return format(dataObj, "dd/MM/yyyy", { locale: ptBR });
+      return format(dataObj, "dd/MM/yyyy (EEEE)", { locale: ptBR });
     } catch {
       return 'Data inválida';
     }
@@ -166,9 +166,9 @@ const MinhasAulasTab = ({ policialId, projetos }: MinhasAulasTabProps) => {
                     </div>
                   </div>
 
-                  {aula.status === 'encerrada' && aula.horaInicio && aula.horaFim && (
+                  {aula.status === 'encerrada' && (
                     <p className="text-xs text-muted-foreground border-t pt-2">
-                      ✓ {calcularHorasCredito(aula.horaInicio, aula.horaFim)} horas creditadas
+                      ✓ 3 horas creditadas
                     </p>
                   )}
 

@@ -21,10 +21,10 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
 
   const carregarAulas = async () => {
     try {
+      // Buscar todas as aulas sem orderBy para evitar índice composto
       const q = query(
         collection(db, 'projetos_aulas'),
-        where('projetoId', '==', projeto.id),
-        orderBy('data', 'desc')
+        where('projetoId', '==', projeto.id)
       );
       
       const snapshot = await getDocs(q);
@@ -50,9 +50,16 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
             id: docSnap.id,
             ...aulaData,
             instrutoresNomes
-          };
+          } as any;
         })
       );
+
+      // Ordenar em memória
+      aulasData.sort((a: any, b: any) => {
+        const dataA = a.data?.toDate ? a.data.toDate() : new Date(a.data);
+        const dataB = b.data?.toDate ? b.data.toDate() : new Date(b.data);
+        return dataB.getTime() - dataA.getTime();
+      });
 
       setAulas(aulasData);
       setLoading(false);
