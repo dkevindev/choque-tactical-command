@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Users, FileText, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '@/firebase';
 
 interface VisualizarAulasTabProps {
   projeto: any;
@@ -14,6 +18,7 @@ interface VisualizarAulasTabProps {
 const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
   const [aulas, setAulas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [gerando, setGerando] = useState<string | null>(null);
 
   useEffect(() => {
     carregarAulas();
@@ -89,6 +94,85 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
     }
   };
 
+  const gerarListaFrequencia = async (aula: any) => {
+    try {
+      setGerando(aula.id);
+      
+      // Buscar dados completos dos instrutores
+      const instrutoresDetalhados = await Promise.all(
+        (aula.instrutores || []).map(async (instrutorId: string) => {
+          let policialSnap = await getDocs(
+            query(collection(db, 'policiais'), where('id', '==', instrutorId))
+          );
+
+          if (policialSnap.empty) {
+            policialSnap = await getDocs(
+              query(collection(db, 'policiais'), where('usuarioId', '==', instrutorId))
+            );
+          }
+
+          if (!policialSnap.empty) {
+            const policial = policialSnap.docs[0].data();
+            return {
+              postGrad: policial['Post/Grad'] || policial.postGrad || '',
+              nomeGuerra: policial['NOME DE GUERRA'] || policial.nomeGuerra || ''
+            };
+          }
+          return { postGrad: '', nomeGuerra: 'Desconhecido' };
+        })
+      );
+
+      // Buscar alunos presentes
+      const alunosDetalhados = await Promise.all(
+        (aula.alunosPresentes || []).map(async (alunoId: string) => {
+          const alunoDoc = await getDoc(doc(db, 'projetos_alunos', alunoId));
+          if (alunoDoc.exists()) {
+            const alunoData = alunoDoc.data();
+            return {
+              nomeCompleto: alunoData.nomeCompleto || '',
+              turno: alunoData.turno || ''
+            };
+          }
+          return { nomeCompleto: 'Aluno não encontrado', turno: '' };
+        })
+      );
+
+      // Buscar conteúdo da aula se houver
+      let conteudo = '';
+      if (aula.conteudoId) {
+        const conteudoDoc = await getDoc(doc(db, 'projetos_conteudos', aula.conteudoId));
+        if (conteudoDoc.exists()) {
+          conteudo = conteudoDoc.data().descricao || '';
+        }
+      }
+
+      const dataFormatada = formatarData(aula.data);
+      const turnoTexto = aula.turnoNome || `Turno ${aula.turno}`;
+
+      // Chamar cloud function
+      const functions = getFunctions(app);
+      const gerarDocx = httpsCallable(functions, 'gerarListaFrequenciaDocx');
+      
+      const resultado = await gerarDocx({
+        instrutores: instrutoresDetalhados,
+        alunos: alunosDetalhados,
+        dataAula: dataFormatada,
+        turno: turnoTexto,
+        conteudo: conteudo
+      });
+
+      toast.success('Lista de frequência gerada com sucesso!');
+      
+      // Download será feito pela cloud function
+      
+    } catch (error) {
+      console.error('Erro ao gerar lista:', error);
+      toast.error('Erro ao gerar lista de frequência');
+    } finally {
+      setGerando(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -151,9 +235,30 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
             </div>
 
             {aula.status === 'encerrada' && (
-              <p className="text-xs text-muted-foreground border-t pt-2">
-                ✓ 3 horas creditadas por instrutor
-              </p>
+              <>
+                <p className="text-xs text-muted-foreground border-t pt-2">
+                  ✓ 3 horas creditadas por instrutor
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => gerarListaFrequencia(aula)}
+                  disabled={gerando === aula.id}
+                >
+                  {gerando === aula.id ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Gerar Lista de Frequência
+                    </>
+                  )}
+                </Button>
+              </>
             )}
           </CardContent>
         </Card>
