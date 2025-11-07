@@ -502,3 +502,7 @@ exports.gerarNadaConstaDocx = functions.https.onRequest(appNadaConsta);
 // ----------------- FUNÇÃO LIVRO DA GUARDA -----------------
 const { gerarLivroGuardaDocx } = require('./gerar-livro-guarda');
 exports.gerarLivroGuardaDocx = gerarLivroGuardaDocx;
+
+// ----------------- FUNÇÃO LISTA DE FREQUÊNCIA (PROJETOS SOCIAIS) -----------------
+const { gerarListaFrequenciaDocx } = require('./gerar-lista-frequencia');
+exports.gerarListaFrequenciaDocx = gerarListaFrequenciaDocx;

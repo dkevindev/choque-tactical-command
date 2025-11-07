@@ -9,6 +9,8 @@ import { Calendar as CalendarIcon } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { AulaDetalhesCard } from '../instrutor/AulaDetalhesCard';
+import { RelatorioMensalGestor } from './RelatorioMensalGestor';
 
 interface RelatoriosGestorTabProps {
   projeto: any;
@@ -73,12 +75,11 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
 
             // Mapear campos corretamente
             const postGrad = policial['Post/Grad'] || policial.postGrad || '';
-            const numeral = policial.NUMERAL || policial.numeral || '';
-            const nome = policial.NOME || policial.nome || policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
+            const nomeGuerra = policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
 
             return {
               id: data.policialId,
-              nome: `${postGrad} ${numeral} ${nome}`.trim(),
+              nome: `${postGrad} ${nomeGuerra}`.trim(),
               aulasMes: aulasMes.length,
               horasMes: aulasMes.length * 3,
               horasTotal: aulasInstrutor.length * 3
@@ -151,10 +152,11 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
 
   return (
     <Tabs defaultValue="instrutores" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="instrutores">Por Instrutor</TabsTrigger>
         <TabsTrigger value="frequencia">Frequência Alunos</TabsTrigger>
         <TabsTrigger value="calendario">Calendário</TabsTrigger>
+        <TabsTrigger value="relatorio">Relatório</TabsTrigger>
       </TabsList>
 
       <TabsContent value="instrutores">
@@ -339,33 +341,17 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
               {dataSelecionada && aulasNoDia.length > 0 && (
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
                   {aulasNoDia.map(aula => (
-                    <div key={aula.id} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge variant="secondary">{aula.turnoNome || aula.turno}</Badge>
-                        <span className="text-xs text-muted-foreground">3h</span>
-                      </div>
-                      {aula.turmaId && (
-                        <p className="text-sm font-medium mb-1">{aula.turmaNome}</p>
-                      )}
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{aula.instrutores?.length || 1} instrutor(es)</span>
-                        {aula.alunosPresentes && (
-                          <span>{aula.alunosPresentes.length} alunos</span>
-                        )}
-                      </div>
-                      <Badge 
-                        variant={aula.instrutoresCompleto ? "default" : "outline"}
-                        className="mt-2"
-                      >
-                        {aula.instrutoresCompleto ? 'Completa' : 'Incompleta'}
-                      </Badge>
-                    </div>
+                    <AulaDetalhesCard key={aula.id} aula={aula} />
                   ))}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
+      </TabsContent>
+
+      <TabsContent value="relatorio">
+        <RelatorioMensalGestor projeto={projeto} />
       </TabsContent>
     </Tabs>
   );

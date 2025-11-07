@@ -35,12 +35,23 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
           // Buscar nomes dos instrutores
           const instrutoresNomes = await Promise.all(
             (aulaData.instrutores || []).map(async (instrutorId: string) => {
-              const policialSnap = await getDocs(
-                query(collection(db, 'policiais'), where('__name__', '==', instrutorId))
+              // Tentar buscar por id primeiro
+              let policialSnap = await getDocs(
+                query(collection(db, 'policiais'), where('id', '==', instrutorId))
               );
+
+              // Se não encontrar, tentar por usuarioId
+              if (policialSnap.empty) {
+                policialSnap = await getDocs(
+                  query(collection(db, 'policiais'), where('usuarioId', '==', instrutorId))
+                );
+              }
+
               if (!policialSnap.empty) {
                 const policial = policialSnap.docs[0].data();
-                return `${policial.postGrad || ''} ${policial.numeral || ''} ${policial.nomeGuerra || policial.nome}`.trim();
+                const postGrad = policial['Post/Grad'] || policial.postGrad || '';
+                const nomeGuerra = policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
+                return `${postGrad} ${nomeGuerra}`.trim();
               }
               return 'Desconhecido';
             })

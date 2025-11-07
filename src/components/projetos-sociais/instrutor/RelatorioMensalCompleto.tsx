@@ -63,7 +63,9 @@ export const RelatorioMensalCompleto = ({ policialId, mesSelecionado }: Relatori
 
               if (!policialSnap.empty) {
                 const policial = policialSnap.docs[0].data();
-                return `${policial.postGrad || policial.patente || ''} ${policial.nomeGuerra}`.trim();
+                const postGrad = policial['Post/Grad'] || policial.postGrad || policial.patente || '';
+                const nomeGuerra = policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
+                return `${postGrad} ${nomeGuerra}`.trim();
               }
               return 'Desconhecido';
             })

@@ -9,7 +9,7 @@ import CadastroAlunosTab from './CadastroAlunosTab';
 import VisualizarAulasTab from './VisualizarAulasTab';
 import RelatoriosGestorTab from './RelatoriosGestorTab';
 import TurmasTab from './TurmasTab';
-import AulasIncompletasTab from './AulasIncompletasTab';
+import ConteudosAulaTab from './ConteudosAulaTab';
 
 interface GestorDashboardProps {
   projetos: any[];
@@ -122,8 +122,8 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
             {projetoSelecionado?.configuracao?.usaTurmas && (
               <TabsTrigger value="turmas">Turmas</TabsTrigger>
             )}
+            <TabsTrigger value="conteudos">Conteúdos</TabsTrigger>
             <TabsTrigger value="aulas">Aulas</TabsTrigger>
-            <TabsTrigger value="incompletas">Incompletas</TabsTrigger>
             <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
           </TabsList>
 
@@ -201,15 +201,12 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
             </TabsContent>
           )}
 
-          <TabsContent value="aulas">
-            <VisualizarAulasTab projeto={projetoSelecionado} />
+          <TabsContent value="conteudos">
+            <ConteudosAulaTab projeto={projetoSelecionado} />
           </TabsContent>
 
-          <TabsContent value="incompletas">
-            <AulasIncompletasTab 
-              projetoId={projetoSelecionado.id}
-              gestorId={policialLogado?.id || policialLogado}
-            />
+          <TabsContent value="aulas">
+            <VisualizarAulasTab projeto={projetoSelecionado} />
           </TabsContent>
 
           <TabsContent value="relatorios">

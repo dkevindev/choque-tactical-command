@@ -31,11 +31,13 @@ export const AulaDetalhesCard = ({ aula }: AulaDetalhesCardProps) => {
             );
           }
 
-          if (!policialSnap.empty) {
-            const policial = policialSnap.docs[0].data();
-            return `${policial.postGrad || policial.patente || ''} ${policial.nomeGuerra}`.trim();
-          }
-          return 'Desconhecido';
+              if (!policialSnap.empty) {
+                const policial = policialSnap.docs[0].data();
+                const postGrad = policial['Post/Grad'] || policial.postGrad || policial.patente || '';
+                const nomeGuerra = policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
+                return `${postGrad} ${nomeGuerra}`.trim();
+              }
+              return 'Desconhecido';
         })
       );
       setInstrutoresNomes(nomes);
