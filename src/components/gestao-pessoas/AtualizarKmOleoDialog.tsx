@@ -129,24 +129,27 @@ const AtualizarKmOleoDialog = ({ open, onOpenChange }: AtualizarKmOleoDialogProp
       return;
     }
 
-    if (kmOleo <= km) {
+    // Alerta se já passou da troca de óleo
+    if (km >= viatura.KMOLEO) {
       toast({
-        title: "KM de troca inválida",
-        description: "A próxima troca de óleo deve ser maior que a KM atual",
+        title: "⚠️ Atenção: Troca de óleo atrasada!",
+        description: `A viatura ${viatura.CADASTRO} já ultrapassou a quilometragem de troca de óleo (${viatura.KMOLEO.toLocaleString()} km)`,
         variant: "destructive"
       });
-      return;
     }
 
-    setUpdatedData(prev => ({
-      ...prev,
+    const dadosAtualizados = {
+      ...updatedData,
       [viatura.id]: { KM: km, KMOLEO: kmOleo }
-    }));
+    };
+
+    setUpdatedData(dadosAtualizados);
 
     if (currentStep < viaturas.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      handleFinalizar();
+      // Finalizar com os dados atualizados incluindo o último veículo
+      handleFinalizar(dadosAtualizados);
     }
   };
 
@@ -164,9 +167,9 @@ const AtualizarKmOleoDialog = ({ open, onOpenChange }: AtualizarKmOleoDialogProp
     }
   };
 
-  const handleFinalizar = async () => {
+  const handleFinalizar = async (dadosParaAtualizar = updatedData) => {
     try {
-      const updates = Object.entries(updatedData).map(async ([id, data]) => {
+      const updates = Object.entries(dadosParaAtualizar).map(async ([id, data]) => {
         const viaturaRef = doc(db, 'frota', id);
         await updateDoc(viaturaRef, data);
       });
@@ -175,7 +178,7 @@ const AtualizarKmOleoDialog = ({ open, onOpenChange }: AtualizarKmOleoDialogProp
 
       toast({
         title: "Atualização concluída!",
-        description: `${Object.keys(updatedData).length} viaturas foram atualizadas com sucesso`,
+        description: `${Object.keys(dadosParaAtualizar).length} viaturas foram atualizadas com sucesso`,
       });
 
       onOpenChange(false);
