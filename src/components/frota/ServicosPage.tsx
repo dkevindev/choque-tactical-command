@@ -167,54 +167,61 @@ export default function ServicosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Policial (Nome de Guerra 1)</TableHead>
+                  <TableHead>Data Início</TableHead>
+                  <TableHead>Data Fim</TableHead>
+                  <TableHead>Motorista</TableHead>
                   <TableHead>Viatura</TableHead>
                   <TableHead>Local</TableHead>
                   <TableHead>KM Inicial</TableHead>
                   <TableHead>KM Final</TableHead>
+                  <TableHead>KM Rodados</TableHead>
                   <TableHead>Avaria</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rowsFiltrados.map(r => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.iniciadoEm ? new Date(r.iniciadoEm).toLocaleString('pt-BR') : '-'}</TableCell>
-                    <TableCell>{r.motorista || '-'}</TableCell>
-                    <TableCell>{r.cadastro || r.placa || '-'}</TableCell>
-                    <TableCell>{r.area || '-'}</TableCell>
-                    <TableCell>{r.kmInicial ?? '-'}</TableCell>
-                    <TableCell>{r.kmFinal ?? '-'}</TableCell>
-                    <TableCell>
-                      {getTeveAvaria(r) ? (
-                        <Badge variant="destructive">Sim</Badge>
-                      ) : (
-                        <Badge variant="secondary">Não</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={r.status === 'aberto' ? 'secondary' : 'default'}>
-                        {r.status?.toUpperCase() || '-'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {r.status === 'aberto' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setServicoParaEncerrar(r);
-                            setShowEncerrarAdmin(true);
-                          }}
-                        >
-                          Encerrar
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {rowsFiltrados.map(r => {
+                  const kmRodados = (r.kmFinal && r.kmInicial) ? r.kmFinal - r.kmInicial : null;
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell>{r.iniciadoEm ? new Date(r.iniciadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</TableCell>
+                      <TableCell>{r.encerradoEm ? new Date(r.encerradoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</TableCell>
+                      <TableCell>{r.motorista || '-'}</TableCell>
+                      <TableCell>{r.cadastro || r.placa || '-'}</TableCell>
+                      <TableCell>{r.area || '-'}</TableCell>
+                      <TableCell>{r.kmInicial ?? '-'}</TableCell>
+                      <TableCell>{r.kmFinal ?? '-'}</TableCell>
+                      <TableCell>{kmRodados !== null ? `${kmRodados} km` : '-'}</TableCell>
+                      <TableCell>
+                        {getTeveAvaria(r) ? (
+                          <Badge variant="destructive">Sim</Badge>
+                        ) : (
+                          <Badge variant="secondary">Não</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={r.status === 'aberto' ? 'secondary' : 'default'}>
+                          {r.status?.toUpperCase() || '-'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {r.status === 'aberto' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setServicoParaEncerrar(r);
+                              setShowEncerrarAdmin(true);
+                            }}
+                          >
+                            Encerrar
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
               <TableCaption>{loading ? 'Carregando...' : `${rowsFiltrados.length} registro(s)`}</TableCaption>
             </Table>
