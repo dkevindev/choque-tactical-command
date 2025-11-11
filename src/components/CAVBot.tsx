@@ -167,8 +167,13 @@ const CAVBot = () => {
   };
 
   // Salvar avaria no documento da viatura (coleção 'frota')
-  const salvarAvaria = async (options?: { gravidade?: 'LEVE' | 'MODERADA' | 'GRAVE' }) => {
-    if (!avariasViatura || !policialLogado || !avariaDraft.tipo) {
+  const salvarAvaria = async (dados: {
+    tipo: string;
+    descricao?: string;
+    gravidade: 'LEVE' | 'MODERADA' | 'GRAVE';
+    posicao?: { x: number; y: number } | null;
+  }) => {
+    if (!avariasViatura || !policialLogado || !dados.tipo) {
       pushBot('Dados insuficientes para salvar a avaria.');
       return;
     }
@@ -180,19 +185,21 @@ const CAVBot = () => {
 
       // Para ângulos com imagem, exigir marcação por clique
       const angulosComImagem = ['frontal', 'traseira', 'esquerdo', 'direito'] as const;
-      if (angulosComImagem.includes(avariasAngulo as any) && !posicaoTemporaria) {
+      const posicaoFinal = dados.posicao || posicaoTemporaria;
+      
+      if (angulosComImagem.includes(avariasAngulo as any) && !posicaoFinal) {
         pushBot('Clique na imagem para marcar a posição da avaria antes de salvar.');
         return;
       }
 
       const nova = {
         id: Date.now().toString(),
-        x: posicaoTemporaria ? posicaoTemporaria.x * 100 : 0,
-        y: posicaoTemporaria ? posicaoTemporaria.y * 100 : 0,
-        tipo: avariaDraft.tipo,
-        descricao: avariaDraft.descricao || '',
+        x: posicaoFinal ? posicaoFinal.x * 100 : 0,
+        y: posicaoFinal ? posicaoFinal.y * 100 : 0,
+        tipo: dados.tipo,
+        descricao: dados.descricao || '',
         data: new Date().toISOString(),
-        gravidade: options?.gravidade || avariaDraft.gravidade || 'LEVE',
+        gravidade: dados.gravidade,
         status: 'PENDENTE',
         responsavel: policialLogado.nomeGuerra1 || policialLogado.NOME,
         angulo: avariasAngulo,
@@ -201,7 +208,6 @@ const CAVBot = () => {
       await updateDoc(ref, { avarias: [...lista, nova] });
       setAvariasLista([...lista, nova]);
       pushBot(`✅ Avaria registrada (${nova.tipo} - ${nova.gravidade}) no ângulo ${avariasAngulo}.`);
-      setAvariaDraft({});
       setPosicaoTemporaria(null);
     } catch (e) {
       console.error('Erro ao salvar avaria:', e);
@@ -535,8 +541,16 @@ const CAVBot = () => {
             pushBot('Valor inválido. Digite: LEVE, MODERADA ou GRAVE.');
             return;
           }
-          setAvariaDraft(prev => ({ ...prev, gravidade: g as any }));
-          await salvarAvaria({ gravidade: g as any });
+          
+          // Passar dados completos para salvarAvaria
+          await salvarAvaria({
+            tipo: avariaDraft.tipo || '',
+            descricao: avariaDraft.descricao || '',
+            gravidade: g as any,
+            posicao: posicaoTemporaria
+          });
+          
+          setAvariaDraft({});
           setFlow(prev => ({ ...prev, stage: 'avarias_ui' }));
           return;
         }
@@ -563,14 +577,14 @@ const CAVBot = () => {
           return;
         }
 
-        // Serviço - encerrar
-        if (flow.stage === 'service_end_km') {
-          const kmf = parseInt(textToSend.replace(/\D/g, ''));
-          if (isNaN(kmf)) { pushBot('KM inválido. Digite apenas números.'); return; }
-          await encerrarServico(kmf);
-          setFlow(prev => ({ ...prev, stage: 'avarias_ui' }));
-          return;
-        }
+        // Serviço - encerrar (REMOVIDO - encerramento só via botão principal)
+        // if (flow.stage === 'service_end_km') {
+        //   const kmf = parseInt(textToSend.replace(/\D/g, ''));
+        //   if (isNaN(kmf)) { pushBot('KM inválido. Digite apenas números.'); return; }
+        //   await encerrarServico(kmf);
+        //   setFlow(prev => ({ ...prev, stage: 'avarias_ui' }));
+        //   return;
+        // }
       }
     }
 
@@ -645,9 +659,9 @@ const CAVBot = () => {
       pushBot('Informe sua matrícula (Portal do Policial):');
       return;
     }
-    if (lower.includes('avarias')) {
+    if (lower.includes('avarias') || lower.includes('iniciar serviço')) {
       setFlow({ active: true, type: 'avarias', stage: 'ask_matricula' });
-      pushBot('🔐 Acesso ao registro de avarias. Informe sua matrícula:');
+      pushBot('🔐 Acesso ao sistema de serviço e avarias. Informe sua matrícula:');
       return;
     }
     handleSendMessage(action);
@@ -739,7 +753,7 @@ const CAVBot = () => {
                   className="quick-button"
                   onClick={() => handleQuickAction('Avarias')}
                 >
-                  🛠️ Avarias
+                  🚗 Iniciar Serviço
                 </button>
                 <button
                   className="quick-button"
@@ -901,12 +915,9 @@ const CAVBot = () => {
                     ▶️ Iniciar Serviço
                   </button>
                 ) : (
-                  <button
-                    className="quick-button"
-                    onClick={() => { setFlow(prev => ({ ...prev, stage: 'service_end_km' })); pushBot('Informe o KM final:'); }}
-                  >
-                    ⏹️ Encerrar Serviço
-                  </button>
+                  <div className="quick-actions-header" style={{ textAlign: 'center', padding: '0.75rem 1rem' }}>
+                    Serviço em andamento
+                  </div>
                 )}
                 <button
                   className="quick-button"
@@ -1167,8 +1178,19 @@ const CAVBot = () => {
                 </button>
                 <button className="quick-button" onClick={async () => {
                   if (!modalTipo.trim()) { pushBot('Informe o tipo da avaria.'); return; }
-                  setAvariaDraft({ tipo: modalTipo.trim(), descricao: modalDesc.trim(), gravidade: modalGravidade });
-                  await salvarAvaria({ gravidade: modalGravidade });
+                  
+                  // Passar dados diretamente, não usar setAvariaDraft
+                  await salvarAvaria({
+                    tipo: modalTipo.trim(),
+                    descricao: modalDesc.trim(),
+                    gravidade: modalGravidade,
+                    posicao: posicaoTemporaria
+                  });
+                  
+                  // Limpar campos
+                  setModalTipo('');
+                  setModalDesc('');
+                  setModalGravidade('LEVE');
                   setShowAvariaModal(false);
                 }}>
                   Registrar

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/firebase';
-import { collection, getDocs, doc, getDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, where, orderBy, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,12 @@ export default function ServicosPage() {
   const [filtroPolicial, setFiltroPolicial] = useState<string>('');
   const [filtroViatura, setFiltroViatura] = useState<string>('');
   const [avariasPorVtr, setAvariasPorVtr] = useState<Record<string, AvariaResumo[]>>({});
+  
+  // Estados para encerramento administrativo
+  const [showEncerrarAdmin, setShowEncerrarAdmin] = useState(false);
+  const [servicoParaEncerrar, setServicoParaEncerrar] = useState<ServicoDiario | null>(null);
+  const [kmFinalAdmin, setKmFinalAdmin] = useState('');
+  const [msgEncerrarAdmin, setMsgEncerrarAdmin] = useState('');
 
   useEffect(() => {
     const fetchServicos = async () => {
@@ -96,6 +102,43 @@ export default function ServicosPage() {
     ));
   };
 
+  // Função para encerrar serviço administrativamente (sem senha)
+  const encerrarServicoAdministrativo = async () => {
+    if (!servicoParaEncerrar) return;
+    const kmf = parseInt(kmFinalAdmin.replace(/\D/g, '') || '');
+    if (isNaN(kmf)) {
+      setMsgEncerrarAdmin('KM inválido.');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'servicosDiarios', servicoParaEncerrar.id), {
+        kmFinal: kmf,
+        status: 'encerrado',
+        encerradoEm: new Date().toISOString(),
+        encerradoPorId: 'ADMIN',
+        encerradoPorNome: 'Encerramento Administrativo',
+      });
+      
+      // Atualizar KM da viatura
+      if (servicoParaEncerrar.viaturaId) {
+        await updateDoc(doc(db, 'frota', servicoParaEncerrar.viaturaId), { KM: kmf });
+      }
+      
+      setMsgEncerrarAdmin('✅ Serviço encerrado com sucesso.');
+      setTimeout(() => {
+        setShowEncerrarAdmin(false);
+        setServicoParaEncerrar(null);
+        setKmFinalAdmin('');
+        setMsgEncerrarAdmin('');
+        // Recarregar serviços
+        window.location.reload();
+      }, 1000);
+    } catch (e) {
+      console.error('Erro ao encerrar serviço:', e);
+      setMsgEncerrarAdmin('Erro ao encerrar serviço.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card className="bg-card border-border shadow-tactical">
@@ -132,6 +175,7 @@ export default function ServicosPage() {
                   <TableHead>KM Final</TableHead>
                   <TableHead>Avaria</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -155,6 +199,20 @@ export default function ServicosPage() {
                         {r.status?.toUpperCase() || '-'}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      {r.status === 'aberto' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setServicoParaEncerrar(r);
+                            setShowEncerrarAdmin(true);
+                          }}
+                        >
+                          Encerrar
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -163,6 +221,42 @@ export default function ServicosPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de encerramento administrativo */}
+      {showEncerrarAdmin && servicoParaEncerrar && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 12, padding: '1.5rem', width: 'min(500px, 90vw)' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>Encerrar Serviço (Administrativo)</h3>
+            <div style={{ color: 'hsl(var(--muted-foreground))', marginBottom: '1rem' }}>
+              <strong>Viatura:</strong> {servicoParaEncerrar.cadastro || servicoParaEncerrar.placa}<br/>
+              <strong>Motorista:</strong> {servicoParaEncerrar.motorista || '-'}<br/>
+              <strong>KM Inicial:</strong> {servicoParaEncerrar.kmInicial ?? '-'}
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'hsl(var(--foreground))' }}>KM Final</label>
+              <Input
+                type="number"
+                value={kmFinalAdmin}
+                onChange={e => setKmFinalAdmin(e.target.value)}
+                placeholder="Informe o KM final"
+              />
+            </div>
+            {msgEncerrarAdmin && (
+              <div style={{ color: msgEncerrarAdmin.startsWith('✅') ? '#86efac' : '#fca5a5', marginBottom: '1rem' }}>
+                {msgEncerrarAdmin}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <Button variant="outline" onClick={() => { setShowEncerrarAdmin(false); setServicoParaEncerrar(null); setKmFinalAdmin(''); setMsgEncerrarAdmin(''); }}>
+                Cancelar
+              </Button>
+              <Button onClick={encerrarServicoAdministrativo}>
+                Confirmar Encerramento
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
