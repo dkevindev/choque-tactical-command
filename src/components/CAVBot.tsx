@@ -219,7 +219,8 @@ const CAVBot = () => {
   const iniciarServico = async (payload?: { motorista?: string; kmInicial: number; area: string }) => {
     const kmInicialVal = payload?.kmInicial ?? servicoDraft.kmInicial;
     const areaVal = payload?.area ?? servicoDraft.area;
-    const motoristaVal = payload?.motorista ?? servicoDraft.motorista ?? (policialLogado?.nomeGuerra1 || policialLogado?.NOME);
+    // SEMPRE usar nomeGuerra1, nunca o nome completo
+    const motoristaVal = policialLogado?.nomeGuerra1 || policialLogado?.NOME || 'Sem identificação';
     if (!avariasViatura || !policialLogado || !kmInicialVal || !areaVal) {
       pushBot('Preencha KM inicial e área para iniciar o serviço.');
       return;
@@ -229,7 +230,7 @@ const CAVBot = () => {
         viaturaId: avariasViatura.id,
         cadastro: avariasViatura.CADASTRO || null,
         placa: avariasViatura.PLACA,
-        motorista: motoristaVal,
+        motorista: motoristaVal, // Agora sempre salva nomeGuerra1
         motoristaId: policialLogado.id,
         kmInicial: kmInicialVal,
         area: areaVal,
@@ -764,7 +765,31 @@ const CAVBot = () => {
                       const q = query(collection(db, 'servicosDiarios'), where('status','==','aberto'));
                       const snap = await getDocs(q);
                       const items: ServicoItem[] = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-                      setServicosAbertos(items);
+                      
+                      // Buscar Nome de Guerra 1 dos policiais
+                      const uniqueMotoristaIds = Array.from(new Set(items.map(r => r.motoristaId).filter(Boolean)));
+                      const nomeGuerraMap: Record<string, string> = {};
+                      
+                      await Promise.all(uniqueMotoristaIds.map(async (mid) => {
+                        try {
+                          const polRef = doc(db, 'policiais', mid!);
+                          const polSnap = await getDoc(polRef);
+                          if (polSnap.exists()) {
+                            const polData: any = polSnap.data();
+                            nomeGuerraMap[mid!] = polData.nomeGuerra1 || polData.NOME || 'Sem identificação';
+                          }
+                        } catch (e) {
+                          console.error('Erro ao buscar policial:', e);
+                        }
+                      }));
+                      
+                      // Atualizar motorista com nome de guerra
+                      const itemsAtualizados = items.map(r => ({
+                        ...r,
+                        motorista: r.motoristaId && nomeGuerraMap[r.motoristaId] ? nomeGuerraMap[r.motoristaId] : r.motorista
+                      }));
+                      
+                      setServicosAbertos(itemsAtualizados);
                     } catch (e) {
                       pushBot('Erro ao carregar serviços abertos.');
                     }

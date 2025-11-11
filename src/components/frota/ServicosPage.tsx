@@ -51,7 +51,31 @@ export default function ServicosPage() {
         const q = query(col, orderBy('iniciadoEm', 'desc'));
         const snap = await getDocs(q);
         const rows: ServicoDiario[] = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-        setServicos(rows);
+        
+        // Buscar Nome de Guerra 1 dos policiais para serviços antigos que salvaram nome completo
+        const uniqueMotoristaIds = Array.from(new Set(rows.map(r => r.motoristaId).filter(Boolean)));
+        const nomeGuerraMap: Record<string, string> = {};
+        
+        await Promise.all(uniqueMotoristaIds.map(async (mid) => {
+          try {
+            const polRef = doc(db, 'policiais', mid);
+            const polSnap = await getDoc(polRef);
+            if (polSnap.exists()) {
+              const polData: any = polSnap.data();
+              nomeGuerraMap[mid] = polData.nomeGuerra1 || polData.NOME || 'Sem identificação';
+            }
+          } catch (e) {
+            console.error('Erro ao buscar policial:', e);
+          }
+        }));
+        
+        // Atualizar motorista com nome de guerra
+        const rowsAtualizados = rows.map(r => ({
+          ...r,
+          motorista: r.motoristaId && nomeGuerraMap[r.motoristaId] ? nomeGuerraMap[r.motoristaId] : r.motorista
+        }));
+        
+        setServicos(rowsAtualizados);
 
         // Buscar avarias das viaturas listadas (para a coluna "Teve avaria")
         const uniqueVtrs = Array.from(new Set(rows.map(r => r.viaturaId).filter(Boolean)));
