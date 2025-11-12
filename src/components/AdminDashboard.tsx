@@ -134,6 +134,39 @@ const DashboardOverview = () => {
       description: 'Patrimônio total'
     }
   ]);
+
+  // Função auxiliar para calcular tempo restante até vencimento
+  const calcularTempoRestante = (dataVencimento: string) => {
+    const hoje = new Date();
+    const vencimento = new Date(dataVencimento);
+    
+    let anos = vencimento.getFullYear() - hoje.getFullYear();
+    let meses = vencimento.getMonth() - hoje.getMonth();
+    let dias = vencimento.getDate() - hoje.getDate();
+
+    if (dias < 0) {
+      meses--;
+      const ultimoDiaMesAnterior = new Date(vencimento.getFullYear(), vencimento.getMonth(), 0).getDate();
+      dias += ultimoDiaMesAnterior;
+    }
+
+    if (meses < 0) {
+      anos--;
+      meses += 12;
+    }
+
+    const totalMeses = anos * 12 + meses;
+
+    if (totalMeses === 0 && dias === 0) {
+      return 'Vence hoje';
+    } else if (totalMeses === 0) {
+      return `Vence em ${dias} dia${dias !== 1 ? 's' : ''}`;
+    } else if (dias === 0) {
+      return `Vence em ${totalMeses} ${totalMeses === 1 ? 'mês' : 'meses'}`;
+    } else {
+      return `Vence em ${totalMeses} ${totalMeses === 1 ? 'mês' : 'meses'} e ${dias} dia${dias !== 1 ? 's' : ''}`;
+    }
+  };
   
   const [coletesVencidos, setColetesVencidos] = useState<any[]>([]);
   const [coletesVencendo, setColetesVencendo] = useState<any[]>([]);
@@ -275,7 +308,7 @@ const DashboardOverview = () => {
     <>
       {/* Modal Coletes Vencidos */}
       <Dialog open={showColetesVencidosModal} onOpenChange={setShowColetesVencidosModal}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogContent className="max-w-3xl max-h-[80vh] bg-destructive/10 dark:bg-destructive/20 border-destructive">
           <DialogHeader>
             <DialogTitle className="text-destructive">Coletes Balísticos Vencidos</DialogTitle>
             <DialogDescription>
@@ -284,31 +317,49 @@ const DashboardOverview = () => {
           </DialogHeader>
           <ScrollArea className="h-[500px] pr-4">
             <div className="space-y-3">
-              {coletesVencidos.map((colete: any) => (
-                <div key={colete.id} className="border border-destructive/30 rounded-lg p-4 bg-destructive/5">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        Número de Série: {colete.numeroSerie || 'S/N'}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Vencimento: {new Date(colete.vencimento).toLocaleDateString('pt-BR')}
-                      </p>
-                      {colete.policialAssociadoNome && (
-                        <p className="text-sm text-muted-foreground">
-                          Cautelado: {colete.policialAssociadoNome}
+              {coletesVencidos.map((colete: any) => {
+                const hoje = new Date();
+                const vencimento = new Date(colete.vencimento);
+                const diasVencidos = Math.floor((hoje.getTime() - vencimento.getTime()) / (1000 * 60 * 60 * 24));
+                const mesesVencidos = Math.floor(diasVencidos / 30);
+                const diasRestantes = diasVencidos % 30;
+
+                let textoVencido = '';
+                if (mesesVencidos > 0) {
+                  textoVencido = `Vencido há ${mesesVencidos} ${mesesVencidos === 1 ? 'mês' : 'meses'}${diasRestantes > 0 ? ` e ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}` : ''}`;
+                } else {
+                  textoVencido = `Vencido há ${diasVencidos} dia${diasVencidos !== 1 ? 's' : ''}`;
+                }
+
+                return (
+                  <div key={colete.id} className="border border-destructive/50 rounded-lg p-4 bg-destructive/20 dark:bg-destructive/30">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground">
+                          Número de Série: {colete.numeroSerie || 'S/N'}
                         </p>
-                      )}
-                      {colete.policialAssociadoPostGrad && (
-                        <p className="text-sm text-muted-foreground">
-                          Posto/Graduação: {colete.policialAssociadoPostGrad}
+                        <p className="text-sm text-destructive font-medium mt-1">
+                          {textoVencido}
                         </p>
-                      )}
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Vencimento: {new Date(colete.vencimento).toLocaleDateString('pt-BR')}
+                        </p>
+                        {colete.policialAssociadoNome && (
+                          <p className="text-sm text-muted-foreground">
+                            Cautelado: {colete.policialAssociadoNome}
+                          </p>
+                        )}
+                        {colete.policialAssociadoPostGrad && (
+                          <p className="text-sm text-muted-foreground">
+                            Posto/Graduação: {colete.policialAssociadoPostGrad}
+                          </p>
+                        )}
+                      </div>
+                      <Badge variant="destructive" className="shrink-0">Vencido</Badge>
                     </div>
-                    <Badge variant="destructive">Vencido</Badge>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </ScrollArea>
         </DialogContent>
@@ -316,7 +367,7 @@ const DashboardOverview = () => {
 
       {/* Modal Coletes Vencendo */}
       <Dialog open={showColetesVencendoModal} onOpenChange={setShowColetesVencendoModal}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogContent className="max-w-3xl max-h-[80vh] bg-orange-900/20 dark:bg-orange-950/40 border-orange-700">
           <DialogHeader>
             <DialogTitle className="text-orange-700 dark:text-orange-400">
               Coletes Vencendo nos Próximos 6 Meses
@@ -327,31 +378,38 @@ const DashboardOverview = () => {
           </DialogHeader>
           <ScrollArea className="h-[500px] pr-4">
             <div className="space-y-3">
-              {coletesVencendo.map((colete: any) => (
-                <div key={colete.id} className="border border-orange-300 dark:border-orange-700 rounded-lg p-4 bg-orange-50 dark:bg-orange-950/30">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        Número de Série: {colete.numeroSerie || 'S/N'}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Vencimento: {new Date(colete.vencimento).toLocaleDateString('pt-BR')}
-                      </p>
-                      {colete.policialAssociadoNome && (
-                        <p className="text-sm text-muted-foreground">
-                          Cautelado: {colete.policialAssociadoNome}
+              {coletesVencendo.map((colete: any) => {
+                const tempoRestante = calcularTempoRestante(colete.vencimento);
+
+                return (
+                  <div key={colete.id} className="border border-orange-700 dark:border-orange-600 rounded-lg p-4 bg-orange-900/30 dark:bg-orange-950/50">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground">
+                          Número de Série: {colete.numeroSerie || 'S/N'}
                         </p>
-                      )}
-                      {colete.policialAssociadoPostGrad && (
-                        <p className="text-sm text-muted-foreground">
-                          Posto/Graduação: {colete.policialAssociadoPostGrad}
+                        <p className="text-sm text-orange-700 dark:text-orange-400 font-medium mt-1">
+                          {tempoRestante}
                         </p>
-                      )}
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Vencimento: {new Date(colete.vencimento).toLocaleDateString('pt-BR')}
+                        </p>
+                        {colete.policialAssociadoNome && (
+                          <p className="text-sm text-muted-foreground">
+                            Cautelado: {colete.policialAssociadoNome}
+                          </p>
+                        )}
+                        {colete.policialAssociadoPostGrad && (
+                          <p className="text-sm text-muted-foreground">
+                            Posto/Graduação: {colete.policialAssociadoPostGrad}
+                          </p>
+                        )}
+                      </div>
+                      <Badge className="bg-orange-700 text-white shrink-0">Vencendo</Badge>
                     </div>
-                    <Badge className="bg-orange-500 text-white">Vencendo</Badge>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </ScrollArea>
         </DialogContent>
@@ -411,20 +469,35 @@ const DashboardOverview = () => {
 
       {/* Alertas de Coletes */}
       {coletesVencidos.length > 0 && (
-        <Alert variant="destructive" className="border-destructive">
+        <Alert variant="destructive" className="border-destructive bg-destructive/10 dark:bg-destructive/20">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Coletes Balísticos Vencidos</AlertTitle>
+          <AlertTitle className="text-destructive">Coletes Balísticos Vencidos</AlertTitle>
           <AlertDescription>
-            <p className="text-destructive-foreground">
+            <p className="text-destructive font-medium">
               {coletesVencidos.length} colete(s) balístico(s) com validade vencida.
             </p>
-            <ul className="mt-2 space-y-1 text-destructive-foreground">
-              {coletesVencidos.slice(0, 3).map((colete: any) => (
-                <li key={colete.id} className="text-sm">
-                  • {colete.numeroSerie || 'S/N'} - Vencimento: {new Date(colete.vencimento).toLocaleDateString('pt-BR')}
-                  {colete.policialAssociadoNome && ` (Cautelado: ${colete.policialAssociadoNome})`}
-                </li>
-              ))}
+            <ul className="mt-2 space-y-1 text-foreground">
+              {coletesVencidos.slice(0, 3).map((colete: any) => {
+                const hoje = new Date();
+                const vencimento = new Date(colete.vencimento);
+                const diasVencidos = Math.floor((hoje.getTime() - vencimento.getTime()) / (1000 * 60 * 60 * 24));
+                const mesesVencidos = Math.floor(diasVencidos / 30);
+                const diasRestantes = diasVencidos % 30;
+
+                let textoVencido = '';
+                if (mesesVencidos > 0) {
+                  textoVencido = `há ${mesesVencidos} ${mesesVencidos === 1 ? 'mês' : 'meses'}${diasRestantes > 0 ? ` e ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}` : ''}`;
+                } else {
+                  textoVencido = `há ${diasVencidos} dia${diasVencidos !== 1 ? 's' : ''}`;
+                }
+
+                return (
+                  <li key={colete.id} className="text-sm">
+                    • {colete.numeroSerie || 'S/N'} - Vencido {textoVencido}
+                    {colete.policialAssociadoNome && ` (Cautelado: ${colete.policialAssociadoNome})`}
+                  </li>
+                );
+              })}
               {coletesVencidos.length > 3 && (
                 <li className="text-sm font-medium">+ {coletesVencidos.length - 3} outros coletes vencidos</li>
               )}
@@ -432,7 +505,7 @@ const DashboardOverview = () => {
             <Button
               size="sm"
               variant="outline"
-              className="mt-3"
+              className="mt-3 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
               onClick={() => setShowColetesVencidosModal(true)}
             >
               Ver Todos os Coletes Vencidos
@@ -442,22 +515,26 @@ const DashboardOverview = () => {
       )}
 
       {coletesVencendo.length > 0 && (
-        <Alert className="border-orange-500 bg-orange-50 dark:bg-orange-950/30">
-          <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-          <AlertTitle className="text-orange-900 dark:text-orange-300">
+        <Alert className="border-orange-700 bg-orange-900/20 dark:bg-orange-950/40">
+          <Clock className="h-4 w-4 text-orange-700 dark:text-orange-400" />
+          <AlertTitle className="text-orange-700 dark:text-orange-400">
             Coletes Vencendo nos Próximos 6 Meses
           </AlertTitle>
           <AlertDescription>
-            <p className="text-orange-800 dark:text-orange-200">
+            <p className="text-orange-700 dark:text-orange-300 font-medium">
               {coletesVencendo.length} colete(s) balístico(s) vencendo em breve.
             </p>
-            <ul className="mt-2 space-y-1 text-orange-800 dark:text-orange-200">
-              {coletesVencendo.slice(0, 3).map((colete: any) => (
-                <li key={colete.id} className="text-sm">
-                  • {colete.numeroSerie || 'S/N'} - Vencimento: {new Date(colete.vencimento).toLocaleDateString('pt-BR')}
-                  {colete.policialAssociadoNome && ` (Cautelado: ${colete.policialAssociadoNome})`}
-                </li>
-              ))}
+            <ul className="mt-2 space-y-1 text-foreground">
+              {coletesVencendo.slice(0, 3).map((colete: any) => {
+                const tempoRestante = calcularTempoRestante(colete.vencimento);
+                
+                return (
+                  <li key={colete.id} className="text-sm">
+                    • {colete.numeroSerie || 'S/N'} - {tempoRestante}
+                    {colete.policialAssociadoNome && ` (Cautelado: ${colete.policialAssociadoNome})`}
+                  </li>
+                );
+              })}
               {coletesVencendo.length > 3 && (
                 <li className="text-sm font-medium">+ {coletesVencendo.length - 3} outros coletes vencendo</li>
               )}
@@ -465,7 +542,7 @@ const DashboardOverview = () => {
             <Button
               size="sm"
               variant="outline"
-              className="mt-3 border-orange-500 text-orange-700 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900/30"
+              className="mt-3 border-orange-700 text-orange-700 hover:bg-orange-800 hover:text-white dark:text-orange-300 dark:hover:bg-orange-900"
               onClick={() => setShowColetesVencendoModal(true)}
             >
               Ver Todos os Coletes Vencendo
