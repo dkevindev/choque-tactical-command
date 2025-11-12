@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -435,116 +437,116 @@ const GerenciarCautelas = () => {
       </Card>
 
       {/* Details Modal */}
-      {cautelaDetalhes && (
-        <Card className="bg-primary/10 border-primary">
-          <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
+      <Dialog open={!!cautelaDetalhes} onOpenChange={(open) => !open && setCautelaDetalhes(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <UserCheck className="h-5 w-5" />
               Detalhes da Cautela
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[600px] pr-4">
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Dados do Policial</h4>
-                  <p><strong>Nome:</strong> {cautelaDetalhes.policialNome}</p>
-                  <p><strong>Matrícula:</strong> {cautelaDetalhes.policialMatricula}</p>
+                  <p><strong>Nome:</strong> {cautelaDetalhes?.policialNome}</p>
+                  <p><strong>Matrícula:</strong> {cautelaDetalhes?.policialMatricula}</p>
                 </div>
                 
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Dados da Cautela</h4>
-                  <p><strong>Número:</strong> {cautelaDetalhes.numeroCautela || '-'}</p>
-                  <p><strong>Tipo:</strong> {cautelaDetalhes.tipoDocumento}</p>
-                  <p><strong>Status:</strong> {cautelaDetalhes.status}</p>
-                  <p><strong>Data Início:</strong> {cautelaDetalhes.dataInicio.toLocaleString()}</p>
-                  {cautelaDetalhes.dataFim && (
+                  <p><strong>Número:</strong> {cautelaDetalhes?.numeroCautela || '-'}</p>
+                  <p><strong>Tipo:</strong> {cautelaDetalhes?.tipoDocumento}</p>
+                  <p><strong>Status:</strong> {cautelaDetalhes?.status}</p>
+                  <p><strong>Data Início:</strong> {cautelaDetalhes?.dataInicio.toLocaleString()}</p>
+                  {cautelaDetalhes?.dataFim && (
                     <p><strong>Data Fim:</strong> {cautelaDetalhes.dataFim.toLocaleString()}</p>
                   )}
                 </div>
               </div>
 
-                <div>
-                  <h4 className="font-semibold text-foreground mb-2">Materiais Cautelados</h4>
-                  <div className="space-y-2">
-                    {cautelaDetalhes.materiais.map((material, index) => (
-                      <div key={index}>
-                        {/* Item principal */}
-                        <div className="p-3 bg-muted rounded border">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-foreground">{material.nome}</p>
-                              <p className="text-sm text-muted-foreground">{material.categoria}</p>
-                              {material.numeroSerie && (
-                                <p className="text-xs text-muted-foreground">Série: {material.numeroSerie}</p>
-                              )}
-                              {material.fabricante && (
-                                <p className="text-xs text-muted-foreground">Fabricante: {material.fabricante}</p>
-                              )}
-                              {material.modelo && (
-                                <p className="text-xs text-muted-foreground">Modelo: {material.modelo}</p>
-                              )}
-                              {material.calibre && (
-                                <p className="text-xs text-muted-foreground">Calibre: {material.calibre}</p>
-                              )}
-                              {material.datadeVencimento && (
-                                <p className="text-xs text-muted-foreground">Data de Vencimento: {material.datadeVencimento}</p>
-                              )}
-                            </div>
-                            <Badge variant="outline">Qtd: {material.quantidade ? material.quantidade : 1}</Badge>
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Materiais Cautelados</h4>
+                <div className="space-y-2">
+                  {cautelaDetalhes?.materiais.map((material, index) => (
+                    <div key={index}>
+                      {/* Item principal */}
+                      <div className="p-3 bg-muted rounded border">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-foreground">{material.nome}</p>
+                            <p className="text-sm text-muted-foreground">{material.categoria}</p>
+                            {material.numeroSerie && (
+                              <p className="text-xs text-muted-foreground">Série: {material.numeroSerie}</p>
+                            )}
+                            {material.fabricante && (
+                              <p className="text-xs text-muted-foreground">Fabricante: {material.fabricante}</p>
+                            )}
+                            {material.modelo && (
+                              <p className="text-xs text-muted-foreground">Modelo: {material.modelo}</p>
+                            )}
+                            {material.calibre && (
+                              <p className="text-xs text-muted-foreground">Calibre: {material.calibre}</p>
+                            )}
+                            {material.datadeVencimento && (
+                              <p className="text-xs text-muted-foreground">Data de Vencimento: {material.datadeVencimento}</p>
+                            )}
                           </div>
+                          <Badge variant="outline">Qtd: {material.quantidade ? material.quantidade : 1}</Badge>
                         </div>
-                        
-                        {/* Se for armamento e tiver carregadores/munições, exibir como itens separados */}
-                        {material.categoria === 'Armamento' && (
-                          <>
-                            {material.quantidadeCarregadores && material.quantidadeCarregadores > 0 && (
-                              <div className="p-3 bg-muted/70 rounded border mt-2 ml-4">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <p className="font-medium text-foreground">
-                                      Carregadores {material.calibre || material.calibreMunicao || ''} {material.modelo ? `- ${material.modelo}` : ''}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">Acessório</p>
-                                    {material.fabricante && (
-                                      <p className="text-xs text-muted-foreground">Fabricante: {material.fabricante}</p>
-                                    )}
-                                  </div>
-                                  <Badge variant="outline">Qtd: {material.quantidadeCarregadores}</Badge>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {material.quantidadeMunicoes && material.quantidadeMunicoes > 0 && (
-                              <div className="p-3 bg-muted/70 rounded border mt-2 ml-4">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <p className="font-medium text-foreground">
-                                      Munição {material.calibreMunicao || material.calibre || ''}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">Munição - Letal</p>
-                                    {(material.calibreMunicao || material.calibre) && (
-                                      <p className="text-xs text-muted-foreground">Calibre: {material.calibreMunicao || material.calibre}</p>
-                                    )}
-                                  </div>
-                                  <Badge variant="outline">Qtd: {material.quantidadeMunicoes}</Badge>
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        )}
                       </div>
-                    ))}
-                  </div>
+                      
+                      {/* Se for armamento e tiver carregadores/munições, exibir como itens separados */}
+                      {material.categoria === 'Armamento' && (
+                        <>
+                          {material.quantidadeCarregadores && material.quantidadeCarregadores > 0 && (
+                            <div className="p-3 bg-muted/70 rounded border mt-2 ml-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-medium text-foreground">
+                                    Carregadores {material.calibre || material.calibreMunicao || ''} {material.modelo ? `- ${material.modelo}` : ''}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">Acessório</p>
+                                  {material.fabricante && (
+                                    <p className="text-xs text-muted-foreground">Fabricante: {material.fabricante}</p>
+                                  )}
+                                </div>
+                                <Badge variant="outline">Qtd: {material.quantidadeCarregadores}</Badge>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {material.quantidadeMunicoes && material.quantidadeMunicoes > 0 && (
+                            <div className="p-3 bg-muted/70 rounded border mt-2 ml-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-medium text-foreground">
+                                    Munição {material.calibreMunicao || material.calibre || ''}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">Munição - Letal</p>
+                                  {(material.calibreMunicao || material.calibre) && (
+                                    <p className="text-xs text-muted-foreground">Calibre: {material.calibreMunicao || material.calibre}</p>
+                                  )}
+                                </div>
+                                <Badge variant="outline">Qtd: {material.quantidadeMunicoes}</Badge>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ))}
                 </div>
+              </div>
 
               <div>
                 <h4 className="font-semibold text-foreground mb-2">Assinatura Eletrônica</h4>
-                <p><strong>Matrícula:</strong> {cautelaDetalhes.assinatura.matricula}</p>
-                <p><strong>Data/Hora:</strong> {cautelaDetalhes.assinatura.timestamp.toLocaleString()}</p>
+                <p><strong>Matrícula:</strong> {cautelaDetalhes?.assinatura.matricula}</p>
+                <p><strong>Data/Hora:</strong> {cautelaDetalhes?.assinatura.timestamp.toLocaleString()}</p>
               </div>
 
-              {cautelaDetalhes.observacoes && (
+              {cautelaDetalhes?.observacoes && (
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Observações</h4>
                   <p className="text-muted-foreground">{cautelaDetalhes.observacoes}</p>
@@ -552,7 +554,7 @@ const GerenciarCautelas = () => {
               )}
 
               <div className="flex gap-2 pt-4 border-t">
-                <Button onClick={() => gerarDocumento(cautelaDetalhes)} className="flex items-center gap-2">
+                <Button onClick={() => cautelaDetalhes && gerarDocumento(cautelaDetalhes)} className="flex items-center gap-2">
                   <Download className="h-4 w-4" />
                   Gerar Documento
                 </Button>
@@ -561,9 +563,9 @@ const GerenciarCautelas = () => {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Transferência */}
       {cautelaTransferencia && (
