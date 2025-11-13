@@ -95,7 +95,7 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
         dataTransferencia: new Date().toISOString(),
         destino,
         publicacao,
-        unidadeOrigem: policial.Unidade
+        unidadeOrigem: "RPMONT"
       };
 
       // Remover o campo 'id' do documento para evitar conflitos
