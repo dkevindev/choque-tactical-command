@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -26,7 +27,8 @@ import {
   MapPin,
   Calendar,
   User,
-  Save
+  Save,
+  CheckCircle
 } from 'lucide-react';
 import { db } from '@/firebase';
 import { collection, addDoc, updateDoc, doc, getDocs, onSnapshot } from 'firebase/firestore';
@@ -42,7 +44,26 @@ interface Avaria {
   gravidade: 'LEVE' | 'MODERADA' | 'GRAVE';
   status: 'PENDENTE' | 'EM_REPARO' | 'RESOLVIDA';
   responsavel: string;
-  angulo: 'frontal' | 'traseira' | 'esquerdo' | 'direito';
+  angulo: 'frontal' | 'traseira' | 'esquerdo' | 'direito' | 'interno' | 'mecanico';
+}
+
+interface ChecklistViatura {
+  oleoMotor: 'abaixo' | 'nivel' | 'acima';
+  aguaRadiador: 'abaixo' | 'nivel' | 'acima';
+  step: 'possui' | 'nao_possui';
+  macaco: 'possui' | 'nao_possui';
+  chaveRoda: 'possui' | 'nao_possui';
+  triangulo: 'possui' | 'nao_possui';
+  smartphone: {
+    estado: 'avariado' | 'bom' | 'otimo';
+    conexao: 'com_conexao' | 'sem_conexao';
+  };
+  radioFixo: 'com_sinal' | 'sem_sinal';
+  cartaoAbastecimento: 'possui' | 'nao_possui';
+  dataVerificacao: string;
+  verificadoPor: string;
+  verificadoPorId: string;
+  problemas?: string[];
 }
 
 interface ViaturaAvarias {
@@ -53,14 +74,17 @@ interface ViaturaAvarias {
   imagemTraseira?: string;
   imagemLadoEsquerdo?: string;
   imagemLadoDireito?: string;
+  imagemInterno?: string;
+  imagemMecanico?: string;
   avarias: Avaria[];
+  ultimoChecklist?: ChecklistViatura;
 }
 
 const AvariasPage = () => {
   const [viaturaAtual, setViaturaAtual] = useState<string>('');
   const [avariasData, setAvariasData] = useState<ViaturaAvarias[]>([]);
   const [viaturasFrota, setViaturasFrota] = useState<any[]>([]);
-  const [anguloAtivo, setAnguloAtivo] = useState<'frontal' | 'traseira' | 'esquerdo' | 'direito'>('frontal');
+  const [anguloAtivo, setAnguloAtivo] = useState<'frontal' | 'traseira' | 'esquerdo' | 'direito' | 'interno' | 'mecanico'>('frontal');
   const [marcandoAvaria, setMarcandoAvaria] = useState(false);
   const [novaAvaria, setNovaAvaria] = useState({
     tipo: '',
@@ -98,7 +122,10 @@ const AvariasPage = () => {
           imagemTraseira: data.imagemTraseira || '',
           imagemLadoEsquerdo: data.imagemEsquerdo || data.imagemLadoEsquerdo || '',
           imagemLadoDireito: data.imagemDireito || data.imagemLadoDireito || '',
-          avarias: data.avarias || []
+          imagemInterno: data.imagemInterno || '',
+          imagemMecanico: data.imagemMecanico || '',
+          avarias: data.avarias || [],
+          ultimoChecklist: data.ultimoChecklist
         });
       });
       
@@ -113,7 +140,10 @@ const AvariasPage = () => {
         imagemTraseira: v.imagemTraseira,
         imagemLadoEsquerdo: v.imagemLadoEsquerdo,
         imagemLadoDireito: v.imagemLadoDireito,
-        avarias: v.avarias
+        imagemInterno: v.imagemInterno,
+        imagemMecanico: v.imagemMecanico,
+        avarias: v.avarias,
+        ultimoChecklist: v.ultimoChecklist
       }));
       
       setAvariasData(dadosAvarias);
@@ -323,6 +353,39 @@ const AvariasPage = () => {
     }
   };
 
+  const formatarValorChecklist = (valor: string): string => {
+    const formatacoes: Record<string, string> = {
+      'abaixo': 'Abaixo do Nível',
+      'nivel': 'No Nível',
+      'acima': 'Acima do Nível',
+      'possui': 'Possui',
+      'nao_possui': 'Não Possui',
+      'avariado': 'Avariado',
+      'bom': 'Bom',
+      'otimo': 'Ótimo',
+      'com_conexao': 'Com Conexão',
+      'sem_conexao': 'Sem Conexão',
+      'com_sinal': 'Com Sinal',
+      'sem_sinal': 'Sem Sinal'
+    };
+    return formatacoes[valor] || valor;
+  };
+
+  const traduzirProblema = (key: string): string => {
+    const traducoes: Record<string, string> = {
+      oleoMotor: 'Óleo do Motor',
+      aguaRadiador: 'Água do Radiador',
+      step: 'Step',
+      macaco: 'Macaco',
+      chaveRoda: 'Chave de Roda',
+      triangulo: 'Triângulo',
+      smartphone: 'Smartphone',
+      radioFixo: 'Rádio Fixo',
+      cartaoAbastecimento: 'Cartão de Abastecimento'
+    };
+    return traducoes[key] || key;
+  };
+
   const viaturaData = getViaturaAtualData();
   const imagemAtual = getImagemAtual();
   const avariasAnguloAtual = getAvariasAnguloAtual();
@@ -358,13 +421,128 @@ const AvariasPage = () => {
 
           {viaturaAtual && (
             <div className="space-y-6">
-              {/* Mostrar todas as 4 fotos */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card de Último Checklist */}
+              {getViaturaAtualData()?.ultimoChecklist && (
+                <Card className="bg-card border-border">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <CheckCircle className="h-5 w-5" />
+                      Último Checklist de Verificação
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">
+                          Verificado em: {new Date(getViaturaAtualData()!.ultimoChecklist!.dataVerificacao).toLocaleString('pt-BR')}
+                        </span>
+                        <span className="text-muted-foreground">
+                          Por: {getViaturaAtualData()!.ultimoChecklist!.verificadoPor}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {/* Óleo do Motor */}
+                        <div className="border rounded p-2">
+                          <p className="text-xs text-muted-foreground mb-1">Óleo do Motor</p>
+                          <Badge variant={getViaturaAtualData()!.ultimoChecklist!.oleoMotor === 'nivel' ? 'default' : 'destructive'} className="text-xs">
+                            {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.oleoMotor)}
+                          </Badge>
+                        </div>
+                        
+                        {/* Água do Radiador */}
+                        <div className="border rounded p-2">
+                          <p className="text-xs text-muted-foreground mb-1">Água do Radiador</p>
+                          <Badge variant={getViaturaAtualData()!.ultimoChecklist!.aguaRadiador === 'nivel' ? 'default' : 'destructive'} className="text-xs">
+                            {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.aguaRadiador)}
+                          </Badge>
+                        </div>
+                        
+                        {/* Step */}
+                        <div className="border rounded p-2">
+                          <p className="text-xs text-muted-foreground mb-1">Step</p>
+                          <Badge variant={getViaturaAtualData()!.ultimoChecklist!.step === 'possui' ? 'default' : 'destructive'} className="text-xs">
+                            {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.step)}
+                          </Badge>
+                        </div>
+                        
+                        {/* Macaco */}
+                        <div className="border rounded p-2">
+                          <p className="text-xs text-muted-foreground mb-1">Macaco</p>
+                          <Badge variant={getViaturaAtualData()!.ultimoChecklist!.macaco === 'possui' ? 'default' : 'destructive'} className="text-xs">
+                            {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.macaco)}
+                          </Badge>
+                        </div>
+                        
+                        {/* Chave de Roda */}
+                        <div className="border rounded p-2">
+                          <p className="text-xs text-muted-foreground mb-1">Chave de Roda</p>
+                          <Badge variant={getViaturaAtualData()!.ultimoChecklist!.chaveRoda === 'possui' ? 'default' : 'destructive'} className="text-xs">
+                            {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.chaveRoda)}
+                          </Badge>
+                        </div>
+                        
+                        {/* Triângulo */}
+                        <div className="border rounded p-2">
+                          <p className="text-xs text-muted-foreground mb-1">Triângulo</p>
+                          <Badge variant={getViaturaAtualData()!.ultimoChecklist!.triangulo === 'possui' ? 'default' : 'destructive'} className="text-xs">
+                            {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.triangulo)}
+                          </Badge>
+                        </div>
+                        
+                        {/* Smartphone */}
+                        <div className="border rounded p-2">
+                          <p className="text-xs text-muted-foreground mb-1">Smartphone</p>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline" className="text-xs w-fit">
+                              {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.smartphone.estado)}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs w-fit">
+                              {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.smartphone.conexao)}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Rádio Fixo */}
+                        <div className="border rounded p-2">
+                          <p className="text-xs text-muted-foreground mb-1">Rádio Fixo</p>
+                          <Badge variant={getViaturaAtualData()!.ultimoChecklist!.radioFixo === 'com_sinal' ? 'default' : 'destructive'} className="text-xs">
+                            {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.radioFixo)}
+                          </Badge>
+                        </div>
+                        
+                        {/* Cartão de Abastecimento */}
+                        <div className="border rounded p-2">
+                          <p className="text-xs text-muted-foreground mb-1">Cartão de Abastecimento</p>
+                          <Badge variant={getViaturaAtualData()!.ultimoChecklist!.cartaoAbastecimento === 'possui' ? 'default' : 'destructive'} className="text-xs">
+                            {formatarValorChecklist(getViaturaAtualData()!.ultimoChecklist!.cartaoAbastecimento)}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      {getViaturaAtualData()!.ultimoChecklist!.problemas && getViaturaAtualData()!.ultimoChecklist!.problemas!.length > 0 && (
+                        <Alert variant="destructive">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertTitle className="text-sm">Itens com Problema</AlertTitle>
+                          <AlertDescription className="text-xs">
+                            {getViaturaAtualData()!.ultimoChecklist!.problemas!.map(traduzirProblema).join(', ')}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Mostrar todas as 6 fotos */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[
                   { key: 'frontal' as const, label: 'Frente' },
                   { key: 'traseira' as const, label: 'Trás' },
                   { key: 'esquerdo' as const, label: 'Lado Esquerdo' },
-                  { key: 'direito' as const, label: 'Lado Direito' }
+                  { key: 'direito' as const, label: 'Lado Direito' },
+                  { key: 'interno' as const, label: 'Interno' },
+                  { key: 'mecanico' as const, label: 'Mecânica' }
                 ].map((angulo) => {
                   const viaturaData = getViaturaAtualData();
                   const imagem = viaturaData ? (() => {
@@ -373,6 +551,8 @@ const AvariasPage = () => {
                       case 'traseira': return viaturaData.imagemTraseira;
                       case 'esquerdo': return viaturaData.imagemLadoEsquerdo;
                       case 'direito': return viaturaData.imagemLadoDireito;
+                      case 'interno': return viaturaData.imagemInterno;
+                      case 'mecanico': return viaturaData.imagemMecanico;
                       default: return null;
                     }
                   })() : null;

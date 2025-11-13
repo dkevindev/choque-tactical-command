@@ -171,6 +171,7 @@ const DashboardOverview = () => {
   const [coletesVencidos, setColetesVencidos] = useState<any[]>([]);
   const [coletesVencendo, setColetesVencendo] = useState<any[]>([]);
   const [alertasChegada, setAlertasChegada] = useState<any[]>([]);
+  const [alertasChecklist, setAlertasChecklist] = useState<any[]>([]);
   const [showColetesVencendoModal, setShowColetesVencendoModal] = useState(false);
   const [showColetesVencidosModal, setShowColetesVencidosModal] = useState(false);
 
@@ -230,6 +231,25 @@ const DashboardOverview = () => {
       );
       const alertasData = alertasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAlertasChegada(alertasData);
+
+      // Buscar viaturas com problemas no checklist
+      const viaturasChecklists: any[] = [];
+      viaturasSnapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.ultimoChecklist?.problemas?.length > 0) {
+          viaturasChecklists.push({
+            viaturaId: docSnap.id,
+            placa: data.PLACA,
+            cadastro: data.CADASTRO,
+            modelo: data.MODELO,
+            problemas: data.ultimoChecklist.problemas,
+            checklist: data.ultimoChecklist,
+            dataVerificacao: data.ultimoChecklist.dataVerificacao,
+            verificadoPor: data.ultimoChecklist.verificadoPor
+          });
+        }
+      });
+      setAlertasChecklist(viaturasChecklists);
 
       // Atualizar stats
       setStats([
@@ -418,14 +438,14 @@ const DashboardOverview = () => {
       <div className="space-y-6">
         {/* Alertas de Chegada de Policiais */}
       {alertasChegada.length > 0 && (
-        <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950">
-          <UserPlus className="h-4 w-4" />
-          <AlertTitle>Novos Policiais Chegaram</AlertTitle>
-          <AlertDescription>
+        <Alert className="border-blue-700 bg-blue-900/10 dark:bg-blue-950/20">
+          <UserPlus className="h-4 w-4 text-blue-700" />
+          <AlertTitle className="text-blue-700">Novos Policiais Chegaram</AlertTitle>
+          <AlertDescription className="text-foreground">
             {alertasChegada.length} policial(is) recém-chegado(s) aguardando registro de materiais bélicos.
             <div className="mt-3 space-y-3">
               {alertasChegada.map((alerta: any) => (
-                <div key={alerta.id} className="bg-white dark:bg-gray-900 p-3 rounded-lg border border-blue-200">
+                <div key={alerta.id} className="bg-background p-3 rounded-lg border border-blue-700/30">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <p className="font-medium">{alerta.policialPostGrad} {alerta.policialNome}</p>
@@ -463,6 +483,48 @@ const DashboardOverview = () => {
             <p className="text-xs mt-3 font-medium">
               💡 Vá até o Controle Bélico para adicionar os materiais que o policial trouxe (arma, colete, etc.)
             </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Alertas de Checklist de Viaturas */}
+      {alertasChecklist.length > 0 && (
+        <Alert className="border-yellow-700 bg-yellow-900/10 dark:bg-yellow-950/20">
+          <AlertTriangle className="h-4 w-4 text-yellow-700" />
+          <AlertTitle className="text-yellow-700">Itens de Verificação com Problemas</AlertTitle>
+          <AlertDescription className="text-foreground">
+            {alertasChecklist.length} viatura(s) com problemas identificados no último checklist.
+            <div className="mt-3 space-y-2 max-h-[200px] overflow-y-auto">
+              {alertasChecklist.slice(0, 3).map((alerta: any, idx: number) => (
+                <div key={idx} className="bg-background p-2 rounded border border-yellow-700/30">
+                  <p className="font-medium text-sm">
+                    {alerta.cadastro} • {alerta.placa}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Verificado em: {new Date(alerta.dataVerificacao).toLocaleString('pt-BR')} por {alerta.verificadoPor}
+                  </p>
+                  <div className="flex gap-1 mt-2 flex-wrap">
+                    {alerta.problemas.map((problema: string) => {
+                      const traducoes: Record<string, string> = {
+                        oleoMotor: 'Óleo do Motor', aguaRadiador: 'Água do Radiador', step: 'Step',
+                        macaco: 'Macaco', chaveRoda: 'Chave de Roda', triangulo: 'Triângulo',
+                        smartphone: 'Smartphone', radioFixo: 'Rádio Fixo', cartaoAbastecimento: 'Cartão'
+                      };
+                      return (
+                        <Badge key={problema} variant="outline" className="text-xs">
+                          {traducoes[problema] || problema}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {alertasChecklist.length > 3 && (
+                <p className="text-xs text-muted-foreground">
+                  + {alertasChecklist.length - 3} outras viaturas
+                </p>
+              )}
+            </div>
           </AlertDescription>
         </Alert>
       )}
