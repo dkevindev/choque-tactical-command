@@ -382,10 +382,10 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
 
           {selectedPolicialData && (
             <div className="my-4 p-4 bg-muted rounded-lg">
-              <h4 className="font-medium mb-2">Dados da Transferência:</h4>
+              <h4 className="font-medium mb-2">Dados da Transferência</h4>
               <div className="space-y-1 text-sm">
                 <p><span className="font-medium">Policial:</span> {selectedPolicialData['Post/Grad']} {selectedPolicialData.NOME}</p>
-                <p><span className="font-medium">De:</span> {selectedPolicialData.Unidade}</p>
+                <p><span className="font-medium">De:</span> "RPMONT"</p>
                 <p><span className="font-medium">Para:</span> {destino}</p>
                 {publicacao && <p><span className="font-medium">Publicação:</span> {publicacao}</p>}
               </div>
