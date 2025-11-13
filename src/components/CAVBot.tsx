@@ -102,6 +102,30 @@ const CAVBot = () => {
   const [confirmNovaSenha, setConfirmNovaSenha] = useState('');
   const [trocarSenhaMsg, setTrocarSenhaMsg] = useState('');
 
+  // Checklist de Verificação da Viatura
+  interface ChecklistViatura {
+    oleoMotor: 'abaixo' | 'nivel' | 'acima';
+    aguaRadiador: 'abaixo' | 'nivel' | 'acima';
+    step: 'possui' | 'nao_possui';
+    macaco: 'possui' | 'nao_possui';
+    chaveRoda: 'possui' | 'nao_possui';
+    triangulo: 'possui' | 'nao_possui';
+    smartphone: {
+      estado: 'avariado' | 'bom' | 'otimo';
+      conexao: 'com_conexao' | 'sem_conexao';
+    };
+    radioFixo: 'com_sinal' | 'sem_sinal';
+    cartaoAbastecimento: 'possui' | 'nao_possui';
+    dataVerificacao: string;
+    verificadoPor: string;
+    verificadoPorId: string;
+    problemas?: string[];
+  }
+  
+  const [checklistDraft, setChecklistDraft] = useState<Partial<ChecklistViatura>>({});
+  const [checklistStep, setChecklistStep] = useState<number>(0); // 0-9 steps
+  const [showChecklist, setShowChecklist] = useState(false);
+
   const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
   const isOperacionalCadastro = (cad?: string): boolean => {
     const c = String(cad || '');
@@ -242,11 +266,73 @@ const CAVBot = () => {
         policialNomeGuerra1: policialLogado.nomeGuerra1 || null,
       });
       setServicoAberto({ id: docRef.id, motorista: motoristaVal, kmInicial: kmInicialVal, area: areaVal, status: 'aberto', viaturaId: avariasViatura.id });
-      pushBot('✅ Serviço iniciado com sucesso.');
+      pushBot('✅ Serviço iniciado! Agora vamos fazer o checklist de verificação da viatura.');
       setServicoDraft({});
+      // Iniciar checklist
+      setChecklistDraft({});
+      setChecklistStep(0);
+      setShowChecklist(true);
     } catch (e) {
       console.error('Erro ao iniciar serviço:', e);
       pushBot('Erro ao iniciar serviço.');
+    }
+  };
+
+  // Salvar checklist completo no Firebase
+  const salvarChecklist = async () => {
+    if (!avariasViatura || !policialLogado) {
+      pushBot('Erro: dados insuficientes para salvar o checklist.');
+      return;
+    }
+    
+    try {
+      const problemas: string[] = [];
+      if (checklistDraft.oleoMotor && checklistDraft.oleoMotor !== 'nivel') problemas.push('oleoMotor');
+      if (checklistDraft.aguaRadiador && checklistDraft.aguaRadiador !== 'nivel') problemas.push('aguaRadiador');
+      if (checklistDraft.step === 'nao_possui') problemas.push('step');
+      if (checklistDraft.macaco === 'nao_possui') problemas.push('macaco');
+      if (checklistDraft.chaveRoda === 'nao_possui') problemas.push('chaveRoda');
+      if (checklistDraft.triangulo === 'nao_possui') problemas.push('triangulo');
+      if (checklistDraft.smartphone?.estado === 'avariado' || checklistDraft.smartphone?.conexao === 'sem_conexao') problemas.push('smartphone');
+      if (checklistDraft.radioFixo === 'sem_sinal') problemas.push('radioFixo');
+      if (checklistDraft.cartaoAbastecimento === 'nao_possui') problemas.push('cartaoAbastecimento');
+      
+      const checklistCompleto: ChecklistViatura = {
+        oleoMotor: checklistDraft.oleoMotor || 'nivel',
+        aguaRadiador: checklistDraft.aguaRadiador || 'nivel',
+        step: checklistDraft.step || 'possui',
+        macaco: checklistDraft.macaco || 'possui',
+        chaveRoda: checklistDraft.chaveRoda || 'possui',
+        triangulo: checklistDraft.triangulo || 'possui',
+        smartphone: checklistDraft.smartphone || { estado: 'bom', conexao: 'com_conexao' },
+        radioFixo: checklistDraft.radioFixo || 'com_sinal',
+        cartaoAbastecimento: checklistDraft.cartaoAbastecimento || 'possui',
+        dataVerificacao: new Date().toISOString(),
+        verificadoPor: policialLogado.nomeGuerra1 || policialLogado.NOME,
+        verificadoPorId: policialLogado.id,
+        problemas
+      };
+      
+      const viaturaRef = doc(db, 'frota', avariasViatura.id);
+      const viaturaSnap = await getDoc(viaturaRef);
+      const viaturaData = viaturaSnap.exists() ? (viaturaSnap.data() as any) : {};
+      const historicoChecklists = Array.isArray(viaturaData.historicoChecklists) ? viaturaData.historicoChecklists : [];
+      
+      await updateDoc(viaturaRef, {
+        ultimoChecklist: checklistCompleto,
+        historicoChecklists: [...historicoChecklists, checklistCompleto]
+      });
+      
+      pushBot('✅ Checklist de verificação concluído e salvo com sucesso!');
+      if (problemas.length > 0) {
+        pushBot(`⚠️ Foram identificados ${problemas.length} item(ns) com problema. Verifique no painel de gestão.`);
+      }
+      setShowChecklist(false);
+      setChecklistDraft({});
+      setChecklistStep(0);
+    } catch (e) {
+      console.error('Erro ao salvar checklist:', e);
+      pushBot('Erro ao salvar o checklist.');
     }
   };
 
@@ -1059,6 +1145,122 @@ const CAVBot = () => {
           onClose={() => setShowSaidaForm(false)}
           onSuccess={handleFormSuccess}
         />
+      )}
+
+      {showChecklist && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: '1rem', width: 'min(600px, 94vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="quick-actions-header" style={{ marginBottom: '0.75rem' }}>Checklist de Verificação - {checklistStep + 1}/9</div>
+            
+            {checklistStep === 0 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Óleo do Motor:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, oleoMotor: 'abaixo' }); setChecklistStep(1); }}>Abaixo do Nível</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, oleoMotor: 'nivel' }); setChecklistStep(1); }}>No Nível</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, oleoMotor: 'acima' }); setChecklistStep(1); }}>Acima do Nível</button>
+                </div>
+              </div>
+            )}
+            
+            {checklistStep === 1 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Água do Radiador:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, aguaRadiador: 'abaixo' }); setChecklistStep(2); }}>Abaixo do Nível</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, aguaRadiador: 'nivel' }); setChecklistStep(2); }}>No Nível</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, aguaRadiador: 'acima' }); setChecklistStep(2); }}>Acima do Nível</button>
+                </div>
+              </div>
+            )}
+            
+            {checklistStep === 2 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Step:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, step: 'possui' }); setChecklistStep(3); }}>Possui</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, step: 'nao_possui' }); setChecklistStep(3); }}>Não Possui</button>
+                </div>
+              </div>
+            )}
+            
+            {checklistStep === 3 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Macaco:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, macaco: 'possui' }); setChecklistStep(4); }}>Possui</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, macaco: 'nao_possui' }); setChecklistStep(4); }}>Não Possui</button>
+                </div>
+              </div>
+            )}
+            
+            {checklistStep === 4 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Chave de Roda:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, chaveRoda: 'possui' }); setChecklistStep(5); }}>Possui</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, chaveRoda: 'nao_possui' }); setChecklistStep(5); }}>Não Possui</button>
+                </div>
+              </div>
+            )}
+            
+            {checklistStep === 5 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Triângulo:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, triangulo: 'possui' }); setChecklistStep(6); }}>Possui</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, triangulo: 'nao_possui' }); setChecklistStep(6); }}>Não Possui</button>
+                </div>
+              </div>
+            )}
+            
+            {checklistStep === 6 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Smartphone - Estado:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, smartphone: { ...(checklistDraft.smartphone || { conexao: 'com_conexao' }), estado: 'avariado' } }); setChecklistStep(7); }}>Avariado</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, smartphone: { ...(checklistDraft.smartphone || { conexao: 'com_conexao' }), estado: 'bom' } }); setChecklistStep(7); }}>Bom</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, smartphone: { ...(checklistDraft.smartphone || { conexao: 'com_conexao' }), estado: 'otimo' } }); setChecklistStep(7); }}>Ótimo</button>
+                </div>
+              </div>
+            )}
+            
+            {checklistStep === 7 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Smartphone - Conexão:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, smartphone: { ...(checklistDraft.smartphone || { estado: 'bom' }), conexao: 'com_conexao' } }); setChecklistStep(8); }}>Com Conexão</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, smartphone: { ...(checklistDraft.smartphone || { estado: 'bom' }), conexao: 'sem_conexao' } }); setChecklistStep(8); }}>Sem Conexão</button>
+                </div>
+              </div>
+            )}
+            
+            {checklistStep === 8 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Rádio Fixo:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, radioFixo: 'com_sinal' }); setChecklistStep(9); }}>Com Sinal</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, radioFixo: 'sem_sinal' }); setChecklistStep(9); }}>Sem Sinal</button>
+                </div>
+              </div>
+            )}
+            
+            {checklistStep === 9 && (
+              <div>
+                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Cartão de Abastecimento:</p>
+                <div className="quick-buttons">
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, cartaoAbastecimento: 'possui' }); salvarChecklist(); }}>Possui</button>
+                  <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, cartaoAbastecimento: 'nao_possui' }); salvarChecklist(); }}>Não Possui</button>
+                </div>
+              </div>
+            )}
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
+              <button className="quick-button" onClick={() => { if (checklistStep > 0) setChecklistStep(checklistStep - 1); }}>Voltar</button>
+              <button className="quick-button" onClick={() => { setShowChecklist(false); setChecklistDraft({}); setChecklistStep(0); }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showAvariaDetalhe && avariaSelecionada && (
