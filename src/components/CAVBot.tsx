@@ -948,14 +948,22 @@ const CAVBot = () => {
                   { k: 'mecanico', label: 'Mecânica' },
                   { k: 'interno', label: 'Interno' },
                 ] as any[]).map(a => (
-                  <button
-                    key={a.k}
-                    className="quick-button"
-                    onClick={() => { setAvariasAngulo(a.k); setPosicaoTemporaria(null); setMarcandoAvaria(false); }}
-                    style={avariasAngulo === a.k ? { borderColor: '#60a5fa', background: '#4b5563' } : undefined}
-                  >
-                    {a.label}
-                  </button>
+                <button
+                  key={a.k}
+                  className="quick-button"
+                  onClick={() => { setAvariasAngulo(a.k); setPosicaoTemporaria(null); setMarcandoAvaria(false); }}
+                  style={
+                    avariasAngulo === a.k 
+                      ? { borderColor: '#60a5fa', background: '#4b5563' } 
+                      : (['interno', 'mecanico'].includes(a.k) 
+                          ? { borderColor: '#8b5cf6', opacity: 0.9 } 
+                          : undefined
+                        )
+                  }
+                >
+                  {(['interno', 'mecanico'].includes(a.k) ? '📝 ' : '')}
+                  {a.label}
+                </button>
                 ))}
               </div>
 
@@ -1016,6 +1024,25 @@ const CAVBot = () => {
                 </div>
               )}
 
+              {/* Mensagem para ângulos textuais */}
+              {(['interno', 'mecanico'] as const).includes(avariasAngulo as any) && (
+                <div className="quick-actions-header" style={{ 
+                  marginTop: '0.75rem', 
+                  padding: '1rem',
+                  background: '#1e293b',
+                  borderRadius: '8px',
+                  border: '1px solid #334155'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '1.5rem' }}>📝</span>
+                    <strong>Ângulo {avariasAngulo === 'interno' ? 'Interno' : 'Mecânica'}</strong>
+                  </div>
+                  <p style={{ fontSize: '0.875rem', color: '#94a3b8', margin: 0 }}>
+                    Este ângulo é apenas textual. Clique em "Registrar Avaria" abaixo para descrever o problema.
+                  </p>
+                </div>
+              )}
+
               {/* Ações de serviço */}
               <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginTop: '0.75rem' }}>
                 {!servicoAberto ? (
@@ -1055,14 +1082,20 @@ const CAVBot = () => {
                     }
                   }}
                 >
-                  ➕ Registrar Avaria no ângulo {avariasAngulo}
+                  {(['interno', 'mecanico'] as const).includes(avariasAngulo as any) 
+                    ? `📝 Descrever Problema (${avariasAngulo === 'interno' ? 'Interno' : 'Mecânica'})`
+                    : `➕ Registrar Avaria no ângulo ${avariasAngulo}`
+                  }
                 </button>
               </div>
 
               {/* Lista de avarias do ângulo */}
               <div style={{ marginTop: '0.75rem' }}>
                 <div className="quick-actions-header" style={{ marginBottom: '0.5rem' }}>
-                  Avarias neste ângulo
+                  {(['interno', 'mecanico'] as const).includes(avariasAngulo as any)
+                    ? `Problemas registrados (${avariasAngulo === 'interno' ? 'Interno' : 'Mecânica'})`
+                    : 'Avarias neste ângulo'
+                  }
                 </div>
                 <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(1, 1fr)' }}>
                   {avariasLista.filter((a: any) => a.angulo === avariasAngulo).length === 0 ? (
