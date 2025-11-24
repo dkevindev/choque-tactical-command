@@ -646,7 +646,10 @@ const DashboardOverview = () => {
 
       {/* Dashboard Rico com Múltiplas Informações */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Alerta de Troca de Óleo */}
+        {/* Alerta de Óleo ATRASADO (crítico) */}
+        <AlertaOleoAtrasado />
+        
+        {/* Alerta de Troca de Óleo PRÓXIMA (aviso) */}
         <AlertaTrocaOleo />
         
         {/* Cards de Informações Adicionais podem ser adicionados aqui */}
@@ -741,6 +744,80 @@ const GestaoContent = () => (
   <GestaoAcesso />
 );
 
+// Alerta de viaturas ATRASADAS na troca de óleo (km ultrapassada)
+const AlertaOleoAtrasado = () => {
+  const [viaturasAtrasadas, setViaturasAtrasadas] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchViaturasAtrasadas();
+  }, []);
+
+  const fetchViaturasAtrasadas = async () => {
+    try {
+      const VIATURAS_MONITORADAS = [
+        'CAV - 04', 'CAV - 05', 'CAV - 06', 'CAV - 08', 'CAV - 11', 
+        'CAV - 12', 'CAV - 13', 'TA - 01', 'TA - 02', 'TA - 03', 
+        'TP', '6398', 'DUSTER'
+      ];
+
+      const viaturasSnapshot = await getDocs(collection(db, 'frota'));
+      const todasViaturas = viaturasSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+
+      const atrasadas = todasViaturas.filter(v => {
+        const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
+        const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
+        return isMonitorada && kmRestante <= 0;
+      });
+
+      setViaturasAtrasadas(atrasadas);
+    } catch (error) {
+      console.error('Erro ao buscar viaturas atrasadas:', error);
+    }
+  };
+
+  if (viaturasAtrasadas.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card className="border-red-600 bg-red-600/10">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-red-600">
+          <AlertTriangle className="h-5 w-5" />
+          ⚠️ TROCA DE ÓLEO ATRASADA
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {viaturasAtrasadas.map(v => {
+            const kmAtrasada = Math.abs((v.KMOLEO || 0) - (v.KM || 0));
+            return (
+              <div key={v.id} className="flex items-center justify-between p-3 bg-background rounded-lg border border-red-300">
+                <div className="flex items-center gap-2">
+                  <Car className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <span className="font-bold">{v.CADASTRO}</span>
+                    <span className="text-sm text-muted-foreground ml-2">({v.PLACA})</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-bold text-red-600">
+                    ⚠️ {kmAtrasada.toLocaleString()} km atrasada
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Alerta de viaturas SE APROXIMANDO da troca de óleo
 const AlertaTrocaOleo = () => {
   const [viaturasAlerta, setViaturasAlerta] = useState<any[]>([]);
 
@@ -765,7 +842,7 @@ const AlertaTrocaOleo = () => {
       const viaturasComAlerta = todasViaturas.filter(v => {
         const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
         const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
-        return isMonitorada && kmRestante <= 500;
+        return isMonitorada && kmRestante > 0 && kmRestante <= 500;
       });
 
       setViaturasAlerta(viaturasComAlerta);
@@ -800,11 +877,8 @@ const AlertaTrocaOleo = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className={`text-sm font-medium ${kmRestante <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
-                    {kmRestante <= 0 
-                      ? `⚠️ Atrasado ${Math.abs(kmRestante).toLocaleString()} km`
-                      : `Faltam ${kmRestante.toLocaleString()} km`
-                    }
+                  <span className="text-sm font-medium text-orange-600">
+                    Faltam {kmRestante.toLocaleString()} km
                   </span>
                 </div>
               </div>
