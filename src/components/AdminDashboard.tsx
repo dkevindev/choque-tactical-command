@@ -765,7 +765,7 @@ const AlertaTrocaOleo = () => {
       const viaturasComAlerta = todasViaturas.filter(v => {
         const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
         const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
-        return isMonitorada && kmRestante <= 500 && kmRestante > 0;
+        return isMonitorada && kmRestante <= 500;
       });
 
       setViaturasAlerta(viaturasComAlerta);
@@ -800,8 +800,11 @@ const AlertaTrocaOleo = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-medium text-orange-600">
-                    Faltam {kmRestante.toLocaleString()} km
+                  <span className={`text-sm font-medium ${kmRestante <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                    {kmRestante <= 0 
+                      ? `⚠️ Atrasado ${Math.abs(kmRestante).toLocaleString()} km`
+                      : `Faltam ${kmRestante.toLocaleString()} km`
+                    }
                   </span>
                 </div>
               </div>
