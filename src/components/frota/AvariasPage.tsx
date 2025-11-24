@@ -45,6 +45,12 @@ interface Avaria {
   status: 'PENDENTE' | 'EM_REPARO' | 'RESOLVIDA';
   responsavel: string;
   angulo: 'frontal' | 'traseira' | 'esquerdo' | 'direito' | 'interno' | 'mecanico';
+  
+  // Campos de resolução
+  dataResolucao?: string;
+  resolvidoPor?: string;
+  solucaoAplicada?: string;
+  observacaoResolucao?: string;
 }
 
 interface ChecklistViatura {
@@ -100,6 +106,16 @@ const AvariasPage = () => {
   const [posicaoTemporaria, setPosicaoTemporaria] = useState<{x: number, y: number} | null>(null);
   const imagemRef = useRef<HTMLImageElement>(null);
   const { toast } = useToast();
+  
+  // Estados para resolução de avarias
+  const [modalResolucaoAberto, setModalResolucaoAberto] = useState(false);
+  const [avariaParaResolver, setAvariaParaResolver] = useState<Avaria | null>(null);
+  const [dadosResolucao, setDadosResolucao] = useState({
+    solucaoAplicada: '',
+    observacao: '',
+    resolvidoPor: ''
+  });
+  const [statusFiltroAvarias, setStatusFiltroAvarias] = useState<'TODOS' | 'PENDENTE' | 'RESOLVIDA'>('TODOS');
 
   useEffect(() => {
     carregarViaturasFrota();
@@ -310,6 +326,62 @@ const AvariasPage = () => {
     } catch (e) {
       console.error('Erro ao remover avaria:', e);
       toast({ title: 'Erro', description: 'Não foi possível excluir a avaria.', variant: 'destructive' });
+    }
+  };
+
+  const resolverAvaria = async () => {
+    if (!avariaParaResolver || !viaturaAtual) return;
+    
+    const viaturaEncontrada = viaturasFrota.find(v => v.placa === viaturaAtual);
+    if (!viaturaEncontrada) return;
+
+    try {
+      // Atualizar a avaria com dados de resolução
+      const avariasAtualizadas = (viaturaEncontrada.avarias || []).map((a: any) => {
+        if (a.id === avariaParaResolver.id) {
+          return {
+            ...a,
+            status: 'RESOLVIDA',
+            dataResolucao: new Date().toISOString().split('T')[0],
+            resolvidoPor: dadosResolucao.resolvidoPor,
+            solucaoAplicada: dadosResolucao.solucaoAplicada,
+            observacaoResolucao: dadosResolucao.observacao
+          };
+        }
+        return a;
+      });
+
+      // Salvar no Firebase
+      await updateDoc(doc(db, 'frota', viaturaEncontrada.id), { 
+        avarias: avariasAtualizadas 
+      });
+
+      // Atualizar estados locais
+      setViaturasFrota(prev => prev.map(v => 
+        v.id === viaturaEncontrada.id ? { ...v, avarias: avariasAtualizadas } : v
+      ));
+      
+      setAvariasData(prev => prev.map(v => 
+        v.placaViatura === viaturaAtual ? { ...v, avarias: avariasAtualizadas } : v
+      ));
+
+      toast({
+        title: "Avaria Resolvida",
+        description: "A avaria foi marcada como resolvida com sucesso!",
+      });
+
+      // Reset
+      setModalResolucaoAberto(false);
+      setAvariaParaResolver(null);
+      setDadosResolucao({ solucaoAplicada: '', observacao: '', resolvidoPor: '' });
+      
+    } catch (error) {
+      console.error('Erro ao resolver avaria:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao resolver avaria",
+        variant: "destructive",
+      });
     }
   };
 
@@ -714,13 +786,43 @@ const AvariasPage = () => {
 
               {/* Lista de Avarias de todos os ângulos */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  Todas as Avarias ({viaturaData?.avarias.length || 0})
-                </h3>
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    Todas as Avarias ({viaturaData?.avarias.length || 0})
+                  </h3>
+                  
+                  {/* Filtros de Status */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant={statusFiltroAvarias === 'TODOS' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setStatusFiltroAvarias('TODOS')}
+                    >
+                      Todas ({viaturaData?.avarias.length || 0})
+                    </Button>
+                    <Button
+                      variant={statusFiltroAvarias === 'PENDENTE' ? 'destructive' : 'outline'}
+                      size="sm"
+                      onClick={() => setStatusFiltroAvarias('PENDENTE')}
+                    >
+                      Pendentes ({viaturaData?.avarias.filter(a => a.status === 'PENDENTE' || a.status === 'EM_REPARO').length || 0})
+                    </Button>
+                    <Button
+                      variant={statusFiltroAvarias === 'RESOLVIDA' ? 'default' : 'outline'}
+                      size="sm"
+                      className={statusFiltroAvarias === 'RESOLVIDA' ? 'bg-green-600 hover:bg-green-700' : ''}
+                      onClick={() => setStatusFiltroAvarias('RESOLVIDA')}
+                    >
+                      Resolvidas ({viaturaData?.avarias.filter(a => a.status === 'RESOLVIDA').length || 0})
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                  {viaturaData?.avarias.map((avaria) => (
+                  {viaturaData?.avarias
+                    .filter(a => statusFiltroAvarias === 'TODOS' || a.status === statusFiltroAvarias || (statusFiltroAvarias === 'PENDENTE' && a.status === 'EM_REPARO'))
+                    .map((avaria) => (
                     <Card key={avaria.id} className="p-4">
                       <div className="space-y-2">
                         <div className="flex justify-between items-start">
@@ -731,14 +833,31 @@ const AvariasPage = () => {
                               {avaria.angulo}
                             </Badge>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removerAvaria(avaria.id)}
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
+                          <div className="flex gap-1">
+                            {/* Botão Resolver - só aparece se status for PENDENTE ou EM_REPARO */}
+                            {(avaria.status === 'PENDENTE' || avaria.status === 'EM_REPARO') && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => {
+                                  setAvariaParaResolver(avaria);
+                                  setModalResolucaoAberto(true);
+                                }}
+                                className="h-6 px-2 text-xs bg-green-600 hover:bg-green-700"
+                              >
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Resolver
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removerAvaria(avaria.id)}
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                         
                         <div className="flex flex-wrap gap-1">
@@ -752,6 +871,30 @@ const AvariasPage = () => {
                         
                         {avaria.descricao && (
                           <p className="text-xs text-muted-foreground">{avaria.descricao}</p>
+                        )}
+                        
+                        {/* Informações de resolução se resolvida */}
+                        {avaria.status === 'RESOLVIDA' && avaria.dataResolucao && (
+                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded">
+                            <div className="text-xs font-medium text-green-700 dark:text-green-400 mb-1">
+                              ✅ Resolvida em {new Date(avaria.dataResolucao).toLocaleDateString('pt-BR')}
+                            </div>
+                            {avaria.solucaoAplicada && (
+                              <div className="text-xs text-muted-foreground">
+                                <strong>Solução:</strong> {avaria.solucaoAplicada}
+                              </div>
+                            )}
+                            {avaria.observacaoResolucao && (
+                              <div className="text-xs text-muted-foreground">
+                                <strong>Obs:</strong> {avaria.observacaoResolucao}
+                              </div>
+                            )}
+                            {avaria.resolvidoPor && (
+                              <div className="text-xs text-muted-foreground">
+                                <strong>Por:</strong> {avaria.resolvidoPor}
+                              </div>
+                            )}
+                          </div>
                         )}
                         
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -918,6 +1061,91 @@ const AvariasPage = () => {
               <div className="flex justify-end">
                 <Button variant="outline" onClick={() => setModalDetalhesAberto(false)}>
                   Fechar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para Resolver Avaria */}
+      <Dialog open={modalResolucaoAberto} onOpenChange={setModalResolucaoAberto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              Resolver Avaria
+            </DialogTitle>
+          </DialogHeader>
+          {avariaParaResolver && (
+            <div className="space-y-4">
+              {/* Informações da Avaria */}
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="text-sm font-medium">{avariaParaResolver.tipo}</div>
+                <div className="text-xs text-muted-foreground">
+                  {avariaParaResolver.angulo} • {new Date(avariaParaResolver.data).toLocaleDateString('pt-BR')}
+                </div>
+              </div>
+
+              {/* Formulário de Resolução */}
+              <div>
+                <label className="text-sm font-medium">Solução Aplicada *</label>
+                <Select
+                  value={dadosResolucao.solucaoAplicada}
+                  onValueChange={(value) => setDadosResolucao(prev => ({ ...prev, solucaoAplicada: value }))}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Selecione a solução..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Reparo Realizado">Reparo Realizado</SelectItem>
+                    <SelectItem value="Peça Substituída">Peça Substituída</SelectItem>
+                    <SelectItem value="Pintura Corrigida">Pintura Corrigida</SelectItem>
+                    <SelectItem value="Polimento">Polimento</SelectItem>
+                    <SelectItem value="Ajuste Mecânico">Ajuste Mecânico</SelectItem>
+                    <SelectItem value="Limpeza e Manutenção">Limpeza e Manutenção</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Observações da Resolução</label>
+                <Textarea
+                  value={dadosResolucao.observacao}
+                  onChange={(e) => setDadosResolucao(prev => ({ ...prev, observacao: e.target.value }))}
+                  placeholder="Descreva como o problema foi resolvido, peças utilizadas, etc..."
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Responsável pela Resolução *</label>
+                <Input
+                  value={dadosResolucao.resolvidoPor}
+                  onChange={(e) => setDadosResolucao(prev => ({ ...prev, resolvidoPor: e.target.value }))}
+                  placeholder="Nome do responsável..."
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setModalResolucaoAberto(false);
+                    setDadosResolucao({ solucaoAplicada: '', observacao: '', resolvidoPor: '' });
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={resolverAvaria}
+                  disabled={!dadosResolucao.solucaoAplicada || !dadosResolucao.resolvidoPor}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Confirmar Resolução
                 </Button>
               </div>
             </div>
