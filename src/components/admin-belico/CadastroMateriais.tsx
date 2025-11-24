@@ -291,13 +291,17 @@ const CadastroMateriais = () => {
         toast.error('Calibre é obrigatório para armamentos');
         return;
       }
-      if (!formData.quantidadeCarregadores || parseInt(formData.quantidadeCarregadores) === 0) {
-        toast.error('Quantidade de carregadores é obrigatória para armamentos');
-        return;
-      }
-      if (!formData.quantidadeMunicoes || parseInt(formData.quantidadeMunicoes) === 0) {
-        toast.error('Quantidade de munições é obrigatória para armamentos');
-        return;
+      
+      // Carregadores e munições são obrigatórios APENAS quando associando a um policial
+      if (formData.policialAssociadoId) {
+        if (!formData.quantidadeCarregadores || parseInt(formData.quantidadeCarregadores) === 0) {
+          toast.error('Quantidade de carregadores é obrigatória ao cautelar um armamento');
+          return;
+        }
+        if (!formData.quantidadeMunicoes || parseInt(formData.quantidadeMunicoes) === 0) {
+          toast.error('Quantidade de munições é obrigatória ao cautelar um armamento');
+          return;
+        }
       }
     }
 
@@ -820,7 +824,10 @@ const CadastroMateriais = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="quantidadeCarregadores">Quantidade de Carregadores *</Label>
+                      <Label htmlFor="quantidadeCarregadores">
+                        Quantidade de Carregadores {formData.policialAssociadoId && '*'}
+                        {!formData.policialAssociadoId && ' (Opcional - apenas para cautelas)'}
+                      </Label>
                       <Input
                         id="quantidadeCarregadores"
                         type="number"
@@ -828,11 +835,14 @@ const CadastroMateriais = () => {
                         onChange={(e) => setFormData(prev => ({ ...prev, quantidadeCarregadores: e.target.value }))}
                         placeholder="Ex: 3"
                         min="1"
-                        required
+                        required={!!formData.policialAssociadoId}
                       />
                     </div>
                     <div>
-                      <Label htmlFor="quantidadeMunicoes">Quantidade de Munições *</Label>
+                      <Label htmlFor="quantidadeMunicoes">
+                        Quantidade de Munições {formData.policialAssociadoId && '*'}
+                        {!formData.policialAssociadoId && ' (Opcional - apenas para cautelas)'}
+                      </Label>
                       <Input
                         id="quantidadeMunicoes"
                         type="number"
@@ -840,7 +850,7 @@ const CadastroMateriais = () => {
                         onChange={(e) => setFormData(prev => ({ ...prev, quantidadeMunicoes: e.target.value }))}
                         placeholder="Ex: 50"
                         min="1"
-                        required
+                        required={!!formData.policialAssociadoId}
                       />
                     </div>
                     <div>
@@ -942,13 +952,24 @@ const CadastroMateriais = () => {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 p-3 rounded-lg border" style={{
+                borderColor: formData.disponivel ? '#22c55e' : '#ef4444',
+                backgroundColor: formData.disponivel ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+              }}>
                 <Switch
                   id="disponivel"
                   checked={formData.disponivel}
                   onCheckedChange={(checked) => setFormData(prev => ({ ...prev, disponivel: checked }))}
+                  className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
                 />
-                <Label htmlFor="disponivel">Material disponível para cautela</Label>
+                <div className="flex flex-col">
+                  <Label htmlFor="disponivel" className="cursor-pointer">
+                    Material disponível para cautela
+                  </Label>
+                  <span className="text-xs" style={{ color: formData.disponivel ? '#22c55e' : '#ef4444' }}>
+                    {formData.disponivel ? '✅ Disponível' : '❌ Indisponível'}
+                  </span>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-4">
