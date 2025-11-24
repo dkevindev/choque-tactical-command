@@ -32,6 +32,8 @@ interface MaterialEstoque {
   dataTransferencia?: Date;
   local?: string; // Fortaleza ou Crato
   tipoArma?: string; // Arma Curta ou Arma Longa
+  calibre?: string; // Calibre da arma ou munição
+  quantidade?: number; // Quantidade (especialmente para munições)
 }
 
 interface EstatisticasEstoque {
@@ -41,6 +43,7 @@ interface EstatisticasEstoque {
     armasLongas: number;
     coletesReserva: number;
     coletesCautelados: number;
+    municoesPorCalibre: Record<string, number>;
   };
   fortaleza: {
     armasCurtasReserva: number;
@@ -48,6 +51,7 @@ interface EstatisticasEstoque {
     armasLongas: number;
     coletesReserva: number;
     coletesCautelados: number;
+    municoesPorCalibre: Record<string, number>;
   };
   crato: {
     armasCurtasReserva: number;
@@ -55,8 +59,18 @@ interface EstatisticasEstoque {
     armasLongas: number;
     coletesReserva: number;
     coletesCautelados: number;
+    municoesPorCalibre: Record<string, number>;
   };
-  porCategoria: Record<string, { total: number; disponiveis: number; cautelados: number }>;
+  porCategoria: Record<string, { 
+    total: number; 
+    disponiveis: number; 
+    cautelados: number;
+    detalhes?: Array<{ 
+      modelo: string; 
+      calibre?: string; 
+      quantidade: number;
+    }>;
+  }>;
 }
 
 const ControleEstoque = () => {
@@ -67,27 +81,31 @@ const ControleEstoque = () => {
       armasCurtasCauteladas: 0,
       armasLongas: 0,
       coletesReserva: 0,
-      coletesCautelados: 0
+      coletesCautelados: 0,
+      municoesPorCalibre: {}
     },
     fortaleza: {
       armasCurtasReserva: 0,
       armasCurtasCauteladas: 0,
       armasLongas: 0,
       coletesReserva: 0,
-      coletesCautelados: 0
+      coletesCautelados: 0,
+      municoesPorCalibre: {}
     },
     crato: {
       armasCurtasReserva: 0,
       armasCurtasCauteladas: 0,
       armasLongas: 0,
       coletesReserva: 0,
-      coletesCautelados: 0
+      coletesCautelados: 0,
+      municoesPorCalibre: {}
     },
     porCategoria: {}
   });
   const [filtro, setFiltro] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('todas');
   const [statusFiltro, setStatusFiltro] = useState('todos');
+  const [categoriasExpandidas, setCategoriasExpandidas] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadDadosEstoque();
@@ -162,6 +180,14 @@ const ControleEstoque = () => {
       (m.categoria === 'EPI' && m.nome && typeof m.nome === 'string' && m.nome.toLowerCase().includes('colete'))
     );
 
+    // Calcular munições por calibre - TOTAL
+    const municoesTotal = materiaisData.filter(m => m.categoria === 'Munição' || m.categoria === 'Munições');
+    const municoesPorCalibreTotal: Record<string, number> = {};
+    municoesTotal.forEach(m => {
+      const calibre = m.calibre || 'Sem Calibre';
+      municoesPorCalibreTotal[calibre] = (municoesPorCalibreTotal[calibre] || 0) + (m.quantidade || 0);
+    });
+
     // Calcular para FORTALEZA
     const materiaisFortaleza = materiaisData.filter(m => m.local === 'Fortaleza');
     const armasCurtasFortaleza = materiaisFortaleza.filter(m => m.tipoArma === 'Arma Curta');
@@ -170,6 +196,14 @@ const ControleEstoque = () => {
       m.categoria === 'Colete Balístico' || 
       (m.categoria === 'EPI' && m.nome && typeof m.nome === 'string' && m.nome.toLowerCase().includes('colete'))
     );
+
+    // Calcular munições por calibre - FORTALEZA
+    const municoesFortaleza = materiaisFortaleza.filter(m => m.categoria === 'Munição' || m.categoria === 'Munições');
+    const municoesPorCalibreFortaleza: Record<string, number> = {};
+    municoesFortaleza.forEach(m => {
+      const calibre = m.calibre || 'Sem Calibre';
+      municoesPorCalibreFortaleza[calibre] = (municoesPorCalibreFortaleza[calibre] || 0) + (m.quantidade || 0);
+    });
 
     // Calcular para CRATO
     const materiaisCrato = materiaisData.filter(m => m.local === 'Crato');
@@ -180,43 +214,83 @@ const ControleEstoque = () => {
       (m.categoria === 'EPI' && m.nome && typeof m.nome === 'string' && m.nome.toLowerCase().includes('colete'))
     );
 
+    // Calcular munições por calibre - CRATO
+    const municoesCrato = materiaisCrato.filter(m => m.categoria === 'Munição' || m.categoria === 'Munições');
+    const municoesPorCalibreCrato: Record<string, number> = {};
+    municoesCrato.forEach(m => {
+      const calibre = m.calibre || 'Sem Calibre';
+      municoesPorCalibreCrato[calibre] = (municoesPorCalibreCrato[calibre] || 0) + (m.quantidade || 0);
+    });
+
     const stats: EstatisticasEstoque = {
       total: {
         armasCurtasReserva: armasCurtasTotal.filter(m => m.disponivel && !m.cautelado).length,
         armasCurtasCauteladas: armasCurtasTotal.filter(m => m.cautelado).length,
         armasLongas: armasLongasTotal.length,
         coletesReserva: coletesTotal.filter(m => m.disponivel && !m.cautelado).length,
-        coletesCautelados: coletesTotal.filter(m => m.cautelado).length
+        coletesCautelados: coletesTotal.filter(m => m.cautelado).length,
+        municoesPorCalibre: municoesPorCalibreTotal
       },
       fortaleza: {
         armasCurtasReserva: armasCurtasFortaleza.filter(m => m.disponivel && !m.cautelado).length,
         armasCurtasCauteladas: armasCurtasFortaleza.filter(m => m.cautelado).length,
         armasLongas: armasLongasFortaleza.length,
         coletesReserva: coletesFortaleza.filter(m => m.disponivel && !m.cautelado).length,
-        coletesCautelados: coletesFortaleza.filter(m => m.cautelado).length
+        coletesCautelados: coletesFortaleza.filter(m => m.cautelado).length,
+        municoesPorCalibre: municoesPorCalibreFortaleza
       },
       crato: {
         armasCurtasReserva: armasCurtasCrato.filter(m => m.disponivel && !m.cautelado).length,
         armasCurtasCauteladas: armasCurtasCrato.filter(m => m.cautelado).length,
         armasLongas: armasLongasCrato.length,
         coletesReserva: coletesCrato.filter(m => m.disponivel && !m.cautelado).length,
-        coletesCautelados: coletesCrato.filter(m => m.cautelado).length
+        coletesCautelados: coletesCrato.filter(m => m.cautelado).length,
+        municoesPorCalibre: municoesPorCalibreCrato
       },
       porCategoria: {}
     };
 
-    // Calculate by category
+    // Calculate by category with details
     const categorias = [...new Set(materiaisData.map(m => m.categoria))];
     categorias.forEach(categoria => {
       const materiaisCategoria = materiaisData.filter(m => m.categoria === categoria);
+      
+      // Agrupar por modelo e calibre para detalhes
+      const detalhes: Array<{modelo: string, calibre?: string, quantidade: number}> = [];
+      const agrupamento = new Map<string, number>();
+      
+      materiaisCategoria.forEach(m => {
+        const chave = `${m.nome}|${m.calibre || 'N/A'}`;
+        const qtdAtual = agrupamento.get(chave) || 0;
+        agrupamento.set(chave, qtdAtual + (m.quantidade || 1));
+      });
+      
+      agrupamento.forEach((qtd, chave) => {
+        const [modelo, calibre] = chave.split('|');
+        detalhes.push({ modelo, calibre: calibre !== 'N/A' ? calibre : undefined, quantidade: qtd });
+      });
+      
       stats.porCategoria[categoria] = {
         total: materiaisCategoria.length,
         disponiveis: materiaisCategoria.filter(m => m.disponivel && !m.cautelado).length,
-        cautelados: materiaisCategoria.filter(m => m.cautelado).length
+        cautelados: materiaisCategoria.filter(m => m.cautelado).length,
+        detalhes
       };
     });
 
     setEstatisticas(stats);
+  };
+
+  const toggleCategoria = (categoria: string) => {
+    setCategoriasExpandidas(prev => {
+      const novo = new Set(prev);
+      if (novo.has(categoria)) {
+        novo.delete(categoria);
+      } else {
+        novo.add(categoria);
+      }
+      return novo;
+    });
   };
 
   const getStatusBadge = (material: MaterialEstoque) => {
@@ -274,26 +348,97 @@ const ControleEstoque = () => {
             <div className="space-y-2">
               <h4 className="font-bold text-foreground text-sm uppercase tracking-wide border-b pb-1">TOTAL</h4>
               <div className="space-y-1.5">
-                <div className="flex justify-between items-center p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-900">
-                  <span className="text-xs font-medium text-green-700 dark:text-green-400">Armas Curtas Reserva</span>
+                <div 
+                  className="flex justify-between items-center p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-900 cursor-pointer hover:bg-green-100 dark:hover:bg-green-950/30 transition-colors"
+                  onClick={() => toggleCategoria('armasCurtasReserva_total')}
+                >
+                  <span className="text-xs font-medium text-green-700 dark:text-green-400">
+                    Armas Curtas Reserva {categoriasExpandidas.has('armasCurtasReserva_total') ? '▼' : '▶'}
+                  </span>
                   <span className="text-lg font-bold text-green-700 dark:text-green-400">{estatisticas.total.armasCurtasReserva}</span>
                 </div>
-                <div className="flex justify-between items-center p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-900">
-                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Armas Curtas Cauteladas</span>
+                {categoriasExpandidas.has('armasCurtasReserva_total') && estatisticas.porCategoria['Armamento']?.detalhes && (
+                  <div className="pl-4 space-y-1">
+                    {estatisticas.porCategoria['Armamento'].detalhes
+                      .filter(d => d.modelo.toLowerCase().includes('pistola') || d.modelo.toLowerCase().includes('curta'))
+                      .map((detalhe, idx) => (
+                        <div key={idx} className="text-xs p-1 bg-muted rounded flex justify-between">
+                          <span>{detalhe.modelo} {detalhe.calibre && `- ${detalhe.calibre}`}</span>
+                          <span className="font-bold">{detalhe.quantidade}</span>
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
+                
+                <div 
+                  className="flex justify-between items-center p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-900 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-950/30 transition-colors"
+                  onClick={() => toggleCategoria('armasCurtasCauteladas_total')}
+                >
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                    Armas Curtas Cauteladas {categoriasExpandidas.has('armasCurtasCauteladas_total') ? '▼' : '▶'}
+                  </span>
                   <span className="text-lg font-bold text-blue-700 dark:text-blue-400">{estatisticas.total.armasCurtasCauteladas}</span>
                 </div>
-                <div className="flex justify-between items-center p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-900">
-                  <span className="text-xs font-medium text-purple-700 dark:text-purple-400">Armas Longas</span>
+                
+                <div 
+                  className="flex justify-between items-center p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-900 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-950/30 transition-colors"
+                  onClick={() => toggleCategoria('armasLongas_total')}
+                >
+                  <span className="text-xs font-medium text-purple-700 dark:text-purple-400">
+                    Armas Longas {categoriasExpandidas.has('armasLongas_total') ? '▼' : '▶'}
+                  </span>
                   <span className="text-lg font-bold text-purple-700 dark:text-purple-400">{estatisticas.total.armasLongas}</span>
                 </div>
-                <div className="flex justify-between items-center p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-900">
-                  <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Coletes Reserva</span>
+                {categoriasExpandidas.has('armasLongas_total') && estatisticas.porCategoria['Armamento']?.detalhes && (
+                  <div className="pl-4 space-y-1">
+                    {estatisticas.porCategoria['Armamento'].detalhes
+                      .filter(d => d.modelo.toLowerCase().includes('fuzil') || d.modelo.toLowerCase().includes('esping') || d.modelo.toLowerCase().includes('longa'))
+                      .map((detalhe, idx) => (
+                        <div key={idx} className="text-xs p-1 bg-muted rounded flex justify-between">
+                          <span>{detalhe.modelo} {detalhe.calibre && `- ${detalhe.calibre}`}</span>
+                          <span className="font-bold">{detalhe.quantidade}</span>
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
+                
+                <div 
+                  className="flex justify-between items-center p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-900 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors"
+                  onClick={() => toggleCategoria('coletesReserva_total')}
+                >
+                  <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                    Coletes Reserva {categoriasExpandidas.has('coletesReserva_total') ? '▼' : '▶'}
+                  </span>
                   <span className="text-lg font-bold text-amber-700 dark:text-amber-400">{estatisticas.total.coletesReserva}</span>
                 </div>
+                
                 <div className="flex justify-between items-center p-2 bg-orange-50 dark:bg-orange-950/20 rounded border border-orange-200 dark:border-orange-900">
                   <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Coletes Cautelados</span>
                   <span className="text-lg font-bold text-orange-700 dark:text-orange-400">{estatisticas.total.coletesCautelados}</span>
                 </div>
+
+                {/* Munições por Calibre */}
+                {Object.keys(estatisticas.total.municoesPorCalibre).length > 0 && (
+                  <>
+                    <div className="col-span-3 border-t pt-2 mt-2">
+                      <h5 className="font-bold text-xs text-muted-foreground uppercase">MUNIÇÕES POR CALIBRE</h5>
+                    </div>
+                    {Object.entries(estatisticas.total.municoesPorCalibre).map(([calibre, qtd]) => (
+                      <div 
+                        key={calibre} 
+                        className="flex justify-between items-center p-2 bg-cyan-50 dark:bg-cyan-950/20 rounded border border-cyan-200 dark:border-cyan-900 cursor-pointer hover:bg-cyan-100 dark:hover:bg-cyan-950/30 transition-colors"
+                        onClick={() => toggleCategoria(`municao_${calibre}_total`)}
+                      >
+                        <span className="text-xs font-medium text-cyan-700 dark:text-cyan-400">
+                          Calibre {calibre} {categoriasExpandidas.has(`municao_${calibre}_total`) ? '▼' : '▶'}
+                        </span>
+                        <span className="text-lg font-bold text-cyan-700 dark:text-cyan-400">{qtd.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             </div>
 
@@ -415,6 +560,7 @@ const ControleEstoque = () => {
                   <TableHead>Material</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Série</TableHead>
+                  <TableHead>Quantidade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Cautelado Para</TableHead>
                   <TableHead>Observações</TableHead>
@@ -429,6 +575,12 @@ const ControleEstoque = () => {
                     </TableCell>
                     <TableCell className="font-mono text-sm">
                       {material.numeroSerie || '-'}
+                    </TableCell>
+                    <TableCell>
+                      {(material.categoria === 'Munição' || material.categoria === 'Munições') && material.quantidade 
+                        ? <Badge variant="secondary" className="font-bold">{material.quantidade.toLocaleString()} un.</Badge>
+                        : '-'
+                      }
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(material)}
