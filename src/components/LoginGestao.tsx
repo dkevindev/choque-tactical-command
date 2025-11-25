@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, Lock, IdCard } from 'lucide-react';
-import cpchoqueLogo from '@/assets/cpchoque-logo.png';
+import logoRegimento from '@/assets/logo-regimento.jpg';
 
 const LoginGestao = () => {
   const [matricula, setMatricula] = useState('');
@@ -32,14 +32,14 @@ const LoginGestao = () => {
           <div className="flex justify-center mb-4">
             <div className="w-20 h-20 bg-tactical-medium rounded-full p-2 border-2 border-tactical-light">
               <img 
-                src={cpchoqueLogo} 
-                alt="CAVALARIA Logo" 
-                className="w-full h-full object-contain filter brightness-200"
+                src={logoRegimento} 
+                alt="1º Regimento Logo" 
+                className="w-full h-full object-contain rounded-full"
               />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-foreground tracking-wide">
-            CAVALARIA
+            1º REGIMENTO
           </CardTitle>
           <p className="text-muted-foreground text-sm font-medium">
             GESTÃO E LOGÍSTICA
@@ -100,7 +100,7 @@ const LoginGestao = () => {
           
           <div className="mt-4 text-center">
             <p className="text-xs text-muted-foreground">
-              Sistema restrito • CAVALARIA PM-CE
+              Sistema restrito • 1º REGIMENTO PM-CE
             </p>
           </div>
         </CardContent>

@@ -16,6 +16,7 @@ import {
   AlertCircle,
   GraduationCap
 } from 'lucide-react';
+import logoRegimento from '@/assets/logo-regimento.jpg';
 
 interface TacticalSidebarProps {
   activeSection: string;
@@ -56,12 +57,16 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
         <div className="flex items-center justify-between">
           {!isCollapsed && (
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-sidebar-primary rounded">
-                <Shield className="h-6 w-6 text-sidebar-primary-foreground" />
+              <div className="w-10 h-10 rounded-full overflow-hidden border border-sidebar-border">
+                <img 
+                  src={logoRegimento} 
+                  alt="1º Regimento Logo" 
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
                 <h2 className="text-sidebar-foreground font-bold text-lg tracking-wide">
-                  CAVALARIA
+                  1º REGIMENTO
                 </h2>
                 <p className="text-xs text-muted-foreground">
                   {isAdmin ? 'ADMIN' : 'POLICIAL'}
