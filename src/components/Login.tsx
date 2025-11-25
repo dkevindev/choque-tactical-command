@@ -39,7 +39,7 @@ const Login = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-foreground tracking-wide">
-            1º REGIMENTO
+            RPMONT
           </CardTitle>
           <p className="text-muted-foreground text-sm font-medium">
             SISTEMA ADMINISTRATIVO P4
@@ -90,7 +90,7 @@ const Login = () => {
           
           <div className="mt-6 text-center">
             <p className="text-xs text-muted-foreground">
-              SISTEMA RESTRITO - 1º REGIMENTO PM-CE
+              SISTEMA RESTRITO - RPMONT PM-CE
             </p>
           </div>
         </CardContent>

@@ -39,7 +39,7 @@ const LoginGestao = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-foreground tracking-wide">
-            1º REGIMENTO
+            RPMONT
           </CardTitle>
           <p className="text-muted-foreground text-sm font-medium">
             GESTÃO E LOGÍSTICA
@@ -100,7 +100,7 @@ const LoginGestao = () => {
           
           <div className="mt-4 text-center">
             <p className="text-xs text-muted-foreground">
-              Sistema restrito • 1º REGIMENTO PM-CE
+              Sistema restrito • RPMONT PM-CE
             </p>
           </div>
         </CardContent>

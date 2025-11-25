@@ -126,7 +126,7 @@ const Home = () => {
             </div>
           </div>
           <h1 className="text-4xl font-bold text-foreground tracking-wide mb-4">
-            1º REGIMENTO
+            RPMONT
           </h1>
           <p className="text-xl text-muted-foreground font-medium">
             SISTEMA INTEGRADO DE GESTÃO OPERACIONAL
@@ -180,7 +180,7 @@ const Home = () => {
         {/* Footer */}
         <div className="text-center mt-12">
           <p className="text-xs text-muted-foreground">
-            Sistema integrado • 1º REGIMENTO PM-CE • DKCODE
+            Sistema integrado • RPMONT PM-CE • DKCODE
           </p>
         </div>
       </div>
