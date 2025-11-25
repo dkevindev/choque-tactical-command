@@ -66,7 +66,7 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
               </div>
               <div>
                 <h2 className="text-sidebar-foreground font-bold text-lg tracking-wide">
-                  1º REGIMENTO
+                  RPMONT
                 </h2>
                 <p className="text-xs text-muted-foreground">
                   {isAdmin ? 'ADMIN' : 'POLICIAL'}
