@@ -35,7 +35,6 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
     { id: 'policial', label: 'POLICIAL', icon: Users, badge: null },
     { id: 'guarda-quartel', label: 'GUARDA QUARTEL', icon: Shield, badge: null },
     { id: 'gestao', label: 'GESTÃO', icon: Shield, badge: null },
-    { id: 'gestao-pessoas', label: 'GESTÃO PESSOAS', icon: Users, badge: null },
     { id: 'documentos', label: 'DOCUMENTOS', icon: FileText, badge: null },
     { id: 'ordens-servico', label: 'OS\'s', icon: FileText, badge: null },
     { id: 'servicos', label: 'SERVIÇOS', icon: FileText, badge: null },
