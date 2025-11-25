@@ -153,7 +153,7 @@ const UserDashboard = () => {
       
       <div className="flex">
         {/* Mobile Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:relative md:translate-x-0 ${
+        <div className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:relative md:translate-x-0 bg-background ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
           <TacticalSidebar 

@@ -50,7 +50,7 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
   const menuItems = isAdmin ? adminMenuItems : userMenuItems;
 
   return (
-    <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-sidebar-background border-r border-sidebar-border transition-all duration-300 flex flex-col shadow-tactical`}>
+    <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-background border-r border-sidebar-border transition-all duration-300 flex flex-col shadow-tactical h-full`}>
       {/* Header */}
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center justify-between">
