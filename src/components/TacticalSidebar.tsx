@@ -43,8 +43,8 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
 
   const userMenuItems = [
     { id: 'dashboard', label: 'INFORMAÇÕES', icon: Home, badge: null },
-    { id: 'reserva', label: 'RESERVA DE ARMAMENTO', icon: Target, badge: null },
-    { id: 'avarias', label: 'AVARIAS', icon: AlertCircle, badge: null },
+    { id: 'servicos', label: 'SERVIÇOS', icon: Truck, badge: null },
+    { id: 'cautela', label: 'CAUTELA', icon: Package, badge: null },
   ];
 
   const menuItems = isAdmin ? adminMenuItems : userMenuItems;

@@ -1,42 +1,143 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import TacticalSidebar from '@/components/TacticalSidebar';
-import UserViaturaAvarias from '@/components/UserViaturaAvarias';
 import ProjetosSociaisSystem from '@/components/projetos-sociais/ProjetosSociaisSystem';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { db } from '@/firebase';
 import { 
   User, 
-  Calendar,
-  Clock,
-  AlertCircle,
-  CheckCircle2,
-  FileText,
   Package,
-  Signature,
-  CheckSquare,
-  ArrowDown,
-  Menu
+  Truck,
+  Menu,
+  Loader2
 } from 'lucide-react';
+
+interface PolicialLogado {
+  id: string;
+  NOME: string;
+  'Post/Grad': string;
+  Matrícula: number | string;
+  UNIDADE?: string;
+  FUNÇÃO?: string;
+  'NOME DE GUERRA1'?: string;
+}
+
+interface CautelaMaterial {
+  nome: string;
+  categoria: string;
+  numeroSerie?: string;
+  quantidade: number;
+  calibre?: string;
+  fabricante?: string;
+  modelo?: string;
+  tamanhoColete?: string;
+  quantidadeCarregadores?: number;
+  quantidadeMunicoes?: number;
+}
+
+interface ServicoMotorista {
+  id: string;
+  cadastro?: string;
+  placa?: string;
+  area?: string;
+  kmInicial?: number;
+  kmFinal?: number;
+  status?: 'aberto' | 'encerrado';
+  iniciadoEm?: string;
+  encerradoEm?: string;
+  motoristaMatricula?: string;
+  motoristaNome?: string;
+}
+
+interface CautelaCompleta {
+  id: string;
+  numeroCautela?: string;
+  dataInicio?: any;
+  status?: string;
+  materiais?: CautelaMaterial[];
+}
 
 const UserDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [policialLogado, setPolicialLogado] = useState<PolicialLogado | null>(null);
+  const [materiaisCautelados, setMateriaisCautelados] = useState<CautelaMaterial[]>([]);
+  const [ultimosServicos, setUltimosServicos] = useState<ServicoMotorista[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const carregarDados = async () => {
+      setLoading(true);
+      try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setPolicialLogado(user);
+
+          // Buscar cautela permanente do policial
+          try {
+            const cautelasQuery = query(
+              collection(db, 'cautelas_permanentes'),
+              where('policialId', '==', user.id),
+              where('status', '==', 'ativa')
+            );
+            const cautelasSnap = await getDocs(cautelasQuery);
+            
+            if (!cautelasSnap.empty) {
+              const cautela = cautelasSnap.docs[0].data();
+              setMateriaisCautelados(cautela.materiais || []);
+            }
+          } catch (error) {
+            console.error('Erro ao buscar cautela:', error);
+          }
+
+          // Buscar últimos serviços como motorista
+          try {
+            const servicosQuery = query(
+              collection(db, 'servicosDiarios'),
+              where('motoristaId', '==', user.id),
+              orderBy('iniciadoEm', 'desc')
+            );
+            const servicosSnap = await getDocs(servicosQuery);
+            const servicos = servicosSnap.docs.slice(0, 5).map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            })) as ServicoMotorista[];
+            setUltimosServicos(servicos);
+          } catch (error) {
+            console.error('Erro ao buscar serviços:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, []);
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'reserva':
-        return <ReservaArmamento />;
-      case 'avarias':
-        return <UserViaturaAvarias />;
+      case 'servicos':
+        return <ServicosMotorista policialLogado={policialLogado} />;
+      case 'cautela':
+        return <MinhaCautela policialLogado={policialLogado} />;
       case 'projetos-sociais':
         return <ProjetosSociaisSystem />;
       default:
-        return <DashboardContent />;
+        return (
+          <DashboardContent 
+            policialLogado={policialLogado} 
+            materiaisCautelados={materiaisCautelados} 
+            ultimosServicos={ultimosServicos}
+            loading={loading}
+          />
+        );
     }
   };
 
@@ -101,7 +202,22 @@ const UserDashboard = () => {
   );
 };
 
-const DashboardContent = () => {
+interface DashboardContentProps {
+  policialLogado: PolicialLogado | null;
+  materiaisCautelados: CautelaMaterial[];
+  ultimosServicos: ServicoMotorista[];
+  loading: boolean;
+}
+
+const DashboardContent = ({ policialLogado, materiaisCautelados, ultimosServicos, loading }: DashboardContentProps) => {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
       {/* Perfil do Policial */}
@@ -124,7 +240,7 @@ const DashboardContent = () => {
                     Nome Completo
                   </label>
                   <p className="text-sm md:text-base text-foreground font-medium truncate">
-                    CABO JOÃO DA SILVA SANTOS
+                    {policialLogado?.['Post/Grad']} {policialLogado?.NOME || 'Carregando...'}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -133,7 +249,7 @@ const DashboardContent = () => {
                       Matrícula
                     </label>
                     <p className="text-sm md:text-base text-foreground font-medium">
-                      PM-123456-SP
+                      {policialLogado?.Matrícula || '-'}
                     </p>
                   </div>
                   <div>
@@ -141,7 +257,7 @@ const DashboardContent = () => {
                       Posto/Graduação
                     </label>
                     <p className="text-sm md:text-base text-foreground font-medium">
-                      CABO PM
+                      {policialLogado?.['Post/Grad'] || '-'}
                     </p>
                   </div>
                 </div>
@@ -150,7 +266,7 @@ const DashboardContent = () => {
                     Unidade
                   </label>
                   <p className="text-sm md:text-base text-foreground font-medium">
-                    CPCHOQUE - 1ª CIA
+                    {policialLogado?.UNIDADE || 'RPMONT'}
                   </p>
                 </div>
               </div>
@@ -177,136 +293,66 @@ const DashboardContent = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
-            <div className="flex items-center justify-between p-2 md:p-3 bg-muted rounded">
-              <div className="flex items-center gap-2 min-w-0">
-                <Package className="h-3 w-3 md:h-4 md:w-4 text-primary flex-shrink-0" />
-                <span className="text-xs md:text-sm font-medium text-foreground truncate">
-                  PISTOLA .40
-                </span>
-              </div>
-              <Badge variant="default" className="text-xs">001</Badge>
-            </div>
-            
-            <div className="flex items-center justify-between p-2 md:p-3 bg-muted rounded">
-              <div className="flex items-center gap-2 min-w-0">
-                <Package className="h-3 w-3 md:h-4 md:w-4 text-primary flex-shrink-0" />
-                <span className="text-xs md:text-sm font-medium text-foreground truncate">
-                  MUNIÇÃO .40
-                </span>
-              </div>
-              <Badge variant="outline" className="text-xs">45 UN</Badge>
-            </div>
-            
-            <div className="flex items-center justify-between p-2 md:p-3 bg-muted rounded">
-              <div className="flex items-center gap-2 min-w-0">
-                <Package className="h-3 w-3 md:h-4 md:w-4 text-primary flex-shrink-0" />
-                <span className="text-xs md:text-sm font-medium text-foreground truncate">
-                  COLETE BALÍSTICO
-                </span>
-              </div>
-              <Badge variant="default" className="text-xs">001</Badge>
-            </div>
+            {materiaisCautelados.length > 0 ? (
+              materiaisCautelados.map((material, index) => (
+                <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-muted rounded">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Package className="h-3 w-3 md:h-4 md:w-4 text-primary flex-shrink-0" />
+                    <span className="text-xs md:text-sm font-medium text-foreground truncate">
+                      {material.nome} {material.calibre && `(${material.calibre})`}
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {material.quantidade} {material.numeroSerie && `- ${material.numeroSerie}`}
+                  </Badge>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhum material cautelado
+              </p>
+            )}
           </div>
           
           <div className="text-xs text-muted-foreground text-center border-t pt-2">
-            Total de itens: 3
+            Total de itens: {materiaisCautelados.length}
           </div>
         </CardContent>
       </Card>
 
-      {/* Agenda */}
-      <Card className="bg-card border-border shadow-tactical">
+      {/* Últimos Serviços */}
+      <Card className="lg:col-span-3 bg-card border-border shadow-tactical">
         <CardHeader className="pb-3">
           <CardTitle className="text-foreground flex items-center gap-2 text-sm md:text-base">
-            <Calendar className="h-4 w-4 md:h-5 md:w-5" />
-            PRÓXIMAS ATIVIDADES
+            <Truck className="h-4 w-4 md:h-5 md:w-5" />
+            ÚLTIMOS SERVIÇOS
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {[
-              { 
-                title: 'Treinamento Tático', 
-                time: '08:00', 
-                date: 'Amanhã',
-                type: 'training' 
-              },
-              { 
-                title: 'Inspeção de Equipamentos', 
-                time: '14:00', 
-                date: 'Quinta',
-                type: 'inspection' 
-              },
-              { 
-                title: 'Reunião de Briefing', 
-                time: '06:00', 
-                date: 'Sexta',
-                type: 'meeting' 
-              }
-            ].map((activity, index) => (
-              <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
-                <Clock className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs md:text-sm font-medium text-foreground truncate">
-                    {activity.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {activity.date} - {activity.time}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Comunicados */}
-      <Card className="bg-card border-border shadow-tactical">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-foreground flex items-center gap-2 text-sm md:text-base">
-            <AlertCircle className="h-4 w-4 md:h-5 md:w-5" />
-            COMUNICADOS
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {[
-              { 
-                title: 'Nova Diretriz Operacional', 
-                priority: 'high',
-                read: false 
-              },
-              { 
-                title: 'Atualização de Protocolos', 
-                priority: 'medium',
-                read: true 
-              },
-              { 
-                title: 'Cronograma de Treinamentos', 
-                priority: 'low',
-                read: true 
-              }
-            ].map((notice, index) => (
-              <div key={index} className="flex items-start gap-2 p-2 bg-muted rounded">
-                {notice.read ? (
-                  <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-primary flex-shrink-0 mt-0.5" />
-                ) : (
-                  <FileText className="h-3 w-3 md:h-4 md:w-4 text-destructive flex-shrink-0 mt-0.5" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs md:text-sm ${notice.read ? 'text-muted-foreground' : 'text-foreground font-medium'} line-clamp-2`}>
-                    {notice.title}
-                  </p>
-                  <Badge 
-                    variant={notice.priority === 'high' ? 'destructive' : 'outline'}
-                    className="text-xs mt-1"
-                  >
-                    {notice.priority === 'high' ? 'URGENTE' : 
-                     notice.priority === 'medium' ? 'IMPORTANTE' : 'INFORMATIVO'}
+            {ultimosServicos.length > 0 ? (
+              ultimosServicos.map((servico) => (
+                <div key={servico.id} className="flex items-center gap-2 p-2 bg-muted rounded">
+                  <Truck className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-medium text-foreground truncate">
+                      {servico.cadastro || servico.placa || 'Viatura'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {servico.iniciadoEm ? new Date(servico.iniciadoEm).toLocaleDateString('pt-BR') : '-'}
+                      {' - '}{servico.area || 'Local não informado'}
+                    </p>
+                  </div>
+                  <Badge variant={servico.status === 'aberto' ? 'secondary' : 'default'}>
+                    {servico.status?.toUpperCase() || '-'}
                   </Badge>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhum serviço registrado
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -314,138 +360,204 @@ const DashboardContent = () => {
   );
 };
 
-const ReservaArmamento = () => {
-  const [materiaisRecebidos, setMateriaisRecebidos] = useState([
-    { id: 1, nome: 'PISTOLA .40', serie: 'PM001234', quantidadeRecebida: 1, observacao: 'Conferida e operacional' },
-    { id: 2, nome: 'MUNIÇÃO .40', lote: 'L2024001', quantidadeRecebida: 30, observacao: 'Conferida' },
-    { id: 3, nome: 'COLETE BALÍSTICO', patrimonio: 'CB001567', quantidadeRecebida: 1, observacao: 'Tamanho G' }
-  ]);
-  
-  const [baixaItems, setBaixaItems] = useState({});
-  const [justificativas, setJustificativas] = useState({});
-  const [isModalOpen, setIsModalOpen] = useState(false);
+interface ServicosMotoristaProps {
+  policialLogado: PolicialLogado | null;
+}
 
-  const handleBaixaQuantidade = (id, quantidade) => {
-    setBaixaItems(prev => ({ ...prev, [id]: quantidade }));
-  };
+const ServicosMotorista = ({ policialLogado }: ServicosMotoristaProps) => {
+  const [servicos, setServicos] = useState<ServicoMotorista[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleJustificativa = (id, texto) => {
-    setJustificativas(prev => ({ ...prev, [id]: texto }));
-  };
+  useEffect(() => {
+    const carregarServicos = async () => {
+      if (!policialLogado?.id) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const servicosQuery = query(
+          collection(db, 'servicosDiarios'),
+          where('motoristaId', '==', policialLogado.id),
+          orderBy('iniciadoEm', 'desc')
+        );
+        const snap = await getDocs(servicosQuery);
+        const data = snap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as ServicoMotorista[];
+        setServicos(data);
+      } catch (error) {
+        console.error('Erro ao carregar serviços:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    carregarServicos();
+  }, [policialLogado]);
 
-  const finalizarBaixa = () => {
-    // Lógica para finalizar a baixa
-    console.log('Baixa realizada:', { baixaItems, justificativas });
-    setIsModalOpen(false);
-    setBaixaItems({});
-    setJustificativas({});
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <Card className="bg-card border-border shadow-tactical">
+      <CardHeader>
+        <CardTitle className="text-foreground flex items-center gap-2">
+          <Truck className="h-5 w-5" />
+          SERVIÇOS COMO MOTORISTA
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {servicos.length > 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Viatura</TableHead>
+                  <TableHead>Local/Área</TableHead>
+                  <TableHead>KM Inicial</TableHead>
+                  <TableHead>KM Final</TableHead>
+                  <TableHead>KM Rodados</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {servicos.map(s => {
+                  const kmRodados = (s.kmFinal && s.kmInicial) ? s.kmFinal - s.kmInicial : null;
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell>{s.iniciadoEm ? new Date(s.iniciadoEm).toLocaleString('pt-BR') : '-'}</TableCell>
+                      <TableCell>{s.cadastro || s.placa || '-'}</TableCell>
+                      <TableCell>{s.area || '-'}</TableCell>
+                      <TableCell>{s.kmInicial ?? '-'}</TableCell>
+                      <TableCell>{s.kmFinal ?? '-'}</TableCell>
+                      <TableCell>{kmRodados !== null ? `${kmRodados} km` : '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant={s.status === 'aberto' ? 'secondary' : 'default'}>
+                          {s.status?.toUpperCase() || '-'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <p className="text-center text-muted-foreground py-8">
+            Nenhum serviço registrado como motorista.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+interface MinhaCautelaProps {
+  policialLogado: PolicialLogado | null;
+}
+
+const MinhaCautela = ({ policialLogado }: MinhaCautelaProps) => {
+  const [cautela, setCautela] = useState<CautelaCompleta | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const carregarCautela = async () => {
+      if (!policialLogado?.id) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const cautelasQuery = query(
+          collection(db, 'cautelas_permanentes'),
+          where('policialId', '==', policialLogado.id),
+          where('status', '==', 'ativa')
+        );
+        const snap = await getDocs(cautelasQuery);
+        
+        if (!snap.empty) {
+          setCautela({
+            id: snap.docs[0].id,
+            ...snap.docs[0].data()
+          } as CautelaCompleta);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar cautela:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    carregarCautela();
+  }, [policialLogado]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <Card className="bg-card border-border shadow-tactical">
         <CardHeader>
           <CardTitle className="text-foreground flex items-center gap-2">
-            <Signature className="h-5 w-5" />
-            MATERIAIS RECEBIDOS - SERVIÇO ATUAL
+            <Package className="h-5 w-5" />
+            MINHA CAUTELA PERMANENTE
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {materiaisRecebidos.map((item) => (
-              <div key={item.id} className="p-4 bg-muted rounded border">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h4 className="font-medium text-foreground">{item.nome}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {item.serie && `Série: ${item.serie}`}
-                      {item.lote && `Lote: ${item.lote}`}
-                      {item.patrimonio && `Patrimônio: ${item.patrimonio}`}
-                    </p>
-                  </div>
-                  <Badge variant="outline">
-                    QTD: {item.quantidadeRecebida}
-                  </Badge>
+          {cautela ? (
+            <>
+              <div className="mb-4 p-3 bg-muted rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <p><strong>Nº da Cautela:</strong> {cautela.numeroCautela || '-'}</p>
+                  <p><strong>Data de Início:</strong> {cautela.dataInicio?.toDate?.().toLocaleDateString('pt-BR') || '-'}</p>
+                  <p><strong>Status:</strong> <Badge variant="default">Ativa</Badge></p>
                 </div>
-                <p className="text-xs text-muted-foreground">{item.observacao}</p>
               </div>
-            ))}
-            
-            <div className="flex gap-3 pt-4 border-t">
-              <Button className="flex-1" variant="outline">
-                <Signature className="h-4 w-4 mr-2" />
-                ASSINAR RECEBIMENTO
-              </Button>
               
-              <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogTrigger asChild>
-                  <Button className="flex-1">
-                    <ArrowDown className="h-4 w-4 mr-2" />
-                    DAR BAIXA
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>BAIXA DE MATERIAL</DialogTitle>
-                  </DialogHeader>
-                  
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {materiaisRecebidos.map((item) => (
-                      <div key={item.id} className="p-4 border rounded">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <h4 className="font-medium">{item.nome}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              Recebido: {item.quantidadeRecebida}
-                            </p>
-                          </div>
-                          <CheckSquare className="h-5 w-5 text-primary" />
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <div>
-                            <Label htmlFor={`quantidade-${item.id}`}>
-                              Quantidade devolvida
-                            </Label>
-                            <Input
-                              id={`quantidade-${item.id}`}
-                              type="number"
-                              max={item.quantidadeRecebida}
-                              placeholder="0"
-                              onChange={(e) => handleBaixaQuantidade(item.id, parseInt(e.target.value) || 0)}
-                            />
-                          </div>
-                          
-                          {baixaItems[item.id] < item.quantidadeRecebida && baixaItems[item.id] !== undefined && (
-                            <div>
-                              <Label htmlFor={`justificativa-${item.id}`} className="text-destructive">
-                                Justificativa obrigatória (diferença: {item.quantidadeRecebida - baixaItems[item.id]})
-                              </Label>
-                              <Textarea
-                                id={`justificativa-${item.id}`}
-                                placeholder="Descreva o motivo da diferença (disparos, etc.)"
-                                onChange={(e) => handleJustificativa(item.id, e.target.value)}
-                                required
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex gap-3">
-                    <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button onClick={finalizarBaixa}>
-                      Finalizar Baixa
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
+              <h4 className="font-semibold mb-3">Materiais Cautelados</h4>
+              <div className="space-y-3">
+                {cautela.materiais?.map((material, index) => (
+                  <Card key={index} className="p-4 bg-muted">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                      <div><strong>Material:</strong> {material.nome}</div>
+                      <div><strong>Categoria:</strong> {material.categoria}</div>
+                      {material.numeroSerie && <div><strong>Nº Série:</strong> {material.numeroSerie}</div>}
+                      {material.calibre && <div><strong>Calibre:</strong> {material.calibre}</div>}
+                      {material.fabricante && <div><strong>Fabricante:</strong> {material.fabricante}</div>}
+                      {material.modelo && <div><strong>Modelo:</strong> {material.modelo}</div>}
+                      <div><strong>Quantidade:</strong> {material.quantidade}</div>
+                      {material.tamanhoColete && <div><strong>Tamanho:</strong> {material.tamanhoColete}</div>}
+                      {material.quantidadeCarregadores && <div><strong>Carregadores:</strong> {material.quantidadeCarregadores}</div>}
+                      {material.quantidadeMunicoes && <div><strong>Munições:</strong> {material.quantidadeMunicoes}</div>}
+                    </div>
+                  </Card>
+                ))}
+                
+                {(!cautela.materiais || cautela.materiais.length === 0) && (
+                  <p className="text-center text-muted-foreground py-4">
+                    Nenhum material na cautela.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">
+              Você não possui cautela permanente ativa.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
