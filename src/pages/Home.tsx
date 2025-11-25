@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Shield, MessageSquare, Truck, Target, Users, FileText, Bot, GraduationCap, UserCog } from 'lucide-react';
-import cpchoqueLogo from '@/assets/cpchoque-logo.png';
+import logoRegimento from '@/assets/logo-regimento.jpg';
 import LoginSistema from '@/components/LoginSistema';
 
 const Home = () => {
@@ -117,16 +117,16 @@ const Home = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
-            <div className="w-24 h-24 bg-tactical-medium rounded-full p-3 border-2 border-tactical-light">
+            <div className="w-24 h-24 bg-tactical-medium rounded-full p-1 border-2 border-tactical-light overflow-hidden">
               <img 
-                src={cpchoqueLogo} 
-                alt="CAVALARIA Logo" 
-                className="w-full h-full object-contain filter brightness-200"
+                src={logoRegimento} 
+                alt="1º Regimento Logo" 
+                className="w-full h-full object-cover rounded-full"
               />
             </div>
           </div>
           <h1 className="text-4xl font-bold text-foreground tracking-wide mb-4">
-            CAVALARIA
+            1º REGIMENTO
           </h1>
           <p className="text-xl text-muted-foreground font-medium">
             SISTEMA INTEGRADO DE GESTÃO OPERACIONAL
@@ -180,7 +180,7 @@ const Home = () => {
         {/* Footer */}
         <div className="text-center mt-12">
           <p className="text-xs text-muted-foreground">
-            Sistema integrado • CAVALARIA PM-CE • DKCODE
+            Sistema integrado • 1º REGIMENTO PM-CE • DKCODE
           </p>
         </div>
       </div>
