@@ -48,8 +48,10 @@ interface ServicoMotorista {
   status?: 'aberto' | 'encerrado';
   iniciadoEm?: string;
   encerradoEm?: string;
+  motoristaId?: string;
   motoristaMatricula?: string;
   motoristaNome?: string;
+  motorista?: string;
 }
 
 interface CautelaCompleta {
@@ -75,6 +77,7 @@ const UserDashboard = () => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
+          console.log('Usuário logado:', user);
           setPolicialLogado(user);
 
           // Buscar cautela permanente do policial
@@ -94,19 +97,33 @@ const UserDashboard = () => {
             console.error('Erro ao buscar cautela:', error);
           }
 
-          // Buscar últimos serviços como motorista
+          // Buscar últimos serviços como motorista (sem orderBy para evitar necessidade de índice)
           try {
-            const servicosQuery = query(
-              collection(db, 'servicosDiarios'),
-              where('motoristaId', '==', user.id),
-              orderBy('iniciadoEm', 'desc')
-            );
-            const servicosSnap = await getDocs(servicosQuery);
-            const servicos = servicosSnap.docs.slice(0, 5).map(doc => ({
+            // Buscar todos os serviços e filtrar no cliente
+            const servicosSnap = await getDocs(collection(db, 'servicosDiarios'));
+            console.log('Total de serviços:', servicosSnap.docs.length);
+            
+            const todosServicos = servicosSnap.docs.map(doc => ({
               id: doc.id,
               ...doc.data()
             })) as ServicoMotorista[];
-            setUltimosServicos(servicos);
+            
+            // Filtrar por motoristaId ou pela matrícula
+            const servicosDoPolicial = todosServicos.filter(s => 
+              s.motoristaId === user.id || 
+              String(s.motoristaMatricula) === String(user.Matrícula)
+            );
+            
+            console.log('Serviços do policial:', servicosDoPolicial);
+            
+            // Ordenar por data (mais recentes primeiro)
+            servicosDoPolicial.sort((a, b) => {
+              const dateA = a.iniciadoEm ? new Date(a.iniciadoEm).getTime() : 0;
+              const dateB = b.iniciadoEm ? new Date(b.iniciadoEm).getTime() : 0;
+              return dateB - dateA;
+            });
+            
+            setUltimosServicos(servicosDoPolicial.slice(0, 5));
           } catch (error) {
             console.error('Erro ao buscar serviços:', error);
           }
@@ -376,17 +393,27 @@ const ServicosMotorista = ({ policialLogado }: ServicosMotoristaProps) => {
       }
       
       try {
-        const servicosQuery = query(
-          collection(db, 'servicosDiarios'),
-          where('motoristaId', '==', policialLogado.id),
-          orderBy('iniciadoEm', 'desc')
-        );
-        const snap = await getDocs(servicosQuery);
-        const data = snap.docs.map(doc => ({
+        // Buscar todos e filtrar no cliente para evitar necessidade de índice
+        const snap = await getDocs(collection(db, 'servicosDiarios'));
+        const todosServicos = snap.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as ServicoMotorista[];
-        setServicos(data);
+        
+        // Filtrar por motoristaId ou matrícula
+        const servicosDoPolicial = todosServicos.filter(s => 
+          s.motoristaId === policialLogado.id || 
+          String(s.motoristaMatricula) === String(policialLogado.Matrícula)
+        );
+        
+        // Ordenar por data (mais recentes primeiro)
+        servicosDoPolicial.sort((a, b) => {
+          const dateA = a.iniciadoEm ? new Date(a.iniciadoEm).getTime() : 0;
+          const dateB = b.iniciadoEm ? new Date(b.iniciadoEm).getTime() : 0;
+          return dateB - dateA;
+        });
+        
+        setServicos(servicosDoPolicial);
       } catch (error) {
         console.error('Erro ao carregar serviços:', error);
       } finally {
