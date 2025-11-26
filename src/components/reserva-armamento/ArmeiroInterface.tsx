@@ -3,10 +3,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Power, PowerOff, User, Clock, Package, BookOpen, Target, Plus, Minus, CheckCircle, AlertCircle, Lock } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Search, User, Clock, Package, BookOpen, Target, Plus, Minus, 
+  CheckCircle, AlertCircle, Lock, Shield, Crosshair, MapPin, 
+  History, RotateCcw 
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, getDocs, orderBy } from 'firebase/firestore';
+import { 
+  collection, query, where, onSnapshot, addDoc, updateDoc, 
+  doc, getDocs, orderBy, getDoc 
+} from 'firebase/firestore';
 import { db } from '@/firebase';
+import ModalConfirmacaoPolicial from './ModalConfirmacaoPolicial';
+import ModalQuantidadeMaterial from './ModalQuantidadeMaterial';
+import ModalFechamentoLivro from './ModalFechamentoLivro';
+import BaixaMaterialSection from './BaixaMaterialSection';
+import HistoricoLivrosSection from './HistoricoLivrosSection';
+import MaterialNaRuaSection from './MaterialNaRuaSection';
 
 interface Policial {
   id: string;
@@ -35,26 +49,30 @@ interface MaterialSelecionado {
   nome: string;
   categoria: string;
   quantidade: number;
+  numeroSerie?: string;
+  carregadores?: number;
 }
 
-interface ReservaAtiva {
+interface LivroAtivo {
   id: string;
-  policialId: string;
-  armeiro: string;
-  materiais: Array<{
-    materialId: string;
-    nome: string;
-    categoria: string;
-    quantidade: number;
-    confirmado: boolean;
-  }>;
-  status: 'ativo' | 'finalizado';
-  createdAt: Date;
+  armeiroId: string;
+  armeiroNome: string;
+  dataAbertura: Date;
+  status: 'aberto' | 'fechado';
 }
+
+const CATEGORIAS = [
+  { id: 'arma_curta', label: 'Arma Curta', icon: Target },
+  { id: 'arma_longa', label: 'Arma Longa', icon: Crosshair },
+  { id: 'municao', label: 'Munição', icon: Package },
+  { id: 'epi', label: 'EPI', icon: Shield },
+  { id: 'acessorio', label: 'Acessórios', icon: Plus }
+];
 
 const ArmeiroInterface = () => {
-  const [livroDiarioAberto, setLivroDiarioAberto] = useState(false);
-  const [armeiro] = useState("ARMEIRO001");
+  const [livroAtivo, setLivroAtivo] = useState<LivroAtivo | null>(null);
+  const [armeiroNome, setArmeiroNome] = useState("ARMEIRO LOGADO");
+  const [armeiroId, setArmeiroId] = useState("armeiro_001");
   const [loading, setLoading] = useState(false);
   
   const [policialSelecionado, setPolicialSelecionado] = useState<Policial | null>(null);
@@ -63,14 +81,51 @@ const ArmeiroInterface = () => {
   const [searchPolicial, setSearchPolicial] = useState("");
   const [searchMaterial, setSearchMaterial] = useState("");
   const [policiais, setPoliciais] = useState<Policial[]>([]);
-  const [reservasAtivas, setReservasAtivas] = useState<ReservaAtiva[]>([]);
+  const [categoriaAtiva, setCategoriaAtiva] = useState("arma_curta");
+  
+  // Modais
+  const [modalConfirmacao, setModalConfirmacao] = useState(false);
+  const [modalQuantidade, setModalQuantidade] = useState(false);
+  const [modalFechamento, setModalFechamento] = useState(false);
+  const [materialParaQuantidade, setMaterialParaQuantidade] = useState<Material | null>(null);
+  const [tipoQuantidade, setTipoQuantidade] = useState<'municao' | 'arma'>('municao');
+  
+  // Estatísticas
+  const [totalCautelasHoje, setTotalCautelasHoje] = useState(0);
+  const [totalBaixasHoje, setTotalBaixasHoje] = useState(0);
+  
+  // Tab ativa
+  const [tabAtiva, setTabAtiva] = useState("cautela");
   
   const { toast } = useToast();
+
+  // Verificar livro ativo ao carregar
+  useEffect(() => {
+    const verificarLivroAtivo = async () => {
+      try {
+        const querySnapshot = await getDocs(
+          query(collection(db, 'livros_reserva_armamento'), where('status', '==', 'aberto'))
+        );
+        
+        if (!querySnapshot.empty) {
+          const livroData = querySnapshot.docs[0].data();
+          setLivroAtivo({
+            id: querySnapshot.docs[0].id,
+            ...livroData,
+            dataAbertura: livroData.dataAbertura?.toDate?.() || new Date()
+          } as LivroAtivo);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar livro ativo:', error);
+      }
+    };
+    
+    verificarLivroAtivo();
+  }, []);
 
   // Carregar policiais do Firebase
   const carregarPoliciais = useCallback(async () => {
     try {
-      console.log('🔍 Carregando policiais do Firebase...');
       const querySnapshot = await getDocs(
         query(collection(db, 'policiais'), orderBy('NOME'))
       );
@@ -80,22 +135,15 @@ const ArmeiroInterface = () => {
         ...doc.data()
       } as Policial));
       
-      console.log('✅ Policiais carregados:', policiaisData.length);
       setPoliciais(policiaisData);
     } catch (error) {
-      console.error('❌ Erro ao carregar policiais:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar policiais do Firebase.",
-        variant: "destructive",
-      });
+      console.error('Erro ao carregar policiais:', error);
     }
-  }, [toast]);
+  }, []);
 
   // Carregar materiais disponíveis do Firebase
   const carregarMateriaisDisponiveis = useCallback(async () => {
     try {
-      console.log('🔍 Carregando materiais do Firebase...');
       const querySnapshot = await getDocs(
         query(collection(db, 'materiais_belicos'), where('disponivel', '==', true))
       );
@@ -105,66 +153,98 @@ const ArmeiroInterface = () => {
         ...doc.data()
       } as Material));
       
-      console.log('✅ Materiais carregados:', materiaisData.length);
       setMateriaisDisponiveis(materiaisData);
     } catch (error) {
-      console.error('❌ Erro ao carregar materiais:', error);
-      // Mock data para desenvolvimento se não encontrar no Firebase
-      const mockMaterials = [
-        { id: '1', nome: 'Pistola .40', categoria: 'Armamento', calibre: '.40', numeroSerie: 'BR001', disponivel: true },
-        { id: '2', nome: 'Espingarda Calibre 12', categoria: 'Armamento', calibre: '12', numeroSerie: 'BR002', disponivel: true },
-        { id: '3', nome: 'Colete Balístico', categoria: 'EPI', disponivel: true },
-        { id: '4', nome: 'Munição .40', categoria: 'Munição', calibre: '.40', quantidade: 1000, disponivel: true },
-        { id: '5', nome: 'Carregador .40', categoria: 'Acessório', disponivel: true }
+      console.error('Erro ao carregar materiais:', error);
+      // Mock data para desenvolvimento
+      const mockMaterials: Material[] = [
+        { id: '1', nome: 'Pistola .40 TAURUS', categoria: 'Arma Curta', calibre: '.40', numeroSerie: 'BR001', disponivel: true },
+        { id: '2', nome: 'Espingarda Cal 12', categoria: 'Arma Longa', calibre: '12', numeroSerie: 'BR002', disponivel: true },
+        { id: '3', nome: 'Colete Balístico Nível III', categoria: 'EPI', disponivel: true },
+        { id: '4', nome: 'Munição .40 CBC', categoria: 'Munição', calibre: '.40', quantidade: 1000, disponivel: true },
+        { id: '5', nome: 'Carregador .40', categoria: 'Acessórios', disponivel: true },
+        { id: '6', nome: 'Fuzil 5.56', categoria: 'Arma Longa', calibre: '5.56', numeroSerie: 'BR003', disponivel: true },
+        { id: '7', nome: 'Munição 5.56', categoria: 'Munição', calibre: '5.56', quantidade: 500, disponivel: true },
       ];
       setMateriaisDisponiveis(mockMaterials);
-      
-      toast({
-        title: "Aviso",
-        description: "Usando dados de exemplo. Configure os materiais no Firebase.",
-        variant: "default",
-      });
     }
-  }, [toast]);
-
-  // Verificar reservas ativas
-  const verificarReservasAtivas = useCallback(() => {
-    console.log('🔍 Configurando listener para reservas ativas...');
-    const q = query(collection(db, 'reservas_ativas'), where('status', '==', 'ativo'));
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const reservas = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as ReservaAtiva));
-      
-      console.log('📊 Reservas ativas:', reservas.length);
-      setReservasAtivas(reservas);
-    }, (error) => {
-      console.error('❌ Erro ao escutar reservas:', error);
-    });
-
-    return unsubscribe;
   }, []);
 
-  const abrirLivroDiario = () => {
-    setLivroDiarioAberto(true);
-    toast({
-      title: "Livro Diário Aberto",
-      description: "O livro diário foi aberto para movimentações.",
-    });
+  useEffect(() => {
+    carregarPoliciais();
+    carregarMateriaisDisponiveis();
+  }, [carregarPoliciais, carregarMateriaisDisponiveis]);
+
+  // Abrir Livro Diário
+  const abrirLivroDiario = async () => {
+    try {
+      setLoading(true);
+      
+      const livroRef = await addDoc(collection(db, 'livros_reserva_armamento'), {
+        armeiroId,
+        armeiroNome,
+        dataAbertura: new Date(),
+        status: 'aberto',
+        alteracoes: [],
+        totalCautelas: 0,
+        totalBaixas: 0
+      });
+      
+      setLivroAtivo({
+        id: livroRef.id,
+        armeiroId,
+        armeiroNome,
+        dataAbertura: new Date(),
+        status: 'aberto'
+      });
+      
+      toast({
+        title: "Livro Diário Aberto",
+        description: "O livro diário foi aberto para movimentações.",
+      });
+    } catch (error) {
+      console.error('Erro ao abrir livro:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao abrir livro diário.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const fecharLivroDiario = () => {
-    setLivroDiarioAberto(false);
-    setPolicialSelecionado(null);
-    setMateriaisSelecionados([]);
-    toast({
-      title: "Livro Diário Fechado",
-      description: "O livro diário foi fechado.",
-    });
+  // Fechar Livro Diário
+  const handleFecharLivro = async (senha: string, alteracoes: any[]) => {
+    try {
+      // TODO: Verificar senha do armeiro no Firebase
+      // Por enquanto, aceitar qualquer senha
+      
+      await updateDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id), {
+        status: 'fechado',
+        dataFechamento: new Date(),
+        alteracoes,
+        totalCautelas: totalCautelasHoje,
+        totalBaixas: totalBaixasHoje
+      });
+      
+      setLivroAtivo(null);
+      setPolicialSelecionado(null);
+      setMateriaisSelecionados([]);
+      
+      toast({
+        title: "Livro Diário Fechado",
+        description: "O livro foi fechado e registrado no histórico.",
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Erro ao fechar livro:', error);
+      return false;
+    }
   };
 
+  // Selecionar Policial
   const selecionarPolicial = (policial: Policial) => {
     setPolicialSelecionado(policial);
     setSearchPolicial('');
@@ -174,7 +254,8 @@ const ArmeiroInterface = () => {
     });
   };
 
-  const adicionarMaterial = (material: Material, quantidade: number = 1) => {
+  // Adicionar Material
+  const adicionarMaterial = (material: Material, quantidade: number = 1, carregadores?: number) => {
     const materialExistente = materiaisSelecionados.find(m => m.materialId === material.id);
     
     if (materialExistente) {
@@ -190,7 +271,9 @@ const ArmeiroInterface = () => {
         materialId: material.id,
         nome: material.nome,
         categoria: material.categoria,
-        quantidade
+        quantidade,
+        numeroSerie: material.numeroSerie,
+        carregadores
       }]);
     }
     
@@ -200,15 +283,39 @@ const ArmeiroInterface = () => {
     });
   };
 
-  const removerMaterial = (materialId: string) => {
-    setMateriaisSelecionados(prev => prev.filter(m => m.materialId !== materialId));
-    toast({
-      title: "Material Removido",
-      description: "Material removido da seleção.",
-    });
+  // Clique em material - verificar tipo para modal
+  const handleClickMaterial = (material: Material) => {
+    if (!policialSelecionado) {
+      toast({
+        title: "Atenção",
+        description: "Selecione um policial primeiro.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const categoriaNorm = material.categoria.toLowerCase();
+    
+    if (categoriaNorm.includes('munição') || categoriaNorm.includes('municao')) {
+      setMaterialParaQuantidade(material);
+      setTipoQuantidade('municao');
+      setModalQuantidade(true);
+    } else if (categoriaNorm.includes('arma')) {
+      setMaterialParaQuantidade(material);
+      setTipoQuantidade('arma');
+      setModalQuantidade(true);
+    } else {
+      adicionarMaterial(material, 1);
+    }
   };
 
-  const enviarParaConfirmacao = async () => {
+  // Remover Material
+  const removerMaterial = (materialId: string) => {
+    setMateriaisSelecionados(prev => prev.filter(m => m.materialId !== materialId));
+  };
+
+  // Enviar para Confirmação
+  const enviarParaConfirmacao = () => {
     if (!policialSelecionado || materiaisSelecionados.length === 0) {
       toast({
         title: "Erro",
@@ -217,35 +324,66 @@ const ArmeiroInterface = () => {
       });
       return;
     }
+    
+    setModalConfirmacao(true);
+  };
 
+  // Confirmar Cautela
+  const handleConfirmarCautela = async () => {
     try {
       setLoading(true);
       
-      const reserva = {
-        policialId: policialSelecionado.id,
-        armeiro: armeiro,
-        materiais: materiaisSelecionados.map(m => ({
-          ...m,
-          confirmado: false
-        })),
-        status: 'ativo',
-        createdAt: new Date()
-      };
-
-      await addDoc(collection(db, 'reservas_ativas'), reserva);
-      
-      toast({
-        title: "Materiais Enviados",
-        description: `Materiais enviados para ${policialSelecionado.NOME}. Aguardando confirmação.`,
+      // Criar cautela provisória
+      await addDoc(collection(db, 'cautelas_provisorias'), {
+        livroId: livroAtivo?.id,
+        policialId: policialSelecionado!.id,
+        policialNome: policialSelecionado!.NOME,
+        policialMatricula: String(policialSelecionado!['Matrícula']),
+        armeiroId,
+        materiais: materiaisSelecionados,
+        dataCautela: new Date(),
+        status: 'ativo'
       });
       
+      // Marcar materiais como indisponíveis
+      for (const material of materiaisSelecionados) {
+        const materialRef = doc(db, 'materiais_belicos', material.materialId);
+        const materialDoc = await getDoc(materialRef);
+        
+        if (materialDoc.exists()) {
+          await updateDoc(materialRef, {
+            disponivel: false,
+            cauteladoPara: policialSelecionado!.id,
+            dataCautela: new Date()
+          });
+        }
+      }
+      
+      // Registrar movimentação
+      await addDoc(collection(db, 'movimentacoes_belicas'), {
+        tipo: 'cautela',
+        policialId: policialSelecionado!.id,
+        policialNome: policialSelecionado!.NOME,
+        livroId: livroAtivo?.id,
+        materiais: materiaisSelecionados,
+        dataCautela: new Date()
+      });
+      
+      // Atualizar contador
+      setTotalCautelasHoje(prev => prev + 1);
+      
+      // Limpar seleção
       setMateriaisSelecionados([]);
+      setPolicialSelecionado(null);
+      
+      // Recarregar materiais disponíveis
+      carregarMateriaisDisponiveis();
       
     } catch (error) {
-      console.error('Erro ao enviar materiais:', error);
+      console.error('Erro ao confirmar cautela:', error);
       toast({
         title: "Erro",
-        description: "Erro ao enviar materiais para confirmação.",
+        description: "Erro ao registrar cautela.",
         variant: "destructive",
       });
     } finally {
@@ -261,24 +399,22 @@ const ArmeiroInterface = () => {
     return nomeMatch || matriculaMatch;
   });
 
-  const materiaisFiltrados = materiaisDisponiveis.filter(m =>
-    m.nome.toLowerCase().includes(searchMaterial.toLowerCase()) ||
-    m.categoria.toLowerCase().includes(searchMaterial.toLowerCase())
-  );
+  // Mapear categoria para o filtro
+  const mapearCategoria = (categoria: string) => {
+    const cat = categoria.toLowerCase();
+    if (cat.includes('arma curta') || cat.includes('pistola') || cat.includes('revolver')) return 'arma_curta';
+    if (cat.includes('arma longa') || cat.includes('fuzil') || cat.includes('espingarda')) return 'arma_longa';
+    if (cat.includes('munição') || cat.includes('municao')) return 'municao';
+    if (cat.includes('epi') || cat.includes('colete')) return 'epi';
+    return 'acessorio';
+  };
 
-  const categorias = [...new Set(materiaisFiltrados.map(m => m.categoria))];
-
-  useEffect(() => {
-    carregarPoliciais();
-    carregarMateriaisDisponiveis();
-    const unsubscribeReservas = verificarReservasAtivas();
-
-    return () => {
-      if (unsubscribeReservas) {
-        unsubscribeReservas();
-      }
-    };
-  }, [carregarPoliciais, carregarMateriaisDisponiveis, verificarReservasAtivas]);
+  const materiaisFiltrados = materiaisDisponiveis.filter(m => {
+    const matchCategoria = mapearCategoria(m.categoria) === categoriaAtiva;
+    const matchSearch = m.nome.toLowerCase().includes(searchMaterial.toLowerCase()) ||
+                       m.categoria.toLowerCase().includes(searchMaterial.toLowerCase());
+    return matchCategoria && (searchMaterial === '' || matchSearch);
+  });
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -286,7 +422,7 @@ const ArmeiroInterface = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {livroDiarioAberto ? (
+            {livroAtivo ? (
               <BookOpen className="h-5 w-5 text-green-500" />
             ) : (
               <Lock className="h-5 w-5 text-red-500" />
@@ -295,12 +431,18 @@ const ArmeiroInterface = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4">
-            <Badge variant={livroDiarioAberto ? "default" : "secondary"}>
-              {livroDiarioAberto ? "ABERTO" : "FECHADO"}
+          <div className="flex items-center gap-4 flex-wrap">
+            <Badge variant={livroAtivo ? "default" : "secondary"} className="text-sm">
+              {livroAtivo ? "ABERTO" : "FECHADO"}
             </Badge>
             
-            {!livroDiarioAberto ? (
+            {livroAtivo && (
+              <span className="text-sm text-muted-foreground">
+                Aberto às {livroAtivo.dataAbertura.toLocaleTimeString('pt-BR')} por {livroAtivo.armeiroNome}
+              </span>
+            )}
+            
+            {!livroAtivo ? (
               <Button 
                 onClick={abrirLivroDiario}
                 disabled={loading}
@@ -311,7 +453,7 @@ const ArmeiroInterface = () => {
               </Button>
             ) : (
               <Button 
-                onClick={fecharLivroDiario}
+                onClick={() => setModalFechamento(true)}
                 disabled={loading}
                 variant="destructive"
               >
@@ -323,21 +465,31 @@ const ArmeiroInterface = () => {
         </CardContent>
       </Card>
 
-      {livroDiarioAberto && (
+      {livroAtivo && (
         <>
           {/* Dashboard de Status */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  Reservas Ativas
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  Cautelas Hoje
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
-                  {reservasAtivas.length}
-                </div>
+                <div className="text-2xl font-bold text-green-600">{totalCautelasHoje}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <RotateCcw className="h-4 w-4 text-blue-600" />
+                  Baixas Hoje
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">{totalBaixasHoje}</div>
               </CardContent>
             </Card>
 
@@ -345,13 +497,11 @@ const ArmeiroInterface = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Policiais Cadastrados
+                  Policiais
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {policiais.length}
-                </div>
+                <div className="text-2xl font-bold">{policiais.length}</div>
               </CardContent>
             </Card>
 
@@ -363,207 +513,273 @@ const ArmeiroInterface = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {materiaisDisponiveis.length}
-                </div>
+                <div className="text-2xl font-bold">{materiaisDisponiveis.length}</div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Interface Principal */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Painel de Seleção de Policial */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Seleção de Policial
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar por nome ou matrícula..."
-                      value={searchPolicial}
-                      onChange={(e) => setSearchPolicial(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
+          {/* Tabs de Navegação */}
+          <Tabs value={tabAtiva} onValueChange={setTabAtiva}>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="cautela" className="flex items-center gap-1">
+                <Target className="h-4 w-4" />
+                <span className="hidden sm:inline">Cautela</span>
+              </TabsTrigger>
+              <TabsTrigger value="baixa" className="flex items-center gap-1">
+                <RotateCcw className="h-4 w-4" />
+                <span className="hidden sm:inline">Baixa</span>
+              </TabsTrigger>
+              <TabsTrigger value="rua" className="flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                <span className="hidden sm:inline">Na Rua</span>
+              </TabsTrigger>
+              <TabsTrigger value="historico" className="flex items-center gap-1">
+                <History className="h-4 w-4" />
+                <span className="hidden sm:inline">Histórico</span>
+              </TabsTrigger>
+            </TabsList>
 
-                  {policialSelecionado ? (
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-semibold text-blue-900">
-                            {policialSelecionado.NOME}
-                          </div>
-                          <div className="text-sm text-blue-700">
-                            {policialSelecionado['Post/Grad']} - Mat: {policialSelecionado['Matrícula']}
+            {/* Tab Cautela */}
+            <TabsContent value="cautela" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Painel de Seleção de Policial */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      Seleção de Policial
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar por nome ou matrícula..."
+                          value={searchPolicial}
+                          onChange={(e) => setSearchPolicial(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+
+                      {policialSelecionado ? (
+                        <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-semibold text-foreground">
+                                {policialSelecionado.NOME}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {policialSelecionado['Post/Grad']} - Mat: {policialSelecionado['Matrícula']}
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPolicialSelecionado(null)}
+                            >
+                              Alterar
+                            </Button>
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPolicialSelecionado(null)}
-                        >
-                          Alterar
-                        </Button>
+                      ) : (
+                        <div className="max-h-60 overflow-y-auto space-y-2">
+                          <div className="text-xs text-muted-foreground mb-2">
+                            {policiaisFiltrados.length} de {policiais.length} policiais
+                          </div>
+                          {policiaisFiltrados.map((policial) => (
+                            <div
+                              key={policial.id}
+                              className="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                              onClick={() => selecionarPolicial(policial)}
+                            >
+                              <div className="font-semibold">{policial.NOME}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {policial['Post/Grad']} - Mat: {policial['Matrícula']}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Painel de Materiais por Categoria */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="h-5 w-5" />
+                      Materiais Disponíveis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Tabs de Categoria */}
+                      <Tabs value={categoriaAtiva} onValueChange={setCategoriaAtiva}>
+                        <TabsList className="grid grid-cols-5 h-auto">
+                          {CATEGORIAS.map((cat) => (
+                            <TabsTrigger 
+                              key={cat.id} 
+                              value={cat.id}
+                              className="text-xs px-2 py-1.5"
+                            >
+                              <cat.icon className="h-3 w-3 mr-1" />
+                              <span className="hidden md:inline">{cat.label}</span>
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
+                      </Tabs>
+
+                      {/* Busca */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar material..."
+                          value={searchMaterial}
+                          onChange={(e) => setSearchMaterial(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+
+                      {/* Lista de Materiais */}
+                      <div className="max-h-60 overflow-y-auto space-y-2">
+                        {materiaisFiltrados.length === 0 ? (
+                          <div className="text-center py-4 text-muted-foreground">
+                            Nenhum material disponível nesta categoria
+                          </div>
+                        ) : (
+                          materiaisFiltrados.map((material) => (
+                            <div
+                              key={material.id}
+                              className="p-3 border rounded-lg hover:bg-accent transition-colors cursor-pointer"
+                              onClick={() => handleClickMaterial(material)}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="font-medium">{material.nome}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {material.numeroSerie && `Série: ${material.numeroSerie}`}
+                                    {material.calibre && ` - Calibre: ${material.calibre}`}
+                                    {material.quantidade && ` - Estoque: ${material.quantidade}`}
+                                  </div>
+                                </div>
+                                <Plus className="h-5 w-5 text-primary" />
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
-                  ) : (
-                    <div className="max-h-60 overflow-y-auto space-y-2">
-                      <div className="text-xs text-muted-foreground mb-2">
-                        {policiaisFiltrados.length} de {policiais.length} policiais
-                      </div>
-                      {policiaisFiltrados.map((policial) => (
-                        <div
-                          key={policial.id}
-                          className="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
-                          onClick={() => selecionarPolicial(policial)}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Materiais Selecionados */}
+              {materiaisSelecionados.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      Materiais Selecionados ({materiaisSelecionados.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {materiaisSelecionados.map((material) => (
+                        <div 
+                          key={material.materialId} 
+                          className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-lg"
                         >
-                          <div className="font-semibold">{policial.NOME}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {policial['Post/Grad']} - Mat: {policial['Matrícula']}
+                          <div>
+                            <span className="font-medium text-foreground">{material.nome}</span>
+                            <div className="text-sm text-muted-foreground">
+                              Qtd: {material.quantidade}
+                              {material.carregadores && ` | ${material.carregadores} carregadores`}
+                              {material.numeroSerie && ` | Série: ${material.numeroSerie}`}
+                            </div>
                           </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => removerMaterial(material.materialId)}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
                         </div>
                       ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Painel de Materiais */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  Materiais Disponíveis
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar material..."
-                      value={searchMaterial}
-                      onChange={(e) => setSearchMaterial(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-
-                  <div className="max-h-96 overflow-y-auto space-y-4">
-                    {categorias.map((categoria) => (
-                      <div key={categoria}>
-                        <h4 className="font-medium text-sm text-muted-foreground mb-2">
-                          {categoria}
-                        </h4>
-                        <div className="space-y-2">
-                          {materiaisFiltrados
-                            .filter(m => m.categoria === categoria)
-                            .map((material) => (
-                              <div
-                                key={material.id}
-                                className="p-3 border rounded-lg hover:bg-accent transition-colors cursor-pointer"
-                                onClick={() => policialSelecionado && adicionarMaterial(material)}
-                              >
-                                <div className="flex justify-between items-start">
-                                  <div className="flex-1">
-                                    <div className="font-medium">{material.nome}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {material.numeroSerie && `Série: ${material.numeroSerie}`}
-                                      {material.calibre && ` - Calibre: ${material.calibre}`}
-                                      {material.quantidade && ` - Qtd: ${material.quantidade}`}
-                                    </div>
-                                  </div>
-                                  <Badge variant="secondary">
-                                    {material.categoria}
-                                  </Badge>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Materiais Selecionados */}
-          {materiaisSelecionados.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5" />
-                  Materiais Selecionados
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {materiaisSelecionados.map((material) => (
-                    <div key={material.materialId} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                      <div>
-                        <span className="font-medium">{material.nome}</span>
-                        <span className="text-sm text-muted-foreground ml-2">
-                          Qtd: {material.quantidade}
-                        </span>
-                      </div>
+                      
                       <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => removerMaterial(material.materialId)}
+                        onClick={enviarParaConfirmacao}
+                        disabled={!policialSelecionado || loading}
+                        className="w-full mt-4"
                       >
-                        <Minus className="h-4 w-4" />
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Enviar para Confirmação do Policial
                       </Button>
                     </div>
-                  ))}
-                  
-                  <Button
-                    onClick={enviarParaConfirmacao}
-                    disabled={!policialSelecionado || loading}
-                    className="w-full mt-4"
-                  >
-                    Enviar para Confirmação do Policial
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
-          {/* Reservas Ativas */}
-          {reservasAtivas.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Reservas Aguardando Confirmação
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {reservasAtivas.map((reserva) => (
-                    <div key={reserva.id} className="p-3 border rounded-lg">
-                      <div className="font-semibold text-orange-600">
-                        Policial ID: {reserva.policialId}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {reserva.materiais.length} materiais enviados
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {reserva.createdAt.toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+            {/* Tab Baixa */}
+            <TabsContent value="baixa">
+              <BaixaMaterialSection 
+                livroId={livroAtivo?.id || ''} 
+                onBaixaRealizada={() => {
+                  setTotalBaixasHoje(prev => prev + 1);
+                  carregarMateriaisDisponiveis();
+                }}
+              />
+            </TabsContent>
+
+            {/* Tab Material na Rua */}
+            <TabsContent value="rua">
+              <MaterialNaRuaSection />
+            </TabsContent>
+
+            {/* Tab Histórico */}
+            <TabsContent value="historico">
+              <HistoricoLivrosSection />
+            </TabsContent>
+          </Tabs>
         </>
+      )}
+
+      {/* Modais */}
+      {policialSelecionado && (
+        <ModalConfirmacaoPolicial
+          open={modalConfirmacao}
+          onClose={() => setModalConfirmacao(false)}
+          policial={policialSelecionado}
+          materiais={materiaisSelecionados}
+          onConfirmar={handleConfirmarCautela}
+        />
+      )}
+
+      <ModalQuantidadeMaterial
+        open={modalQuantidade}
+        onClose={() => {
+          setModalQuantidade(false);
+          setMaterialParaQuantidade(null);
+        }}
+        material={materialParaQuantidade}
+        tipo={tipoQuantidade}
+        onConfirmar={(quantidade, carregadores) => {
+          if (materialParaQuantidade) {
+            adicionarMaterial(materialParaQuantidade, quantidade, carregadores);
+          }
+        }}
+      />
+
+      {livroAtivo && (
+        <ModalFechamentoLivro
+          open={modalFechamento}
+          onClose={() => setModalFechamento(false)}
+          armeiroNome={armeiroNome}
+          onFechar={handleFecharLivro}
+        />
       )}
     </div>
   );
