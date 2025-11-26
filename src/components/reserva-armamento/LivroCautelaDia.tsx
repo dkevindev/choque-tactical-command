@@ -104,7 +104,7 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                 {movimentacoes.map((mov) => (
                   <TableRow 
                     key={mov.id} 
-                    className="bg-white dark:bg-card"
+                    className="bg-white dark:bg-gray-800 hover:bg-white dark:hover:bg-gray-800"
                   >
                     <TableCell className="text-center font-mono font-bold">
                       {String(mov.sequencial).padStart(3, '0')}
