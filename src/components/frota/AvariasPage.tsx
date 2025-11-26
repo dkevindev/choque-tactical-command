@@ -70,6 +70,8 @@ interface ChecklistViatura {
   verificadoPor: string;
   verificadoPorId: string;
   problemas?: string[];
+  cienciaProblemas?: boolean;
+  dataCienciaProblemas?: string;
 }
 
 interface ViaturaAvarias {
@@ -592,12 +594,54 @@ const AvariasPage = () => {
                         </div>
                       </div>
                       
-                      {getViaturaAtualData()!.ultimoChecklist!.problemas && getViaturaAtualData()!.ultimoChecklist!.problemas!.length > 0 && (
+                      {getViaturaAtualData()!.ultimoChecklist!.problemas && getViaturaAtualData()!.ultimoChecklist!.problemas!.length > 0 && !getViaturaAtualData()!.ultimoChecklist!.cienciaProblemas && (
                         <Alert variant="destructive">
                           <AlertTriangle className="h-4 w-4" />
                           <AlertTitle className="text-sm">Itens com Problema</AlertTitle>
-                          <AlertDescription className="text-xs">
-                            {getViaturaAtualData()!.ultimoChecklist!.problemas!.map(traduzirProblema).join(', ')}
+                          <AlertDescription className="text-xs flex items-center justify-between gap-2">
+                            <span>{getViaturaAtualData()!.ultimoChecklist!.problemas!.map(traduzirProblema).join(', ')}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                const viatura = viaturasFrota.find(v => v.placa === viaturaAtual);
+                                if (!viatura) return;
+                                try {
+                                  await updateDoc(doc(db, 'frota', viatura.id), {
+                                    ultimoChecklist: {
+                                      ...viatura.ultimoChecklist,
+                                      cienciaProblemas: true,
+                                      dataCienciaProblemas: new Date().toISOString()
+                                    }
+                                  });
+                                  setViaturasFrota(prev => prev.map(v => 
+                                    v.id === viatura.id 
+                                      ? { ...v, ultimoChecklist: { ...v.ultimoChecklist, cienciaProblemas: true } }
+                                      : v
+                                  ));
+                                  setAvariasData(prev => prev.map(v => 
+                                    v.placaViatura === viaturaAtual
+                                      ? { ...v, ultimoChecklist: { ...v.ultimoChecklist!, cienciaProblemas: true } }
+                                      : v
+                                  ));
+                                  toast({
+                                    title: "Ciência registrada",
+                                    description: "Alerta de problemas dispensado com sucesso."
+                                  });
+                                } catch (error) {
+                                  console.error('Erro ao registrar ciência:', error);
+                                  toast({
+                                    title: "Erro",
+                                    description: "Não foi possível registrar ciência.",
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}
+                              className="flex-shrink-0 gap-1 text-xs"
+                            >
+                              <CheckCircle className="h-3 w-3" />
+                              Ciência
+                            </Button>
                           </AlertDescription>
                         </Alert>
                       )}

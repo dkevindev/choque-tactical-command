@@ -232,11 +232,11 @@ const DashboardOverview = () => {
       const alertasData = alertasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setAlertasChegada(alertasData);
 
-      // Buscar viaturas com problemas no checklist
+      // Buscar viaturas com problemas no checklist (sem ciência)
       const viaturasChecklists: any[] = [];
       viaturasSnapshot.forEach(docSnap => {
         const data = docSnap.data();
-        if (data.ultimoChecklist?.problemas?.length > 0) {
+        if (data.ultimoChecklist?.problemas?.length > 0 && !data.ultimoChecklist?.cienciaProblemas) {
           viaturasChecklists.push({
             viaturaId: docSnap.id,
             placa: data.PLACA,
@@ -287,6 +287,22 @@ const DashboardOverview = () => {
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
       setLoading(false);
+    }
+  };
+
+  const handleCienciaChecklist = async (viaturaId: string, checklist: any) => {
+    try {
+      await updateDoc(doc(db, 'frota', viaturaId), {
+        ultimoChecklist: {
+          ...checklist,
+          cienciaProblemas: true,
+          dataCienciaProblemas: new Date().toISOString()
+        }
+      });
+      
+      setAlertasChecklist(prev => prev.filter(a => a.viaturaId !== viaturaId));
+    } catch (error) {
+      console.error('Erro ao registrar ciência:', error);
     }
   };
 
@@ -496,27 +512,38 @@ const DashboardOverview = () => {
             {alertasChecklist.length} viatura(s) com problemas identificados no último checklist.
             <div className="mt-3 space-y-2 max-h-[200px] overflow-y-auto">
               {alertasChecklist.slice(0, 3).map((alerta: any, idx: number) => (
-                <div key={idx} className="bg-background p-2 rounded border border-yellow-700/30">
-                  <p className="font-medium text-sm">
-                    {alerta.cadastro} • {alerta.placa}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Verificado em: {new Date(alerta.dataVerificacao).toLocaleString('pt-BR')} por {alerta.verificadoPor}
-                  </p>
-                  <div className="flex gap-1 mt-2 flex-wrap">
-                    {alerta.problemas.map((problema: string) => {
-                      const traducoes: Record<string, string> = {
-                        oleoMotor: 'Óleo do Motor', aguaRadiador: 'Água do Radiador', step: 'Step',
-                        macaco: 'Macaco', chaveRoda: 'Chave de Roda', triangulo: 'Triângulo',
-                        smartphone: 'Smartphone', radioFixo: 'Rádio Fixo', cartaoAbastecimento: 'Cartão'
-                      };
-                      return (
-                        <Badge key={problema} variant="outline" className="text-xs">
-                          {traducoes[problema] || problema}
-                        </Badge>
-                      );
-                    })}
+                <div key={idx} className="bg-background p-2 rounded border border-yellow-700/30 flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">
+                      {alerta.cadastro} • {alerta.placa}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Verificado em: {new Date(alerta.dataVerificacao).toLocaleString('pt-BR')} por {alerta.verificadoPor}
+                    </p>
+                    <div className="flex gap-1 mt-2 flex-wrap">
+                      {alerta.problemas.map((problema: string) => {
+                        const traducoes: Record<string, string> = {
+                          oleoMotor: 'Óleo do Motor', aguaRadiador: 'Água do Radiador', step: 'Step',
+                          macaco: 'Macaco', chaveRoda: 'Chave de Roda', triangulo: 'Triângulo',
+                          smartphone: 'Smartphone', radioFixo: 'Rádio Fixo', cartaoAbastecimento: 'Cartão'
+                        };
+                        return (
+                          <Badge key={problema} variant="outline" className="text-xs">
+                            {traducoes[problema] || problema}
+                          </Badge>
+                        );
+                      })}
+                    </div>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCienciaChecklist(alerta.viaturaId, alerta.checklist)}
+                    className="flex-shrink-0 gap-1"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Ciência
+                  </Button>
                 </div>
               ))}
               {alertasChecklist.length > 3 && (
