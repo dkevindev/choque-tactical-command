@@ -24,7 +24,6 @@ import HistoricoLivrosSection from './HistoricoLivrosSection';
 import MaterialNaRuaSection from './MaterialNaRuaSection';
 import PendenciasAnterioresSection from './PendenciasAnterioresSection';
 import LivroCautelaDia from './LivroCautelaDia';
-import LivroCautelaDia from './LivroCautelaDia';
 
 interface Policial {
   id: string;
