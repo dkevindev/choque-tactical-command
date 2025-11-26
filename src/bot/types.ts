@@ -1,3 +1,19 @@
+export interface Avaria {
+  id: string;
+  tipo: string;
+  descricao?: string;
+  gravidade?: 'LEVE' | 'MODERADA' | 'GRAVE';
+  angulo?: string;
+  status: 'PENDENTE' | 'RESOLVIDA';
+  data: string;
+  responsavel?: string;
+  ciencia?: boolean;
+  cienciaPor?: string;
+  dataCiencia?: string;
+  x?: number;
+  y?: number;
+}
+
 export interface Viatura {
   id: string;
   CADASTRO: string;
@@ -16,6 +32,7 @@ export interface Viatura {
   SITUACAO: string;
   UTILIZACAO: string;
   tipo?: 'leve' | 'pesada';
+  avarias?: Avaria[];
 }
 
 export interface ViaturaNaOficina {

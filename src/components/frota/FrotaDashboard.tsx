@@ -15,7 +15,9 @@ import {
   DollarSign,
   Settings,
   Eye,
-  RefreshCw
+  RefreshCw,
+  User,
+  CheckCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
@@ -57,6 +59,7 @@ const FrotaDashboard = () => {
   const [gastoFrotePesadaMes, setGastoFrotePesadaMes] = useState(0);
   const [totalOSMes, setTotalOSMes] = useState(0);
   const [kmDialogOpen, setKmDialogOpen] = useState(false);
+  const [avariasNaoVisualizadas, setAvariasNaoVisualizadas] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -529,6 +532,86 @@ const FrotaDashboard = () => {
     }
   }, [viaturas, ordensServico]);
 
+  // Buscar avarias pendentes sem ciência
+  useEffect(() => {
+    const buscarAvariasSemCiencia = () => {
+      const todasAvarias: any[] = [];
+      
+      viaturas.forEach(viatura => {
+        const avarias = viatura.avarias || [];
+        avarias
+          .filter((a: any) => a.status === 'PENDENTE' && !a.ciencia)
+          .forEach((avaria: any) => {
+            todasAvarias.push({
+              ...avaria,
+              viaturaCadastro: viatura.CADASTRO,
+              viaturaPlaca: viatura.PLACA,
+              viaturaId: viatura.id
+            });
+          });
+      });
+      
+      // Ordenar por data mais recente
+      todasAvarias.sort((a, b) => 
+        new Date(b.data).getTime() - new Date(a.data).getTime()
+      );
+      
+      setAvariasNaoVisualizadas(todasAvarias);
+    };
+
+    if (viaturas.length > 0) {
+      buscarAvariasSemCiencia();
+    }
+  }, [viaturas]);
+
+  // Função para dar ciência em uma avaria
+  const handleDarCiencia = async (avaria: any) => {
+    try {
+      const viaturaRef = doc(db, 'frota', avaria.viaturaId);
+      
+      // Buscar viatura atual
+      const viatura = viaturas.find(v => v.id === avaria.viaturaId);
+      if (!viatura) return;
+      
+      // Buscar usuário logado
+      const userStr = localStorage.getItem('policialLogado');
+      const usuarioLogado = userStr ? JSON.parse(userStr) : null;
+      
+      // Atualizar avaria com ciência
+      const avariasAtualizadas = (viatura.avarias || []).map((a: any) => {
+        if (a.id === avaria.id) {
+          return {
+            ...a,
+            ciencia: true,
+            cienciaPor: usuarioLogado?.NOME || 'Admin',
+            dataCiencia: new Date().toISOString()
+          };
+        }
+        return a;
+      });
+      
+      await updateDoc(viaturaRef, { avarias: avariasAtualizadas });
+      
+      // Remover do estado local
+      setAvariasNaoVisualizadas(prev => 
+        prev.filter(a => !(a.id === avaria.id && a.viaturaId === avaria.viaturaId))
+      );
+      
+      toast({
+        title: "Ciência registrada",
+        description: "Alerta de avaria dispensado com sucesso."
+      });
+      
+    } catch (error) {
+      console.error('Erro ao registrar ciência:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível registrar ciência.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header com configurações */}
@@ -614,6 +697,74 @@ const FrotaDashboard = () => {
                     </div>
                   );
                 })}
+            </div>
+        </CardContent>
+        </Card>
+      )}
+
+      {/* Alertas de Novas Avarias */}
+      {avariasNaoVisualizadas.length > 0 && (
+        <Card className="border-red-500 bg-red-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Novas Avarias Constatadas ({avariasNaoVisualizadas.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-[300px] overflow-y-auto">
+              {avariasNaoVisualizadas.map((avaria, idx) => (
+                <div 
+                  key={`${avaria.viaturaId}-${avaria.id}-${idx}`} 
+                  className="flex items-start justify-between p-3 bg-background rounded-lg border gap-4"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <Car className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="font-semibold text-sm">
+                        {avaria.viaturaCadastro} ({avaria.viaturaPlaca})
+                      </span>
+                      <Badge 
+                        variant={avaria.gravidade === 'GRAVE' ? 'destructive' : 
+                                avaria.gravidade === 'MODERADA' ? 'secondary' : 'outline'}
+                        className="text-xs"
+                      >
+                        {avaria.gravidade || 'N/D'}
+                      </Badge>
+                    </div>
+                    
+                    <div className="space-y-1 text-sm">
+                      <p className="text-foreground">
+                        <strong>Tipo:</strong> {avaria.tipo || 'N/D'}
+                        {avaria.descricao && ` - ${avaria.descricao}`}
+                      </p>
+                      <p className="text-muted-foreground">
+                        <strong>Local:</strong> {avaria.angulo?.toUpperCase() || 'N/D'}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          Constatado por: {avaria.responsavel || 'N/D'}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {avaria.data ? new Date(avaria.data).toLocaleDateString('pt-BR') : 'N/D'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDarCiencia(avaria)}
+                    className="flex-shrink-0 gap-1"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Ciência
+                  </Button>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
