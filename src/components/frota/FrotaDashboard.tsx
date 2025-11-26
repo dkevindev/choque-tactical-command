@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where, orderBy, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, query, where, orderBy, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -569,17 +569,30 @@ const FrotaDashboard = () => {
     try {
       const viaturaRef = doc(db, 'frota', avaria.viaturaId);
       
-      // Buscar viatura atual
-      const viatura = viaturas.find(v => v.id === avaria.viaturaId);
-      if (!viatura) return;
+      // Buscar viatura atual do Firebase para garantir dados atualizados
+      const viaturaDoc = await getDoc(viaturaRef);
+      if (!viaturaDoc.exists()) {
+        toast({
+          title: "Erro",
+          description: "Viatura não encontrada.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const viaturaData = viaturaDoc.data();
       
       // Buscar usuário logado
       const userStr = localStorage.getItem('policialLogado');
       const usuarioLogado = userStr ? JSON.parse(userStr) : null;
       
-      // Atualizar avaria com ciência
-      const avariasAtualizadas = (viatura.avarias || []).map((a: any) => {
-        if (a.id === avaria.id) {
+      // Atualizar avaria com ciência - usando data e tipo para identificar já que ID pode não existir
+      const avariasAtualizadas = (viaturaData.avarias || []).map((a: any, index: number) => {
+        // Comparar por múltiplos campos para garantir match correto
+        const isMatch = (a.id && avaria.id && a.id === avaria.id) || 
+          (a.data === avaria.data && a.tipo === avaria.tipo && a.descricao === avaria.descricao);
+        
+        if (isMatch) {
           return {
             ...a,
             ciencia: true,
@@ -594,7 +607,7 @@ const FrotaDashboard = () => {
       
       // Remover do estado local
       setAvariasNaoVisualizadas(prev => 
-        prev.filter(a => !(a.id === avaria.id && a.viaturaId === avaria.viaturaId))
+        prev.filter(a => !(a.data === avaria.data && a.tipo === avaria.tipo && a.viaturaId === avaria.viaturaId))
       );
       
       toast({
