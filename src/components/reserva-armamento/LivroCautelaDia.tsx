@@ -22,6 +22,7 @@ interface MovimentacaoDia {
   horaCautela: string;
   dataBaixa?: Date;
   horaBaixa?: string;
+  recebidoPorNome?: string;
   status: 'pendente' | 'entregue';
   sequencial: number;
 }
@@ -43,6 +44,24 @@ const formatarAssinatura = (data: Date, hora: string) => {
       <span className="font-medium text-foreground">Assinado digitalmente</span>
       <br />
       com senha pessoal e intransferível
+      <br />
+      às <span className="font-medium text-foreground">{hora}</span> do dia{' '}
+      <span className="font-medium text-foreground">{dataFormatada}</span>
+    </div>
+  );
+};
+
+const formatarDevolucao = (data: Date, hora: string, armeiroNome?: string) => {
+  const dataFormatada = data.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+  return (
+    <div className="text-xs text-muted-foreground leading-relaxed">
+      <span className="font-medium text-green-600 dark:text-green-400">Devolvido</span>
+      <br />
+      ao armeiro <span className="font-medium text-foreground">{armeiroNome || 'N/A'}</span>
       <br />
       às <span className="font-medium text-foreground">{hora}</span> do dia{' '}
       <span className="font-medium text-foreground">{dataFormatada}</span>
@@ -97,7 +116,7 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                   <TableHead className="min-w-[200px]">Materiais</TableHead>
                   <TableHead className="w-[100px] text-center">Status</TableHead>
                   <TableHead className="min-w-[180px] text-center">Assinatura Saída</TableHead>
-                  <TableHead className="min-w-[180px] text-center">Assinatura Entrada</TableHead>
+                  <TableHead className="min-w-[180px] text-center">Devolução</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -154,7 +173,7 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                     </TableCell>
                     <TableCell className="text-center">
                       {mov.dataBaixa && mov.horaBaixa ? (
-                        formatarAssinatura(mov.dataBaixa, mov.horaBaixa)
+                        formatarDevolucao(mov.dataBaixa, mov.horaBaixa, mov.recebidoPorNome)
                       ) : (
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
