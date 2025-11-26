@@ -210,6 +210,46 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
         }
       });
 
+      // Registrar entrada no livro original (assinatura digital)
+      try {
+        const livroOriginalRef = doc(db, 'livros_reserva_armamento', cautela.livroId);
+        const livroOriginalDoc = await getDoc(livroOriginalRef);
+
+        if (livroOriginalDoc.exists()) {
+          const livroData = livroOriginalDoc.data();
+          const entradasExternas = livroData.entradasExternas || [];
+          
+          await updateDoc(livroOriginalRef, {
+            entradasExternas: [
+              ...entradasExternas,
+              {
+                cautelaId: cautela.id,
+                policialId: cautela.policialId,
+                policialNome: cautela.policialNome,
+                policialNomeGuerra: cautela.policialNomeGuerra,
+                policialMatricula: cautela.policialMatricula,
+                materiais: materiaisDevolucao.map(m => ({
+                  materialId: m.materialId,
+                  nome: m.nome,
+                  quantidadeCautelada: m.quantidadeCautelada,
+                  quantidadeDevolvida: m.quantidadeDevolvida
+                })),
+                dataEntrada: agora,
+                horaEntrada: horaBaixa,
+                recebidoPorId: armeiroId,
+                recebidoPorNome: armeiroNome,
+                assinatura: {
+                  validadoPorSenha: true,
+                  dataValidacao: agora
+                }
+              }
+            ]
+          });
+        }
+      } catch (e) {
+        console.error('Erro ao registrar entrada no livro original:', e);
+      }
+
       // Registrar movimentação
       await addDoc(collection(db, 'movimentacoes_belicas'), {
         tipo: 'baixa_pendente',
