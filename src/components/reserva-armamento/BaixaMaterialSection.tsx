@@ -141,6 +141,15 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
     try {
       setLoading(true);
 
+      // Coletar materiais para registro
+      const materiaisDevolvidos: Array<{
+        materialId: string;
+        nome: string;
+        quantidade: number;
+        categoria?: string;
+        numeroSerie?: string;
+      }> = [];
+
       // Processar cada cautela
       for (const cautela of cautelasAtivas) {
         const materiaisParaBaixa = cautela.materiais.filter(m => 
@@ -149,16 +158,40 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
         
         if (materiaisParaBaixa.length === 0) continue;
 
-        // Devolver materiais ao estoque (marcar como disponíveis)
+        // Devolver materiais ao estoque
         for (const material of materiaisParaBaixa) {
           const materialRef = doc(db, 'materiais_belicos', material.materialId);
           const materialDoc = await getDoc(materialRef);
           
           if (materialDoc.exists()) {
-            await updateDoc(materialRef, {
-              disponivel: true,
-              cauteladoPara: null,
-              dataCautela: null
+            const materialData = materialDoc.data();
+            const isMunicao = materialData?.categoria?.toLowerCase().includes('munição') || 
+                             materialData?.categoria?.toLowerCase().includes('municao');
+            
+            if (isMunicao) {
+              // Para munição: AUMENTAR a quantidade no estoque
+              const quantidadeAtual = materialData.quantidade || 0;
+              const novaQuantidade = quantidadeAtual + material.quantidade;
+              await updateDoc(materialRef, {
+                quantidade: novaQuantidade,
+                disponivel: true
+              });
+            } else {
+              // Para armas e outros: marcar como disponível
+              await updateDoc(materialRef, {
+                disponivel: true,
+                cauteladoPara: null,
+                dataCautela: null
+              });
+            }
+            
+            // Adicionar ao registro
+            materiaisDevolvidos.push({
+              materialId: material.materialId,
+              nome: material.nome,
+              quantidade: material.quantidade,
+              categoria: material.categoria,
+              numeroSerie: material.numeroSerie
             });
           }
         }
@@ -182,15 +215,21 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
         }
       }
 
-      // Registrar baixa no histórico
-      await addDoc(collection(db, 'movimentacoes_belicas'), {
+      // Registrar baixa no histórico com materiais detalhados
+      const movimentacaoData: Record<string, any> = {
         tipo: 'baixa',
         policialId: policialSelecionado!.id,
         policialNome: policialSelecionado!.NOME,
-        livroId,
-        materiaisDevolvidos: materiaisSelecionados.length,
+        policialMatricula: String(policialSelecionado!['Matrícula'] || ''),
+        materiais: materiaisDevolvidos,
         dataBaixa: new Date()
-      });
+      };
+      
+      if (livroId) {
+        movimentacaoData.livroId = livroId;
+      }
+      
+      await addDoc(collection(db, 'movimentacoes_belicas'), movimentacaoData);
 
       toast({
         title: "Baixa Realizada",
