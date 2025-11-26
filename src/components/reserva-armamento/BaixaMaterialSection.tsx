@@ -216,14 +216,23 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       }
 
       // Registrar baixa no histórico com materiais detalhados
+      const agora = new Date();
+      const horaBaixa = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      
       const movimentacaoData: Record<string, any> = {
         tipo: 'baixa',
         policialId: policialSelecionado!.id,
         policialNome: policialSelecionado!.NOME,
         policialMatricula: String(policialSelecionado!['Matrícula'] || ''),
         materiais: materiaisDevolvidos,
-        dataBaixa: new Date()
+        dataBaixa: agora,
+        horaBaixa
       };
+      
+      // Vincular à cautela se houver apenas uma ativa
+      if (cautelasAtivas.length === 1) {
+        movimentacaoData.cautelaId = cautelasAtivas[0].id;
+      }
       
       if (livroId) {
         movimentacaoData.livroId = livroId;

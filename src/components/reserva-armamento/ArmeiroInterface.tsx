@@ -27,6 +27,9 @@ interface Policial {
   id: string;
   'Matrícula': string | number;
   NOME: string;
+  'NOME DE GUERRA'?: string;
+  'NOME DE GUERRA1'?: string;
+  NUMERAL?: number;
   'Post/Grad': string;
   'SITUAÇÃO': string;
   senha?: string;
@@ -65,9 +68,11 @@ interface LivroAtivo {
 
 interface MovimentacaoDia {
   id: string;
-  tipo: 'cautela' | 'baixa';
+  cautelaId?: string;
   policialNome: string;
+  policialNomeGuerra?: string;
   policialMatricula?: string;
+  policialNumeral?: number;
   postoGrad?: string;
   materiais: Array<{
     nome: string;
@@ -75,9 +80,11 @@ interface MovimentacaoDia {
     numeroSerie?: string;
     categoria?: string;
   }>;
-  dataCautela?: Date;
+  dataCautela: Date;
+  horaCautela: string;
   dataBaixa?: Date;
-  hora: string;
+  horaBaixa?: string;
+  status: 'pendente' | 'entregue';
   sequencial: number;
 }
 
@@ -130,53 +137,76 @@ const ArmeiroInterface = () => {
         query(collection(db, 'cautelas_provisorias'), where('livroId', '==', livroId))
       );
       
-      // Carregar movimentações (cautelas e baixas) do livro
-      const movimentacoesSnapshot = await getDocs(
-        query(collection(db, 'movimentacoes_belicas'), where('livroId', '==', livroId))
+      // Carregar movimentações de baixa do livro
+      const baixasSnapshot = await getDocs(
+        query(collection(db, 'movimentacoes_belicas'), where('livroId', '==', livroId), where('tipo', '==', 'baixa'))
       );
       
-      const movimentacoes: MovimentacaoDia[] = [];
-      let sequencial = 1;
-      
-      // Processar cautelas
-      cautelasSnapshot.docs.forEach(docSnap => {
+      // Criar mapa de baixas por cautelaId para vincular
+      const baixasPorCautela = new Map<string, { dataBaixa: Date; horaBaixa: string }>();
+      baixasSnapshot.docs.forEach(docSnap => {
         const data = docSnap.data();
-        const dataCautela = data.dataCautela?.toDate?.() || new Date();
-        movimentacoes.push({
-          id: docSnap.id,
-          tipo: 'cautela',
-          policialNome: data.policialNome || '',
-          policialMatricula: data.policialMatricula,
-          materiais: data.materiais || [],
-          dataCautela,
-          hora: dataCautela.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          sequencial: 0 // será atribuído depois de ordenar
-        });
-      });
-      
-      // Processar baixas das movimentações
-      movimentacoesSnapshot.docs.forEach(docSnap => {
-        const data = docSnap.data();
-        if (data.tipo === 'baixa') {
+        if (data.cautelaId) {
           const dataBaixa = data.dataBaixa?.toDate?.() || new Date();
-          movimentacoes.push({
-            id: docSnap.id,
-            tipo: 'baixa',
-            policialNome: data.policialNome || '',
-            policialMatricula: data.policialMatricula,
-            materiais: data.materiais || [],
+          baixasPorCautela.set(data.cautelaId, {
             dataBaixa,
-            hora: dataBaixa.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            sequencial: 0
+            horaBaixa: data.horaBaixa || dataBaixa.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
           });
         }
       });
       
+      const movimentacoes: MovimentacaoDia[] = [];
+      
+      // Processar cautelas
+      for (const docSnap of cautelasSnapshot.docs) {
+        const data = docSnap.data();
+        const dataCautela = data.dataCautela?.toDate?.() || new Date();
+        const horaCautela = data.horaCautela || dataCautela.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        
+        // Verificar se existe baixa para esta cautela
+        const baixaInfo = baixasPorCautela.get(docSnap.id);
+        const status = data.status === 'baixado' || baixaInfo ? 'entregue' : 'pendente';
+        
+        // Buscar dados completos do policial se necessário
+        let nomeGuerra = data.policialNomeGuerra;
+        let numeral = data.policialNumeral;
+        let postoGrad = data.postoGrad;
+        
+        if (!nomeGuerra && data.policialId) {
+          try {
+            const policialDoc = await getDoc(doc(db, 'policiais', data.policialId));
+            if (policialDoc.exists()) {
+              const policialData = policialDoc.data();
+              nomeGuerra = policialData['NOME DE GUERRA'] || policialData['NOME DE GUERRA1'];
+              numeral = policialData['NUMERAL'];
+              postoGrad = postoGrad || policialData['Post/Grad'];
+            }
+          } catch (e) {
+            console.error('Erro ao buscar policial:', e);
+          }
+        }
+        
+        movimentacoes.push({
+          id: docSnap.id,
+          cautelaId: docSnap.id,
+          policialNome: data.policialNome || '',
+          policialNomeGuerra: nomeGuerra,
+          policialMatricula: data.policialMatricula,
+          policialNumeral: numeral,
+          postoGrad: postoGrad,
+          materiais: data.materiais || [],
+          dataCautela,
+          horaCautela,
+          dataBaixa: baixaInfo?.dataBaixa || (data.dataBaixa?.toDate?.()),
+          horaBaixa: baixaInfo?.horaBaixa || data.horaBaixa,
+          status,
+          sequencial: 0
+        });
+      }
+      
       // Ordenar por data e atribuir sequencial
       movimentacoes.sort((a, b) => {
-        const dateA = a.dataCautela || a.dataBaixa || new Date();
-        const dateB = b.dataCautela || b.dataBaixa || new Date();
-        return dateA.getTime() - dateB.getTime();
+        return a.dataCautela.getTime() - b.dataCautela.getTime();
       });
       
       movimentacoes.forEach((mov, idx) => {
@@ -186,10 +216,8 @@ const ArmeiroInterface = () => {
       setMovimentacoesDoDia(movimentacoes);
       
       // Atualizar contadores
-      const totalCautelas = movimentacoes.filter(m => m.tipo === 'cautela').length;
-      const totalBaixas = movimentacoes.filter(m => m.tipo === 'baixa').length;
-      setTotalCautelasHoje(totalCautelas);
-      setTotalBaixasHoje(totalBaixas);
+      setTotalCautelasHoje(movimentacoes.length);
+      setTotalBaixasHoje(movimentacoes.filter(m => m.status === 'entregue').length);
       
     } catch (error) {
       console.error('Erro ao carregar movimentações do dia:', error);
@@ -463,14 +491,23 @@ const ArmeiroInterface = () => {
         ...(m.carregadores && { carregadores: m.carregadores })
       }));
       
+      const agora = new Date();
+      const horaCautela = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const nomeGuerra = policialSelecionado['NOME DE GUERRA'] || policialSelecionado['NOME DE GUERRA1'] || '';
+      const numeral = policialSelecionado.NUMERAL;
+      
       // Criar cautela provisória - sem campos undefined
       const cautelaData: Record<string, any> = {
         policialId: policialSelecionado.id,
         policialNome: policialSelecionado.NOME,
+        policialNomeGuerra: nomeGuerra,
+        policialNumeral: numeral,
         policialMatricula: String(policialSelecionado['Matrícula'] || ''),
+        postoGrad: policialSelecionado['Post/Grad'],
         armeiroId,
         materiais: materiaisLimpos,
-        dataCautela: new Date(),
+        dataCautela: agora,
+        horaCautela,
         status: 'ativo'
       };
 
@@ -527,9 +564,11 @@ const ArmeiroInterface = () => {
       // Atualizar contador e adicionar à lista de movimentações local
       const novaMovimentacao: MovimentacaoDia = {
         id: `temp_${Date.now()}`,
-        tipo: 'cautela',
+        cautelaId: `temp_${Date.now()}`,
         policialNome: policialSelecionado.NOME,
+        policialNomeGuerra: nomeGuerra,
         policialMatricula: String(policialSelecionado['Matrícula'] || ''),
+        policialNumeral: numeral,
         postoGrad: policialSelecionado['Post/Grad'],
         materiais: materiaisLimpos.map(m => ({
           nome: m.nome,
@@ -537,8 +576,9 @@ const ArmeiroInterface = () => {
           numeroSerie: m.numeroSerie,
           categoria: m.categoria
         })),
-        dataCautela: new Date(),
-        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        dataCautela: agora,
+        horaCautela,
+        status: 'pendente',
         sequencial: movimentacoesDoDia.length + 1
       };
       
@@ -706,16 +746,9 @@ const ArmeiroInterface = () => {
             </Card>
           </div>
 
-          {/* Tabela Visual do Livro de Cautela */}
-          <LivroCautelaDia 
-            movimentacoes={movimentacoesDoDia}
-            dataAbertura={livroAtivo.dataAbertura}
-            armeiroNome={livroAtivo.armeiroNome}
-          />
-
           {/* Tabs de Navegação */}
           <Tabs value={tabAtiva} onValueChange={setTabAtiva}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="cautela" className="flex items-center gap-1">
                 <Target className="h-4 w-4" />
                 <span className="hidden sm:inline">Cautela</span>
@@ -727,6 +760,10 @@ const ArmeiroInterface = () => {
               <TabsTrigger value="rua" className="flex items-center gap-1">
                 <MapPin className="h-4 w-4" />
                 <span className="hidden sm:inline">Na Rua</span>
+              </TabsTrigger>
+              <TabsTrigger value="livro" className="flex items-center gap-1">
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Livro do Dia</span>
               </TabsTrigger>
               <TabsTrigger value="historico" className="flex items-center gap-1">
                 <History className="h-4 w-4" />
@@ -935,6 +972,15 @@ const ArmeiroInterface = () => {
             {/* Tab Material na Rua */}
             <TabsContent value="rua">
               <MaterialNaRuaSection />
+            </TabsContent>
+
+            {/* Tab Livro do Dia */}
+            <TabsContent value="livro">
+              <LivroCautelaDia 
+                movimentacoes={movimentacoesDoDia}
+                dataAbertura={livroAtivo.dataAbertura}
+                armeiroNome={livroAtivo.armeiroNome}
+              />
             </TabsContent>
 
             {/* Tab Histórico */}
