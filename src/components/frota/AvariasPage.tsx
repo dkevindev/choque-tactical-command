@@ -606,15 +606,13 @@ const AvariasPage = () => {
                 </Card>
               )}
 
-              {/* Mostrar todas as 6 fotos */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Mostrar as 4 fotos de carroceria */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { key: 'frontal' as const, label: 'Frente' },
                   { key: 'traseira' as const, label: 'Trás' },
                   { key: 'esquerdo' as const, label: 'Lado Esquerdo' },
-                  { key: 'direito' as const, label: 'Lado Direito' },
-                  { key: 'interno' as const, label: 'Interno' },
-                  { key: 'mecanico' as const, label: 'Mecânica' }
+                  { key: 'direito' as const, label: 'Lado Direito' }
                 ].map((angulo) => {
                   const viaturaData = getViaturaAtualData();
                   const imagem = viaturaData ? (() => {
@@ -623,8 +621,6 @@ const AvariasPage = () => {
                       case 'traseira': return viaturaData.imagemTraseira;
                       case 'esquerdo': return viaturaData.imagemLadoEsquerdo;
                       case 'direito': return viaturaData.imagemLadoDireito;
-                      case 'interno': return viaturaData.imagemInterno;
-                      case 'mecanico': return viaturaData.imagemMecanico;
                       default: return null;
                     }
                   })() : null;
@@ -724,6 +720,86 @@ const AvariasPage = () => {
                               </>
                             )}
                           </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Seções de Interno e Mecânica - Apenas descrição textual */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { key: 'interno' as const, label: 'Interno', icon: '🚗' },
+                  { key: 'mecanico' as const, label: 'Mecânica', icon: '🔧' }
+                ].map((secao) => {
+                  const viaturaData = getViaturaAtualData();
+                  const avariasSecao = viaturaData?.avarias.filter(a => a.angulo === secao.key) || [];
+                  
+                  return (
+                    <Card key={secao.key}>
+                      <CardHeader>
+                        <CardTitle className="text-sm flex justify-between items-center">
+                          <span>{secao.icon} {secao.label}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {avariasSecao.length} problemas
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {/* Botão para adicionar problema */}
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => {
+                              setAnguloAtivo(secao.key);
+                              setPosicaoTemporaria({ x: 50, y: 50 }); // Posição fictícia para avarias textuais
+                              setModalAberto(true);
+                            }}
+                            className="w-full text-xs"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Adicionar Problema
+                          </Button>
+
+                          {/* Lista de problemas */}
+                          <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                            {avariasSecao.length === 0 ? (
+                              <div className="text-center py-4 text-muted-foreground text-sm">
+                                Nenhum problema registrado
+                              </div>
+                            ) : (
+                              avariasSecao.map((avaria) => (
+                                <div 
+                                  key={avaria.id} 
+                                  className="p-3 border rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                                  onClick={() => handleAvariaClick(avaria)}
+                                >
+                                  <div className="flex justify-between items-start mb-1">
+                                    <span className="font-medium text-sm">{avaria.tipo}</span>
+                                    <div className="flex gap-1">
+                                      <Badge variant={getCorStatus(avaria.status)} className="text-xs">
+                                        {avaria.status.replace('_', ' ')}
+                                      </Badge>
+                                      <Badge variant="outline" className={`text-xs ${getCorAvaria(avaria.gravidade)} text-white`}>
+                                        {avaria.gravidade}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  {avaria.descricao && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2">{avaria.descricao}</p>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                    <Calendar className="h-3 w-3" />
+                                    {new Date(avaria.data).toLocaleDateString('pt-BR')}
+                                    <User className="h-3 w-3 ml-2" />
+                                    {avaria.responsavel}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
