@@ -187,6 +187,18 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       const agora = new Date();
       const horaBaixa = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
+      // Buscar nome do armeiro atual
+      const userStorage = localStorage.getItem('user');
+      let armeiroNome = 'Armeiro';
+      if (userStorage) {
+        const userData = JSON.parse(userStorage);
+        const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
+        if (armeiroDoc.exists()) {
+          const armeiroData = armeiroDoc.data();
+          armeiroNome = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+        }
+      }
+
       // Devolver munição ao estoque
       const materialRef = doc(db, 'materiais_belicos', materialMunicao.materialId);
       const materialDoc = await getDoc(materialRef);
@@ -215,7 +227,8 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
         await updateDoc(doc(db, 'cautelas_provisorias', cautelaMunicao.id), {
           status: 'entregue',
           dataBaixa: agora,
-          horaBaixa
+          horaBaixa,
+          recebidoPorNome: armeiroNome
         });
       } else {
         // BAIXA PARCIAL: Criar nova entrada para material devolvido
@@ -236,6 +249,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
           status: 'entregue',
           dataBaixa: agora,
           horaBaixa,
+          recebidoPorNome: armeiroNome,
           sequencial: proximoSequencial,
           cautelaOriginalId: cautelaMunicao.id
         });
@@ -375,6 +389,18 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
     try {
       setLoading(true);
 
+      // Buscar nome do armeiro atual
+      const userStorage = localStorage.getItem('user');
+      let armeiroNome = 'Armeiro';
+      if (userStorage) {
+        const userData = JSON.parse(userStorage);
+        const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
+        if (armeiroDoc.exists()) {
+          const armeiroData = armeiroDoc.data();
+          armeiroNome = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+        }
+      }
+
       const materiaisDevolvidos: Array<{
         materialId: string;
         nome: string;
@@ -443,7 +469,8 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
           await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
             status: 'entregue',
             dataBaixa: agora,
-            horaBaixa
+            horaBaixa,
+            recebidoPorNome: armeiroNome
           });
         } else {
           // BAIXA PARCIAL: Criar nova entrada para materiais devolvidos
@@ -464,6 +491,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
             status: 'entregue',
             dataBaixa: agora,
             horaBaixa,
+            recebidoPorNome: armeiroNome,
             sequencial: proximoSequencial,
             cautelaOriginalId: cautela.id
           });

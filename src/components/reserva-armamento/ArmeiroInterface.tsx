@@ -86,6 +86,7 @@ interface MovimentacaoDia {
   horaCautela: string;
   dataBaixa?: Date;
   horaBaixa?: string;
+  recebidoPorNome?: string;
   status: 'pendente' | 'entregue';
   sequencial: number;
 }
@@ -200,7 +201,8 @@ const ArmeiroInterface = () => {
           horaCautela,
           dataBaixa: baixaInfo?.dataBaixa || (data.dataBaixa?.toDate?.()),
           horaBaixa: baixaInfo?.horaBaixa || data.horaBaixa,
-          status,
+          recebidoPorNome: data.recebidoPorNome,
+          status: data.status === 'entregue' ? 'entregue' : (baixaInfo ? 'entregue' : 'pendente'),
           sequencial: 0
         });
       }
