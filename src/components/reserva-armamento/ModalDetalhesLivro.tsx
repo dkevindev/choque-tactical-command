@@ -93,16 +93,24 @@ const ModalDetalhesLivro = ({ livro, open, onClose }: ModalDetalhesLivroProps) =
     const carregarMovimentacoes = async () => {
       setLoading(true);
       try {
+        // Buscar cautelas do livro (sem ordenação por sequencial para evitar erro de índice)
         const querySnapshot = await getDocs(
           query(
             collection(db, 'cautelas_provisorias'),
-            where('livroId', '==', livro.id),
-            orderBy('sequencial', 'asc')
+            where('livroId', '==', livro.id)
           )
         );
 
         const movs = querySnapshot.docs.map(doc => {
           const data = doc.data();
+          // Mapear status: 'ativo' -> 'pendente', 'baixado' -> 'entregue'
+          let status: 'pendente' | 'entregue' = 'pendente';
+          if (data.status === 'entregue' || data.status === 'baixado') {
+            status = 'entregue';
+          } else if (data.status === 'pendente' || data.status === 'ativo') {
+            status = 'pendente';
+          }
+          
           return {
             id: doc.id,
             policialNome: data.policialNome || '',
@@ -115,9 +123,24 @@ const ModalDetalhesLivro = ({ livro, open, onClose }: ModalDetalhesLivroProps) =
             horaCautela: data.horaCautela || '',
             dataBaixa: data.dataBaixa?.toDate?.() || null,
             horaBaixa: data.horaBaixa || null,
-            status: data.status || 'pendente',
+            status,
             sequencial: data.sequencial || 0
           } as MovimentacaoLivro;
+        });
+        
+        // Ordenar por sequencial ou dataCautela localmente
+        movs.sort((a, b) => {
+          if (a.sequencial && b.sequencial) {
+            return a.sequencial - b.sequencial;
+          }
+          return a.dataCautela.getTime() - b.dataCautela.getTime();
+        });
+        
+        // Atribuir sequencial se não existir
+        movs.forEach((mov, idx) => {
+          if (!mov.sequencial) {
+            mov.sequencial = idx + 1;
+          }
         });
 
         setMovimentacoes(movs);

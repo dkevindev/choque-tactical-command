@@ -22,6 +22,8 @@ import ModalFechamentoLivro from './ModalFechamentoLivro';
 import BaixaMaterialSection from './BaixaMaterialSection';
 import HistoricoLivrosSection from './HistoricoLivrosSection';
 import MaterialNaRuaSection from './MaterialNaRuaSection';
+import PendenciasAnterioresSection from './PendenciasAnterioresSection';
+import LivroCautelaDia from './LivroCautelaDia';
 import LivroCautelaDia from './LivroCautelaDia';
 
 interface Policial {
@@ -536,6 +538,9 @@ const ArmeiroInterface = () => {
       const nomeGuerra = policialSelecionado['NOME DE GUERRA'] || policialSelecionado['NOME DE GUERRA1'] || '';
       const numeral = policialSelecionado.NUMERAL;
       
+      // Calcular sequencial baseado nas cautelas existentes do livro
+      const sequencial = movimentacoesDoDia.length + 1;
+      
       // Criar cautela provisória - sem campos undefined
       const cautelaData: Record<string, any> = {
         policialId: policialSelecionado.id,
@@ -548,7 +553,8 @@ const ArmeiroInterface = () => {
         materiais: materiaisLimpos,
         dataCautela: agora,
         horaCautela,
-        status: 'ativo'
+        status: 'pendente',
+        sequencial
       };
 
       // Só adiciona livroId se existir
