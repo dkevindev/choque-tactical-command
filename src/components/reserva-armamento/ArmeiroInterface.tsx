@@ -785,6 +785,17 @@ const ArmeiroInterface = () => {
 
       {livroAtivo && (
         <>
+          {/* Pendências de Turnos Anteriores */}
+          <PendenciasAnterioresSection 
+            livroAtualId={livroAtivo.id}
+            onRecebimentoRealizado={() => {
+              if (livroAtivo?.id) {
+                carregarMovimentacoesDoDia(livroAtivo.id);
+              }
+              carregarMateriaisDisponiveis();
+            }}
+          />
+
           {/* Dashboard de Status */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>
