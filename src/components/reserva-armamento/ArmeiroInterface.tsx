@@ -167,7 +167,17 @@ const ArmeiroInterface = () => {
         
         // Verificar se existe baixa para esta cautela
         const baixaInfo = baixasPorCautela.get(docSnap.id);
-        const status = data.status === 'baixado' || baixaInfo ? 'entregue' : 'pendente';
+        // Priorizar o status explícito da cautela sobre a inferência do baixaInfo
+        let status: 'pendente' | 'entregue';
+        if (data.status === 'entregue') {
+          status = 'entregue';
+        } else if (data.status === 'pendente') {
+          status = 'pendente';
+        } else if (data.status === 'baixado' || baixaInfo) {
+          status = 'entregue';
+        } else {
+          status = 'pendente';
+        }
         
         // Buscar dados completos do policial se necessário
         let nomeGuerra = data.policialNomeGuerra;
@@ -202,7 +212,7 @@ const ArmeiroInterface = () => {
           dataBaixa: baixaInfo?.dataBaixa || (data.dataBaixa?.toDate?.()),
           horaBaixa: baixaInfo?.horaBaixa || data.horaBaixa,
           recebidoPorNome: data.recebidoPorNome,
-          status: data.status === 'entregue' ? 'entregue' : (baixaInfo ? 'entregue' : 'pendente'),
+          status,
           sequencial: 0
         });
       }
