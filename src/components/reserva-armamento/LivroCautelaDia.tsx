@@ -91,7 +91,7 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/50">
+                <TableRow className="bg-muted">
                   <TableHead className="w-[50px] text-center">Nº</TableHead>
                   <TableHead className="min-w-[150px]">Policial</TableHead>
                   <TableHead className="min-w-[200px]">Materiais</TableHead>
@@ -104,7 +104,7 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                 {movimentacoes.map((mov) => (
                   <TableRow 
                     key={mov.id} 
-                    className="bg-white dark:bg-gray-800 hover:bg-white dark:hover:bg-gray-800"
+                    className="bg-card hover:bg-accent/30"
                   >
                     <TableCell className="text-center font-mono font-bold">
                       {String(mov.sequencial).padStart(3, '0')}
