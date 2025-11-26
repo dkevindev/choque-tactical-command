@@ -126,7 +126,7 @@ const ArmeiroInterface = () => {
   const [movimentacoesDoDia, setMovimentacoesDoDia] = useState<MovimentacaoDia[]>([]);
   
   // Tab ativa
-  const [tabAtiva, setTabAtiva] = useState("cautela");
+  const [tabAtiva, setTabAtiva] = useState("livro");
   
   const { toast } = useToast();
 
@@ -850,6 +850,10 @@ const ArmeiroInterface = () => {
           {/* Tabs de Navegação */}
           <Tabs value={tabAtiva} onValueChange={setTabAtiva}>
             <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="livro" className="flex items-center gap-1">
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Livro do Dia</span>
+              </TabsTrigger>
               <TabsTrigger value="cautela" className="flex items-center gap-1">
                 <Target className="h-4 w-4" />
                 <span className="hidden sm:inline">Cautela</span>
@@ -861,10 +865,6 @@ const ArmeiroInterface = () => {
               <TabsTrigger value="rua" className="flex items-center gap-1">
                 <MapPin className="h-4 w-4" />
                 <span className="hidden sm:inline">Na Rua</span>
-              </TabsTrigger>
-              <TabsTrigger value="livro" className="flex items-center gap-1">
-                <BookOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Livro do Dia</span>
               </TabsTrigger>
               <TabsTrigger value="historico" className="flex items-center gap-1">
                 <History className="h-4 w-4" />
