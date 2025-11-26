@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Lock, CheckCircle, AlertCircle, User, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -41,27 +39,11 @@ const ModalConfirmacaoPolicial = ({
   onConfirmar
 }: ModalConfirmacaoPolicialProps) => {
   const [senha, setSenha] = useState('');
-  const [materiaisConferidos, setMateriaisConferidos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
   const { toast } = useToast();
 
-  const toggleMaterialConferido = (materialId: string) => {
-    setMateriaisConferidos(prev => 
-      prev.includes(materialId) 
-        ? prev.filter(id => id !== materialId)
-        : [...prev, materialId]
-    );
-  };
-
-  const todosConferidos = materiais.every(m => materiaisConferidos.includes(m.materialId));
-
   const handleConfirmar = async () => {
-    if (!todosConferidos) {
-      setErro('Confira todos os materiais antes de confirmar.');
-      return;
-    }
-
     if (!senha.trim()) {
       setErro('Digite sua senha para confirmar.');
       return;
@@ -110,7 +92,6 @@ const ModalConfirmacaoPolicial = ({
 
       // Limpar estado
       setSenha('');
-      setMateriaisConferidos([]);
       onClose();
 
     } catch (error) {
@@ -123,7 +104,6 @@ const ModalConfirmacaoPolicial = ({
 
   const handleClose = () => {
     setSenha('');
-    setMateriaisConferidos([]);
     setErro('');
     onClose();
   };
@@ -150,28 +130,19 @@ const ModalConfirmacaoPolicial = ({
             </p>
           </div>
 
-          {/* Lista de Materiais para Conferência */}
+          {/* Lista de Materiais (somente visualização) */}
           <div className="space-y-2">
             <h4 className="font-medium flex items-center gap-2">
               <Package className="h-4 w-4" />
-              Confira os materiais recebidos:
+              Materiais a receber:
             </h4>
             <div className="max-h-60 overflow-y-auto space-y-2">
               {materiais.map((material) => (
                 <div
                   key={material.materialId}
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    materiaisConferidos.includes(material.materialId)
-                      ? 'bg-green-50 dark:bg-green-950/20 border-green-500'
-                      : 'bg-muted hover:bg-accent'
-                  }`}
-                  onClick={() => toggleMaterialConferido(material.materialId)}
+                  className="p-3 bg-muted border rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <Checkbox 
-                      checked={materiaisConferidos.includes(material.materialId)}
-                      onCheckedChange={() => toggleMaterialConferido(material.materialId)}
-                    />
                     <div className="flex-1">
                       <div className="font-medium text-foreground">{material.nome}</div>
                       <div className="text-sm text-muted-foreground">
@@ -179,13 +150,13 @@ const ModalConfirmacaoPolicial = ({
                         {material.numeroSerie && ` - Série: ${material.numeroSerie}`}
                       </div>
                     </div>
-                    {materiaisConferidos.includes(material.materialId) && (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    )}
                   </div>
                 </div>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Total: {materiais.length} {materiais.length === 1 ? 'item' : 'itens'}
+            </p>
           </div>
 
           {/* Campo de Senha */}
@@ -210,16 +181,6 @@ const ModalConfirmacaoPolicial = ({
               {erro}
             </div>
           )}
-
-          {/* Status */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {materiaisConferidos.length} de {materiais.length} conferidos
-            </span>
-            <Badge variant={todosConferidos ? "default" : "secondary"}>
-              {todosConferidos ? "Pronto para confirmar" : "Confira todos os itens"}
-            </Badge>
-          </div>
         </div>
 
         <DialogFooter className="gap-2">
@@ -228,7 +189,7 @@ const ModalConfirmacaoPolicial = ({
           </Button>
           <Button 
             onClick={handleConfirmar} 
-            disabled={!todosConferidos || !senha || loading}
+            disabled={!senha || loading}
           >
             {loading ? 'Confirmando...' : 'Confirmar Recebimento'}
           </Button>
