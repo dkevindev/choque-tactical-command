@@ -82,34 +82,47 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
   useEffect(() => {
     const carregarPoliciaisComCautela = async () => {
       try {
+        console.log('[BaixaMaterial] Buscando cautelas pendentes...');
         const querySnapshot = await getDocs(
           query(collection(db, 'cautelas_provisorias'), where('status', '==', 'pendente'))
         );
         
-        const cautelasData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          dataCautela: doc.data().dataCautela?.toDate?.() || new Date()
-        } as CautelaProvisoria));
+        console.log('[BaixaMaterial] Cautelas encontradas:', querySnapshot.size);
+        
+        const cautelasData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('[BaixaMaterial] Cautela:', doc.id, data);
+          return {
+            id: doc.id,
+            ...data,
+            dataCautela: data.dataCautela?.toDate?.() || new Date()
+          } as CautelaProvisoria;
+        });
 
         // Extrair policiais únicos
         const policialIds = [...new Set(cautelasData.map(c => c.policialId))];
+        console.log('[BaixaMaterial] IDs de policiais com cautela:', policialIds);
         
         // Carregar dados dos policiais
         const policiaisData: Policial[] = [];
         for (const policialId of policialIds) {
           const policialDoc = await getDoc(doc(db, 'policiais', policialId));
           if (policialDoc.exists()) {
+            const policialData = policialDoc.data();
+            console.log('[BaixaMaterial] Policial encontrado:', policialId, policialData.NOME);
             policiaisData.push({
               id: policialDoc.id,
-              ...policialDoc.data()
+              ...policialData
             } as Policial);
+          } else {
+            console.log('[BaixaMaterial] Policial NÃO encontrado:', policialId);
           }
         }
         
+        console.log('[BaixaMaterial] Total de policiais com cautela:', policiaisData.length);
         setPoliciaisComCautela(policiaisData);
       } catch (error) {
-        console.error('Erro ao carregar policiais com cautela:', error);
+        console.error('[BaixaMaterial] Erro ao carregar policiais com cautela:', error);
       }
     };
 
@@ -546,9 +559,12 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
   };
 
   const policiaisFiltrados = policiaisComCautela.filter(p => {
+    if (!search) return true;
     const filtroLower = search.toLowerCase();
     return (
       p.NOME?.toLowerCase().includes(filtroLower) ||
+      p['NOME DE GUERRA1']?.toLowerCase().includes(filtroLower) ||
+      p['NOME DE GUERRA']?.toLowerCase().includes(filtroLower) ||
       String(p['Matrícula']).includes(search)
     );
   });
@@ -592,7 +608,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-primary" />
                           <div>
-                            <div className="font-medium">{policial.NOME}</div>
+                            <div className="font-medium">{policial['NOME DE GUERRA1'] || policial['NOME DE GUERRA'] || policial.NOME}</div>
                             <div className="text-sm text-muted-foreground">
                               {policial['Post/Grad']} - Mat: {policial['Matrícula']}
                             </div>
@@ -610,7 +626,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
               <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-semibold">{policialSelecionado.NOME}</div>
+                    <div className="font-semibold">{policialSelecionado['NOME DE GUERRA1'] || policialSelecionado['NOME DE GUERRA'] || policialSelecionado.NOME}</div>
                     <div className="text-sm text-muted-foreground">
                       {policialSelecionado['Post/Grad']} - Mat: {policialSelecionado['Matrícula']}
                     </div>
