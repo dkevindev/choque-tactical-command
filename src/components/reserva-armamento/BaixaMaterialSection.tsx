@@ -24,9 +24,13 @@ interface CautelaProvisoria {
   policialId: string;
   policialNome: string;
   policialMatricula: string;
+  policialNomeGuerra?: string;
+  policialNumeral?: number;
+  postoGrad?: string;
   armeiroId: string;
   materiais: MaterialCautela[];
   dataCautela: Date;
+  horaCautela?: string;
   dataBaixa?: Date;
   status: 'pendente' | 'entregue';
 }
@@ -253,12 +257,12 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
           policialId: cautelaMunicao.policialId,
           policialNome: cautelaMunicao.policialNome,
           policialMatricula: cautelaMunicao.policialMatricula,
-          policialNomeGuerra: (cautelaMunicao as any).policialNomeGuerra,
-          policialPostGrad: (cautelaMunicao as any).policialPostGrad,
+          policialNomeGuerra: cautelaMunicao.policialNomeGuerra,
+          postoGrad: cautelaMunicao.postoGrad,
           armeiroId: cautelaMunicao.armeiroId,
           materiais: materialDevolvido ? [materialDevolvido] : [],
           dataCautela: cautelaMunicao.dataCautela,
-          horaCautela: (cautelaMunicao as any).horaCautela,
+          horaCautela: cautelaMunicao.horaCautela,
           status: 'entregue',
           dataBaixa: agora,
           horaBaixa,
@@ -495,12 +499,12 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
             policialId: cautela.policialId,
             policialNome: cautela.policialNome,
             policialMatricula: cautela.policialMatricula,
-            policialNomeGuerra: (cautela as any).policialNomeGuerra,
-            policialPostGrad: (cautela as any).policialPostGrad,
+            policialNomeGuerra: cautela.policialNomeGuerra,
+            postoGrad: cautela.postoGrad,
             armeiroId: cautela.armeiroId,
             materiais: materiaisParaEntrega,
             dataCautela: cautela.dataCautela,
-            horaCautela: (cautela as any).horaCautela,
+            horaCautela: cautela.horaCautela,
             status: 'entregue',
             dataBaixa: agora,
             horaBaixa,
