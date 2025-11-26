@@ -104,10 +104,7 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                 {movimentacoes.map((mov) => (
                   <TableRow 
                     key={mov.id} 
-                    className={mov.status === 'pendente' 
-                      ? 'bg-yellow-100/60 dark:bg-yellow-900/30' 
-                      : 'bg-emerald-100/60 dark:bg-emerald-900/30'
-                    }
+                    className="bg-white dark:bg-card"
                   >
                     <TableCell className="text-center font-mono font-bold">
                       {String(mov.sequencial).padStart(3, '0')}
@@ -139,12 +136,12 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                     </TableCell>
                     <TableCell className="text-center">
                       {mov.status === 'pendente' ? (
-                        <Badge variant="outline" className="bg-yellow-200 dark:bg-yellow-800/50 border-yellow-600 text-yellow-800 dark:text-yellow-200">
+                        <Badge variant="outline" className="bg-yellow-100 border-yellow-500 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
                           <Clock className="h-3 w-3 mr-1" />
                           Pendente
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-emerald-200 dark:bg-emerald-800/50 border-emerald-600 text-emerald-800 dark:text-emerald-200">
+                        <Badge variant="outline" className="bg-green-100 border-green-500 text-green-700 dark:bg-green-900 dark:text-green-300">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Entregue
                         </Badge>
@@ -171,11 +168,11 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
         
         {/* Resumo */}
         <div className="mt-4 flex gap-4 justify-end text-sm">
-          <Badge variant="outline" className="bg-yellow-200 dark:bg-yellow-800/50 border-yellow-600 text-yellow-800 dark:text-yellow-200">
+          <Badge variant="outline" className="bg-yellow-100 border-yellow-500 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
             <Clock className="h-3 w-3 mr-1" />
             Pendentes: {totalPendentes}
           </Badge>
-          <Badge variant="outline" className="bg-emerald-200 dark:bg-emerald-800/50 border-emerald-600 text-emerald-800 dark:text-emerald-200">
+          <Badge variant="outline" className="bg-green-100 border-green-500 text-green-700 dark:bg-green-900 dark:text-green-300">
             <CheckCircle className="h-3 w-3 mr-1" />
             Entregues: {totalEntregues}
           </Badge>
