@@ -32,6 +32,7 @@ import GerenciarCautelas from '@/components/admin-belico/GerenciarCautelas';
 import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferidos';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
+import MaterialNaRuaSection from '@/components/reserva-armamento/MaterialNaRuaSection';
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -770,7 +771,32 @@ const DocumentosContent = ({ locationState }: { locationState?: any }) => (
 );
 
 const GestaoContent = () => (
-  <GestaoAcesso />
+  <div className="space-y-6">
+    <Card className="bg-card border-border shadow-tactical">
+      <CardHeader>
+        <CardTitle className="text-foreground flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          GESTÃO E LOGÍSTICA
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="acessos" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="acessos">Gestão de Acesso</TabsTrigger>
+            <TabsTrigger value="na-rua">Na Rua</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="acessos">
+            <GestaoAcesso />
+          </TabsContent>
+
+          <TabsContent value="na-rua">
+            <MaterialNaRuaSection />
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  </div>
 );
 
 // Alerta de viaturas ATRASADAS na troca de óleo (km ultrapassada)
