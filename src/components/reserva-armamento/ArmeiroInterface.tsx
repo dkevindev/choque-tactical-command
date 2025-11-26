@@ -666,7 +666,7 @@ const ArmeiroInterface = () => {
             
             {livroAtivo && (
               <span className="text-sm text-muted-foreground">
-                Aberto às {livroAtivo.dataAbertura.toLocaleTimeString('pt-BR')} por {livroAtivo.armeiroNome}
+                Aberto às {livroAtivo.dataAbertura.toLocaleTimeString('pt-BR')} por Armeiro: {livroAtivo.armeiroNome}
               </span>
             )}
             
@@ -799,10 +799,10 @@ const ArmeiroInterface = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <div className="font-semibold text-foreground">
-                                {policialSelecionado.NOME}
+                                {policialSelecionado['NOME DE GUERRA1'] || policialSelecionado['NOME DE GUERRA'] || policialSelecionado.NOME}
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                {policialSelecionado['Post/Grad']} - Mat: {policialSelecionado['Matrícula']}
+                                Numeral: {policialSelecionado.NUMERAL || '-'} - Mat: {policialSelecionado['Matrícula']}
                               </div>
                             </div>
                             <Button
@@ -825,9 +825,9 @@ const ArmeiroInterface = () => {
                               className="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
                               onClick={() => selecionarPolicial(policial)}
                             >
-                              <div className="font-semibold">{policial.NOME}</div>
+                              <div className="font-semibold">{policial['NOME DE GUERRA1'] || policial['NOME DE GUERRA'] || policial.NOME}</div>
                               <div className="text-sm text-muted-foreground">
-                                {policial['Post/Grad']} - Mat: {policial['Matrícula']}
+                                Numeral: {policial.NUMERAL || '-'} - Mat: {policial['Matrícula']}
                               </div>
                             </div>
                           ))}
