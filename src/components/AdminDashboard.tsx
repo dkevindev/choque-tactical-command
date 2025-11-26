@@ -36,6 +36,7 @@ import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Car, Droplet } from 'lucide-react';
+import AlertasGestaoSection from '@/components/gestao/AlertasGestaoSection';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -678,9 +679,10 @@ const DashboardOverview = () => {
         
         {/* Alerta de Troca de Óleo PRÓXIMA (aviso) */}
         <AlertaTrocaOleo />
-        
-        {/* Cards de Informações Adicionais podem ser adicionados aqui */}
       </div>
+
+      {/* Alertas da Reserva de Armamento */}
+      <AlertasGestaoSection />
     </div>
     </>
   );

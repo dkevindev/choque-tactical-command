@@ -388,15 +388,58 @@ const ArmeiroInterface = () => {
   // Fechar Livro Diário
   const handleFecharLivro = async (senha: string, alteracoes: any[]) => {
     try {
-      // TODO: Verificar senha do armeiro no Firebase
-      // Por enquanto, aceitar qualquer senha
+      // Buscar cautelas pendentes do livro
+      const cautelasPendentesSnapshot = await getDocs(
+        query(
+          collection(db, 'cautelas_provisorias'),
+          where('livroId', '==', livroAtivo!.id),
+          where('status', '==', 'pendente')
+        )
+      );
+
+      // Criar alertas para materiais pendentes
+      if (cautelasPendentesSnapshot.size > 0) {
+        for (const cautelaDoc of cautelasPendentesSnapshot.docs) {
+          const cautelaData = cautelaDoc.data();
+          const materiaisNomes = cautelaData.materiais?.map((m: any) => m.nome).join(', ') || 'Material não especificado';
+          
+          await addDoc(collection(db, 'alertas_gestao'), {
+            tipo: 'material_pendente',
+            dataHora: new Date(),
+            policialId: cautelaData.policialId,
+            policialNome: cautelaData.policialNome,
+            policialNomeGuerra: cautelaData.policialNomeGuerra,
+            armeiroNome: livroAtivo!.armeiroNome,
+            materialNome: materiaisNomes,
+            materiais: cautelaData.materiais,
+            livroId: livroAtivo!.id,
+            cautelaId: cautelaDoc.id,
+            lido: false
+          });
+        }
+      }
+
+      // Criar alertas para observações/alterações do livro
+      if (alteracoes && alteracoes.length > 0) {
+        for (const alteracao of alteracoes) {
+          await addDoc(collection(db, 'alertas_gestao'), {
+            tipo: 'observacao_livro',
+            dataHora: new Date(),
+            observacao: alteracao.descricao,
+            armeiroNome: livroAtivo!.armeiroNome,
+            livroId: livroAtivo!.id,
+            lido: false
+          });
+        }
+      }
       
       await updateDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id), {
         status: 'fechado',
         dataFechamento: new Date(),
         alteracoes,
         totalCautelas: totalCautelasHoje,
-        totalBaixas: totalBaixasHoje
+        totalBaixas: totalBaixasHoje,
+        materiaisPendentes: cautelasPendentesSnapshot.size
       });
       
       setLivroAtivo(null);
@@ -405,7 +448,9 @@ const ArmeiroInterface = () => {
       
       toast({
         title: "Livro Diário Fechado",
-        description: "O livro foi fechado e registrado no histórico.",
+        description: cautelasPendentesSnapshot.size > 0 
+          ? `Livro fechado. ${cautelasPendentesSnapshot.size} material(is) pendente(s) registrado(s) como alerta.`
+          : "O livro foi fechado e registrado no histórico.",
       });
       
       return true;
