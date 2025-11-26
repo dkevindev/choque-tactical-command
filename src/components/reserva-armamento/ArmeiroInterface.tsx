@@ -35,6 +35,7 @@ interface Material {
   id: string;
   nome: string;
   categoria: string;
+  tipoArma?: string;
   subcategoria?: string;
   calibre?: string;
   numeroSerie?: string;
@@ -158,12 +159,12 @@ const ArmeiroInterface = () => {
       console.error('Erro ao carregar materiais:', error);
       // Mock data para desenvolvimento
       const mockMaterials: Material[] = [
-        { id: '1', nome: 'Pistola .40 TAURUS', categoria: 'Arma Curta', calibre: '.40', numeroSerie: 'BR001', disponivel: true },
-        { id: '2', nome: 'Espingarda Cal 12', categoria: 'Arma Longa', calibre: '12', numeroSerie: 'BR002', disponivel: true },
+        { id: '1', nome: 'Pistola .40 TAURUS', categoria: 'Arma', tipoArma: 'Arma Curta', calibre: '.40', numeroSerie: 'BR001', disponivel: true },
+        { id: '2', nome: 'Espingarda Cal 12', categoria: 'Arma', tipoArma: 'Arma Longa', calibre: '12', numeroSerie: 'BR002', disponivel: true },
         { id: '3', nome: 'Colete Balístico Nível III', categoria: 'EPI', disponivel: true },
         { id: '4', nome: 'Munição .40 CBC', categoria: 'Munição', calibre: '.40', quantidade: 1000, disponivel: true },
         { id: '5', nome: 'Carregador .40', categoria: 'Acessórios', disponivel: true },
-        { id: '6', nome: 'Fuzil 5.56', categoria: 'Arma Longa', calibre: '5.56', numeroSerie: 'BR003', disponivel: true },
+        { id: '6', nome: 'Fuzil 5.56', categoria: 'Arma', tipoArma: 'Arma Longa', calibre: '5.56', numeroSerie: 'BR003', disponivel: true },
         { id: '7', nome: 'Munição 5.56', categoria: 'Munição', calibre: '5.56', quantidade: 500, disponivel: true },
       ];
       setMateriaisDisponiveis(mockMaterials);
@@ -399,20 +400,30 @@ const ArmeiroInterface = () => {
     return nomeMatch || matriculaMatch;
   });
 
-  // Mapear categoria para o filtro
-  const mapearCategoria = (categoria: string) => {
-    const cat = categoria.toLowerCase();
-    if (cat.includes('arma curta') || cat.includes('pistola') || cat.includes('revolver')) return 'arma_curta';
-    if (cat.includes('arma longa') || cat.includes('fuzil') || cat.includes('espingarda')) return 'arma_longa';
-    if (cat.includes('munição') || cat.includes('municao')) return 'municao';
-    if (cat.includes('epi') || cat.includes('colete')) return 'epi';
+  // Mapear categoria para o filtro usando tipoArma do Firebase
+  const mapearCategoria = (material: Material) => {
+    const tipoArma = (material.tipoArma || '').toLowerCase();
+    const categoria = (material.categoria || '').toLowerCase();
+    
+    // Priorizar tipoArma do Firebase
+    if (tipoArma === 'arma curta' || tipoArma.includes('curta')) return 'arma_curta';
+    if (tipoArma === 'arma longa' || tipoArma.includes('longa')) return 'arma_longa';
+    
+    // Fallback para categoria
+    if (categoria.includes('munição') || categoria.includes('municao')) return 'municao';
+    if (categoria.includes('epi') || categoria.includes('colete')) return 'epi';
+    if (categoria.includes('arma curta') || categoria.includes('pistola') || categoria.includes('revolver')) return 'arma_curta';
+    if (categoria.includes('arma longa') || categoria.includes('fuzil') || categoria.includes('espingarda')) return 'arma_longa';
+    
     return 'acessorio';
   };
 
   const materiaisFiltrados = materiaisDisponiveis.filter(m => {
-    const matchCategoria = mapearCategoria(m.categoria) === categoriaAtiva;
-    const matchSearch = m.nome.toLowerCase().includes(searchMaterial.toLowerCase()) ||
-                       m.categoria.toLowerCase().includes(searchMaterial.toLowerCase());
+    const matchCategoria = mapearCategoria(m) === categoriaAtiva;
+    const searchLower = searchMaterial.toLowerCase();
+    const matchSearch = m.nome.toLowerCase().includes(searchLower) ||
+                       (m.categoria || '').toLowerCase().includes(searchLower) ||
+                       (m.numeroSerie || '').toLowerCase().includes(searchLower);
     return matchCategoria && (searchMaterial === '' || matchSearch);
   });
 
@@ -635,7 +646,7 @@ const ArmeiroInterface = () => {
                       <div className="relative">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Buscar material..."
+                          placeholder="Buscar por nome ou nº série..."
                           value={searchMaterial}
                           onChange={(e) => setSearchMaterial(e.target.value)}
                           className="pl-10"
