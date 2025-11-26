@@ -209,9 +209,9 @@ const ArmeiroInterface = () => {
           materiais: data.materiais || [],
           dataCautela,
           horaCautela,
-          dataBaixa: baixaInfo?.dataBaixa || (data.dataBaixa?.toDate?.()),
-          horaBaixa: baixaInfo?.horaBaixa || data.horaBaixa,
-          recebidoPorNome: data.recebidoPorNome,
+          dataBaixa: status === 'entregue' ? (baixaInfo?.dataBaixa || data.dataBaixa?.toDate?.()) : undefined,
+          horaBaixa: status === 'entregue' ? (baixaInfo?.horaBaixa || data.horaBaixa) : undefined,
+          recebidoPorNome: status === 'entregue' ? data.recebidoPorNome : undefined,
           status,
           sequencial: 0
         });
