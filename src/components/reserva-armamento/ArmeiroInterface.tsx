@@ -99,7 +99,7 @@ const CATEGORIAS = [
 
 const ArmeiroInterface = () => {
   const [livroAtivo, setLivroAtivo] = useState<LivroAtivo | null>(null);
-  const [armeiroSelecionado, setArmeiroSelecionado] = useState<Policial | null>(null);
+  const [policialLogado, setPolicialLogado] = useState<Policial | null>(null);
   const [loading, setLoading] = useState(false);
   
   const [policialSelecionado, setPolicialSelecionado] = useState<Policial | null>(null);
@@ -224,8 +224,35 @@ const ArmeiroInterface = () => {
     }
   }, []);
 
-  // Verificar livro ativo ao carregar
+  // Carregar policial logado e verificar livro ativo ao carregar
   useEffect(() => {
+    const carregarPolicialLogado = async () => {
+      const userStorage = localStorage.getItem('user');
+      if (userStorage) {
+        try {
+          const userData = JSON.parse(userStorage);
+          const docRef = doc(db, 'policiais', userData.id);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setPolicialLogado({
+              id: docSnap.id,
+              'Matrícula': data['Matrícula'],
+              NOME: data.NOME,
+              'NOME DE GUERRA': data['NOME DE GUERRA'],
+              'NOME DE GUERRA1': data['NOME DE GUERRA1'],
+              NUMERAL: data.NUMERAL,
+              'Post/Grad': data['Post/Grad'],
+              'SITUAÇÃO': data['SITUAÇÃO'],
+              senha: data.senha
+            });
+          }
+        } catch (e) {
+          console.error('Erro ao carregar policial logado:', e);
+        }
+      }
+    };
+
     const verificarLivroAtivo = async () => {
       try {
         const querySnapshot = await getDocs(
@@ -250,6 +277,7 @@ const ArmeiroInterface = () => {
       }
     };
     
+    carregarPolicialLogado();
     verificarLivroAtivo();
   }, [carregarMovimentacoesDoDia]);
 
@@ -307,10 +335,10 @@ const ArmeiroInterface = () => {
 
   // Abrir Livro Diário
   const abrirLivroDiario = async () => {
-    if (!armeiroSelecionado) {
+    if (!policialLogado) {
       toast({
-        title: "Atenção",
-        description: "Selecione o armeiro responsável antes de abrir o livro.",
+        title: "Erro",
+        description: "Não foi possível identificar o usuário logado.",
         variant: "destructive",
       });
       return;
@@ -319,8 +347,8 @@ const ArmeiroInterface = () => {
     try {
       setLoading(true);
       
-      const armeiroNome = armeiroSelecionado['NOME DE GUERRA1'] || armeiroSelecionado['NOME DE GUERRA'] || armeiroSelecionado.NOME;
-      const armeiroId = armeiroSelecionado.id;
+      const armeiroNome = policialLogado['NOME DE GUERRA1'] || policialLogado['NOME DE GUERRA'] || policialLogado.NOME;
+      const armeiroId = policialLogado.id;
       
       const livroRef = await addDoc(collection(db, 'livros_reserva_armamento'), {
         armeiroId,
@@ -516,7 +544,7 @@ const ArmeiroInterface = () => {
         policialNumeral: numeral,
         policialMatricula: String(policialSelecionado['Matrícula'] || ''),
         postoGrad: policialSelecionado['Post/Grad'],
-        armeiroId: armeiroSelecionado?.id || livroAtivo?.armeiroId,
+        armeiroId: policialLogado?.id || livroAtivo?.armeiroId,
         materiais: materiaisLimpos,
         dataCautela: agora,
         horaCautela,
@@ -683,34 +711,14 @@ const ArmeiroInterface = () => {
             )}
             
             {!livroAtivo ? (
-              <div className="flex items-center gap-3">
-                <Select
-                  value={armeiroSelecionado?.id || ''}
-                  onValueChange={(value) => {
-                    const policial = policiais.find(p => p.id === value);
-                    setArmeiroSelecionado(policial || null);
-                  }}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Selecione o Armeiro" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {policiais.map((policial) => (
-                      <SelectItem key={policial.id} value={policial.id}>
-                        {policial['NOME DE GUERRA1'] || policial['NOME DE GUERRA'] || policial.NOME}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button 
-                  onClick={abrirLivroDiario}
-                  disabled={loading || !armeiroSelecionado}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  Abrir Livro Diário
-                </Button>
-              </div>
+              <Button 
+                onClick={abrirLivroDiario}
+                disabled={loading || !policialLogado}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <BookOpen className="h-4 w-4 mr-2" />
+                Abrir Livro Diário
+              </Button>
             ) : (
               <Button 
                 onClick={() => setModalFechamento(true)}
