@@ -19,6 +19,7 @@ interface CautelaAtiva {
   id: string;
   policialId: string;
   policialNome: string;
+  policialNomeGuerra?: string;
   policialMatricula: string;
   materiais: MaterialCautelado[];
   dataCautela: Date;
@@ -122,7 +123,7 @@ const PolicialAvatar = ({
           "bg-primary/20 text-primary-foreground border border-primary/30",
           "whitespace-nowrap max-w-[80px] truncate"
         )}>
-          {cautela.policialNome.split(' ')[0]}
+          {cautela.policialNomeGuerra || cautela.policialNome.split(' ')[0]}
         </div>
       </div>
     </div>
@@ -183,7 +184,7 @@ const ModalDetalhePolicial = ({
           <DialogTitle className="flex items-center gap-3">
             <span className="text-4xl">👮‍♂️</span>
             <div>
-              <div className="text-lg">{cautela.policialNome}</div>
+              <div className="text-lg">{cautela.policialNomeGuerra || cautela.policialNome}</div>
               <div className="text-sm text-muted-foreground font-normal">Mat: {cautela.policialMatricula}</div>
             </div>
           </DialogTitle>
@@ -389,7 +390,7 @@ const MaterialNaRuaSection = () => {
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">👮‍♂️</span>
                         <div>
-                          <div className="font-medium text-sm">{cautela.policialNome}</div>
+                          <div className="font-medium text-sm">{cautela.policialNomeGuerra || cautela.policialNome}</div>
                           <div className="text-xs text-muted-foreground">
                             Mat: {cautela.policialMatricula} • {cautela.dataCautela.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                           </div>
