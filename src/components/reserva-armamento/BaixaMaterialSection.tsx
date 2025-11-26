@@ -531,7 +531,12 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
         horaBaixa
       };
       
-      if (cautelasAtivas.length === 1) {
+      // Só associar cautelaId quando for baixa TOTAL (todos os materiais devolvidos)
+      const foiBaixaTotal = cautelasAtivas.every(cautela => 
+        cautela.materiais.every(m => materiaisSelecionados.includes(m.materialId))
+      );
+      
+      if (foiBaixaTotal && cautelasAtivas.length === 1) {
         movimentacaoData.cautelaId = cautelasAtivas[0].id;
       }
       
