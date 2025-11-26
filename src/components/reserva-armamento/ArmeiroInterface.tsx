@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Search, User, Clock, Package, BookOpen, Target, Plus, Minus, 
   CheckCircle, AlertCircle, Lock, Shield, Crosshair, MapPin, 
@@ -98,8 +99,7 @@ const CATEGORIAS = [
 
 const ArmeiroInterface = () => {
   const [livroAtivo, setLivroAtivo] = useState<LivroAtivo | null>(null);
-  const [armeiroNome, setArmeiroNome] = useState("ARMEIRO LOGADO");
-  const [armeiroId, setArmeiroId] = useState("armeiro_001");
+  const [armeiroSelecionado, setArmeiroSelecionado] = useState<Policial | null>(null);
   const [loading, setLoading] = useState(false);
   
   const [policialSelecionado, setPolicialSelecionado] = useState<Policial | null>(null);
@@ -307,8 +307,20 @@ const ArmeiroInterface = () => {
 
   // Abrir Livro Diário
   const abrirLivroDiario = async () => {
+    if (!armeiroSelecionado) {
+      toast({
+        title: "Atenção",
+        description: "Selecione o armeiro responsável antes de abrir o livro.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       setLoading(true);
+      
+      const armeiroNome = armeiroSelecionado['NOME DE GUERRA1'] || armeiroSelecionado['NOME DE GUERRA'] || armeiroSelecionado.NOME;
+      const armeiroId = armeiroSelecionado.id;
       
       const livroRef = await addDoc(collection(db, 'livros_reserva_armamento'), {
         armeiroId,
@@ -330,7 +342,7 @@ const ArmeiroInterface = () => {
       
       toast({
         title: "Livro Diário Aberto",
-        description: "O livro diário foi aberto para movimentações.",
+        description: `Livro aberto por ${armeiroNome}.`,
       });
     } catch (error) {
       console.error('Erro ao abrir livro:', error);
@@ -504,7 +516,7 @@ const ArmeiroInterface = () => {
         policialNumeral: numeral,
         policialMatricula: String(policialSelecionado['Matrícula'] || ''),
         postoGrad: policialSelecionado['Post/Grad'],
-        armeiroId,
+        armeiroId: armeiroSelecionado?.id || livroAtivo?.armeiroId,
         materiais: materiaisLimpos,
         dataCautela: agora,
         horaCautela,
@@ -671,14 +683,34 @@ const ArmeiroInterface = () => {
             )}
             
             {!livroAtivo ? (
-              <Button 
-                onClick={abrirLivroDiario}
-                disabled={loading}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <BookOpen className="h-4 w-4 mr-2" />
-                Abrir Livro Diário
-              </Button>
+              <div className="flex items-center gap-3">
+                <Select
+                  value={armeiroSelecionado?.id || ''}
+                  onValueChange={(value) => {
+                    const policial = policiais.find(p => p.id === value);
+                    setArmeiroSelecionado(policial || null);
+                  }}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Selecione o Armeiro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {policiais.map((policial) => (
+                      <SelectItem key={policial.id} value={policial.id}>
+                        {policial['NOME DE GUERRA1'] || policial['NOME DE GUERRA'] || policial.NOME}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button 
+                  onClick={abrirLivroDiario}
+                  disabled={loading || !armeiroSelecionado}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Abrir Livro Diário
+                </Button>
+              </div>
             ) : (
               <Button 
                 onClick={() => setModalFechamento(true)}
@@ -1021,7 +1053,7 @@ const ArmeiroInterface = () => {
         <ModalFechamentoLivro
           open={modalFechamento}
           onClose={() => setModalFechamento(false)}
-          armeiroNome={armeiroNome}
+          armeiroNome={livroAtivo.armeiroNome}
           onFechar={handleFecharLivro}
         />
       )}
