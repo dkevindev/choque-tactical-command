@@ -235,7 +235,7 @@ const MaterialNaRuaSection = () => {
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const q = query(collection(db, 'cautelas_provisorias'), where('status', '==', 'ativo'));
+    const q = query(collection(db, 'cautelas_provisorias'), where('status', '==', 'pendente'));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const novasCautelas = querySnapshot.docs.map(doc => {
