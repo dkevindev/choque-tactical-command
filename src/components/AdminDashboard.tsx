@@ -63,6 +63,8 @@ const AdminDashboard = () => {
         return <GuardaQuartelContent />;
       case 'gestao':
         return <GestaoContent />;
+      case 'na-rua':
+        return <MaterialNaRuaSection />;
       case 'documentos':
         return <DocumentosContent locationState={location.state} />;
       case 'ordens-servico': // <--- Adicione este novo case
@@ -780,20 +782,7 @@ const GestaoContent = () => (
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="acessos" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="acessos">Gestão de Acesso</TabsTrigger>
-            <TabsTrigger value="na-rua">Na Rua</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="acessos">
-            <GestaoAcesso />
-          </TabsContent>
-
-          <TabsContent value="na-rua">
-            <MaterialNaRuaSection />
-          </TabsContent>
-        </Tabs>
+        <GestaoAcesso />
       </CardContent>
     </Card>
   </div>
