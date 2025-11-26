@@ -60,6 +60,24 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
   
   const { toast } = useToast();
 
+  // Função para obter próximo sequencial do livro
+  const obterProximoSequencial = async (livroIdParam: string): Promise<number> => {
+    const cautelasSnapshot = await getDocs(
+      query(
+        collection(db, 'cautelas_provisorias'),
+        where('livroId', '==', livroIdParam)
+      )
+    );
+    
+    let maiorSequencial = 0;
+    cautelasSnapshot.forEach(docSnapshot => {
+      const seq = docSnapshot.data().sequencial || 0;
+      if (seq > maiorSequencial) maiorSequencial = seq;
+    });
+    
+    return maiorSequencial + 1;
+  };
+
   // Carregar policiais com cautela ativa
   useEffect(() => {
     const carregarPoliciaisComCautela = async () => {
@@ -188,6 +206,10 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
         m.materialId !== materialMunicao.materialId
       );
 
+      const materialDevolvido = cautelaMunicao.materiais.find(m =>
+        m.materialId === materialMunicao.materialId
+      );
+
       if (materiaisRestantes.length === 0) {
         // Todos devolvidos - marcar cautela como entregue
         await updateDoc(doc(db, 'cautelas_provisorias', cautelaMunicao.id), {
@@ -196,7 +218,29 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
           horaBaixa
         });
       } else {
-        // Atualizar lista de materiais da cautela
+        // BAIXA PARCIAL: Criar nova entrada para material devolvido
+        const proximoSequencial = await obterProximoSequencial(livroId);
+        
+        // Criar nova cautela para o material devolvido
+        await addDoc(collection(db, 'cautelas_provisorias'), {
+          livroId,
+          policialId: cautelaMunicao.policialId,
+          policialNome: cautelaMunicao.policialNome,
+          policialMatricula: cautelaMunicao.policialMatricula,
+          policialNomeGuerra: (cautelaMunicao as any).policialNomeGuerra,
+          policialPostGrad: (cautelaMunicao as any).policialPostGrad,
+          armeiroId: cautelaMunicao.armeiroId,
+          materiais: materialDevolvido ? [materialDevolvido] : [],
+          dataCautela: cautelaMunicao.dataCautela,
+          horaCautela: (cautelaMunicao as any).horaCautela,
+          status: 'entregue',
+          dataBaixa: agora,
+          horaBaixa,
+          sequencial: proximoSequencial,
+          cautelaOriginalId: cautelaMunicao.id
+        });
+        
+        // Atualizar cautela original mantendo apenas materiais pendentes
         await updateDoc(doc(db, 'cautelas_provisorias', cautelaMunicao.id), {
           materiais: materiaisRestantes
         });
@@ -390,13 +434,41 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
           !materiaisSelecionados.includes(m.materialId)
         );
 
+        const materiaisParaEntrega = cautela.materiais.filter(m =>
+          materiaisSelecionados.includes(m.materialId)
+        );
+
         if (materiaisRestantes.length === 0) {
+          // BAIXA TOTAL: marcar cautela como entregue
           await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
             status: 'entregue',
             dataBaixa: agora,
             horaBaixa
           });
         } else {
+          // BAIXA PARCIAL: Criar nova entrada para materiais devolvidos
+          const proximoSequencial = await obterProximoSequencial(livroId);
+          
+          // Criar nova cautela para os materiais devolvidos
+          await addDoc(collection(db, 'cautelas_provisorias'), {
+            livroId,
+            policialId: cautela.policialId,
+            policialNome: cautela.policialNome,
+            policialMatricula: cautela.policialMatricula,
+            policialNomeGuerra: (cautela as any).policialNomeGuerra,
+            policialPostGrad: (cautela as any).policialPostGrad,
+            armeiroId: cautela.armeiroId,
+            materiais: materiaisParaEntrega,
+            dataCautela: cautela.dataCautela,
+            horaCautela: (cautela as any).horaCautela,
+            status: 'entregue',
+            dataBaixa: agora,
+            horaBaixa,
+            sequencial: proximoSequencial,
+            cautelaOriginalId: cautela.id
+          });
+          
+          // Atualizar cautela original mantendo apenas materiais pendentes
           await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
             materiais: materiaisRestantes
           });
