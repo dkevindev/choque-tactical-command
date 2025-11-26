@@ -179,7 +179,7 @@ const ArmeiroInterface = () => {
             const policialDoc = await getDoc(doc(db, 'policiais', data.policialId));
             if (policialDoc.exists()) {
               const policialData = policialDoc.data();
-              nomeGuerra = policialData['NOME DE GUERRA'] || policialData['NOME DE GUERRA1'];
+              nomeGuerra = policialData['NOME DE GUERRA1'] || policialData['NOME DE GUERRA'];
               numeral = policialData['NUMERAL'];
               postoGrad = postoGrad || policialData['Post/Grad'];
             }
@@ -581,7 +581,7 @@ const ArmeiroInterface = () => {
       
       const agora = new Date();
       const horaCautela = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      const nomeGuerra = policialSelecionado['NOME DE GUERRA'] || policialSelecionado['NOME DE GUERRA1'] || '';
+      const nomeGuerra = policialSelecionado['NOME DE GUERRA1'] || policialSelecionado['NOME DE GUERRA'] || '';
       const numeral = policialSelecionado.NUMERAL;
       
       // Calcular sequencial baseado nas cautelas existentes do livro
