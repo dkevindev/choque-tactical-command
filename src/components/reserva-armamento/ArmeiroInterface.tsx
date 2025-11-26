@@ -21,6 +21,7 @@ import ModalFechamentoLivro from './ModalFechamentoLivro';
 import BaixaMaterialSection from './BaixaMaterialSection';
 import HistoricoLivrosSection from './HistoricoLivrosSection';
 import MaterialNaRuaSection from './MaterialNaRuaSection';
+import LivroCautelaDia from './LivroCautelaDia';
 
 interface Policial {
   id: string;
@@ -62,6 +63,24 @@ interface LivroAtivo {
   status: 'aberto' | 'fechado';
 }
 
+interface MovimentacaoDia {
+  id: string;
+  tipo: 'cautela' | 'baixa';
+  policialNome: string;
+  policialMatricula?: string;
+  postoGrad?: string;
+  materiais: Array<{
+    nome: string;
+    quantidade: number;
+    numeroSerie?: string;
+    categoria?: string;
+  }>;
+  dataCautela?: Date;
+  dataBaixa?: Date;
+  hora: string;
+  sequencial: number;
+}
+
 const CATEGORIAS = [
   { id: 'arma_curta', label: 'Arma Curta', icon: Target },
   { id: 'arma_longa', label: 'Arma Longa', icon: Crosshair },
@@ -95,10 +114,87 @@ const ArmeiroInterface = () => {
   const [totalCautelasHoje, setTotalCautelasHoje] = useState(0);
   const [totalBaixasHoje, setTotalBaixasHoje] = useState(0);
   
+  // Movimentações do dia (para tabela visual)
+  const [movimentacoesDoDia, setMovimentacoesDoDia] = useState<MovimentacaoDia[]>([]);
+  
   // Tab ativa
   const [tabAtiva, setTabAtiva] = useState("cautela");
   
   const { toast } = useToast();
+
+  // Carregar movimentações do dia do Firebase
+  const carregarMovimentacoesDoDia = useCallback(async (livroId: string) => {
+    try {
+      // Carregar cautelas do livro
+      const cautelasSnapshot = await getDocs(
+        query(collection(db, 'cautelas_provisorias'), where('livroId', '==', livroId))
+      );
+      
+      // Carregar movimentações (cautelas e baixas) do livro
+      const movimentacoesSnapshot = await getDocs(
+        query(collection(db, 'movimentacoes_belicas'), where('livroId', '==', livroId))
+      );
+      
+      const movimentacoes: MovimentacaoDia[] = [];
+      let sequencial = 1;
+      
+      // Processar cautelas
+      cautelasSnapshot.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        const dataCautela = data.dataCautela?.toDate?.() || new Date();
+        movimentacoes.push({
+          id: docSnap.id,
+          tipo: 'cautela',
+          policialNome: data.policialNome || '',
+          policialMatricula: data.policialMatricula,
+          materiais: data.materiais || [],
+          dataCautela,
+          hora: dataCautela.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          sequencial: 0 // será atribuído depois de ordenar
+        });
+      });
+      
+      // Processar baixas das movimentações
+      movimentacoesSnapshot.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.tipo === 'baixa') {
+          const dataBaixa = data.dataBaixa?.toDate?.() || new Date();
+          movimentacoes.push({
+            id: docSnap.id,
+            tipo: 'baixa',
+            policialNome: data.policialNome || '',
+            policialMatricula: data.policialMatricula,
+            materiais: data.materiais || [],
+            dataBaixa,
+            hora: dataBaixa.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            sequencial: 0
+          });
+        }
+      });
+      
+      // Ordenar por data e atribuir sequencial
+      movimentacoes.sort((a, b) => {
+        const dateA = a.dataCautela || a.dataBaixa || new Date();
+        const dateB = b.dataCautela || b.dataBaixa || new Date();
+        return dateA.getTime() - dateB.getTime();
+      });
+      
+      movimentacoes.forEach((mov, idx) => {
+        mov.sequencial = idx + 1;
+      });
+      
+      setMovimentacoesDoDia(movimentacoes);
+      
+      // Atualizar contadores
+      const totalCautelas = movimentacoes.filter(m => m.tipo === 'cautela').length;
+      const totalBaixas = movimentacoes.filter(m => m.tipo === 'baixa').length;
+      setTotalCautelasHoje(totalCautelas);
+      setTotalBaixasHoje(totalBaixas);
+      
+    } catch (error) {
+      console.error('Erro ao carregar movimentações do dia:', error);
+    }
+  }, []);
 
   // Verificar livro ativo ao carregar
   useEffect(() => {
@@ -110,11 +206,16 @@ const ArmeiroInterface = () => {
         
         if (!querySnapshot.empty) {
           const livroData = querySnapshot.docs[0].data();
+          const livroId = querySnapshot.docs[0].id;
+          
           setLivroAtivo({
-            id: querySnapshot.docs[0].id,
+            id: livroId,
             ...livroData,
             dataAbertura: livroData.dataAbertura?.toDate?.() || new Date()
           } as LivroAtivo);
+          
+          // Carregar movimentações do dia
+          await carregarMovimentacoesDoDia(livroId);
         }
       } catch (error) {
         console.error('Erro ao verificar livro ativo:', error);
@@ -122,7 +223,7 @@ const ArmeiroInterface = () => {
     };
     
     verificarLivroAtivo();
-  }, []);
+  }, [carregarMovimentacoesDoDia]);
 
   // Carregar policiais do Firebase
   const carregarPoliciais = useCallback(async () => {
@@ -423,7 +524,25 @@ const ArmeiroInterface = () => {
 
       await addDoc(collection(db, 'movimentacoes_belicas'), movimentacaoData);
       
-      // Atualizar contador
+      // Atualizar contador e adicionar à lista de movimentações local
+      const novaMovimentacao: MovimentacaoDia = {
+        id: `temp_${Date.now()}`,
+        tipo: 'cautela',
+        policialNome: policialSelecionado.NOME,
+        policialMatricula: String(policialSelecionado['Matrícula'] || ''),
+        postoGrad: policialSelecionado['Post/Grad'],
+        materiais: materiaisLimpos.map(m => ({
+          nome: m.nome,
+          quantidade: m.quantidade,
+          numeroSerie: m.numeroSerie,
+          categoria: m.categoria
+        })),
+        dataCautela: new Date(),
+        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        sequencial: movimentacoesDoDia.length + 1
+      };
+      
+      setMovimentacoesDoDia(prev => [...prev, novaMovimentacao]);
       setTotalCautelasHoje(prev => prev + 1);
       
       // Limpar seleção
@@ -586,6 +705,13 @@ const ArmeiroInterface = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Tabela Visual do Livro de Cautela */}
+          <LivroCautelaDia 
+            movimentacoes={movimentacoesDoDia}
+            dataAbertura={livroAtivo.dataAbertura}
+            armeiroNome={livroAtivo.armeiroNome}
+          />
 
           {/* Tabs de Navegação */}
           <Tabs value={tabAtiva} onValueChange={setTabAtiva}>
@@ -797,7 +923,10 @@ const ArmeiroInterface = () => {
               <BaixaMaterialSection 
                 livroId={livroAtivo?.id || ''} 
                 onBaixaRealizada={() => {
-                  setTotalBaixasHoje(prev => prev + 1);
+                  // Recarregar movimentações do dia para incluir a baixa
+                  if (livroAtivo?.id) {
+                    carregarMovimentacoesDoDia(livroAtivo.id);
+                  }
                   carregarMateriaisDisponiveis();
                 }}
               />
