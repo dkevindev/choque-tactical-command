@@ -334,17 +334,51 @@ const ArmeiroInterface = () => {
     try {
       setLoading(true);
       
-      // Criar cautela provisória
-      await addDoc(collection(db, 'cautelas_provisorias'), {
-        livroId: livroAtivo?.id,
-        policialId: policialSelecionado!.id,
-        policialNome: policialSelecionado!.NOME,
-        policialMatricula: String(policialSelecionado!['Matrícula']),
+      if (!policialSelecionado) {
+        toast({
+          title: "Erro",
+          description: "Nenhum policial selecionado.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (materiaisSelecionados.length === 0) {
+        toast({
+          title: "Erro",
+          description: "Nenhum material selecionado.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Preparar materiais sem campos undefined
+      const materiaisLimpos = materiaisSelecionados.map(m => ({
+        materialId: m.materialId,
+        nome: m.nome,
+        categoria: m.categoria,
+        quantidade: m.quantidade,
+        ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
+        ...(m.carregadores && { carregadores: m.carregadores })
+      }));
+      
+      // Criar cautela provisória - sem campos undefined
+      const cautelaData: Record<string, any> = {
+        policialId: policialSelecionado.id,
+        policialNome: policialSelecionado.NOME,
+        policialMatricula: String(policialSelecionado['Matrícula'] || ''),
         armeiroId,
-        materiais: materiaisSelecionados,
+        materiais: materiaisLimpos,
         dataCautela: new Date(),
         status: 'ativo'
-      });
+      };
+
+      // Só adiciona livroId se existir
+      if (livroAtivo?.id) {
+        cautelaData.livroId = livroAtivo.id;
+      }
+
+      await addDoc(collection(db, 'cautelas_provisorias'), cautelaData);
       
       // Marcar materiais como indisponíveis
       for (const material of materiaisSelecionados) {
@@ -352,23 +386,42 @@ const ArmeiroInterface = () => {
         const materialDoc = await getDoc(materialRef);
         
         if (materialDoc.exists()) {
-          await updateDoc(materialRef, {
-            disponivel: false,
-            cauteladoPara: policialSelecionado!.id,
-            dataCautela: new Date()
-          });
+          const materialData = materialDoc.data();
+          const isMunicao = materialData?.categoria?.toLowerCase().includes('munição') || 
+                           materialData?.categoria?.toLowerCase().includes('municao');
+          
+          if (isMunicao && materialData?.quantidade) {
+            // Para munição, diminuir a quantidade
+            const novaQuantidade = Math.max(0, (materialData.quantidade || 0) - material.quantidade);
+            await updateDoc(materialRef, {
+              quantidade: novaQuantidade,
+              ...(novaQuantidade <= 0 && { disponivel: false })
+            });
+          } else {
+            // Para armas e outros, marcar como indisponível
+            await updateDoc(materialRef, {
+              disponivel: false,
+              cauteladoPara: policialSelecionado.id,
+              dataCautela: new Date()
+            });
+          }
         }
       }
       
-      // Registrar movimentação
-      await addDoc(collection(db, 'movimentacoes_belicas'), {
+      // Registrar movimentação - sem campos undefined
+      const movimentacaoData: Record<string, any> = {
         tipo: 'cautela',
-        policialId: policialSelecionado!.id,
-        policialNome: policialSelecionado!.NOME,
-        livroId: livroAtivo?.id,
-        materiais: materiaisSelecionados,
+        policialId: policialSelecionado.id,
+        policialNome: policialSelecionado.NOME,
+        materiais: materiaisLimpos,
         dataCautela: new Date()
-      });
+      };
+
+      if (livroAtivo?.id) {
+        movimentacaoData.livroId = livroAtivo.id;
+      }
+
+      await addDoc(collection(db, 'movimentacoes_belicas'), movimentacaoData);
       
       // Atualizar contador
       setTotalCautelasHoje(prev => prev + 1);
@@ -377,6 +430,11 @@ const ArmeiroInterface = () => {
       setMateriaisSelecionados([]);
       setPolicialSelecionado(null);
       
+      toast({
+        title: "Cautela Registrada",
+        description: `Materiais cautelados para ${policialSelecionado.NOME} com sucesso.`,
+      });
+      
       // Recarregar materiais disponíveis
       carregarMateriaisDisponiveis();
       
@@ -384,7 +442,7 @@ const ArmeiroInterface = () => {
       console.error('Erro ao confirmar cautela:', error);
       toast({
         title: "Erro",
-        description: "Erro ao registrar cautela.",
+        description: "Erro ao registrar cautela. Verifique os dados.",
         variant: "destructive",
       });
     } finally {
