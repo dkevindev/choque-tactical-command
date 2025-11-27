@@ -424,25 +424,64 @@ const DashboardOverview = () => {
                 return (
                   <div key={colete.id} className="border border-orange-700 dark:border-orange-600 rounded-lg p-4 bg-orange-900/30 dark:bg-orange-950/50">
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-semibold text-foreground">
-                          Número de Série: {colete.numeroSerie || 'S/N'}
-                        </p>
-                        <p className="text-sm text-orange-700 dark:text-orange-400 font-medium mt-1">
-                          {tempoRestante}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Vencimento: {new Date(colete.vencimento).toLocaleDateString('pt-BR')}
-                        </p>
-                        {colete.policialAssociadoNome && (
-                          <p className="text-sm text-muted-foreground">
-                            Cautelado: {colete.policialAssociadoNome}
+                      <div className="flex-1 space-y-2">
+                        <div>
+                          <p className="font-semibold text-foreground">
+                            Número de Série: {colete.numeroSerie || 'S/N'}
                           </p>
-                        )}
-                        {colete.policialAssociadoPostGrad && (
-                          <p className="text-sm text-muted-foreground">
-                            Posto/Graduação: {colete.policialAssociadoPostGrad}
+                          <p className="text-sm text-orange-700 dark:text-orange-400 font-medium mt-1">
+                            {tempoRestante}
                           </p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 pt-2 border-t border-orange-700/30">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Vencimento</p>
+                            <p className="text-sm font-medium">{new Date(colete.vencimento).toLocaleDateString('pt-BR')}</p>
+                          </div>
+                          
+                          {colete.dataFabricacao && (
+                            <div>
+                              <p className="text-xs text-muted-foreground">Data Fabricação</p>
+                              <p className="text-sm font-medium">{new Date(colete.dataFabricacao).toLocaleDateString('pt-BR')}</p>
+                            </div>
+                          )}
+                          
+                          {colete.fabricante && (
+                            <div>
+                              <p className="text-xs text-muted-foreground">Fabricante</p>
+                              <p className="text-sm font-medium">{colete.fabricante}</p>
+                            </div>
+                          )}
+                          
+                          {colete.tamanho && (
+                            <div>
+                              <p className="text-xs text-muted-foreground">Tamanho</p>
+                              <p className="text-sm font-medium">{colete.tamanho}</p>
+                            </div>
+                          )}
+                          
+                          {colete.sexo && (
+                            <div>
+                              <p className="text-xs text-muted-foreground">Sexo</p>
+                              <p className="text-sm font-medium">{colete.sexo}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {(colete.policialAssociadoNome || colete.policialAssociadoPostGrad) && (
+                          <div className="pt-2 border-t border-orange-700/30">
+                            {colete.policialAssociadoNome && (
+                              <p className="text-sm text-muted-foreground">
+                                Cautelado: {colete.policialAssociadoNome}
+                              </p>
+                            )}
+                            {colete.policialAssociadoPostGrad && (
+                              <p className="text-sm text-muted-foreground">
+                                Posto/Graduação: {colete.policialAssociadoPostGrad}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                       <Badge className="bg-orange-700 text-white shrink-0">Vencendo</Badge>
