@@ -1181,13 +1181,13 @@ const CAVBot = () => {
       )}
 
       {showChecklist && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: '1rem', width: 'min(600px, 94vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, transform: 'translateZ(0)', willChange: 'transform' }}>
+          <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: '1rem', width: 'min(600px, 94vw)', maxHeight: '90vh', overflowY: 'auto', isolation: 'isolate', contain: 'layout style' }}>
             <div className="quick-actions-header" style={{ marginBottom: '0.75rem' }}>Checklist de Verificação - {checklistStep + 1}/9</div>
             
             {checklistStep === 0 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Óleo do Motor:</p>
+              <div key="checklist-step-0">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Óleo do Motor:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, oleoMotor: 'abaixo' }); setChecklistStep(1); }}>Abaixo do Nível</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, oleoMotor: 'nivel' }); setChecklistStep(1); }}>No Nível</button>
@@ -1197,8 +1197,8 @@ const CAVBot = () => {
             )}
             
             {checklistStep === 1 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Água do Radiador:</p>
+              <div key="checklist-step-1">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Água do Radiador:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, aguaRadiador: 'abaixo' }); setChecklistStep(2); }}>Abaixo do Nível</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, aguaRadiador: 'nivel' }); setChecklistStep(2); }}>No Nível</button>
@@ -1208,8 +1208,8 @@ const CAVBot = () => {
             )}
             
             {checklistStep === 2 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Step:</p>
+              <div key="checklist-step-2">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Step:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, step: 'possui' }); setChecklistStep(3); }}>Possui</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, step: 'nao_possui' }); setChecklistStep(3); }}>Não Possui</button>
@@ -1218,8 +1218,8 @@ const CAVBot = () => {
             )}
             
             {checklistStep === 3 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Macaco:</p>
+              <div key="checklist-step-3">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Macaco:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, macaco: 'possui' }); setChecklistStep(4); }}>Possui</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, macaco: 'nao_possui' }); setChecklistStep(4); }}>Não Possui</button>
@@ -1228,8 +1228,8 @@ const CAVBot = () => {
             )}
             
             {checklistStep === 4 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Chave de Roda:</p>
+              <div key="checklist-step-4">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Chave de Roda:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, chaveRoda: 'possui' }); setChecklistStep(5); }}>Possui</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, chaveRoda: 'nao_possui' }); setChecklistStep(5); }}>Não Possui</button>
@@ -1238,8 +1238,8 @@ const CAVBot = () => {
             )}
             
             {checklistStep === 5 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Triângulo:</p>
+              <div key="checklist-step-5">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Triângulo:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, triangulo: 'possui' }); setChecklistStep(6); }}>Possui</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, triangulo: 'nao_possui' }); setChecklistStep(6); }}>Não Possui</button>
@@ -1248,8 +1248,8 @@ const CAVBot = () => {
             )}
             
             {checklistStep === 6 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Smartphone - Estado:</p>
+              <div key="checklist-step-6">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Smartphone - Estado:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, smartphone: { ...(checklistDraft.smartphone || { conexao: 'com_conexao' }), estado: 'avariado' } }); setChecklistStep(7); }}>Avariado</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, smartphone: { ...(checklistDraft.smartphone || { conexao: 'com_conexao' }), estado: 'bom' } }); setChecklistStep(7); }}>Bom</button>
@@ -1259,8 +1259,8 @@ const CAVBot = () => {
             )}
             
             {checklistStep === 7 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Smartphone - Conexão:</p>
+              <div key="checklist-step-7">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Smartphone - Conexão:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, smartphone: { ...(checklistDraft.smartphone || { estado: 'bom' }), conexao: 'com_conexao' } }); setChecklistStep(8); }}>Com Conexão</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, smartphone: { ...(checklistDraft.smartphone || { estado: 'bom' }), conexao: 'sem_conexao' } }); setChecklistStep(8); }}>Sem Conexão</button>
@@ -1269,8 +1269,8 @@ const CAVBot = () => {
             )}
             
             {checklistStep === 8 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Rádio Fixo:</p>
+              <div key="checklist-step-8">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Rádio Fixo:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, radioFixo: 'com_sinal' }); setChecklistStep(9); }}>Com Sinal</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, radioFixo: 'sem_sinal' }); setChecklistStep(9); }}>Sem Sinal</button>
@@ -1279,8 +1279,8 @@ const CAVBot = () => {
             )}
             
             {checklistStep === 9 && (
-              <div>
-                <p style={{ color: '#e5e7eb', marginBottom: 12 }}>Cartão de Abastecimento:</p>
+              <div key="checklist-step-9">
+                <p style={{ color: '#e5e7eb', marginBottom: 12, whiteSpace: 'normal', WebkitFontSmoothing: 'antialiased' }}>Cartão de Abastecimento:</p>
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, cartaoAbastecimento: 'possui' }); salvarChecklist(); }}>Possui</button>
                   <button className="quick-button" onClick={() => { setChecklistDraft({ ...checklistDraft, cartaoAbastecimento: 'nao_possui' }); salvarChecklist(); }}>Não Possui</button>
@@ -1510,7 +1510,10 @@ const CAVBot = () => {
           max-width: 100vw;
           background: #1f2937;
           color: #f9fafb;
-          font-family: 'Roboto', sans-serif;
+          font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: optimizeLegibility;
           overflow: hidden;
           position: relative;
         }
@@ -1750,6 +1753,12 @@ const CAVBot = () => {
           display: flex;
           align-items: center;
           gap: 0.5rem;
+          white-space: normal;
+          overflow-wrap: break-word;
+          word-wrap: break-word;
+          text-overflow: clip;
+          -webkit-text-size-adjust: 100%;
+          -webkit-font-smoothing: antialiased;
         }
 
         .quick-button:hover {
@@ -1791,6 +1800,7 @@ const CAVBot = () => {
             font-size: 0.95rem;
             padding: 1rem;
             text-align: center;
+            justify-content: center;
           }
 
           .message {
