@@ -31,6 +31,7 @@ import ControleEstoque from '@/components/admin-belico/ControleEstoque';
 import GerenciarCautelas from '@/components/admin-belico/GerenciarCautelas';
 import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferidos';
+import ColetesTab from '@/components/admin-belico/ColetesTab';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import MaterialNaRuaSection from '@/components/reserva-armamento/MaterialNaRuaSection';
 import { db } from '@/firebase';
@@ -758,8 +759,9 @@ const BelicoContent = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="cautelas" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="cautelas">Cautelas</TabsTrigger>
+              <TabsTrigger value="coletes">Coletes</TabsTrigger>
               <TabsTrigger value="transferencias">Transferências</TabsTrigger>
               <TabsTrigger value="materiais">Materiais</TabsTrigger>
               <TabsTrigger value="estoque">Carga</TabsTrigger>
@@ -768,6 +770,10 @@ const BelicoContent = () => {
 
             <TabsContent value="cautelas">
               <GerenciarCautelas />
+            </TabsContent>
+
+            <TabsContent value="coletes">
+              <ColetesTab />
             </TabsContent>
 
             <TabsContent value="transferencias">
