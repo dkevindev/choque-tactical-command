@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -7,8 +7,10 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Plus, Play, Square, Settings, BarChart3, Car, Clock, DollarSign, Trash2, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Play, Square, Settings, BarChart3, Car, Clock, DollarSign, Trash2, Edit2, ChevronLeft, ChevronRight, Volume2, Percent } from 'lucide-react';
 import { format, startOfDay, endOfDay, subDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -33,10 +35,12 @@ interface Aluguel {
 
 interface AluguelAtivo {
   carrinhoId: string;
+  aluguelId: string;
   inicio: Date;
   duracaoMinutos: number;
   tempoRestante: number;
   valorTotal: number;
+  alertaTocado: boolean;
 }
 
 const AluguelCarrinhos = () => {
@@ -54,9 +58,14 @@ const AluguelCarrinhos = () => {
   // Iniciar aluguel
   const [carrinhoSelecionado, setCarrinhoSelecionado] = useState<Carrinho | null>(null);
   const [dialogAluguel, setDialogAluguel] = useState(false);
-  const [tipoAluguel, setTipoAluguel] = useState<'minutos' | 'valor'>('minutos');
+  const [tipoAluguel, setTipoAluguel] = useState<'minutos' | 'valor' | 'desconto'>('minutos');
   const [inputMinutos, setInputMinutos] = useState('');
   const [inputValor, setInputValor] = useState('');
+  const [descontoMinutos, setDescontoMinutos] = useState('');
+  const [descontoValor, setDescontoValor] = useState('');
+  
+  // Audio ref para alerta sonoro
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Relatórios
   const [dataRelatorio, setDataRelatorio] = useState(new Date());
@@ -74,26 +83,54 @@ const AluguelCarrinhos = () => {
     return () => unsubscribe();
   }, []);
 
+  // Inicializar áudio
+  useEffect(() => {
+    // Criar um audio context com beep
+    audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleaOqwoZQFBcnc6rO6qJ1LxEzjtn/nIZ/n7F9KwYAMYP/5NKbiHtrRxgAAzSr/+zGnI9mcj0EADaf/+jIoYladj0DADCb/+vHoIpYdzwDAC6Y/+rIoIlYeDwCACyW/+rJn4hXeDsCACqU/+rKn4dWeTsCACiS/+nKn4ZVejsCACSP/+nLoIVUezoCAB+M/+jMoYNSejoCABqJ/+fNoYJQejoCABWF/+bOooFPejkCABCA/+XPon9NejkCAAt8/+TQo35MezkCAAZ4/+PQpHxLfDkCAAFz/+LRpXtKfDgCAPxu/+HSp3lJfTgCAPdq/+DTqHhHfTcCAPJl/97UqnZGfTcCAPVh/93VrHVFfjYCAPld/9zWrnNDfjYCAPxa/9vXsHFCfjUCAP9X/9rYsnBBfjQCAP9V/9rYs25AfjQCAP9T/9rYtW0/fjMCAP9Q/9nZt2s+fjMCAP9O/9jZuWo8fjICAP9L/9fauWk7fjECAP9J/9faumi6fjECAP9H/9bbu2i5fjACAP9F/9XcvGe4fi8CAP9D/9Tcvma4fi4CAP9B/9PdwGW3fi4CAP8//9LewWS2fi0CAP89/9HewmO1fiwCAP87/9DfxGK0fiwCAP85/8/gxWGzfisCAP83/87gx2CyfioCAPy1/83hx1+xfioCAP+z/8ziyV6wfikCAP+x/8vjyl2vfikCAP+v/8rjzFyufiggAP+t/8nkzlutficgAP+r/8jl0FqsfiYgAP+p/8fm0lmrfiUgAP+n/8bn1FeqfiQgAP+l/8Xo1larfiMgAP+j/8Tp2FWqfyIgAP+h/8Pp2lSpfyEgAP+f/8Lq3FOnfyAgAP+d/8Hr3lKmfx8gAP+b/8Ds4FGlfx4gAP+Z/7/s4lCkfx0gAP+X/77t5E+jfxwgAP+V/73u5k6ifxsgAP+T/7zv6E2hfxogAP+R/7vv6kyggBkgAP+P/7rw7EufgBggAP+N/7nx7kqegBcgAP+L/7jy8EmcgBYg');
+    audioRef.current.volume = 0.8;
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const tocarAlerta = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+      // Tocar 3 vezes
+      setTimeout(() => audioRef.current?.play().catch(() => {}), 300);
+      setTimeout(() => audioRef.current?.play().catch(() => {}), 600);
+    }
+  };
+
   // Carregar aluguéis ativos
   useEffect(() => {
     const unsubscribe = onSnapshot(
       query(collection(db, 'alugueis_carrinhos'), where('finalizado', '==', false)),
       (snapshot) => {
         const novosAtivos = new Map<string, AluguelAtivo>();
-        snapshot.docs.forEach(doc => {
-          const data = doc.data() as Aluguel;
+        snapshot.docs.forEach(docSnap => {
+          const data = docSnap.data() as Aluguel;
           const inicio = data.inicio.toDate();
           const agora = new Date();
           const tempoDecorrido = Math.floor((agora.getTime() - inicio.getTime()) / 1000);
           const tempoTotal = data.duracaoMinutos * 60;
           const tempoRestante = Math.max(0, tempoTotal - tempoDecorrido);
           
+          // Manter estado de alerta tocado
+          const prevAluguel = alugueisAtivos.get(data.carrinhoId);
+          
           novosAtivos.set(data.carrinhoId, {
             carrinhoId: data.carrinhoId,
+            aluguelId: docSnap.id,
             inicio,
             duracaoMinutos: data.duracaoMinutos,
             tempoRestante,
-            valorTotal: data.valorTotal
+            valorTotal: data.valorTotal,
+            alertaTocado: prevAluguel?.alertaTocado || false
           });
         });
         setAlugueisAtivos(novosAtivos);
@@ -132,11 +169,12 @@ const AluguelCarrinhos = () => {
           const tempoTotal = aluguel.duracaoMinutos * 60;
           const tempoRestante = Math.max(0, tempoTotal - tempoDecorrido);
           
-          novos.set(carrinhoId, { ...aluguel, tempoRestante });
-          
-          // Finalizar automaticamente quando tempo acabar
-          if (tempoRestante === 0 && prev.get(carrinhoId)?.tempoRestante !== 0) {
-            finalizarAluguel(carrinhoId);
+          // Tocar alerta sonoro quando tempo acabar (apenas uma vez)
+          if (tempoRestante === 0 && prev.get(carrinhoId)?.tempoRestante !== 0 && !aluguel.alertaTocado) {
+            tocarAlerta();
+            novos.set(carrinhoId, { ...aluguel, tempoRestante, alertaTocado: true });
+          } else {
+            novos.set(carrinhoId, { ...aluguel, tempoRestante });
           }
         });
         return novos;
@@ -196,13 +234,16 @@ const AluguelCarrinhos = () => {
     if (tipoAluguel === 'minutos') {
       duracaoMinutos = parseInt(inputMinutos);
       valorTotal = duracaoMinutos * carrinhoSelecionado.valorMinuto;
-    } else {
+    } else if (tipoAluguel === 'valor') {
       valorTotal = parseFloat(inputValor);
       duracaoMinutos = Math.floor(valorTotal / carrinhoSelecionado.valorMinuto);
+    } else if (tipoAluguel === 'desconto') {
+      duracaoMinutos = parseInt(descontoMinutos);
+      valorTotal = parseFloat(descontoValor);
     }
 
-    if (duracaoMinutos <= 0) {
-      toast.error('Tempo inválido');
+    if (duracaoMinutos <= 0 || valorTotal <= 0) {
+      toast.error('Valores inválidos');
       return;
     }
 
@@ -221,55 +262,39 @@ const AluguelCarrinhos = () => {
       setDialogAluguel(false);
       setInputMinutos('');
       setInputValor('');
+      setDescontoMinutos('');
+      setDescontoValor('');
       setCarrinhoSelecionado(null);
     } catch (error) {
       toast.error('Erro ao iniciar aluguel');
     }
   };
 
-  const finalizarAluguel = async (carrinhoId: string) => {
+  const encerrarAluguel = async (carrinhoId: string) => {
+    const aluguel = alugueisAtivos.get(carrinhoId);
+    if (!aluguel) return;
+    
     try {
-      const q = query(
-        collection(db, 'alugueis_carrinhos'),
-        where('carrinhoId', '==', carrinhoId),
-        where('finalizado', '==', false)
-      );
-      
-      const unsubscribe = onSnapshot(q, async (snapshot) => {
-        if (!snapshot.empty) {
-          const docRef = snapshot.docs[0].ref;
-          await updateDoc(docRef, {
-            finalizado: true,
-            fim: Timestamp.now()
-          });
-        }
-        unsubscribe();
+      await updateDoc(doc(db, 'alugueis_carrinhos', aluguel.aluguelId), {
+        finalizado: true,
+        fim: Timestamp.now()
       });
-      
-      toast.info('Tempo finalizado!');
+      toast.success('Aluguel encerrado!');
     } catch (error) {
-      console.error('Erro ao finalizar:', error);
+      toast.error('Erro ao encerrar');
     }
   };
 
   const pararAluguel = async (carrinhoId: string) => {
+    const aluguel = alugueisAtivos.get(carrinhoId);
+    if (!aluguel) return;
+    
     try {
-      const q = query(
-        collection(db, 'alugueis_carrinhos'),
-        where('carrinhoId', '==', carrinhoId),
-        where('finalizado', '==', false)
-      );
-      
-      onSnapshot(q, async (snapshot) => {
-        if (!snapshot.empty) {
-          const docRef = snapshot.docs[0].ref;
-          await updateDoc(docRef, {
-            finalizado: true,
-            fim: Timestamp.now()
-          });
-          toast.success('Aluguel encerrado!');
-        }
-      }, { once: true } as any);
+      await updateDoc(doc(db, 'alugueis_carrinhos', aluguel.aluguelId), {
+        finalizado: true,
+        fim: Timestamp.now()
+      });
+      toast.success('Aluguel encerrado!');
     } catch (error) {
       toast.error('Erro ao encerrar');
     }
@@ -389,21 +414,34 @@ const AluguelCarrinhos = () => {
                       )}
                       
                       {aluguel ? (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="w-full"
-                          onClick={() => pararAluguel(carrinho.id)}
-                        >
-                          <Square className="h-3 w-3 mr-1" />
-                          Parar
-                        </Button>
+                        status === 'finalizado' ? (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="w-full animate-pulse"
+                            onClick={() => encerrarAluguel(carrinho.id)}
+                          >
+                            <Volume2 className="h-3 w-3 mr-1" />
+                            ENCERRAR
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full border-red-500 text-red-400 hover:bg-red-500/20"
+                            onClick={() => pararAluguel(carrinho.id)}
+                          >
+                            <Square className="h-3 w-3 mr-1" />
+                            Parar
+                          </Button>
+                        )
                       ) : (
                         <Button
                           size="sm"
                           className="w-full bg-emerald-600 hover:bg-emerald-700"
                           onClick={() => {
                             setCarrinhoSelecionado(carrinho);
+                            setTipoAluguel('minutos');
                             setDialogAluguel(true);
                           }}
                         >
@@ -580,9 +618,13 @@ const AluguelCarrinhos = () => {
               </div>
 
               <Tabs value={tipoAluguel} onValueChange={(v) => setTipoAluguel(v as any)}>
-                <TabsList className="grid w-full grid-cols-2 bg-slate-700">
-                  <TabsTrigger value="minutos">Por Minutos</TabsTrigger>
-                  <TabsTrigger value="valor">Por Valor</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3 bg-slate-700">
+                  <TabsTrigger value="minutos">Minutos</TabsTrigger>
+                  <TabsTrigger value="valor">Valor</TabsTrigger>
+                  <TabsTrigger value="desconto" className="text-yellow-400">
+                    <Percent className="h-3 w-3 mr-1" />
+                    Desconto
+                  </TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="minutos" className="mt-4">
@@ -613,6 +655,45 @@ const AluguelCarrinhos = () => {
                     <p className="text-center mt-2 text-emerald-400">
                       Tempo: {Math.floor(parseFloat(inputValor) / carrinhoSelecionado.valorMinuto)} min
                     </p>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="desconto" className="mt-4 space-y-3">
+                  <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-3 text-center">
+                    <p className="text-yellow-400 text-sm">Valor personalizado com desconto</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-slate-400">Minutos</Label>
+                      <Input
+                        type="number"
+                        placeholder="Ex: 10"
+                        value={descontoMinutos}
+                        onChange={(e) => setDescontoMinutos(e.target.value)}
+                        className="bg-slate-700 border-slate-600 text-center text-xl h-12"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-400">Valor (R$)</Label>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        placeholder="Ex: 9"
+                        value={descontoValor}
+                        onChange={(e) => setDescontoValor(e.target.value)}
+                        className="bg-slate-700 border-slate-600 text-center text-xl h-12"
+                      />
+                    </div>
+                  </div>
+                  {descontoMinutos && descontoValor && (
+                    <div className="bg-slate-700 rounded-lg p-3 text-center">
+                      <p className="text-sm text-slate-400">
+                        Normal: R$ {(parseInt(descontoMinutos) * carrinhoSelecionado.valorMinuto).toFixed(2)}
+                      </p>
+                      <p className="text-lg font-bold text-yellow-400">
+                        Desconto: R$ {(parseInt(descontoMinutos) * carrinhoSelecionado.valorMinuto - parseFloat(descontoValor)).toFixed(2)} OFF
+                      </p>
+                    </div>
                   )}
                 </TabsContent>
               </Tabs>
