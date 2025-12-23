@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
+import AluguelCarrinhos from "./pages/AluguelCarrinhos";
 import LoginGestao from "./components/LoginGestao";
 import GestãoPessoas from "./components/GestãoPessoas";
 import CAVBot from "./components/CAVBot";
@@ -28,6 +29,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/alugueis" element={<AluguelCarrinhos />} />
           <Route path="/login-gestao" element={<LoginGestao />} />
           <Route path="/login-policial" element={<LoginGestao />} />
           <Route path="/cavbot" element={<CAVBot />} />
