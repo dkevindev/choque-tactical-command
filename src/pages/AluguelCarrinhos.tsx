@@ -401,14 +401,14 @@ const AluguelCarrinhos = () => {
                             {formatarTempo(aluguel.tempoRestante)}
                           </div>
                           <div className="text-xs text-slate-400 mt-1">
-                            R$ {aluguel.valorTotal.toFixed(2)}
+                            R$ {(aluguel.valorTotal || 0).toFixed(2)}
                           </div>
                         </div>
                       ) : (
                         <div className="text-center my-3">
                           <div className="text-2xl font-mono text-slate-500">--:--</div>
                           <div className="text-xs text-slate-500 mt-1">
-                            R$ {carrinho.valorMinuto.toFixed(2)}/min
+                            R$ {(carrinho.valorMinuto || 0).toFixed(2)}/min
                           </div>
                         </div>
                       )}
@@ -480,7 +480,7 @@ const AluguelCarrinhos = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">{carrinho.nome}</p>
-                      <p className="text-sm text-emerald-400">R$ {carrinho.valorMinuto.toFixed(2)}/min</p>
+                      <p className="text-sm text-emerald-400">R$ {(carrinho.valorMinuto || 0).toFixed(2)}/min</p>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -564,7 +564,7 @@ const AluguelCarrinhos = () => {
                 <Card key={aluguel.id} className="bg-slate-800/50 border-slate-700 p-2 text-sm">
                   <div className="flex justify-between">
                     <span>{aluguel.carrinhoNome}</span>
-                    <span className="text-emerald-400">R$ {aluguel.valorTotal.toFixed(2)}</span>
+                    <span className="text-emerald-400">R$ {(aluguel.valorTotal || 0).toFixed(2)}</span>
                   </div>
                   <div className="text-xs text-slate-500">
                     {format(aluguel.inicio.toDate(), 'HH:mm')} - {aluguel.duracaoMinutos} min
@@ -614,7 +614,7 @@ const AluguelCarrinhos = () => {
             <div className="space-y-4">
               <div className="text-center p-3 bg-slate-700 rounded-lg">
                 <p className="font-bold text-lg">{carrinhoSelecionado.nome}</p>
-                <p className="text-emerald-400">R$ {carrinhoSelecionado.valorMinuto.toFixed(2)}/min</p>
+                <p className="text-emerald-400">R$ {(carrinhoSelecionado.valorMinuto || 0).toFixed(2)}/min</p>
               </div>
 
               <Tabs value={tipoAluguel} onValueChange={(v) => setTipoAluguel(v as any)}>
@@ -637,7 +637,7 @@ const AluguelCarrinhos = () => {
                   />
                   {inputMinutos && (
                     <p className="text-center mt-2 text-emerald-400">
-                      Total: R$ {(parseInt(inputMinutos) * carrinhoSelecionado.valorMinuto).toFixed(2)}
+                      Total: R$ {((parseInt(inputMinutos) || 0) * (carrinhoSelecionado.valorMinuto || 0)).toFixed(2)}
                     </p>
                   )}
                 </TabsContent>
@@ -688,10 +688,10 @@ const AluguelCarrinhos = () => {
                   {descontoMinutos && descontoValor && (
                     <div className="bg-slate-700 rounded-lg p-3 text-center">
                       <p className="text-sm text-slate-400">
-                        Normal: R$ {(parseInt(descontoMinutos) * carrinhoSelecionado.valorMinuto).toFixed(2)}
+                        Normal: R$ {((parseInt(descontoMinutos) || 0) * (carrinhoSelecionado.valorMinuto || 0)).toFixed(2)}
                       </p>
                       <p className="text-lg font-bold text-yellow-400">
-                        Desconto: R$ {(parseInt(descontoMinutos) * carrinhoSelecionado.valorMinuto - parseFloat(descontoValor)).toFixed(2)} OFF
+                        Desconto: R$ {((parseInt(descontoMinutos) || 0) * (carrinhoSelecionado.valorMinuto || 0) - (parseFloat(descontoValor) || 0)).toFixed(2)} OFF
                       </p>
                     </div>
                   )}
