@@ -300,6 +300,18 @@ const AluguelCarrinhos = () => {
     }
   };
 
+  const excluirAluguel = async (carrinhoId: string) => {
+    const aluguel = alugueisAtivos.get(carrinhoId);
+    if (!aluguel) return;
+    
+    try {
+      await deleteDoc(doc(db, 'alugueis_carrinhos', aluguel.aluguelId));
+      toast.success('Aluguel excluído!');
+    } catch (error) {
+      toast.error('Erro ao excluir');
+    }
+  };
+
   const formatarTempo = (segundos: number) => {
     const min = Math.floor(segundos / 60);
     const seg = segundos % 60;
@@ -414,27 +426,42 @@ const AluguelCarrinhos = () => {
                       )}
                       
                       {aluguel ? (
-                        status === 'finalizado' ? (
+                        <div className="space-y-2">
+                          {status === 'finalizado' ? (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="w-full animate-pulse"
+                              onClick={() => encerrarAluguel(carrinho.id)}
+                            >
+                              <Volume2 className="h-3 w-3 mr-1" />
+                              ENCERRAR
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full border-red-500 text-red-400 hover:bg-red-500/20"
+                              onClick={() => pararAluguel(carrinho.id)}
+                            >
+                              <Square className="h-3 w-3 mr-1" />
+                              Parar
+                            </Button>
+                          )}
                           <Button
                             size="sm"
-                            variant="destructive"
-                            className="w-full animate-pulse"
-                            onClick={() => encerrarAluguel(carrinho.id)}
+                            variant="ghost"
+                            className="w-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-xs"
+                            onClick={() => {
+                              if (confirm('Excluir este aluguel? O valor não será contabilizado.')) {
+                                excluirAluguel(carrinho.id);
+                              }
+                            }}
                           >
-                            <Volume2 className="h-3 w-3 mr-1" />
-                            ENCERRAR
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Excluir
                           </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full border-red-500 text-red-400 hover:bg-red-500/20"
-                            onClick={() => pararAluguel(carrinho.id)}
-                          >
-                            <Square className="h-3 w-3 mr-1" />
-                            Parar
-                          </Button>
-                        )
+                        </div>
                       ) : (
                         <Button
                           size="sm"
