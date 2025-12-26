@@ -300,12 +300,9 @@ const AluguelCarrinhos = () => {
     }
   };
 
-  const excluirAluguel = async (carrinhoId: string) => {
-    const aluguel = alugueisAtivos.get(carrinhoId);
-    if (!aluguel) return;
-    
+  const excluirAluguelById = async (aluguelId: string) => {
     try {
-      await deleteDoc(doc(db, 'alugueis_carrinhos', aluguel.aluguelId));
+      await deleteDoc(doc(db, 'alugueis_carrinhos', aluguelId));
       toast.success('Aluguel excluído!');
     } catch (error) {
       toast.error('Erro ao excluir');
@@ -426,42 +423,27 @@ const AluguelCarrinhos = () => {
                       )}
                       
                       {aluguel ? (
-                        <div className="space-y-2">
-                          {status === 'finalizado' ? (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="w-full animate-pulse"
-                              onClick={() => encerrarAluguel(carrinho.id)}
-                            >
-                              <Volume2 className="h-3 w-3 mr-1" />
-                              ENCERRAR
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full border-red-500 text-red-400 hover:bg-red-500/20"
-                              onClick={() => pararAluguel(carrinho.id)}
-                            >
-                              <Square className="h-3 w-3 mr-1" />
-                              Parar
-                            </Button>
-                          )}
+                        status === 'finalizado' ? (
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="w-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-xs"
-                            onClick={() => {
-                              if (confirm('Excluir este aluguel? O valor não será contabilizado.')) {
-                                excluirAluguel(carrinho.id);
-                              }
-                            }}
+                            variant="destructive"
+                            className="w-full animate-pulse"
+                            onClick={() => encerrarAluguel(carrinho.id)}
                           >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Excluir
+                            <Volume2 className="h-3 w-3 mr-1" />
+                            ENCERRAR
                           </Button>
-                        </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full border-red-500 text-red-400 hover:bg-red-500/20"
+                            onClick={() => pararAluguel(carrinho.id)}
+                          >
+                            <Square className="h-3 w-3 mr-1" />
+                            Parar
+                          </Button>
+                        )
                       ) : (
                         <Button
                           size="sm"
@@ -589,12 +571,28 @@ const AluguelCarrinhos = () => {
               <h3 className="text-sm font-medium text-slate-400">Histórico</h3>
               {alugueis.map(aluguel => (
                 <Card key={aluguel.id} className="bg-slate-800/50 border-slate-700 p-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>{aluguel.carrinhoNome}</span>
-                    <span className="text-emerald-400">R$ {(aluguel.valorTotal || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {format(aluguel.inicio.toDate(), 'HH:mm')} - {aluguel.duracaoMinutos} min
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1">
+                      <div className="flex justify-between">
+                        <span>{aluguel.carrinhoNome}</span>
+                        <span className="text-emerald-400">R$ {(aluguel.valorTotal || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {format(aluguel.inicio.toDate(), 'HH:mm')} - {aluguel.duracaoMinutos} min
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="ml-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8 p-0"
+                      onClick={() => {
+                        if (confirm('Excluir este lançamento?')) {
+                          excluirAluguelById(aluguel.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </Card>
               ))}
