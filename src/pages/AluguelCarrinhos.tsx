@@ -337,7 +337,7 @@ const AluguelCarrinhos = () => {
     const { aluguel, carrinho } = aluguelParaEncerrar;
     const agora = new Date();
     const tempoDecorridoSegundos = Math.floor((agora.getTime() - aluguel.inicio.getTime()) / 1000);
-    const minutosUsados = Math.ceil(tempoDecorridoSegundos / 60);
+    const minutosUsados = Math.max(1, Math.ceil(tempoDecorridoSegundos / 60));
     
     if (aluguel.tipo === 'tempo_livre') {
       // Tempo livre - cobra pelo tempo usado
@@ -345,10 +345,13 @@ const AluguelCarrinhos = () => {
       return { valorUsado, valorDevolver: 0, minutosUsados };
     } else {
       // Aluguel normal - calcula devolução
+      if (aluguel.duracaoMinutos <= 0) {
+        return { valorUsado: aluguel.valorTotal, valorDevolver: 0, minutosUsados };
+      }
       const valorPorMinuto = aluguel.valorTotal / aluguel.duracaoMinutos;
-      const valorUsado = minutosUsados * valorPorMinuto;
+      const valorUsado = Math.min(minutosUsados * valorPorMinuto, aluguel.valorTotal);
       const valorDevolver = Math.max(0, aluguel.valorTotal - valorUsado);
-      return { valorUsado: Math.min(valorUsado, aluguel.valorTotal), valorDevolver, minutosUsados };
+      return { valorUsado, valorDevolver, minutosUsados };
     }
   };
 
