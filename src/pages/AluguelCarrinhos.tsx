@@ -268,7 +268,7 @@ const AluguelCarrinhos = () => {
   };
 
   const iniciarAluguel = async () => {
-    if (!carrinhoSelecionado) return;
+    if (!carrinhoSelecionado || processando) return;
 
     let duracaoMinutos = 0;
     let valorTotal = 0;
@@ -280,24 +280,44 @@ const AluguelCarrinhos = () => {
       valorTotal = 0;
       tipo = 'tempo_livre';
     } else if (tipoAluguel === 'minutos') {
-      duracaoMinutos = parseInt(inputMinutos);
+      const minutos = parseInt(inputMinutos) || 0;
+      if (minutos <= 0) {
+        toast.error('Informe os minutos');
+        return;
+      }
+      duracaoMinutos = minutos;
       valorTotal = duracaoMinutos * carrinhoSelecionado.valorMinuto;
       tipo = 'minutos';
     } else if (tipoAluguel === 'valor') {
-      valorTotal = parseFloat(inputValor);
+      const valor = parseFloat(inputValor) || 0;
+      if (valor <= 0) {
+        toast.error('Informe o valor');
+        return;
+      }
+      valorTotal = valor;
       duracaoMinutos = Math.floor(valorTotal / carrinhoSelecionado.valorMinuto);
+      if (duracaoMinutos <= 0) {
+        toast.error('Valor insuficiente para 1 minuto');
+        return;
+      }
       tipo = 'valor';
     } else if (tipoAluguel === 'desconto') {
-      duracaoMinutos = parseInt(descontoMinutos);
-      valorTotal = parseFloat(descontoValor);
+      const minutos = parseInt(descontoMinutos) || 0;
+      const valor = parseFloat(descontoValor) || 0;
+      if (minutos <= 0) {
+        toast.error('Informe os minutos');
+        return;
+      }
+      if (valor <= 0) {
+        toast.error('Informe o valor');
+        return;
+      }
+      duracaoMinutos = minutos;
+      valorTotal = valor;
       tipo = 'minutos';
     }
 
-    if (tipoAluguel !== 'tempo_livre' && (duracaoMinutos <= 0 || valorTotal <= 0)) {
-      toast.error('Valores inválidos');
-      return;
-    }
-
+    setProcessando(true);
     try {
       await addDoc(collection(db, 'alugueis_carrinhos'), {
         carrinhoId: carrinhoSelecionado.id,
@@ -322,6 +342,8 @@ const AluguelCarrinhos = () => {
       setCarrinhoSelecionado(null);
     } catch (error) {
       toast.error('Erro ao iniciar aluguel');
+    } finally {
+      setProcessando(false);
     }
   };
 
@@ -593,32 +615,44 @@ const AluguelCarrinhos = () => {
                           <Button
                             size="sm"
                             variant="destructive"
-                            className="w-full animate-pulse"
-                            onClick={() => encerrarAluguel(carrinho.id)}
+                            className="w-full animate-pulse touch-manipulation"
+                            disabled={processando}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              encerrarAluguel(carrinho.id);
+                            }}
                           >
                             <Volume2 className="h-3 w-3 mr-1" />
-                            ENCERRAR
+                            {processando ? 'Aguarde...' : 'ENCERRAR'}
                           </Button>
                         ) : (
                           <Button
                             size="sm"
                             variant="outline"
-                            className={`w-full ${
+                            className={`w-full touch-manipulation ${
                               status === 'tempo_livre' 
                                 ? 'border-purple-500 text-purple-400 hover:bg-purple-500/20'
                                 : 'border-red-500 text-red-400 hover:bg-red-500/20'
                             }`}
-                            onClick={() => pararAluguel(carrinho.id)}
+                            disabled={processando}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              pararAluguel(carrinho.id);
+                            }}
                           >
                             <Square className="h-3 w-3 mr-1" />
-                            {status === 'tempo_livre' ? 'Encerrar' : 'Parar'}
+                            {processando ? 'Aguarde...' : (status === 'tempo_livre' ? 'Encerrar' : 'Parar')}
                           </Button>
                         )
                       ) : (
                         <Button
                           size="sm"
-                          className="w-full bg-emerald-600 hover:bg-emerald-700"
-                          onClick={() => {
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 touch-manipulation"
+                          disabled={processando}
+                          onClick={(e) => {
+                            e.preventDefault();
                             setCarrinhoSelecionado(carrinho);
                             setTipoAluguel('minutos');
                             setDialogAluguel(true);
