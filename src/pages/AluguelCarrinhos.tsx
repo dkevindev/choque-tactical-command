@@ -72,6 +72,9 @@ const AluguelCarrinhos = () => {
   const [dialogEncerramentoAntecipado, setDialogEncerramentoAntecipado] = useState(false);
   const [aluguelParaEncerrar, setAluguelParaEncerrar] = useState<{ carrinhoId: string; aluguel: AluguelAtivo; carrinho: Carrinho } | null>(null);
   
+  // Estado para prevenir cliques múltiplos
+  const [processando, setProcessando] = useState(false);
+  
   // Audio ref para alerta sonoro
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
@@ -356,8 +359,9 @@ const AluguelCarrinhos = () => {
   };
 
   const confirmarEncerramentoAntecipado = async () => {
-    if (!aluguelParaEncerrar) return;
+    if (!aluguelParaEncerrar || processando) return;
     
+    setProcessando(true);
     const { valorUsado, valorDevolver, minutosUsados } = calcularValoresEncerramento();
     const { aluguel, carrinho } = aluguelParaEncerrar;
     
@@ -383,13 +387,18 @@ const AluguelCarrinhos = () => {
       setAluguelParaEncerrar(null);
     } catch (error) {
       toast.error('Erro ao encerrar');
+    } finally {
+      setProcessando(false);
     }
   };
 
   const encerrarAluguel = async (carrinhoId: string) => {
+    if (processando) return;
+    
     const aluguel = alugueisAtivos.get(carrinhoId);
     if (!aluguel) return;
     
+    setProcessando(true);
     try {
       await updateDoc(doc(db, 'alugueis_carrinhos', aluguel.aluguelId), {
         finalizado: true,
@@ -398,10 +407,14 @@ const AluguelCarrinhos = () => {
       toast.success('Aluguel encerrado!');
     } catch (error) {
       toast.error('Erro ao encerrar');
+    } finally {
+      setProcessando(false);
     }
   };
 
   const pararAluguel = async (carrinhoId: string) => {
+    if (processando) return;
+    
     const aluguel = alugueisAtivos.get(carrinhoId);
     if (!aluguel) return;
     
@@ -1066,8 +1079,9 @@ const AluguelCarrinhos = () => {
                   <Button 
                     className={`flex-1 ${isTempo_livre ? 'bg-purple-600 hover:bg-purple-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
                     onClick={confirmarEncerramentoAntecipado}
+                    disabled={processando}
                   >
-                    Confirmar
+                    {processando ? 'Processando...' : 'Confirmar'}
                   </Button>
                 </DialogFooter>
               </div>
