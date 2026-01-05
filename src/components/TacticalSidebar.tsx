@@ -22,9 +22,10 @@ interface TacticalSidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
   isAdmin?: boolean;
+  acessoReservaArmamento?: boolean;
 }
 
-const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: TacticalSidebarProps) => {
+const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false, acessoReservaArmamento = false }: TacticalSidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const adminMenuItems = [
@@ -46,6 +47,7 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false }: Ta
     { id: 'dashboard', label: 'INFORMAÇÕES', icon: Home, badge: null },
     { id: 'servicos', label: 'SERVIÇOS', icon: Truck, badge: null },
     { id: 'cautela', label: 'CAUTELA', icon: Package, badge: null },
+    ...(acessoReservaArmamento ? [{ id: 'material', label: 'MATERIAL', icon: Target, badge: null }] : []),
   ];
 
   const menuItems = isAdmin ? adminMenuItems : userMenuItems;
