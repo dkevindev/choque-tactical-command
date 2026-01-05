@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import TacticalSidebar from '@/components/TacticalSidebar';
 import ProjetosSociaisSystem from '@/components/projetos-sociais/ProjetosSociaisSystem';
+import ConsultaMaterialPolicial from '@/components/consultas/ConsultaMaterialPolicial';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { 
@@ -69,6 +70,7 @@ const UserDashboard = () => {
   const [materiaisCautelados, setMateriaisCautelados] = useState<CautelaMaterial[]>([]);
   const [ultimosServicos, setUltimosServicos] = useState<ServicoMotorista[]>([]);
   const [loading, setLoading] = useState(true);
+  const [acessoReservaArmamento, setAcessoReservaArmamento] = useState(false);
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -79,6 +81,11 @@ const UserDashboard = () => {
           const user = JSON.parse(userStr);
           console.log('Usuário logado:', user);
           setPolicialLogado(user);
+          
+          // Verificar acesso à reserva de armamento
+          if (user.acessos?.reservaArmamento === true) {
+            setAcessoReservaArmamento(true);
+          }
 
           // Buscar cautela permanente do policial
           try {
@@ -146,6 +153,8 @@ const UserDashboard = () => {
         return <MinhaCautela policialLogado={policialLogado} />;
       case 'projetos-sociais':
         return <ProjetosSociaisSystem />;
+      case 'material':
+        return <ConsultaMaterialPolicial />;
       default:
         return (
           <DashboardContent 
@@ -179,7 +188,8 @@ const UserDashboard = () => {
               setActiveSection(section);
               setSidebarOpen(false);
             }} 
-            isAdmin={false} 
+            isAdmin={false}
+            acessoReservaArmamento={acessoReservaArmamento}
           />
         </div>
         
