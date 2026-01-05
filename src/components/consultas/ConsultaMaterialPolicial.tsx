@@ -43,13 +43,13 @@ interface CautelaAtiva {
 
 interface Viatura {
   id: string;
-  cadastro?: string;
-  placa?: string;
-  modelo?: string;
-  marca?: string;
-  ano?: number;
+  CADASTRO?: string;
+  PLACA?: string;
+  MODELO?: string;
+  MARCA?: string;
+  ANO?: number;
   situacao?: string;
-  kmAtual?: number;
+  KM?: number;
   categoria?: string;
 }
 
@@ -164,9 +164,9 @@ const ConsultaMaterialPolicial = () => {
   // Filtrar viaturas
   const viaturasFiltradas = viaturas.filter(v => {
     if (searchViatura === '') return true;
-    return v.cadastro?.toLowerCase().includes(searchViatura.toLowerCase()) ||
-           v.placa?.toLowerCase().includes(searchViatura.toLowerCase()) ||
-           v.modelo?.toLowerCase().includes(searchViatura.toLowerCase());
+    return v.CADASTRO?.toLowerCase().includes(searchViatura.toLowerCase()) ||
+           v.PLACA?.toLowerCase().includes(searchViatura.toLowerCase()) ||
+           v.MODELO?.toLowerCase().includes(searchViatura.toLowerCase());
   });
 
   // Obter categorias únicas
@@ -469,12 +469,12 @@ const ConsultaMaterialPolicial = () => {
                     {viaturasFiltradas.length > 0 ? (
                       viaturasFiltradas.map(v => (
                         <TableRow key={v.id}>
-                          <TableCell className="font-medium">{v.cadastro || '-'}</TableCell>
-                          <TableCell>{v.placa || '-'}</TableCell>
-                          <TableCell>{v.modelo || '-'}</TableCell>
-                          <TableCell>{v.marca || '-'}</TableCell>
-                          <TableCell>{v.ano || '-'}</TableCell>
-                          <TableCell>{v.kmAtual?.toLocaleString('pt-BR') || '-'}</TableCell>
+                          <TableCell className="font-medium">{v.CADASTRO || '-'}</TableCell>
+                          <TableCell>{v.PLACA || '-'}</TableCell>
+                          <TableCell>{v.MODELO || '-'}</TableCell>
+                          <TableCell>{v.MARCA || '-'}</TableCell>
+                          <TableCell>{v.ANO || '-'}</TableCell>
+                          <TableCell>{v.KM?.toLocaleString('pt-BR') || '-'}</TableCell>
                           <TableCell>
                             <Badge 
                               variant={
