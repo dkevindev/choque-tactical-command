@@ -8,7 +8,20 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-app.use(cors({ origin: true }));
+
+// CORS middleware - deve responder antes de qualquer outra coisa
+app.use((req, res, next) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+    next();
+});
+
 app.use(express.json());
 
 app.post('/', async (req, res) => {
