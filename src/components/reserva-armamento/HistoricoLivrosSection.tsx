@@ -127,7 +127,7 @@ const HistoricoLivrosSection = () => {
       };
 
       // Chamar Firebase Function
-      const response = await fetch('https://us-central1-colog-rpmont.cloudfunctions.net/gerarLivroReservaArmamentoDocx', {
+      const response = await fetch('https://gerarlivroreservaarmamentodocx-owvlmrnsjq-uc.a.run.app', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
