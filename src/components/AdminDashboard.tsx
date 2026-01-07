@@ -33,7 +33,7 @@ import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferidos';
 import ColetesTab from '@/components/admin-belico/ColetesTab';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
-import MaterialNaRuaSection from '@/components/reserva-armamento/MaterialNaRuaSection';
+import ReservaAdminPage from '@/components/admin/ReservaAdminPage';
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -64,8 +64,8 @@ const AdminDashboard = () => {
         return <GuardaQuartelContent />;
       case 'gestao':
         return <GestaoContent />;
-      case 'na-rua':
-        return <MaterialNaRuaSection />;
+      case 'reserva':
+        return <ReservaAdminPage />;
       case 'documentos':
         return <DocumentosContent locationState={location.state} />;
       case 'ordens-servico': // <--- Adicione este novo case
