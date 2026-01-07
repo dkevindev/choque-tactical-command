@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { History, BookOpen, Calendar, User } from "lucide-react";
-import { collection, query, orderBy, getDocs, limit } from 'firebase/firestore';
+import { Button } from "@/components/ui/button";
+import { History, BookOpen, Calendar, User, FileDown, Loader2 } from "lucide-react";
+import { collection, query, orderBy, getDocs, limit, where } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { toast } from "sonner";
 import ModalDetalhesLivro from './ModalDetalhesLivro';
 
 interface Alteracao {
@@ -27,6 +29,7 @@ const HistoricoLivrosSection = () => {
   const [livros, setLivros] = useState<LivroDiario[]>([]);
   const [loading, setLoading] = useState(true);
   const [livroSelecionado, setLivroSelecionado] = useState<LivroDiario | null>(null);
+  const [exportando, setExportando] = useState<string | null>(null);
 
   useEffect(() => {
     const carregarHistorico = async () => {
@@ -70,6 +73,91 @@ const HistoricoLivrosSection = () => {
       month: '2-digit',
       year: 'numeric'
     });
+  };
+
+  const exportarLivro = async (livro: LivroDiario, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExportando(livro.id);
+    
+    try {
+      // Buscar movimentações do livro
+      const querySnapshot = await getDocs(
+        query(
+          collection(db, 'cautelas_provisorias'),
+          where('livroId', '==', livro.id)
+        )
+      );
+
+      const movimentacoes = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        let status: 'pendente' | 'entregue' = 'pendente';
+        if (data.status === 'entregue' || data.status === 'baixado') {
+          status = 'entregue';
+        }
+        
+        return {
+          policialNome: data.policialNome || '',
+          policialNomeGuerra: data.policialNomeGuerra,
+          policialMatricula: data.policialMatricula,
+          postoGrad: data.postoGrad,
+          materiais: data.materiais || [],
+          dataCautela: data.dataCautela?.toDate?.()?.toISOString() || new Date().toISOString(),
+          horaCautela: data.horaCautela || '',
+          dataBaixa: data.dataBaixa?.toDate?.()?.toISOString() || null,
+          horaBaixa: data.horaBaixa || null,
+          status,
+          sequencial: data.sequencial || 0
+        };
+      });
+
+      // Ordenar por sequencial
+      movimentacoes.sort((a, b) => a.sequencial - b.sequencial);
+
+      // Preparar dados para o endpoint
+      const dados = {
+        armeiroNome: livro.armeiroNome,
+        dataAbertura: livro.dataAbertura.toISOString(),
+        dataFechamento: livro.dataFechamento?.toISOString() || null,
+        movimentacoes,
+        alteracoes: livro.alteracoes.map(a => ({
+          descricao: a.descricao,
+          dataHora: a.dataHora.toISOString()
+        })),
+        armeiroResponsavel: livro.armeiroNome
+      };
+
+      // Chamar Firebase Function
+      const response = await fetch('https://us-central1-colog-rpmont.cloudfunctions.net/gerarLivroReservaArmamentoDocx', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dados)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Erro ao gerar documento');
+      }
+
+      // Download do arquivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Livro-Reserva-${formatarData(livro.dataAbertura).replace(/\//g, '-')}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Documento exportado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar livro:', error);
+      toast.error('Erro ao exportar documento');
+    } finally {
+      setExportando(null);
+    }
   };
 
   if (loading) {
@@ -133,6 +221,19 @@ const HistoricoLivrosSection = () => {
                       <Badge variant={livro.status === 'aberto' ? 'default' : 'secondary'}>
                         {livro.status === 'aberto' ? 'Aberto' : 'Fechado'}
                       </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => exportarLivro(livro, e)}
+                        disabled={exportando === livro.id}
+                        className="ml-2"
+                      >
+                        {exportando === livro.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileDown className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>

@@ -506,3 +506,7 @@ exports.gerarLivroGuardaDocx = gerarLivroGuardaDocx;
 // ----------------- FUNÇÃO LISTA DE FREQUÊNCIA (PROJETOS SOCIAIS) -----------------
 const { gerarListaFrequenciaDocx } = require('./gerar-lista-frequencia');
 exports.gerarListaFrequenciaDocx = gerarListaFrequenciaDocx;
+
+// ----------------- FUNÇÃO LIVRO RESERVA DE ARMAMENTO -----------------
+const { gerarLivroReservaArmamentoDocx } = require('./gerar-livro-reserva-armamento');
+exports.gerarLivroReservaArmamentoDocx = gerarLivroReservaArmamentoDocx;
