@@ -9,23 +9,8 @@ const path = require('path');
 
 const app = express();
 
-// Usar o pacote cors com configuração permissiva
+// CORS - mesmo padrão que funciona em outras funções
 app.use(cors({ origin: true }));
-
-// Também adicionar headers manualmente para garantir
-app.use((req, res, next) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.set('Access-Control-Max-Age', '3600');
-    
-    // Responder imediatamente às requisições OPTIONS (preflight)
-    if (req.method === 'OPTIONS') {
-        return res.status(204).send('');
-    }
-    next();
-});
-
 app.use(express.json());
 
 app.post('/', async (req, res) => {
