@@ -10,6 +10,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '@/firebase';
+import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
 
 interface VisualizarAulasTabProps {
   projeto: any;
@@ -37,28 +38,11 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
         snapshot.docs.map(async (docSnap) => {
           const aulaData = docSnap.data();
           
-          // Buscar nomes dos instrutores
+          // Buscar nomes dos instrutores usando função utilitária
           const instrutoresNomes = await Promise.all(
             (aulaData.instrutores || []).map(async (instrutorId: string) => {
-              // Tentar buscar por id primeiro
-              let policialSnap = await getDocs(
-                query(collection(db, 'policiais'), where('id', '==', instrutorId))
-              );
-
-              // Se não encontrar, tentar por usuarioId
-              if (policialSnap.empty) {
-                policialSnap = await getDocs(
-                  query(collection(db, 'policiais'), where('usuarioId', '==', instrutorId))
-                );
-              }
-
-              if (!policialSnap.empty) {
-                const policial = policialSnap.docs[0].data();
-                const postGrad = policial['Post/Grad'] || policial.postGrad || '';
-                const nomeGuerra = policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
-                return `${postGrad} ${nomeGuerra}`.trim();
-              }
-              return 'Desconhecido';
+              const policial = await buscarPolicialPorId(instrutorId);
+              return formatarNomePolicial(policial);
             })
           );
 
@@ -98,21 +82,12 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
     try {
       setGerando(aula.id);
       
-      // Buscar dados completos dos instrutores
+      // Buscar dados completos dos instrutores usando função utilitária
       const instrutoresDetalhados = await Promise.all(
         (aula.instrutores || []).map(async (instrutorId: string) => {
-          let policialSnap = await getDocs(
-            query(collection(db, 'policiais'), where('id', '==', instrutorId))
-          );
+          const policial = await buscarPolicialPorId(instrutorId);
 
-          if (policialSnap.empty) {
-            policialSnap = await getDocs(
-              query(collection(db, 'policiais'), where('usuarioId', '==', instrutorId))
-            );
-          }
-
-          if (!policialSnap.empty) {
-            const policial = policialSnap.docs[0].data();
+          if (policial) {
             return {
               postGrad: policial['Post/Grad'] || policial.postGrad || '',
               nomeGuerra: policial['NOME DE GUERRA'] || policial.nomeGuerra || ''

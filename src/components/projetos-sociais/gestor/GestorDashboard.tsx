@@ -73,17 +73,24 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
       const instrutoresSnapshot = await getDocs(instrutoresQuery);
       const totalInstrutores = instrutoresSnapshot.size;
 
-      // Contar aulas do mês
+      // Contar aulas do mês - buscar todas e filtrar em memória
       const hoje = new Date();
       const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
       
       const aulasQuery = query(
         collection(db, 'projetos_aulas'),
-        where('projetoId', '==', projetoSelecionado.id),
-        where('data', '>=', primeiroDiaMes)
+        where('projetoId', '==', projetoSelecionado.id)
       );
       const aulasSnapshot = await getDocs(aulasQuery);
-      const aulasMes = aulasSnapshot.size;
+      
+      // Filtrar aulas encerradas do mês em memória
+      const aulasDoMes = aulasSnapshot.docs.filter(doc => {
+        const aula = doc.data();
+        const aulaData = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
+        return aula.status === 'encerrada' && aulaData >= primeiroDiaMes;
+      });
+      
+      const aulasMes = aulasDoMes.length;
       const horasMes = aulasMes * 3;
 
       setStats({

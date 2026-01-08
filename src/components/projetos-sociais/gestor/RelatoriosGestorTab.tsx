@@ -5,12 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Eye } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { AulaDetalhesCard } from '../instrutor/AulaDetalhesCard';
 import { RelatorioMensalGestor } from './RelatorioMensalGestor';
+import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
 
 interface RelatoriosGestorTabProps {
   projeto: any;
@@ -23,6 +27,11 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
   const [todasAulas, setTodasAulas] = useState<any[]>([]);
   const [dataSelecionada, setDataSelecionada] = useState<Date>();
   const [mesSelecionado, setMesSelecionado] = useState(new Date());
+  
+  // Estado para o dialog de detalhes do instrutor
+  const [instrutorSelecionado, setInstrutorSelecionado] = useState<any>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [aulasInstrutor, setAulasInstrutor] = useState<any[]>([]);
 
   useEffect(() => {
     carregarDados();
@@ -54,13 +63,11 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
       const instrutoresData = await Promise.all(
         instrutoresSnapshot.docs.map(async (docSnap) => {
           const data = docSnap.data();
-          const policialSnap = await getDocs(
-            query(collection(db, 'policiais'), where('__name__', '==', data.policialId))
-          );
+          
+          // Usar função utilitária para buscar policial
+          const policial = await buscarPolicialPorId(data.policialId);
 
-          if (!policialSnap.empty) {
-            const policial = policialSnap.docs[0].data();
-            
+          if (policial) {
             // Contar aulas do instrutor
             const aulasInstrutor = aulas.filter(a => 
               a.instrutores?.includes(data.policialId)
@@ -73,13 +80,9 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
               return dataAula >= primeiroDiaMes;
             });
 
-            // Mapear campos corretamente
-            const postGrad = policial['Post/Grad'] || policial.postGrad || '';
-            const nomeGuerra = policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
-
             return {
               id: data.policialId,
-              nome: `${postGrad} ${nomeGuerra}`.trim(),
+              nome: formatarNomePolicial(policial),
               aulasMes: aulasMes.length,
               horasMes: aulasMes.length * 3,
               horasTotal: aulasInstrutor.length * 3
@@ -121,6 +124,33 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       setLoading(false);
+    }
+  };
+
+  const verDetalhesInstrutor = (instrutor: any) => {
+    // Buscar aulas do instrutor
+    const aulasDoInstrutor = todasAulas.filter(
+      a => a.instrutores?.includes(instrutor.id)
+    );
+    
+    // Ordenar por data decrescente
+    aulasDoInstrutor.sort((a, b) => {
+      const dataA = a.data?.toDate ? a.data.toDate() : new Date(a.data);
+      const dataB = b.data?.toDate ? b.data.toDate() : new Date(b.data);
+      return dataB.getTime() - dataA.getTime();
+    });
+    
+    setInstrutorSelecionado(instrutor);
+    setAulasInstrutor(aulasDoInstrutor);
+    setDialogOpen(true);
+  };
+
+  const formatarDataAula = (data: any) => {
+    try {
+      const dataObj = data?.toDate ? data.toDate() : new Date(data);
+      return format(dataObj, "dd/MM/yyyy", { locale: ptBR });
+    } catch {
+      return 'Data inválida';
     }
   };
 
@@ -216,8 +246,17 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
                 </TableHeader>
                 <TableBody>
                   {instrutoresRelatorio.map((instrutor) => (
-                    <TableRow key={instrutor.id}>
-                      <TableCell className="font-medium">{instrutor.nome}</TableCell>
+                    <TableRow 
+                      key={instrutor.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => verDetalhesInstrutor(instrutor)}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {instrutor.nome}
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </TableCell>
                       <TableCell>{instrutor.aulasMes}</TableCell>
                       <TableCell>{instrutor.horasMes}h</TableCell>
                       <TableCell className="font-bold">{instrutor.horasTotal}h</TableCell>
@@ -353,6 +392,48 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
       <TabsContent value="relatorio">
         <RelatorioMensalGestor projeto={projeto} />
       </TabsContent>
+
+      {/* Dialog de detalhes do instrutor */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Aulas de {instrutorSelecionado?.nome}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {aulasInstrutor.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
+                Nenhuma aula registrada
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Turno</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {aulasInstrutor.map((aula) => (
+                    <TableRow key={aula.id}>
+                      <TableCell>{formatarDataAula(aula.data)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {aula.turnoNome || `Turno ${aula.turno}`}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </ScrollArea>
+          <div className="border-t pt-4 mt-2">
+            <p className="text-sm text-muted-foreground">
+              Total: {aulasInstrutor.length} aulas • {aulasInstrutor.length * 3}h
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Tabs>
   );
 };

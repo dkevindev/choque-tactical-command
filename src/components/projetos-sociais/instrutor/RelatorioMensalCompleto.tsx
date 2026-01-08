@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
 
 interface RelatorioMensalCompletoProps {
   policialId: string;
@@ -46,28 +47,13 @@ export const RelatorioMensalCompleto = ({ policialId, mesSelecionado }: Relatori
         return dataAula >= inicio && dataAula <= fim;
       });
 
-      // Carregar nomes dos instrutores para cada aula
+      // Carregar nomes dos instrutores para cada aula usando função utilitária
       const aulasComNomes = await Promise.all(
         aulasDoMes.map(async (aula: any) => {
           const instrutoresNomes = await Promise.all(
             (aula.instrutores || []).map(async (instrutorId: string) => {
-              let policialSnap = await getDocs(
-                query(collection(db, 'policiais'), where('id', '==', instrutorId))
-              );
-
-              if (policialSnap.empty) {
-                policialSnap = await getDocs(
-                  query(collection(db, 'policiais'), where('usuarioId', '==', instrutorId))
-                );
-              }
-
-              if (!policialSnap.empty) {
-                const policial = policialSnap.docs[0].data();
-                const postGrad = policial['Post/Grad'] || policial.postGrad || policial.patente || '';
-                const nomeGuerra = policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
-                return `${postGrad} ${nomeGuerra}`.trim();
-              }
-              return 'Desconhecido';
+              const policial = await buscarPolicialPorId(instrutorId);
+              return formatarNomePolicial(policial);
             })
           );
 
