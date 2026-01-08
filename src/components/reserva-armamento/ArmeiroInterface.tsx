@@ -93,8 +93,7 @@ interface MovimentacaoDia {
 }
 
 const CATEGORIAS = [
-  { id: 'arma_curta', label: 'Arma Curta', icon: Target },
-  { id: 'arma_longa', label: 'Arma Longa', icon: Crosshair },
+  { id: 'serie', label: 'Nº Série', icon: Search },
   { id: 'municao', label: 'Munição', icon: Package },
   { id: 'epi', label: 'EPI', icon: Shield },
   { id: 'acessorio', label: 'Acessórios', icon: Plus }
@@ -111,7 +110,7 @@ const ArmeiroInterface = () => {
   const [searchPolicial, setSearchPolicial] = useState("");
   const [searchMaterial, setSearchMaterial] = useState("");
   const [policiais, setPoliciais] = useState<Policial[]>([]);
-  const [categoriaAtiva, setCategoriaAtiva] = useState("arma_curta");
+  const [categoriaAtiva, setCategoriaAtiva] = useState("serie");
   
   // Modais
   const [modalConfirmacao, setModalConfirmacao] = useState(false);
@@ -722,24 +721,32 @@ const ArmeiroInterface = () => {
 
   // Mapear categoria para o filtro usando tipoArma do Firebase
   const mapearCategoria = (material: Material) => {
-    const tipoArma = (material.tipoArma || '').toLowerCase();
     const categoria = (material.categoria || '').toLowerCase();
     
-    // Priorizar tipoArma do Firebase
-    if (tipoArma === 'arma curta' || tipoArma.includes('curta')) return 'arma_curta';
-    if (tipoArma === 'arma longa' || tipoArma.includes('longa')) return 'arma_longa';
+    // Materiais com número de série vão para a aba "serie"
+    if (material.numeroSerie) return 'serie';
     
     // Fallback para categoria
     if (categoria.includes('munição') || categoria.includes('municao')) return 'municao';
     if (categoria.includes('epi') || categoria.includes('colete')) return 'epi';
-    if (categoria.includes('arma curta') || categoria.includes('pistola') || categoria.includes('revolver')) return 'arma_curta';
-    if (categoria.includes('arma longa') || categoria.includes('fuzil') || categoria.includes('espingarda')) return 'arma_longa';
     
     return 'acessorio';
   };
 
   const materiaisFiltrados = materiaisDisponiveis.filter(m => {
-    const matchCategoria = mapearCategoria(m) === categoriaAtiva;
+    const categoriaDoMaterial = mapearCategoria(m);
+    
+    // Se categoria ativa é "serie", mostrar todos com número de série
+    if (categoriaAtiva === 'serie') {
+      const temSerie = !!m.numeroSerie;
+      const searchLower = searchMaterial.toLowerCase();
+      const matchSearch = m.nome.toLowerCase().includes(searchLower) ||
+                         (m.numeroSerie || '').toLowerCase().includes(searchLower);
+      return temSerie && (searchMaterial === '' || matchSearch);
+    }
+    
+    // Para outras categorias
+    const matchCategoria = categoriaDoMaterial === categoriaAtiva;
     const searchLower = searchMaterial.toLowerCase();
     const matchSearch = m.nome.toLowerCase().includes(searchLower) ||
                        (m.categoria || '').toLowerCase().includes(searchLower) ||
@@ -796,18 +803,6 @@ const ArmeiroInterface = () => {
         </CardContent>
       </Card>
 
-      {/* Seção de Consultas - sempre disponível */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
-            Consulta de Materiais
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ConsultaMaterialPolicial />
-        </CardContent>
-      </Card>
 
       {livroAtivo && (
         <>
@@ -875,7 +870,7 @@ const ArmeiroInterface = () => {
 
           {/* Tabs de Navegação */}
           <Tabs value={tabAtiva} onValueChange={setTabAtiva}>
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="livro" className="flex items-center gap-1">
                 <BookOpen className="h-4 w-4" />
                 <span className="hidden sm:inline">Livro do Dia</span>
@@ -895,6 +890,10 @@ const ArmeiroInterface = () => {
               <TabsTrigger value="historico" className="flex items-center gap-1">
                 <History className="h-4 w-4" />
                 <span className="hidden sm:inline">Histórico</span>
+              </TabsTrigger>
+              <TabsTrigger value="consultas" className="flex items-center gap-1">
+                <Search className="h-4 w-4" />
+                <span className="hidden sm:inline">Consultas</span>
               </TabsTrigger>
             </TabsList>
 
@@ -976,7 +975,7 @@ const ArmeiroInterface = () => {
                     <div className="space-y-4">
                       {/* Tabs de Categoria */}
                       <Tabs value={categoriaAtiva} onValueChange={setCategoriaAtiva}>
-                        <TabsList className="grid grid-cols-5 h-auto">
+                        <TabsList className="grid grid-cols-4 h-auto">
                           {CATEGORIAS.map((cat) => (
                             <TabsTrigger 
                               key={cat.id} 
@@ -1113,6 +1112,11 @@ const ArmeiroInterface = () => {
             {/* Tab Histórico */}
             <TabsContent value="historico">
               <HistoricoLivrosSection />
+            </TabsContent>
+
+            {/* Tab Consultas */}
+            <TabsContent value="consultas">
+              <ConsultaMaterialPolicial />
             </TabsContent>
           </Tabs>
         </>
