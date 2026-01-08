@@ -185,10 +185,16 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
   };
 
   const verDetalhesInstrutor = (instrutor: any) => {
-    // Buscar aulas do instrutor
-    const aulasDoInstrutor = todasAulas.filter(
-      a => a.instrutores?.includes(instrutor.id)
-    );
+    // Buscar aulas do instrutor apenas do mês atual
+    const hoje = new Date();
+    const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59);
+    
+    const aulasDoInstrutor = todasAulas.filter(a => {
+      if (!a.instrutores?.includes(instrutor.id)) return false;
+      const dataAula = a.data?.toDate ? a.data.toDate() : new Date(a.data);
+      return dataAula >= primeiroDiaMes && dataAula <= ultimoDiaMes;
+    });
     
     // Ordenar por data decrescente
     aulasDoInstrutor.sort((a, b) => {
