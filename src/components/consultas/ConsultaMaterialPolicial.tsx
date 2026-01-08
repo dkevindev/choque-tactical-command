@@ -63,7 +63,7 @@ const ConsultaMaterialPolicial = () => {
   const [searchSerie, setSearchSerie] = useState('');
   const [searchCautela, setSearchCautela] = useState('');
   const [searchViatura, setSearchViatura] = useState('');
-  const [categoriaFiltro, setCategoriaFiltro] = useState('todos');
+  const [searchSerieTab, setSearchSerieTab] = useState('');
 
   // Carregar materiais bélicos
   useEffect(() => {
@@ -140,12 +140,12 @@ const ConsultaMaterialPolicial = () => {
   const materiaisFiltrados = materiais.filter(m => {
     const matchSearch = searchTerm === '' || 
       m.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.numeroSerie?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.calibre?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchCategoria = categoriaFiltro === 'todos' || m.categoria === categoriaFiltro;
+    const matchSerie = searchSerieTab === '' || 
+      m.numeroSerie?.toLowerCase().includes(searchSerieTab.toLowerCase());
     
-    return matchSearch && matchCategoria;
+    return matchSearch && matchSerie;
   });
 
   // Filtrar por número de série
@@ -168,9 +168,6 @@ const ConsultaMaterialPolicial = () => {
            v.PLACA?.toLowerCase().includes(searchViatura.toLowerCase()) ||
            v.MODELO?.toLowerCase().includes(searchViatura.toLowerCase());
   });
-
-  // Obter categorias únicas
-  const categorias = [...new Set(materiais.map(m => m.categoria).filter(Boolean))];
 
   // Verificar se material está cautelado
   const verificarCautelado = (numeroSerie: string) => {
@@ -228,22 +225,20 @@ const ConsultaMaterialPolicial = () => {
               <div className="flex flex-col md:flex-row gap-3">
                 <div className="flex-1">
                   <Input
-                    placeholder="Buscar por nome, série ou calibre..."
+                    placeholder="Buscar por nome ou calibre..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="bg-background"
                   />
                 </div>
-                <select
-                  value={categoriaFiltro}
-                  onChange={(e) => setCategoriaFiltro(e.target.value)}
-                  className="px-3 py-2 rounded-md border border-input bg-background text-foreground text-sm"
-                >
-                  <option value="todos">Todas as categorias</option>
-                  {categorias.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
+                <div className="flex-1 md:flex-none md:w-56">
+                  <Input
+                    placeholder="Número de Série..."
+                    value={searchSerieTab}
+                    onChange={(e) => setSearchSerieTab(e.target.value)}
+                    className="bg-background"
+                  />
+                </div>
               </div>
 
               {loading ? (

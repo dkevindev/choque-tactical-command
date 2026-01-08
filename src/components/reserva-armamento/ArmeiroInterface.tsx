@@ -24,6 +24,7 @@ import HistoricoLivrosSection from './HistoricoLivrosSection';
 import MaterialNaRuaSection from './MaterialNaRuaSection';
 import PendenciasAnterioresSection from './PendenciasAnterioresSection';
 import LivroCautelaDia from './LivroCautelaDia';
+import ConsultaMaterialPolicial from '@/components/consultas/ConsultaMaterialPolicial';
 
 interface Policial {
   id: string;
@@ -792,6 +793,19 @@ const ArmeiroInterface = () => {
               </Button>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Seção de Consultas - sempre disponível */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            Consulta de Materiais
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ConsultaMaterialPolicial />
         </CardContent>
       </Card>
 
