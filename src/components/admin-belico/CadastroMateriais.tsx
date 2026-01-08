@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,10 @@ const CadastroMateriais = () => {
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [filtro, setFiltro] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('todas');
+  const [disponibilidadeFiltro, setDisponibilidadeFiltro] = useState('todos');
+  const [tipoArmaFiltro, setTipoArmaFiltro] = useState('todos');
+  const [cauteladoFiltro, setCauteladoFiltro] = useState('todos');
+  const [modeloFiltro, setModeloFiltro] = useState('todos');
   const [formData, setFormData] = useState({
     nome: '',
     categoria: '',
@@ -533,13 +537,54 @@ const CadastroMateriais = () => {
     }
   };
 
+  // Extrair modelos únicos dos materiais
+  const modelosUnicos = useMemo(() => {
+    const modelos = materiais
+      .filter(m => m.modelo)
+      .map(m => m.modelo!)
+      .filter((value, index, self) => self.indexOf(value) === index)
+      .sort();
+    return modelos;
+  }, [materiais]);
+
   const materiaisFiltrados = materiais.filter(material => {
     const matchNome = material.nome?.toLowerCase().includes(filtro.toLowerCase()) || false;
     const matchSerie = material.numeroSerie?.toLowerCase().includes(filtro.toLowerCase()) || false;
     const matchCategoria = categoriaFiltro === 'todas' || categoriaFiltro === '' || material.categoria === categoriaFiltro;
     
-    return (matchNome || matchSerie) && matchCategoria;
+    // Filtro por disponibilidade para cautela
+    const matchDisponibilidade = 
+      disponibilidadeFiltro === 'todos' ||
+      (disponibilidadeFiltro === 'disponivel' && material.disponivel === true) ||
+      (disponibilidadeFiltro === 'indisponivel' && material.disponivel === false);
+    
+    // Filtro por tipo de arma
+    const matchTipoArma = 
+      tipoArmaFiltro === 'todos' ||
+      material.tipoArma === tipoArmaFiltro;
+    
+    // Filtro por status cautelado
+    const matchCautelado = 
+      cauteladoFiltro === 'todos' ||
+      (cauteladoFiltro === 'cautelado' && material.cautelado === true) ||
+      (cauteladoFiltro === 'nao_cautelado' && !material.cautelado);
+    
+    // Filtro por modelo
+    const matchModelo = 
+      modeloFiltro === 'todos' ||
+      material.modelo === modeloFiltro;
+    
+    return (matchNome || matchSerie) && matchCategoria && matchDisponibilidade && matchTipoArma && matchCautelado && matchModelo;
   });
+
+  const limparFiltros = () => {
+    setFiltro('');
+    setCategoriaFiltro('todas');
+    setDisponibilidadeFiltro('todos');
+    setTipoArmaFiltro('todos');
+    setCauteladoFiltro('todos');
+    setModeloFiltro('todos');
+  };
 
   return (
     <div className="space-y-6">
@@ -569,7 +614,8 @@ const CadastroMateriais = () => {
 
       {/* Filters */}
       <Card className="bg-card border-border">
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-4">
+          {/* Linha 1: Busca, Categoria, Disponibilidade */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -591,11 +637,60 @@ const CadastroMateriais = () => {
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-2">
+            <Select value={disponibilidadeFiltro} onValueChange={setDisponibilidadeFiltro}>
+              <SelectTrigger>
+                <SelectValue placeholder="Disponibilidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas (Disponibilidade)</SelectItem>
+                <SelectItem value="disponivel">Disponíveis para Cautela</SelectItem>
+                <SelectItem value="indisponivel">Não Disponíveis</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Linha 2: Tipo Arma, Status Cautelado, Modelo, Badges */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Select value={tipoArmaFiltro} onValueChange={setTipoArmaFiltro}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tipo de Arma" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os Tipos</SelectItem>
+                <SelectItem value="Arma Curta">Arma Curta</SelectItem>
+                <SelectItem value="Arma Longa">Arma Longa</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={cauteladoFiltro} onValueChange={setCauteladoFiltro}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status Cautela" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos (Cautela)</SelectItem>
+                <SelectItem value="nao_cautelado">Não Cautelado</SelectItem>
+                <SelectItem value="cautelado">Cautelado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={modeloFiltro} onValueChange={setModeloFiltro}>
+              <SelectTrigger>
+                <SelectValue placeholder="Modelo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os Modelos</SelectItem>
+                {modelosUnicos.map(modelo => (
+                  <SelectItem key={modelo} value={modelo}>{modelo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">Total: {materiaisFiltrados.length}</Badge>
               <Badge variant="default">
                 Disponíveis: {materiaisFiltrados.filter(m => m.disponivel).length}
               </Badge>
+              <Button variant="ghost" size="sm" onClick={limparFiltros} className="h-7 px-2">
+                <X className="h-3 w-3 mr-1" />
+                Limpar
+              </Button>
             </div>
           </div>
         </CardContent>
