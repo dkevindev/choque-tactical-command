@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { db } from "@/firebase";
-import { doc, updateDoc, collection, query, where, getDocs, arrayUnion, Timestamp } from "firebase/firestore";
+import { doc, updateDoc, collection, query, where, getDocs, arrayUnion, Timestamp, getDoc } from "firebase/firestore";
+import { buscarPolicialPorId, formatarNomePolicial } from "@/lib/policialUtils";
 
 interface EditarAulaDialogProps {
   aula: any;
@@ -45,23 +46,14 @@ export function EditarAulaDialog({
         snapshot.docs.map(async (docSnap) => {
           const policialId = docSnap.data().policialId;
           
-          // Buscar dados do policial - primeiro por id, depois por usuarioId
-          let policialDoc = await getDocs(
-            query(collection(db, "policiais"), where("id", "==", policialId))
-          );
+          // Usar função utilitária para buscar policial
+          const policial = await buscarPolicialPorId(policialId);
 
-          if (policialDoc.empty) {
-            policialDoc = await getDocs(
-              query(collection(db, "policiais"), where("usuarioId", "==", policialId))
-            );
-          }
-
-          if (!policialDoc.empty) {
-            const policialData = policialDoc.docs[0].data();
+          if (policial) {
             return {
-              id: policialData.id || policialDoc.docs[0].id,
-              nome: `${policialData.postGrad || policialData.patente || ''} ${policialData.nomeGuerra}`.trim(),
-              nomeCompleto: policialData.nome
+              id: policialId,
+              nome: formatarNomePolicial(policial),
+              nomeCompleto: policial.nome
             };
           }
           return null;

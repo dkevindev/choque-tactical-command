@@ -13,6 +13,7 @@ import { EditarAulaDialog } from './EditarAulaDialog';
 import { toast } from 'sonner';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '@/firebase';
+import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
 
 interface MinhasAulasTabProps {
   policialId: string;
@@ -92,21 +93,12 @@ const MinhasAulasTab = ({ policialId, projetos }: MinhasAulasTabProps) => {
     try {
       setGerando(aula.id);
       
-      // Buscar dados completos dos instrutores
+      // Buscar dados completos dos instrutores usando função utilitária
       const instrutoresDetalhados = await Promise.all(
         (aula.instrutores || []).map(async (instrutorId: string) => {
-          let policialSnap = await getDocs(
-            query(collection(db, 'policiais'), where('id', '==', instrutorId))
-          );
+          const policial = await buscarPolicialPorId(instrutorId);
 
-          if (policialSnap.empty) {
-            policialSnap = await getDocs(
-              query(collection(db, 'policiais'), where('usuarioId', '==', instrutorId))
-            );
-          }
-
-          if (!policialSnap.empty) {
-            const policial = policialSnap.docs[0].data();
+          if (policial) {
             return {
               postGrad: policial['Post/Grad'] || policial.postGrad || '',
               nomeGuerra: policial['NOME DE GUERRA'] || policial.nomeGuerra || ''

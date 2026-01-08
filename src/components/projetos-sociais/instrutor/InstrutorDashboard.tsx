@@ -4,11 +4,12 @@ import { db } from '@/firebase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Play, Clock, CheckCircle, Home, History, BarChart } from 'lucide-react';
+import { Play, Clock, CheckCircle, Home, History, BarChart, CalendarDays } from 'lucide-react';
 import IniciarAulaWizard from './IniciarAulaWizard';
 import AulaEmAndamento from './AulaEmAndamento';
 import MinhasAulasTab from './MinhasAulasTab';
 import RelatoriosInstrutorTab from './RelatoriosInstrutorTab';
+import { MinhasAulasMesSimplificado } from './MinhasAulasMesSimplificado';
 
 interface InstrutorDashboardProps {
   projetos: any[];
@@ -16,7 +17,7 @@ interface InstrutorDashboardProps {
 }
 
 const InstrutorDashboard = ({ projetos, policialLogado }: InstrutorDashboardProps) => {
-  const [activeTab, setActiveTab] = useState<'inicio' | 'aulas' | 'relatorios'>('inicio');
+  const [activeTab, setActiveTab] = useState<'inicio' | 'aulas' | 'mes' | 'relatorios'>('inicio');
   const [aulaEmAndamento, setAulaEmAndamento] = useState<any>(null);
   const [horasMes, setHorasMes] = useState(0);
   const [aulasMes, setAulasMes] = useState(0);
@@ -70,6 +71,8 @@ const InstrutorDashboard = ({ projetos, policialLogado }: InstrutorDashboardProp
     switch (activeTab) {
       case 'aulas':
         return <MinhasAulasTab policialId={policialLogado.id} projetos={projetos} />;
+      case 'mes':
+        return <MinhasAulasMesSimplificado policialId={policialLogado.id} />;
       case 'relatorios':
         return <RelatoriosInstrutorTab policialId={policialLogado.id} />;
       default:
@@ -165,7 +168,16 @@ const InstrutorDashboard = ({ projetos, policialLogado }: InstrutorDashboardProp
             <span className="text-xs mt-1">Aulas</span>
           </Button>
           <Button 
-            variant={activeTab === 'relatorios' ? 'default' : 'ghost'} 
+            variant={activeTab === 'mes' ? 'default' : 'ghost'} 
+            size="lg" 
+            className="flex-col h-16"
+            onClick={() => setActiveTab('mes')}
+          >
+            <CalendarDays className="h-6 w-6" />
+            <span className="text-xs mt-1">Mês</span>
+          </Button>
+          <Button 
+            variant={activeTab === 'relatorios' ? 'default' : 'ghost'}
             size="lg" 
             className="flex-col h-16"
             onClick={() => setActiveTab('relatorios')}
