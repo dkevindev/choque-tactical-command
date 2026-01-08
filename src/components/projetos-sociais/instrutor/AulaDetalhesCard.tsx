@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/firebase';
 import { Badge } from '@/components/ui/badge';
+import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
 
 interface AulaDetalhesCardProps {
   aula: any;
@@ -19,25 +18,8 @@ export const AulaDetalhesCard = ({ aula }: AulaDetalhesCardProps) => {
     try {
       const nomes = await Promise.all(
         (aula.instrutores || []).map(async (instrutorId: string) => {
-          // Tentar buscar por id
-          let policialSnap = await getDocs(
-            query(collection(db, 'policiais'), where('id', '==', instrutorId))
-          );
-
-          // Se não encontrar, tentar por usuarioId
-          if (policialSnap.empty) {
-            policialSnap = await getDocs(
-              query(collection(db, 'policiais'), where('usuarioId', '==', instrutorId))
-            );
-          }
-
-              if (!policialSnap.empty) {
-                const policial = policialSnap.docs[0].data();
-                const postGrad = policial['Post/Grad'] || policial.postGrad || policial.patente || '';
-                const nomeGuerra = policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
-                return `${postGrad} ${nomeGuerra}`.trim();
-              }
-              return 'Desconhecido';
+          const policial = await buscarPolicialPorId(instrutorId);
+          return formatarNomePolicial(policial);
         })
       );
       setInstrutoresNomes(nomes);
