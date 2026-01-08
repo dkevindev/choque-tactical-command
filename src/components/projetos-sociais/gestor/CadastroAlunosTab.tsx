@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserPlus, MoreHorizontal, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,8 +19,15 @@ interface CadastroAlunosTabProps {
   onUpdate: () => void;
 }
 
+interface Turma {
+  id: string;
+  nome: string;
+  alunos: string[];
+}
+
 const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
   const [alunos, setAlunos] = useState<any[]>([]);
+  const [turmas, setTurmas] = useState<Turma[]>([]);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [alunoEditando, setAlunoEditando] = useState<any>(null);
@@ -33,11 +41,13 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
     nomeMae: '',
     endereco: '',
     contatoResponsavel: '',
-    observacoes: ''
+    observacoes: '',
+    turmaId: ''
   });
 
   useEffect(() => {
     carregarAlunos();
+    carregarTurmas();
   }, [projeto]);
 
   const carregarAlunos = async () => {
@@ -57,6 +67,30 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
     }
   };
 
+  const carregarTurmas = async () => {
+    try {
+      const q = query(
+        collection(db, 'projetos_turmas'),
+        where('projetoId', '==', projeto.id),
+        where('ativo', '==', true)
+      );
+      const snapshot = await getDocs(q);
+      const turmasData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Turma[];
+      setTurmas(turmasData);
+    } catch (error) {
+      console.error('Erro ao carregar turmas:', error);
+    }
+  };
+
+  // Encontrar turma do aluno
+  const encontrarTurmaDoAluno = (alunoId: string): string => {
+    const turma = turmas.find(t => t.alunos?.includes(alunoId));
+    return turma?.id || '';
+  };
+
   const resetForm = () => {
     setFormData({
       nomeCompleto: '',
@@ -66,12 +100,14 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
       nomeMae: '',
       endereco: '',
       contatoResponsavel: '',
-      observacoes: ''
+      observacoes: '',
+      turmaId: ''
     });
     setAlunoEditando(null);
   };
 
   const abrirDialogEdicao = (aluno: any) => {
+    const turmaAtual = encontrarTurmaDoAluno(aluno.id);
     setFormData({
       nomeCompleto: aluno.nomeCompleto || '',
       idade: aluno.idade?.toString() || '',
@@ -80,7 +116,8 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
       nomeMae: aluno.nomeMae || '',
       endereco: aluno.endereco || '',
       contatoResponsavel: aluno.contatoResponsavel || '',
-      observacoes: aluno.observacoes || ''
+      observacoes: aluno.observacoes || '',
+      turmaId: turmaAtual
     });
     setAlunoEditando(aluno);
     setDialogOpen(true);
@@ -91,25 +128,58 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
     try {
       setLoading(true);
 
+      const { turmaId, ...dadosAluno } = formData;
+      
       const alunoData = {
-        ...formData,
+        ...dadosAluno,
         idade: Number(formData.idade),
         projetoId: projeto.id,
         ativo: true,
         ...(alunoEditando ? {} : { dataCadastro: new Date() })
       };
 
+      let alunoId: string;
+
       if (alunoEditando) {
         await updateDoc(doc(db, 'projetos_alunos', alunoEditando.id), alunoData);
+        alunoId = alunoEditando.id;
         toast.success('Aluno atualizado com sucesso!');
       } else {
-        await addDoc(collection(db, 'projetos_alunos'), alunoData);
+        const docRef = await addDoc(collection(db, 'projetos_alunos'), alunoData);
+        alunoId = docRef.id;
         toast.success('Aluno cadastrado com sucesso!');
+      }
+
+      // Atualizar turma do aluno
+      const turmaAnterior = alunoEditando ? encontrarTurmaDoAluno(alunoEditando.id) : '';
+      
+      // Remover da turma anterior se existir
+      if (turmaAnterior && turmaAnterior !== turmaId) {
+        const turmaAnteriorDoc = turmas.find(t => t.id === turmaAnterior);
+        if (turmaAnteriorDoc) {
+          await updateDoc(doc(db, 'projetos_turmas', turmaAnterior), {
+            alunos: turmaAnteriorDoc.alunos.filter(id => id !== alunoId)
+          });
+        }
+      }
+
+      // Adicionar na nova turma se selecionada
+      if (turmaId && turmaId !== turmaAnterior) {
+        const novaTurma = turmas.find(t => t.id === turmaId);
+        if (novaTurma) {
+          const alunosAtualizados = novaTurma.alunos?.includes(alunoId)
+            ? novaTurma.alunos
+            : [...(novaTurma.alunos || []), alunoId];
+          await updateDoc(doc(db, 'projetos_turmas', turmaId), {
+            alunos: alunosAtualizados
+          });
+        }
       }
 
       setDialogOpen(false);
       resetForm();
       carregarAlunos();
+      carregarTurmas();
       onUpdate();
       setLoading(false);
     } catch (error) {
@@ -235,6 +305,36 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
                 </div>
 
                 <div className="col-span-2">
+                  <Label htmlFor="turma">Turma</Label>
+                  <Select
+                    value={formData.turmaId}
+                    onValueChange={(value) => setFormData({...formData, turmaId: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma turma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {turmas.length === 0 ? (
+                        <SelectItem value="none" disabled>
+                          Nenhuma turma cadastrada
+                        </SelectItem>
+                      ) : (
+                        turmas.map((turma) => (
+                          <SelectItem key={turma.id} value={turma.id}>
+                            {turma.nome}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {turmas.length === 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Cadastre turmas na aba "Turmas" antes de vincular alunos
+                    </p>
+                  )}
+                </div>
+
+                <div className="col-span-2">
                   <Label htmlFor="observacoes">Observações</Label>
                   <Textarea
                     id="observacoes"
@@ -276,43 +376,54 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
                 <TableHead>Nome Completo</TableHead>
                 <TableHead>Nome de Guerra</TableHead>
                 <TableHead>Idade</TableHead>
+                <TableHead>Turma</TableHead>
                 <TableHead>Contato</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {alunosFiltrados.map((aluno) => (
-                <TableRow key={aluno.id}>
-                  <TableCell className="font-medium">{aluno.nomeCompleto}</TableCell>
-                  <TableCell>{aluno.nomeGuerra}</TableCell>
-                  <TableCell>{aluno.idade} anos</TableCell>
-                  <TableCell>{aluno.contatoResponsavel}</TableCell>
-                  <TableCell>
-                    <Badge variant={aluno.ativo ? 'default' : 'secondary'}>
-                      {aluno.ativo ? 'Ativo' : 'Inativo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => abrirDialogEdicao(aluno)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => toggleStatusAluno(aluno.id, aluno.ativo)}>
-                          {aluno.ativo ? 'Inativar' : 'Ativar'}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {alunosFiltrados.map((aluno) => {
+                const turmaNome = turmas.find(t => t.alunos?.includes(aluno.id))?.nome;
+                return (
+                  <TableRow key={aluno.id}>
+                    <TableCell className="font-medium">{aluno.nomeCompleto}</TableCell>
+                    <TableCell>{aluno.nomeGuerra}</TableCell>
+                    <TableCell>{aluno.idade} anos</TableCell>
+                    <TableCell>
+                      {turmaNome ? (
+                        <Badge variant="outline">{turmaNome}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Sem turma</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{aluno.contatoResponsavel}</TableCell>
+                    <TableCell>
+                      <Badge variant={aluno.ativo ? 'default' : 'secondary'}>
+                        {aluno.ativo ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => abrirDialogEdicao(aluno)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toggleStatusAluno(aluno.id, aluno.ativo)}>
+                            {aluno.ativo ? 'Inativar' : 'Ativar'}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
