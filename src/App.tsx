@@ -13,6 +13,7 @@ import UserDashboard from "./components/UserDashboard";
 import ReservaArmamentoSystem from "./components/reserva-armamento/ReservaArmamentoSystem";
 import LivroGuardaPage from "./components/guarda-quartel/LivroGuardaPage";
 import HistoricoLivrosGuardaPage from "./components/guarda-quartel/HistoricoLivrosGuardaPage";
+import GuardaQuartelHome from "./components/guarda-quartel/GuardaQuartelHome";
 import ProjetosSociaisSystem from "./components/projetos-sociais/ProjetosSociaisSystem";
 import InstrutorSystem from "./components/projetos-sociais/InstrutorSystem";
 import GestorSystem from "./components/projetos-sociais/GestorSystem";
@@ -37,7 +38,8 @@ const App = () => (
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/user-dashboard" element={<UserDashboard />} />
           <Route path="/reserva-armamento/*" element={<ReservaArmamentoSystem />} />
-          <Route path="/guarda-quartel" element={<LivroGuardaPage />} />
+          <Route path="/guarda-quartel" element={<GuardaQuartelHome />} />
+          <Route path="/guarda-quartel/novo" element={<LivroGuardaPage />} />
           <Route path="/guarda-quartel/historico" element={<HistoricoLivrosGuardaPage />} />
           <Route path="/projetos-sociais/instrutor" element={<InstrutorSystem />} />
           <Route path="/projetos-sociais/gestor" element={<GestorSystem />} />
