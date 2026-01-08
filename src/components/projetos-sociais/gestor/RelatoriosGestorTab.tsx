@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon, Eye } from 'lucide-react';
+import { Calendar as CalendarIcon, Eye, Users, ChevronDown, ChevronRight } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AulaDetalhesCard } from '../instrutor/AulaDetalhesCard';
 import { RelatorioMensalGestor } from './RelatorioMensalGestor';
 import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
@@ -20,13 +21,31 @@ interface RelatoriosGestorTabProps {
   projeto: any;
 }
 
+interface Turma {
+  id: string;
+  nome: string;
+  descricao?: string;
+  alunos: string[];
+}
+
+interface AlunoFrequencia {
+  id: string;
+  nomeCompleto: string;
+  aulasParticipadas: number;
+  faltas: number;
+  percentualPresenca: number;
+  turmaId?: string;
+}
+
 const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
   const [instrutoresRelatorio, setInstrutoresRelatorio] = useState<any[]>([]);
-  const [alunosFrequencia, setAlunosFrequencia] = useState<any[]>([]);
+  const [alunosFrequencia, setAlunosFrequencia] = useState<AlunoFrequencia[]>([]);
+  const [turmas, setTurmas] = useState<Turma[]>([]);
   const [loading, setLoading] = useState(true);
   const [todasAulas, setTodasAulas] = useState<any[]>([]);
   const [dataSelecionada, setDataSelecionada] = useState<Date>();
   const [mesSelecionado, setMesSelecionado] = useState(new Date());
+  const [turmasAbertas, setTurmasAbertas] = useState<string[]>([]);
   
   // Estado para o dialog de detalhes do instrutor
   const [instrutorSelecionado, setInstrutorSelecionado] = useState<any>(null);
@@ -51,6 +70,19 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
         ...doc.data()
       })) as any[];
       setTodasAulas(aulas);
+
+      // Buscar turmas do projeto
+      const turmasQuery = query(
+        collection(db, 'projetos_turmas'),
+        where('projetoId', '==', projeto.id),
+        where('ativo', '==', true)
+      );
+      const turmasSnapshot = await getDocs(turmasQuery);
+      const turmasData = turmasSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Turma[];
+      setTurmas(turmasData);
 
       // Calcular relatório de instrutores
       const instrutoresQuery = query(
@@ -102,6 +134,14 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
       );
       const alunosSnapshot = await getDocs(alunosQuery);
       
+      // Criar mapa de aluno -> turma
+      const alunoTurmaMap: Record<string, string> = {};
+      turmasData.forEach(turma => {
+        turma.alunos?.forEach(alunoId => {
+          alunoTurmaMap[alunoId] = turma.id;
+        });
+      });
+
       const alunosData = alunosSnapshot.docs.map(doc => {
         const aluno = doc.data();
         const totalAulas = aulas.length;
@@ -115,7 +155,8 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
           nomeCompleto: aluno.nomeCompleto,
           aulasParticipadas: aulasPresentes,
           faltas: totalAulas - aulasPresentes,
-          percentualPresenca: percentual
+          percentualPresenca: percentual,
+          turmaId: alunoTurmaMap[doc.id]
         };
       });
 
@@ -125,6 +166,22 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
       console.error('Erro ao carregar dados:', error);
       setLoading(false);
     }
+  };
+
+  const toggleTurma = (turmaId: string) => {
+    setTurmasAbertas(prev => 
+      prev.includes(turmaId) 
+        ? prev.filter(id => id !== turmaId)
+        : [...prev, turmaId]
+    );
+  };
+
+  const getAlunosDaTurma = (turmaId: string) => {
+    return alunosFrequencia.filter(aluno => aluno.turmaId === turmaId);
+  };
+
+  const getAlunosSemTurma = () => {
+    return alunosFrequencia.filter(aluno => !aluno.turmaId);
   };
 
   const verDetalhesInstrutor = (instrutor: any) => {
@@ -270,41 +327,160 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
       </TabsContent>
 
       <TabsContent value="frequencia">
-        <Card>
-          <CardHeader>
-            <CardTitle>Frequência dos Alunos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Aluno</TableHead>
-                  <TableHead>Presença (%)</TableHead>
-                  <TableHead>Aulas Participadas</TableHead>
-                  <TableHead>Faltas</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {alunosFrequencia.map((aluno) => (
-                  <TableRow key={aluno.id}>
-                    <TableCell className="font-medium">{aluno.nomeCompleto}</TableCell>
-                    <TableCell>
-                      <span className={`font-medium ${
-                        aluno.percentualPresenca >= 80 ? 'text-green-600' :
-                        aluno.percentualPresenca >= 60 ? 'text-yellow-600' :
-                        'text-red-600'
-                      }`}>
-                        {aluno.percentualPresenca.toFixed(1)}%
-                      </span>
-                    </TableCell>
-                    <TableCell>{aluno.aulasParticipadas}</TableCell>
-                    <TableCell>{aluno.faltas}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Frequência dos Alunos por Turma
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {turmas.length === 0 && alunosFrequencia.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum aluno ou turma cadastrada
+                </div>
+              ) : (
+                <>
+                  {/* Turmas */}
+                  {turmas.map((turma) => {
+                    const alunosTurma = getAlunosDaTurma(turma.id);
+                    const isOpen = turmasAbertas.includes(turma.id);
+                    const mediaPresenca = alunosTurma.length > 0
+                      ? alunosTurma.reduce((sum, a) => sum + a.percentualPresenca, 0) / alunosTurma.length
+                      : 0;
+
+                    return (
+                      <Collapsible key={turma.id} open={isOpen} onOpenChange={() => toggleTurma(turma.id)}>
+                        <CollapsibleTrigger asChild>
+                          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                            <div className="flex items-center gap-3">
+                              {isOpen ? (
+                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                              )}
+                              <div>
+                                <p className="font-medium">{turma.nome}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {alunosTurma.length} aluno(s)
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <Badge variant={mediaPresenca >= 80 ? "default" : mediaPresenca >= 60 ? "secondary" : "destructive"}>
+                                Média: {mediaPresenca.toFixed(1)}%
+                              </Badge>
+                            </div>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          {alunosTurma.length === 0 ? (
+                            <div className="text-center py-4 text-sm text-muted-foreground border-x border-b rounded-b-lg">
+                              Nenhum aluno vinculado a esta turma
+                            </div>
+                          ) : (
+                            <div className="border-x border-b rounded-b-lg overflow-hidden">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Aluno</TableHead>
+                                    <TableHead>Presença (%)</TableHead>
+                                    <TableHead>Aulas Participadas</TableHead>
+                                    <TableHead>Faltas</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {alunosTurma.map((aluno) => (
+                                    <TableRow key={aluno.id}>
+                                      <TableCell className="font-medium">{aluno.nomeCompleto}</TableCell>
+                                      <TableCell>
+                                        <span className={`font-medium ${
+                                          aluno.percentualPresenca >= 80 ? 'text-green-600' :
+                                          aluno.percentualPresenca >= 60 ? 'text-yellow-600' :
+                                          'text-red-600'
+                                        }`}>
+                                          {aluno.percentualPresenca.toFixed(1)}%
+                                        </span>
+                                      </TableCell>
+                                      <TableCell>{aluno.aulasParticipadas}</TableCell>
+                                      <TableCell>{aluno.faltas}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    );
+                  })}
+
+                  {/* Alunos sem turma */}
+                  {getAlunosSemTurma().length > 0 && (
+                    <Collapsible 
+                      open={turmasAbertas.includes('sem-turma')} 
+                      onOpenChange={() => toggleTurma('sem-turma')}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-3">
+                            {turmasAbertas.includes('sem-turma') ? (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            )}
+                            <div>
+                              <p className="font-medium text-muted-foreground">Sem Turma</p>
+                              <p className="text-sm text-muted-foreground">
+                                {getAlunosSemTurma().length} aluno(s)
+                              </p>
+                            </div>
+                          </div>
+                          <Badge variant="outline">
+                            Média: {(getAlunosSemTurma().reduce((sum, a) => sum + a.percentualPresenca, 0) / getAlunosSemTurma().length).toFixed(1)}%
+                          </Badge>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="border-x border-b rounded-b-lg overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Aluno</TableHead>
+                                <TableHead>Presença (%)</TableHead>
+                                <TableHead>Aulas Participadas</TableHead>
+                                <TableHead>Faltas</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {getAlunosSemTurma().map((aluno) => (
+                                <TableRow key={aluno.id}>
+                                  <TableCell className="font-medium">{aluno.nomeCompleto}</TableCell>
+                                  <TableCell>
+                                    <span className={`font-medium ${
+                                      aluno.percentualPresenca >= 80 ? 'text-green-600' :
+                                      aluno.percentualPresenca >= 60 ? 'text-yellow-600' :
+                                      'text-red-600'
+                                    }`}>
+                                      {aluno.percentualPresenca.toFixed(1)}%
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>{aluno.aulasParticipadas}</TableCell>
+                                  <TableCell>{aluno.faltas}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </TabsContent>
 
       <TabsContent value="calendario" className="space-y-6">
