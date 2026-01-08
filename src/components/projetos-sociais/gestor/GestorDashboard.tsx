@@ -122,13 +122,11 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
         </header>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className={`grid w-full ${projetoSelecionado?.configuracao?.usaTurmas ? 'grid-cols-7' : 'grid-cols-6'}`}>
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="configuracao">Configuração</TabsTrigger>
             <TabsTrigger value="alunos">Alunos</TabsTrigger>
-            {projetoSelecionado?.configuracao?.usaTurmas && (
-              <TabsTrigger value="turmas">Turmas</TabsTrigger>
-            )}
+            <TabsTrigger value="turmas">Turmas</TabsTrigger>
             <TabsTrigger value="conteudos">Conteúdos</TabsTrigger>
             <TabsTrigger value="aulas">Aulas</TabsTrigger>
             <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
@@ -202,11 +200,9 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
             <CadastroAlunosTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
           </TabsContent>
 
-          {projetoSelecionado?.configuracao?.usaTurmas && (
-            <TabsContent value="turmas">
-              <TurmasTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
-            </TabsContent>
-          )}
+          <TabsContent value="turmas">
+            <TurmasTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
+          </TabsContent>
 
           <TabsContent value="conteudos">
             <ConteudosAulaTab projeto={projetoSelecionado} />
