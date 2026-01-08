@@ -49,6 +49,7 @@ interface Material {
   quantidade?: number;
   disponivel: boolean;
   fabricante?: string;
+  modelo?: string;
   observacoes?: string;
 }
 
@@ -59,6 +60,8 @@ interface MaterialSelecionado {
   quantidade: number;
   numeroSerie?: string;
   carregadores?: number;
+  modelo?: string;
+  fabricante?: string;
 }
 
 interface LivroAtivo {
@@ -501,7 +504,9 @@ const ArmeiroInterface = () => {
         categoria: material.categoria,
         quantidade,
         numeroSerie: material.numeroSerie,
-        carregadores
+        carregadores,
+        modelo: material.modelo,
+        fabricante: material.fabricante
       }]);
     }
     
@@ -1015,7 +1020,11 @@ const ArmeiroInterface = () => {
                             >
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <div className="font-medium">{material.nome}</div>
+                                  <div className="font-medium">
+                                    {material.nome}
+                                    {material.modelo && ` ${material.modelo}`}
+                                    {material.fabricante && ` ${material.fabricante}`}
+                                  </div>
                                   <div className="text-sm text-muted-foreground">
                                     {material.numeroSerie && `Série: ${material.numeroSerie}`}
                                     {material.calibre && ` - Calibre: ${material.calibre}`}
@@ -1050,7 +1059,11 @@ const ArmeiroInterface = () => {
                           className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-lg"
                         >
                           <div>
-                            <span className="font-medium text-foreground">{material.nome}</span>
+                            <span className="font-medium text-foreground">
+                              {material.nome}
+                              {material.modelo && ` ${material.modelo}`}
+                              {material.fabricante && ` ${material.fabricante}`}
+                            </span>
                             <div className="text-sm text-muted-foreground">
                               Qtd: {material.quantidade}
                               {material.carregadores && ` | ${material.carregadores} carregadores`}
