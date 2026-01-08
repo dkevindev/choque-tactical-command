@@ -9,15 +9,19 @@ const path = require('path');
 
 const app = express();
 
-// CORS middleware - deve responder antes de qualquer outra coisa
+// Usar o pacote cors com configuração permissiva
+app.use(cors({ origin: true }));
+
+// Também adicionar headers manualmente para garantir
 app.use((req, res, next) => {
     res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.set('Access-Control-Max-Age', '3600');
     
+    // Responder imediatamente às requisições OPTIONS (preflight)
     if (req.method === 'OPTIONS') {
-        res.status(204).send('');
-        return;
+        return res.status(204).send('');
     }
     next();
 });
