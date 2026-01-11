@@ -76,6 +76,14 @@ const DIAS_SEMANA_NOMES: Record<string, string> = {
   'sabado': 'Sábado'
 };
 
+// Mapeamento de turno string (usado nas turmas) para número (usado nas aulas)
+const TURNO_STRING_PARA_NUMERO: Record<string, number> = {
+  'manha': 1,
+  'tarde': 2,
+  'noite': 3,
+  'noturno': 4
+};
+
 const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmasComContagem, setTurmasComContagem] = useState<Map<string, number>>(new Map());
@@ -163,9 +171,14 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       }));
   };
 
-  const buscarAulasMes = async (turmaId: string, turno: string, ano: number, mes: number): Promise<Aula[]> => {
+  const buscarAulasMes = async (turmaId: string, turnoString: string, ano: number, mes: number): Promise<Aula[]> => {
     const inicio = startOfMonth(new Date(ano, mes - 1));
     const fim = endOfMonth(new Date(ano, mes - 1));
+    
+    // Converter turno string ("manha", "tarde") para número (1, 2, 3, 4)
+    const turnoNumero = TURNO_STRING_PARA_NUMERO[turnoString];
+    
+    console.log('buscarAulasMes - turnoString:', turnoString, 'turnoNumero:', turnoNumero);
     
     const q = query(
       collection(db, 'projetos_aulas'),
@@ -175,24 +188,34 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
     );
     
     const snapshot = await getDocs(q);
-    return snapshot.docs
-      .map(doc => {
-        const data = doc.data();
-        const aulaData = data.data?.toDate ? data.data.toDate() : new Date(data.data);
-        return {
-          id: doc.id,
-          data: aulaData,
-          turmaId: data.turmaId,
-          turno: data.turno,
-          alunosPresentes: data.alunosPresentes || [],
-          instrutores: data.instrutores || [],
-          conteudo: data.conteudo || '',
-          status: data.status
-        };
-      })
-      .filter(aula => {
-        return aula.data >= inicio && aula.data <= fim && aula.turno === turno;
-      });
+    const todasAulas = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const aulaData = data.data?.toDate ? data.data.toDate() : new Date(data.data);
+      return {
+        id: doc.id,
+        data: aulaData,
+        turmaId: data.turmaId,
+        turno: data.turno,
+        alunosPresentes: data.alunosPresentes || [],
+        instrutores: data.instrutores || [],
+        conteudo: data.conteudo || '',
+        status: data.status
+      };
+    });
+    
+    console.log('Total de aulas encerradas encontradas:', todasAulas.length);
+    console.log('Aulas:', todasAulas.map(a => ({ data: format(a.data, 'dd/MM'), turno: a.turno, instrutores: a.instrutores })));
+    
+    const aulasFiltradas = todasAulas.filter(aula => {
+      const dentroDoMes = aula.data >= inicio && aula.data <= fim;
+      // Comparar turno como número (aula.turno é número, turnoNumero é a conversão da string)
+      const turnoCorreto = aula.turno === turnoNumero;
+      return dentroDoMes && turnoCorreto;
+    });
+    
+    console.log('Aulas filtradas para o mês/turno:', aulasFiltradas.length);
+    
+    return aulasFiltradas;
   };
 
   const buscarInstrutores = async (instrutoresIds: string[]): Promise<any[]> => {
