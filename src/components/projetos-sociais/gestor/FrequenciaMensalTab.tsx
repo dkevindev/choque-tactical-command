@@ -211,6 +211,27 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       }));
   };
 
+  const buscarConteudoMes = async (mes: number, ano: number): Promise<string> => {
+    try {
+      const q = query(
+        collection(db, 'projetos_conteudos'),
+        where('projetoId', '==', projeto.id),
+        where('mes', '==', mes),
+        where('ano', '==', ano),
+        where('ativo', '==', true)
+      );
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const conteudo = snapshot.docs[0].data().conteudo;
+        return conteudo || '';
+      }
+      return '';
+    } catch (error) {
+      console.error('Erro ao buscar conteúdo do mês:', error);
+      return '';
+    }
+  };
+
   const gerarFrequenciaMensal = async (turma: Turma) => {
     if (!turma.diasSemana || turma.diasSemana.length === 0) {
       toast.error('Esta turma não tem dias da semana configurados');
@@ -249,8 +270,8 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       });
       const instrutores = await buscarInstrutores([...instrutoresIdsSet]);
       
-      // 5. Coletar conteúdos das aulas
-      const conteudos = [...new Set(aulas.map(a => a.conteudo).filter(c => c))];
+      // 5. Buscar conteúdo cadastrado para o mês
+      const conteudoCadastrado = await buscarConteudoMes(mes, ano);
       
       // 6. Preparar datas para as colunas (máximo 12)
       const datasFormatadas = diasAula.slice(0, 12).map(d => format(d, 'dd/MM'));
@@ -320,7 +341,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
         mes: MESES.find(m => m.value === mesSelecionado)?.label.toUpperCase() || '',
         turma: turma.nome,
         turno: turma.turnoNome || turma.turno.toUpperCase(),
-        conteudo: conteudos.join(', ') || 'CONTEÚDO PROGRAMÁTICO',
+        conteudo: conteudoCadastrado || 'CONTEÚDO PROGRAMÁTICO',
         projeto: projeto.nome || 'PROJETO CÉLERIS',
         ...datasPadded,
         instrutores: instrutoresComPresenca,
