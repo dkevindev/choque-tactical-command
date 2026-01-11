@@ -346,6 +346,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       }
       
       // 7. Montar presença dos alunos
+      const hoje = new Date();
       const alunosComPresenca = alunos.map(aluno => {
         const presencas: Record<string, string> = {};
         
@@ -355,8 +356,11 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
           
           if (!aulaData) {
-            // Não houve aula registrada - deixar vazio (dia ainda não aconteceu ou sem registro)
-            presencas[`p${idx + 1}`] = '';
+            // Não houve aula registrada
+            // Se o dia já passou, marcar como "-" (não teve aula)
+            // Se o dia ainda não chegou, deixar vazio
+            const diaPassou = dia < hoje;
+            presencas[`p${idx + 1}`] = diaPassou ? '-' : '';
           } else {
             // Houve aula - verificar se aluno estava presente
             presencas[`p${idx + 1}`] = aulaData.alunosPresentes.includes(aluno.id) ? '' : '-';
@@ -383,7 +387,9 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
           
           if (!aulaData) {
-            presencas[`p${idx + 1}`] = '';
+            // Não houve aula registrada - se dia passou, marcar "-"
+            const diaPassou = dia < hoje;
+            presencas[`p${idx + 1}`] = diaPassou ? '-' : '';
           } else {
             presencas[`p${idx + 1}`] = aulaData.instrutores.includes(inst.policialId) ? '' : '-';
           }
