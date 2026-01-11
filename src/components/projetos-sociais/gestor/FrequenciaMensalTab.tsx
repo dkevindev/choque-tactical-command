@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -221,17 +221,57 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
   const buscarInstrutores = async (instrutoresIds: string[]): Promise<any[]> => {
     if (!instrutoresIds || instrutoresIds.length === 0) return [];
     
+    console.log('buscarInstrutores - IDs recebidos:', instrutoresIds);
+    
     const q = query(
       collection(db, 'projetos_instrutores'),
       where('projetoId', '==', projeto.id)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs
-      .filter(doc => instrutoresIds.includes(doc.id))
+    
+    // Filtrar por policialId, não por doc.id
+    const instrutoresVinculados = snapshot.docs
+      .filter(doc => {
+        const policialId = doc.data().policialId;
+        const match = instrutoresIds.includes(policialId);
+        console.log('Comparando policialId:', policialId, 'match:', match);
+        return match;
+      })
       .map(doc => ({
         id: doc.id,
+        policialId: doc.data().policialId,
         ...doc.data()
       }));
+    
+    console.log('Instrutores vinculados encontrados:', instrutoresVinculados.length);
+    
+    // Buscar dados completos dos policiais
+    const instrutoresCompletos = await Promise.all(
+      instrutoresVinculados.map(async (inst) => {
+        try {
+          const policialDocRef = doc(db, 'policiais', inst.policialId);
+          const policialSnap = await getDoc(policialDocRef);
+          
+          if (policialSnap.exists()) {
+            const policialData = policialSnap.data();
+            return {
+              ...inst,
+              postGrad: policialData['Post/Grad'] || policialData.postGrad || '',
+              nomeGuerra: policialData['NOME DE GUERRA'] || policialData.nomeGuerra || '',
+              nome: policialData.NOME || policialData.nome || ''
+            };
+          }
+          return inst;
+        } catch (error) {
+          console.error('Erro ao buscar policial:', inst.policialId, error);
+          return inst;
+        }
+      })
+    );
+    
+    console.log('Instrutores completos:', instrutoresCompletos.map((i: any) => ({ policialId: i.policialId, nome: i.nomeGuerra })));
+    
+    return instrutoresCompletos;
   };
 
   const buscarConteudoMes = async (mes: number, ano: number): Promise<string> => {
@@ -345,7 +385,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           if (!aulaData) {
             presencas[`p${idx + 1}`] = '';
           } else {
-            presencas[`p${idx + 1}`] = aulaData.instrutores.includes(inst.id) ? '' : '-';
+            presencas[`p${idx + 1}`] = aulaData.instrutores.includes(inst.policialId) ? '' : '-';
           }
         });
         
