@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, query, where, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,13 +9,30 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Users, Plus, Trash2, Edit, Save, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Users, Plus, Trash2, Edit, Save, X, Calendar, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface TurmasTabProps {
   projeto: any;
   onUpdate: () => void;
 }
+
+const DIAS_SEMANA = [
+  { value: 'segunda', label: 'Segunda-feira' },
+  { value: 'terca', label: 'Terça-feira' },
+  { value: 'quarta', label: 'Quarta-feira' },
+  { value: 'quinta', label: 'Quinta-feira' },
+  { value: 'sexta', label: 'Sexta-feira' },
+  { value: 'sabado', label: 'Sábado' },
+];
+
+const TURNOS = [
+  { value: 'manha', label: 'Manhã' },
+  { value: 'tarde', label: 'Tarde' },
+  { value: 'noite', label: 'Noite' },
+];
 
 const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
   const [turmas, setTurmas] = useState<any[]>([]);
@@ -26,6 +43,8 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
   const [nomeTurma, setNomeTurma] = useState('');
   const [descricaoTurma, setDescricaoTurma] = useState('');
   const [alunosSelecionados, setAlunosSelecionados] = useState<string[]>([]);
+  const [diasSemana, setDiasSemana] = useState<string[]>([]);
+  const [turno, setTurno] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -77,6 +96,18 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
       return;
     }
 
+    if (diasSemana.length === 0) {
+      toast.error('Selecione pelo menos um dia da semana');
+      return;
+    }
+
+    if (!turno) {
+      toast.error('Selecione o turno');
+      return;
+    }
+
+    const turnoLabel = TURNOS.find(t => t.value === turno)?.label || turno;
+
     try {
       setLoading(true);
       await addDoc(collection(db, 'projetos_turmas'), {
@@ -84,6 +115,9 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
         nome: nomeTurma,
         descricao: descricaoTurma,
         alunos: alunosSelecionados,
+        diasSemana: diasSemana,
+        turno: turno,
+        turnoNome: turnoLabel,
         ativo: true,
         dataCriacao: new Date()
       });
@@ -106,6 +140,8 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
     setNomeTurma(turma.nome);
     setDescricaoTurma(turma.descricao || '');
     setAlunosSelecionados(turma.alunos || []);
+    setDiasSemana(turma.diasSemana || []);
+    setTurno(turma.turno || '');
     setDialogEditarTurma(true);
   };
 
@@ -115,12 +151,27 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
       return;
     }
 
+    if (diasSemana.length === 0) {
+      toast.error('Selecione pelo menos um dia da semana');
+      return;
+    }
+
+    if (!turno) {
+      toast.error('Selecione o turno');
+      return;
+    }
+
+    const turnoLabel = TURNOS.find(t => t.value === turno)?.label || turno;
+
     try {
       setLoading(true);
       await updateDoc(doc(db, 'projetos_turmas', turmaEditando.id), {
         nome: nomeTurma,
         descricao: descricaoTurma,
-        alunos: alunosSelecionados
+        alunos: alunosSelecionados,
+        diasSemana: diasSemana,
+        turno: turno,
+        turnoNome: turnoLabel
       });
 
       toast.success('Turma atualizada com sucesso!');
@@ -160,11 +211,29 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
     }
   };
 
+  const toggleDiaSemana = (dia: string) => {
+    if (diasSemana.includes(dia)) {
+      setDiasSemana(diasSemana.filter(d => d !== dia));
+    } else {
+      setDiasSemana([...diasSemana, dia]);
+    }
+  };
+
   const limparFormulario = () => {
     setNomeTurma('');
     setDescricaoTurma('');
     setAlunosSelecionados([]);
+    setDiasSemana([]);
+    setTurno('');
     setTurmaEditando(null);
+  };
+
+  const formatarDiasSemana = (dias: string[]): string => {
+    if (!dias || dias.length === 0) return 'Não configurado';
+    return dias.map(d => {
+      const dia = DIAS_SEMANA.find(ds => ds.value === d);
+      return dia ? dia.label.replace('-feira', '') : d;
+    }).join(', ');
   };
 
   return (
@@ -211,9 +280,45 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="mb-2 block">Dias da Semana *</Label>
+                      <div className="space-y-2 border rounded-lg p-3">
+                        {DIAS_SEMANA.map((dia) => (
+                          <label
+                            key={dia.value}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={diasSemana.includes(dia.value)}
+                              onCheckedChange={() => toggleDiaSemana(dia.value)}
+                            />
+                            <span className="text-sm">{dia.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="turno">Turno *</Label>
+                      <Select value={turno} onValueChange={setTurno}>
+                        <SelectTrigger className="mt-2">
+                          <SelectValue placeholder="Selecione o turno" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background border shadow-lg z-50">
+                          {TURNOS.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
                   <div>
                     <Label className="mb-2 block">Alunos da Turma</Label>
-                    <ScrollArea className="h-[300px] border rounded-lg p-4">
+                    <ScrollArea className="h-[200px] border rounded-lg p-4">
                       <div className="space-y-2">
                         {alunos.map((aluno) => (
                           <label
@@ -299,11 +404,24 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4" />
+                      <span>{formatarDiasSemana(turma.diasSemana)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>{turma.turnoNome || 'Turno não definido'}</span>
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Users className="h-4 w-4" />
                       <span>{turma.alunos?.length || 0} aluno(s)</span>
                     </div>
+                    {(!turma.diasSemana || turma.diasSemana.length === 0 || !turma.turno) && (
+                      <Badge variant="destructive" className="text-xs">
+                        Configuração incompleta
+                      </Badge>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -338,32 +456,52 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="mb-2 block">Dias da Semana *</Label>
+                <div className="space-y-2 border rounded-lg p-3">
+                  {DIAS_SEMANA.map((dia) => (
+                    <label key={dia.value} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={diasSemana.includes(dia.value)}
+                        onCheckedChange={() => toggleDiaSemana(dia.value)}
+                      />
+                      <span className="text-sm">{dia.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-turno">Turno *</Label>
+                <Select value={turno} onValueChange={setTurno}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Selecione o turno" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-lg z-50">
+                    {TURNOS.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div>
               <Label className="mb-2 block">Alunos da Turma</Label>
-              <ScrollArea className="h-[300px] border rounded-lg p-4">
+              <ScrollArea className="h-[200px] border rounded-lg p-4">
                 <div className="space-y-2">
                   {alunos.map((aluno) => (
-                    <label
-                      key={aluno.id}
-                      className="flex items-center gap-3 p-2 hover:bg-muted rounded cursor-pointer"
-                    >
-                      <Checkbox
-                        checked={alunosSelecionados.includes(aluno.id)}
-                        onCheckedChange={() => toggleAluno(aluno.id)}
-                      />
+                    <label key={aluno.id} className="flex items-center gap-3 p-2 hover:bg-muted rounded cursor-pointer">
+                      <Checkbox checked={alunosSelecionados.includes(aluno.id)} onCheckedChange={() => toggleAluno(aluno.id)} />
                       <div>
                         <p className="font-medium">{aluno.nomeCompleto}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {aluno.nomeGuerra} • {aluno.idade} anos
-                        </p>
+                        <p className="text-sm text-muted-foreground">{aluno.nomeGuerra} • {aluno.idade} anos</p>
                       </div>
                     </label>
                   ))}
                 </div>
               </ScrollArea>
-              <p className="text-sm text-muted-foreground mt-2">
-                {alunosSelecionados.length} aluno(s) selecionado(s)
-              </p>
+              <p className="text-sm text-muted-foreground mt-2">{alunosSelecionados.length} aluno(s) selecionado(s)</p>
             </div>
 
             <div className="flex gap-3">

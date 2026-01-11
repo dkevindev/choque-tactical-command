@@ -507,6 +507,10 @@ exports.gerarLivroGuardaDocx = gerarLivroGuardaDocx;
 const { gerarListaFrequenciaDocx } = require('./gerar-lista-frequencia');
 exports.gerarListaFrequenciaDocx = gerarListaFrequenciaDocx;
 
+// ----------------- FUNÇÃO FREQUÊNCIA MENSAL (PROJETOS SOCIAIS) -----------------
+const { gerarFrequenciaMensalDocx } = require('./gerar-frequencia-mensal');
+exports.gerarFrequenciaMensalDocx = gerarFrequenciaMensalDocx;
+
 // ----------------- FUNÇÃO LIVRO RESERVA DE ARMAMENTO -----------------
 const appLivroReservaArmamento = express();
 appLivroReservaArmamento.use(cors({ origin: true }));
