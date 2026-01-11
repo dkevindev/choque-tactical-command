@@ -346,7 +346,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       }
       
       // 7. Montar presença dos alunos
-      const hoje = new Date();
+      // Lógica: todos os dias iniciam com "-", só fica vazio (para assinar) quando teve aula E estava presente
       const alunosComPresenca = alunos.map(aluno => {
         const presencas: Record<string, string> = {};
         
@@ -355,19 +355,16 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           // Verificar se houve aula neste dia
           const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
           
-          if (!aulaData) {
-            // Não houve aula registrada
-            // Se o dia já passou, marcar como "-" (não teve aula)
-            // Se o dia ainda não chegou, deixar vazio
-            const diaPassou = dia < hoje;
-            presencas[`p${idx + 1}`] = diaPassou ? '-' : '';
+          if (aulaData && aulaData.alunosPresentes.includes(aluno.id)) {
+            // Teve aula E aluno estava presente → vazio (disponível para assinar)
+            presencas[`p${idx + 1}`] = '';
           } else {
-            // Houve aula - verificar se aluno estava presente
-            presencas[`p${idx + 1}`] = aulaData.alunosPresentes.includes(aluno.id) ? '' : '-';
+            // Não teve aula OU aluno faltou → "-"
+            presencas[`p${idx + 1}`] = '-';
           }
         });
         
-        // Preencher colunas restantes até 10
+        // Preencher colunas restantes até 10 (dias que não existem no mês)
         for (let i = diasAula.length + 1; i <= 10; i++) {
           presencas[`p${i}`] = '';
         }
@@ -379,6 +376,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       });
       
       // 8. Montar presença dos instrutores
+      // Mesma lógica: só fica vazio quando deu aula naquele dia
       const instrutoresComPresenca = instrutores.map(inst => {
         const presencas: Record<string, string> = {};
         
@@ -386,15 +384,16 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           const dataStr = format(dia, 'dd/MM');
           const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
           
-          if (!aulaData) {
-            // Não houve aula registrada - se dia passou, marcar "-"
-            const diaPassou = dia < hoje;
-            presencas[`p${idx + 1}`] = diaPassou ? '-' : '';
+          if (aulaData && aulaData.instrutores.includes(inst.policialId)) {
+            // Teve aula E instrutor participou → vazio (disponível para assinar)
+            presencas[`p${idx + 1}`] = '';
           } else {
-            presencas[`p${idx + 1}`] = aulaData.instrutores.includes(inst.policialId) ? '' : '-';
+            // Não teve aula OU instrutor não participou → "-"
+            presencas[`p${idx + 1}`] = '-';
           }
         });
         
+        // Preencher colunas restantes até 10
         for (let i = diasAula.length + 1; i <= 10; i++) {
           presencas[`p${i}`] = '';
         }
