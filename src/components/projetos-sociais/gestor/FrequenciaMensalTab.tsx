@@ -78,6 +78,7 @@ const DIAS_SEMANA_NOMES: Record<string, string> = {
 
 const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
   const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [turmasComContagem, setTurmasComContagem] = useState<Map<string, number>>(new Map());
   const [mesSelecionado, setMesSelecionado] = useState<string>(String(new Date().getMonth() + 1));
   const [anoSelecionado, setAnoSelecionado] = useState<string>(String(new Date().getFullYear()));
   const [loading, setLoading] = useState(false);
@@ -94,18 +95,37 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
   const carregarTurmas = async () => {
     try {
       setLoading(true);
-      const q = query(
+      
+      // Buscar turmas
+      const qTurmas = query(
         collection(db, 'projetos_turmas'),
         where('projetoId', '==', projeto.id),
         where('ativo', '==', true)
       );
-      const snapshot = await getDocs(q);
-      const turmasData = snapshot.docs.map(doc => ({
+      const snapshotTurmas = await getDocs(qTurmas);
+      const turmasData = snapshotTurmas.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Turma[];
       
+      // Buscar todos os alunos ativos do projeto
+      const qAlunos = query(
+        collection(db, 'projetos_alunos'),
+        where('projetoId', '==', projeto.id),
+        where('ativo', '==', true)
+      );
+      const snapshotAlunos = await getDocs(qAlunos);
+      const alunosAtivosIds = new Set(snapshotAlunos.docs.map(doc => doc.id));
+      
+      // Calcular contagem real de alunos ativos por turma
+      const contagem = new Map<string, number>();
+      turmasData.forEach(turma => {
+        const alunosAtivosNaTurma = (turma.alunos || []).filter(id => alunosAtivosIds.has(id));
+        contagem.set(turma.id, alunosAtivosNaTurma.length);
+      });
+      
       setTurmas(turmasData);
+      setTurmasComContagem(contagem);
     } catch (error) {
       console.error('Erro ao carregar turmas:', error);
       toast.error('Erro ao carregar turmas');
@@ -446,7 +466,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
                       
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Users className="h-4 w-4" />
-                        <span>{turma.alunos?.length || 0} aluno(s)</span>
+                        <span>{turmasComContagem.get(turma.id) || 0} aluno(s) ativos</span>
                       </div>
                       
                       {temConfiguracao && (
