@@ -10,6 +10,7 @@ import VisualizarAulasTab from './VisualizarAulasTab';
 import RelatoriosGestorTab from './RelatoriosGestorTab';
 import TurmasTab from './TurmasTab';
 import ConteudosAulaTab from './ConteudosAulaTab';
+import FrequenciaMensalTab from './FrequenciaMensalTab';
 
 interface GestorDashboardProps {
   projetos: any[];
@@ -122,13 +123,14 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
         </header>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="configuracao">Configuração</TabsTrigger>
             <TabsTrigger value="alunos">Alunos</TabsTrigger>
             <TabsTrigger value="turmas">Turmas</TabsTrigger>
             <TabsTrigger value="conteudos">Conteúdos</TabsTrigger>
             <TabsTrigger value="aulas">Aulas</TabsTrigger>
+            <TabsTrigger value="frequencia">Frequência</TabsTrigger>
             <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
           </TabsList>
 
@@ -210,6 +212,10 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
 
           <TabsContent value="aulas">
             <VisualizarAulasTab projeto={projetoSelecionado} />
+          </TabsContent>
+
+          <TabsContent value="frequencia">
+            <FrequenciaMensalTab projeto={projetoSelecionado} />
           </TabsContent>
 
           <TabsContent value="relatorios">

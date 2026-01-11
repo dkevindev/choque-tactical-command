@@ -1,0 +1,493 @@
+import { useState, useEffect } from 'react';
+import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { db } from '@/firebase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { FileText, Calendar, Users, Clock, Download, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+interface FrequenciaMensalTabProps {
+  projeto: any;
+}
+
+interface Turma {
+  id: string;
+  nome: string;
+  descricao?: string;
+  alunos: string[];
+  diasSemana: string[];
+  turno: string;
+  turnoNome: string;
+}
+
+interface Aluno {
+  id: string;
+  nomeGuerra: string;
+  nomeCompleto: string;
+}
+
+interface Aula {
+  id: string;
+  data: Date;
+  turmaId: string;
+  turno: string;
+  alunosPresentes: string[];
+  instrutores: string[];
+  conteudo?: string;
+  status: string;
+}
+
+const MESES = [
+  { value: '1', label: 'Janeiro' },
+  { value: '2', label: 'Fevereiro' },
+  { value: '3', label: 'Março' },
+  { value: '4', label: 'Abril' },
+  { value: '5', label: 'Maio' },
+  { value: '6', label: 'Junho' },
+  { value: '7', label: 'Julho' },
+  { value: '8', label: 'Agosto' },
+  { value: '9', label: 'Setembro' },
+  { value: '10', label: 'Outubro' },
+  { value: '11', label: 'Novembro' },
+  { value: '12', label: 'Dezembro' },
+];
+
+const DIAS_SEMANA_MAP: Record<string, number> = {
+  'domingo': 0,
+  'segunda': 1,
+  'terca': 2,
+  'quarta': 3,
+  'quinta': 4,
+  'sexta': 5,
+  'sabado': 6
+};
+
+const DIAS_SEMANA_NOMES: Record<string, string> = {
+  'domingo': 'Domingo',
+  'segunda': 'Segunda',
+  'terca': 'Terça',
+  'quarta': 'Quarta',
+  'quinta': 'Quinta',
+  'sexta': 'Sexta',
+  'sabado': 'Sábado'
+};
+
+const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [mesSelecionado, setMesSelecionado] = useState<string>(String(new Date().getMonth() + 1));
+  const [anoSelecionado, setAnoSelecionado] = useState<string>(String(new Date().getFullYear()));
+  const [loading, setLoading] = useState(false);
+  const [gerando, setGerando] = useState<string | null>(null);
+
+  const anos = [2024, 2025, 2026, 2027];
+
+  useEffect(() => {
+    if (projeto) {
+      carregarTurmas();
+    }
+  }, [projeto?.id]);
+
+  const carregarTurmas = async () => {
+    try {
+      setLoading(true);
+      const q = query(
+        collection(db, 'projetos_turmas'),
+        where('projetoId', '==', projeto.id),
+        where('ativo', '==', true)
+      );
+      const snapshot = await getDocs(q);
+      const turmasData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Turma[];
+      
+      setTurmas(turmasData);
+    } catch (error) {
+      console.error('Erro ao carregar turmas:', error);
+      toast.error('Erro ao carregar turmas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calcularDiasAula = (ano: number, mes: number, diasSemana: string[]): Date[] => {
+    if (!diasSemana || diasSemana.length === 0) return [];
+    
+    const diasNumericos = diasSemana.map(d => DIAS_SEMANA_MAP[d]).filter(d => d !== undefined);
+    const inicio = startOfMonth(new Date(ano, mes - 1));
+    const fim = endOfMonth(new Date(ano, mes - 1));
+    
+    const todosDias = eachDayOfInterval({ start: inicio, end: fim });
+    return todosDias.filter(dia => diasNumericos.includes(getDay(dia)));
+  };
+
+  const buscarAlunosTurma = async (alunosIds: string[]): Promise<Aluno[]> => {
+    if (!alunosIds || alunosIds.length === 0) return [];
+    
+    const q = query(
+      collection(db, 'projetos_alunos'),
+      where('projetoId', '==', projeto.id),
+      where('ativo', '==', true)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .filter(doc => alunosIds.includes(doc.id))
+      .map(doc => ({
+        id: doc.id,
+        nomeGuerra: doc.data().nomeGuerra || doc.data().nomeCompleto,
+        nomeCompleto: doc.data().nomeCompleto
+      }));
+  };
+
+  const buscarAulasMes = async (turmaId: string, turno: string, ano: number, mes: number): Promise<Aula[]> => {
+    const inicio = startOfMonth(new Date(ano, mes - 1));
+    const fim = endOfMonth(new Date(ano, mes - 1));
+    
+    const q = query(
+      collection(db, 'projetos_aulas'),
+      where('projetoId', '==', projeto.id),
+      where('turmaId', '==', turmaId),
+      where('status', '==', 'encerrada')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        const aulaData = data.data?.toDate ? data.data.toDate() : new Date(data.data);
+        return {
+          id: doc.id,
+          data: aulaData,
+          turmaId: data.turmaId,
+          turno: data.turno,
+          alunosPresentes: data.alunosPresentes || [],
+          instrutores: data.instrutores || [],
+          conteudo: data.conteudo || '',
+          status: data.status
+        };
+      })
+      .filter(aula => {
+        return aula.data >= inicio && aula.data <= fim && aula.turno === turno;
+      });
+  };
+
+  const buscarInstrutores = async (instrutoresIds: string[]): Promise<any[]> => {
+    if (!instrutoresIds || instrutoresIds.length === 0) return [];
+    
+    const q = query(
+      collection(db, 'projetos_instrutores'),
+      where('projetoId', '==', projeto.id)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .filter(doc => instrutoresIds.includes(doc.id))
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+  };
+
+  const gerarFrequenciaMensal = async (turma: Turma) => {
+    if (!turma.diasSemana || turma.diasSemana.length === 0) {
+      toast.error('Esta turma não tem dias da semana configurados');
+      return;
+    }
+
+    if (!turma.turno) {
+      toast.error('Esta turma não tem turno configurado');
+      return;
+    }
+
+    try {
+      setGerando(turma.id);
+      
+      const ano = parseInt(anoSelecionado);
+      const mes = parseInt(mesSelecionado);
+      
+      // 1. Calcular dias de aula do mês
+      const diasAula = calcularDiasAula(ano, mes, turma.diasSemana);
+      
+      if (diasAula.length === 0) {
+        toast.error('Nenhum dia de aula encontrado para este mês');
+        return;
+      }
+      
+      // 2. Buscar aulas encerradas do mês para essa turma/turno
+      const aulas = await buscarAulasMes(turma.id, turma.turno, ano, mes);
+      
+      // 3. Buscar alunos da turma
+      const alunos = await buscarAlunosTurma(turma.alunos || []);
+      
+      // 4. Identificar instrutores que deram aula
+      const instrutoresIdsSet = new Set<string>();
+      aulas.forEach(aula => {
+        (aula.instrutores || []).forEach(id => instrutoresIdsSet.add(id));
+      });
+      const instrutores = await buscarInstrutores([...instrutoresIdsSet]);
+      
+      // 5. Coletar conteúdos das aulas
+      const conteudos = [...new Set(aulas.map(a => a.conteudo).filter(c => c))];
+      
+      // 6. Preparar datas para as colunas (máximo 12)
+      const datasFormatadas = diasAula.slice(0, 12).map(d => format(d, 'dd/MM'));
+      
+      // Preencher até 12 colunas
+      const datasPadded: Record<string, string> = {};
+      for (let i = 1; i <= 12; i++) {
+        datasPadded[`data${i}`] = datasFormatadas[i - 1] || '';
+      }
+      
+      // 7. Montar presença dos alunos
+      const alunosComPresenca = alunos.map(aluno => {
+        const presencas: Record<string, string> = {};
+        
+        diasAula.slice(0, 12).forEach((dia, idx) => {
+          const dataStr = format(dia, 'dd/MM');
+          // Verificar se houve aula neste dia
+          const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
+          
+          if (!aulaData) {
+            // Não houve aula registrada - deixar vazio (dia ainda não aconteceu ou sem registro)
+            presencas[`p${idx + 1}`] = '';
+          } else {
+            // Houve aula - verificar se aluno estava presente
+            presencas[`p${idx + 1}`] = aulaData.alunosPresentes.includes(aluno.id) ? '' : '-';
+          }
+        });
+        
+        // Preencher colunas restantes até 12
+        for (let i = diasAula.length + 1; i <= 12; i++) {
+          presencas[`p${i}`] = '';
+        }
+        
+        return {
+          nome: aluno.nomeGuerra || aluno.nomeCompleto,
+          ...presencas
+        };
+      });
+      
+      // 8. Montar presença dos instrutores
+      const instrutoresComPresenca = instrutores.map(inst => {
+        const presencas: Record<string, string> = {};
+        
+        diasAula.slice(0, 12).forEach((dia, idx) => {
+          const dataStr = format(dia, 'dd/MM');
+          const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
+          
+          if (!aulaData) {
+            presencas[`p${idx + 1}`] = '';
+          } else {
+            presencas[`p${idx + 1}`] = aulaData.instrutores.includes(inst.id) ? '' : '-';
+          }
+        });
+        
+        for (let i = diasAula.length + 1; i <= 12; i++) {
+          presencas[`p${i}`] = '';
+        }
+        
+        return {
+          nome: `${inst.postGrad || inst['Post/Grad'] || ''} ${inst.nomeGuerra || inst['NOME DE GUERRA'] || ''}`.trim(),
+          ...presencas
+        };
+      });
+      
+      // 9. Preparar dados para a Cloud Function
+      const dadosFrequencia = {
+        mes: MESES.find(m => m.value === mesSelecionado)?.label.toUpperCase() || '',
+        turma: turma.nome,
+        turno: turma.turnoNome || turma.turno.toUpperCase(),
+        conteudo: conteudos.join(', ') || 'CONTEÚDO PROGRAMÁTICO',
+        projeto: projeto.nome || 'PROJETO CÉLERIS',
+        ...datasPadded,
+        instrutores: instrutoresComPresenca,
+        alunos: alunosComPresenca
+      };
+      
+      console.log('Dados para frequência mensal:', dadosFrequencia);
+      
+      // 10. Chamar a Cloud Function
+      const response = await fetch(
+        'https://us-central1-regimento-fbc77.cloudfunctions.net/gerarFrequenciaMensalDocx',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dadosFrequencia)
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Erro ao gerar documento');
+      }
+      
+      // 11. Download do arquivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Frequencia_${turma.nome}_${turma.turnoNome}_${MESES.find(m => m.value === mesSelecionado)?.label}_${anoSelecionado}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Lista de frequência gerada com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao gerar frequência mensal:', error);
+      toast.error('Erro ao gerar lista de frequência');
+    } finally {
+      setGerando(null);
+    }
+  };
+
+  const formatarDiasSemana = (dias: string[]): string => {
+    if (!dias || dias.length === 0) return 'Não configurado';
+    return dias.map(d => DIAS_SEMANA_NOMES[d] || d).join(' e ');
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Frequência Mensal
+              </CardTitle>
+              <CardDescription>
+                Gere listas de frequência mensal por turma e turno
+              </CardDescription>
+            </div>
+            
+            <div className="flex gap-3">
+              <Select value={mesSelecionado} onValueChange={setMesSelecionado}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Mês" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  {MESES.map(mes => (
+                    <SelectItem key={mes.value} value={mes.value}>
+                      {mes.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={anoSelecionado} onValueChange={setAnoSelecionado}>
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue placeholder="Ano" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  {anos.map(ano => (
+                    <SelectItem key={ano} value={String(ano)}>
+                      {ano}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : turmas.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>Nenhuma turma cadastrada</p>
+              <p className="text-sm mt-2">Crie turmas na aba "Turmas" e configure os dias de aula</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {turmas.map(turma => {
+                const temConfiguracao = turma.diasSemana?.length > 0 && turma.turno;
+                const diasAula = calcularDiasAula(
+                  parseInt(anoSelecionado),
+                  parseInt(mesSelecionado),
+                  turma.diasSemana || []
+                );
+                
+                return (
+                  <Card key={turma.id} className={!temConfiguracao ? 'opacity-60' : ''}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">{turma.nome}</CardTitle>
+                          {turma.descricao && (
+                            <CardDescription className="mt-1">
+                              {turma.descricao}
+                            </CardDescription>
+                          )}
+                        </div>
+                        {turma.turnoNome && (
+                          <Badge variant="secondary">{turma.turnoNome}</Badge>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        <span>{formatarDiasSemana(turma.diasSemana)}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{turma.turnoNome || 'Turno não definido'}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        <span>{turma.alunos?.length || 0} aluno(s)</span>
+                      </div>
+                      
+                      {temConfiguracao && (
+                        <div className="text-sm text-muted-foreground">
+                          <span className="font-medium">{diasAula.length}</span> dias de aula em {MESES.find(m => m.value === mesSelecionado)?.label}
+                        </div>
+                      )}
+                      
+                      <Button 
+                        onClick={() => gerarFrequenciaMensal(turma)}
+                        disabled={!temConfiguracao || gerando === turma.id}
+                        className="w-full mt-2"
+                      >
+                        {gerando === turma.id ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Gerando...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="mr-2 h-4 w-4" />
+                            Gerar Lista de Frequência
+                          </>
+                        )}
+                      </Button>
+                      
+                      {!temConfiguracao && (
+                        <p className="text-xs text-destructive text-center">
+                          Configure os dias e turno na aba Turmas
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default FrequenciaMensalTab;
