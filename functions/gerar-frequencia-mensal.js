@@ -38,7 +38,7 @@ appFrequenciaMensal.post('/', async (req, res) => {
             linebreaks: true,
         });
 
-        // Preparar dados dos instrutores (garantir que todos tenham p1-p12)
+        // Preparar dados dos instrutores (garantir que todos tenham p1-p10)
         const instrutores = (data.instrutores || []).map(inst => ({
             nome: inst.nome || '',
             p1: inst.p1 || '',
@@ -50,12 +50,10 @@ appFrequenciaMensal.post('/', async (req, res) => {
             p7: inst.p7 || '',
             p8: inst.p8 || '',
             p9: inst.p9 || '',
-            p10: inst.p10 || '',
-            p11: inst.p11 || '',
-            p12: inst.p12 || ''
+            p10: inst.p10 || ''
         }));
 
-        // Preparar dados dos alunos (garantir que todos tenham p1-p12)
+        // Preparar dados dos alunos (garantir que todos tenham p1-p10)
         const alunos = (data.alunos || []).map(aluno => ({
             nome: aluno.nome || '',
             p1: aluno.p1 || '',
@@ -67,9 +65,7 @@ appFrequenciaMensal.post('/', async (req, res) => {
             p7: aluno.p7 || '',
             p8: aluno.p8 || '',
             p9: aluno.p9 || '',
-            p10: aluno.p10 || '',
-            p11: aluno.p11 || '',
-            p12: aluno.p12 || ''
+            p10: aluno.p10 || ''
         }));
 
         const templateData = {
@@ -78,7 +74,7 @@ appFrequenciaMensal.post('/', async (req, res) => {
             turno: data.turno || '',
             conteudo: data.conteudo || '',
             projeto: data.projeto || 'PROJETO CÉLERIS',
-            // Datas das colunas (até 12)
+            // Datas das colunas (até 10)
             data1: data.data1 || '',
             data2: data.data2 || '',
             data3: data.data3 || '',
@@ -89,8 +85,6 @@ appFrequenciaMensal.post('/', async (req, res) => {
             data8: data.data8 || '',
             data9: data.data9 || '',
             data10: data.data10 || '',
-            data11: data.data11 || '',
-            data12: data.data12 || '',
             // Arrays
             instrutores: instrutores,
             alunos: alunos

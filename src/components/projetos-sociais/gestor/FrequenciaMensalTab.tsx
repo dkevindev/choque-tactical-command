@@ -273,12 +273,12 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       // 5. Buscar conteúdo cadastrado para o mês
       const conteudoCadastrado = await buscarConteudoMes(mes, ano);
       
-      // 6. Preparar datas para as colunas (máximo 12)
-      const datasFormatadas = diasAula.slice(0, 12).map(d => format(d, 'dd/MM'));
+      // 6. Preparar datas para as colunas (máximo 10)
+      const datasFormatadas = diasAula.slice(0, 10).map(d => format(d, 'dd/MM'));
       
-      // Preencher até 12 colunas
+      // Preencher até 10 colunas
       const datasPadded: Record<string, string> = {};
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= 10; i++) {
         datasPadded[`data${i}`] = datasFormatadas[i - 1] || '';
       }
       
@@ -286,7 +286,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       const alunosComPresenca = alunos.map(aluno => {
         const presencas: Record<string, string> = {};
         
-        diasAula.slice(0, 12).forEach((dia, idx) => {
+        diasAula.slice(0, 10).forEach((dia, idx) => {
           const dataStr = format(dia, 'dd/MM');
           // Verificar se houve aula neste dia
           const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
@@ -300,8 +300,8 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           }
         });
         
-        // Preencher colunas restantes até 12
-        for (let i = diasAula.length + 1; i <= 12; i++) {
+        // Preencher colunas restantes até 10
+        for (let i = diasAula.length + 1; i <= 10; i++) {
           presencas[`p${i}`] = '';
         }
         
@@ -315,7 +315,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       const instrutoresComPresenca = instrutores.map(inst => {
         const presencas: Record<string, string> = {};
         
-        diasAula.slice(0, 12).forEach((dia, idx) => {
+        diasAula.slice(0, 10).forEach((dia, idx) => {
           const dataStr = format(dia, 'dd/MM');
           const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
           
@@ -326,7 +326,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           }
         });
         
-        for (let i = diasAula.length + 1; i <= 12; i++) {
+        for (let i = diasAula.length + 1; i <= 10; i++) {
           presencas[`p${i}`] = '';
         }
         
