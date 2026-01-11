@@ -352,7 +352,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       
       // 10. Chamar a Cloud Function
       const response = await fetch(
-        'https://us-central1-regimento-fbc77.cloudfunctions.net/gerarFrequenciaMensalDocx',
+        'https://us-central1-finkevin-fbd9a.cloudfunctions.net/gerarFrequenciaMensalDocx',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
