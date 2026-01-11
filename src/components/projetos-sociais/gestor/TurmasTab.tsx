@@ -20,6 +20,7 @@ interface TurmasTabProps {
 }
 
 const DIAS_SEMANA = [
+  { value: 'domingo', label: 'Domingo' },
   { value: 'segunda', label: 'Segunda-feira' },
   { value: 'terca', label: 'Terça-feira' },
   { value: 'quarta', label: 'Quarta-feira' },
