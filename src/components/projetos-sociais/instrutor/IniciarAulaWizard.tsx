@@ -32,6 +32,7 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
   const [searchAluno, setSearchAluno] = useState('');
   const [loading, setLoading] = useState(false);
   const [turnosOcupados, setTurnosOcupados] = useState<number[]>([]);
+  const [turmasOcupadasPorTurno, setTurmasOcupadasPorTurno] = useState<Map<number, string[]>>(new Map());
 
   const projeto = projetos[0];
   const config = projeto?.configuracao || {};
@@ -75,9 +76,33 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
       );
       
       const snapshot = await getDocs(q);
-      const turnosUsados = snapshot.docs.map(doc => doc.data().turno);
-      setTurnosOcupados(turnosUsados);
-      console.log('Turnos ocupados hoje:', turnosUsados);
+      
+      // Para projetos SEM turmas: bloquear por turno
+      // Para projetos COM turmas: bloquear por turno+turma
+      if (usaTurmas) {
+        // Mapear quais turmas estão ocupadas em cada turno
+        const turmasMap = new Map<number, string[]>();
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          const turno = data.turno as number;
+          const turmaId = data.turmaId as string;
+          
+          if (turmaId) {
+            const turmasNoTurno = turmasMap.get(turno) || [];
+            if (!turmasNoTurno.includes(turmaId)) {
+              turmasNoTurno.push(turmaId);
+            }
+            turmasMap.set(turno, turmasNoTurno);
+          }
+        });
+        setTurmasOcupadasPorTurno(turmasMap);
+        console.log('Turmas ocupadas por turno:', Object.fromEntries(turmasMap));
+      } else {
+        // Projetos sem turmas: bloquear turno inteiro
+        const turnosUsados = snapshot.docs.map(doc => doc.data().turno);
+        setTurnosOcupados(turnosUsados);
+        console.log('Turnos ocupados hoje:', turnosUsados);
+      }
     } catch (error) {
       console.error('Erro ao verificar turnos ocupados:', error);
     }
@@ -348,28 +373,41 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
         <div className="space-y-4">
           <h2 className="text-2xl font-bold">Selecione a Turma</h2>
           <div className="space-y-3">
-            {turmas.map((turma) => (
-              <Card
-                key={turma.id}
-                className={`p-6 cursor-pointer hover:border-primary transition-all ${
-                  turmaSelecionada === turma.id ? 'border-primary border-2' : ''
-                }`}
-                onClick={() => setTurmaSelecionada(turma.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xl font-bold">{turma.nome}</p>
-                    {turma.descricao && (
-                      <p className="text-sm text-muted-foreground">{turma.descricao}</p>
-                    )}
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {turma.alunos?.length || 0} aluno(s)
-                    </p>
+            {turmas.map((turma) => {
+              // Verificar se esta turma já está ocupada no turno selecionado
+              const turmasOcupadasNoTurno = turmasOcupadasPorTurno.get(turnoSelecionado!) || [];
+              const turmaOcupada = turmasOcupadasNoTurno.includes(turma.id);
+              
+              return (
+                <Card
+                  key={turma.id}
+                  className={`p-6 transition-all ${
+                    turmaOcupada 
+                      ? 'opacity-50 cursor-not-allowed' 
+                      : `cursor-pointer hover:border-primary ${turmaSelecionada === turma.id ? 'border-primary border-2' : ''}`
+                  }`}
+                  onClick={() => !turmaOcupada && setTurmaSelecionada(turma.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xl font-bold">{turma.nome}</p>
+                      {turma.descricao && (
+                        <p className="text-sm text-muted-foreground">{turma.descricao}</p>
+                      )}
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {turma.alunos?.length || 0} aluno(s)
+                      </p>
+                      {turmaOcupada && (
+                        <p className="text-sm text-destructive font-medium mt-1">
+                          Aula já iniciada neste turno
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className={`h-8 w-8 ${turmaOcupada ? 'opacity-50' : ''}`} />
                   </div>
-                  <ChevronRight className="h-8 w-8" />
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
             {turmas.length === 0 && (
               <p className="text-center text-muted-foreground">
                 Nenhuma turma cadastrada ainda
