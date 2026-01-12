@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { Badge } from '@/components/ui/badge';
 import { Users, Plus, Trash2, Edit, Save, X, Calendar, Clock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -45,7 +45,7 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
   const [descricaoTurma, setDescricaoTurma] = useState('');
   const [alunosSelecionados, setAlunosSelecionados] = useState<string[]>([]);
   const [diasSemana, setDiasSemana] = useState<string[]>([]);
-  const [turno, setTurno] = useState('');
+  const [turnos, setTurnos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -102,12 +102,12 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
       return;
     }
 
-    if (!turno) {
-      toast.error('Selecione o turno');
+    if (turnos.length === 0) {
+      toast.error('Selecione pelo menos um turno');
       return;
     }
 
-    const turnoLabel = TURNOS.find(t => t.value === turno)?.label || turno;
+    const turnoLabel = turnos.map(t => TURNOS.find(tr => tr.value === t)?.label || t).join(' e ');
 
     try {
       setLoading(true);
@@ -117,7 +117,7 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
         descricao: descricaoTurma,
         alunos: alunosSelecionados,
         diasSemana: diasSemana,
-        turno: turno,
+        turnos: turnos,
         turnoNome: turnoLabel,
         ativo: true,
         dataCriacao: new Date()
@@ -142,7 +142,7 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
     setDescricaoTurma(turma.descricao || '');
     setAlunosSelecionados(turma.alunos || []);
     setDiasSemana(turma.diasSemana || []);
-    setTurno(turma.turno || '');
+    setTurnos(turma.turnos || (turma.turno ? [turma.turno] : []));
     setDialogEditarTurma(true);
   };
 
@@ -157,12 +157,12 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
       return;
     }
 
-    if (!turno) {
-      toast.error('Selecione o turno');
+    if (turnos.length === 0) {
+      toast.error('Selecione pelo menos um turno');
       return;
     }
 
-    const turnoLabel = TURNOS.find(t => t.value === turno)?.label || turno;
+    const turnoLabel = turnos.map(t => TURNOS.find(tr => tr.value === t)?.label || t).join(' e ');
 
     try {
       setLoading(true);
@@ -171,7 +171,7 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
         descricao: descricaoTurma,
         alunos: alunosSelecionados,
         diasSemana: diasSemana,
-        turno: turno,
+        turnos: turnos,
         turnoNome: turnoLabel
       });
 
@@ -225,7 +225,7 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
     setDescricaoTurma('');
     setAlunosSelecionados([]);
     setDiasSemana([]);
-    setTurno('');
+    setTurnos([]);
     setTurmaEditando(null);
   };
 
@@ -301,19 +301,27 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
                     </div>
 
                     <div>
-                      <Label htmlFor="turno">Turno *</Label>
-                      <Select value={turno} onValueChange={setTurno}>
-                        <SelectTrigger className="mt-2">
-                          <SelectValue placeholder="Selecione o turno" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border shadow-lg z-50">
-                          {TURNOS.map((t) => (
-                            <SelectItem key={t.value} value={t.value}>
-                              {t.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label className="mb-2 block">Turno(s) *</Label>
+                      <div className="space-y-2 border rounded-lg p-3">
+                        {TURNOS.map((t) => (
+                          <label
+                            key={t.value}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={turnos.includes(t.value)}
+                              onCheckedChange={() => {
+                                if (turnos.includes(t.value)) {
+                                  setTurnos(turnos.filter(turno => turno !== t.value));
+                                } else {
+                                  setTurnos([...turnos, t.value]);
+                                }
+                              }}
+                            />
+                            <span className="text-sm">{t.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -418,7 +426,7 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
                       <Users className="h-4 w-4" />
                       <span>{turma.alunos?.length || 0} aluno(s)</span>
                     </div>
-                    {(!turma.diasSemana || turma.diasSemana.length === 0 || !turma.turno) && (
+                    {(!turma.diasSemana || turma.diasSemana.length === 0 || (!turma.turnos?.length && !turma.turno)) && (
                       <Badge variant="destructive" className="text-xs">
                         Configuração incompleta
                       </Badge>
@@ -473,17 +481,24 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
                 </div>
               </div>
               <div>
-                <Label htmlFor="edit-turno">Turno *</Label>
-                <Select value={turno} onValueChange={setTurno}>
-                  <SelectTrigger className="mt-2">
-                    <SelectValue placeholder="Selecione o turno" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border shadow-lg z-50">
-                    {TURNOS.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="mb-2 block">Turno(s) *</Label>
+                <div className="space-y-2 border rounded-lg p-3">
+                  {TURNOS.map((t) => (
+                    <label key={t.value} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={turnos.includes(t.value)}
+                        onCheckedChange={() => {
+                          if (turnos.includes(t.value)) {
+                            setTurnos(turnos.filter(turno => turno !== t.value));
+                          } else {
+                            setTurnos([...turnos, t.value]);
+                          }
+                        }}
+                      />
+                      <span className="text-sm">{t.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
 
