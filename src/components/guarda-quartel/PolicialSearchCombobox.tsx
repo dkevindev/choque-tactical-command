@@ -126,7 +126,11 @@ const PolicialSearchCombobox = ({
           </div>
         )}
       </SelectTrigger>
-      <SelectContent className="w-[400px]">
+      <SelectContent 
+        className="w-[400px] z-[9999] bg-popover border shadow-lg"
+        position="popper"
+        sideOffset={4}
+      >
         <div className="p-2 border-b">
           <Input
             placeholder="Digite nome, matrícula ou numeral..."
