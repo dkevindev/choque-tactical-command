@@ -36,6 +36,7 @@ const TURNOS = [
 ];
 
 const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
+  const usaFrequencia = projeto?.configuracao?.usaFrequencia !== false;
   const [turmas, setTurmas] = useState<any[]>([]);
   const [alunos, setAlunos] = useState<any[]>([]);
   const [dialogNovaTurma, setDialogNovaTurma] = useState(false);
@@ -325,33 +326,35 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="mb-2 block">Alunos da Turma</Label>
-                    <ScrollArea className="h-[200px] border rounded-lg p-4">
-                      <div className="space-y-2">
-                        {alunos.map((aluno) => (
-                          <label
-                            key={aluno.id}
-                            className="flex items-center gap-3 p-2 hover:bg-muted rounded cursor-pointer"
-                          >
-                            <Checkbox
-                              checked={alunosSelecionados.includes(aluno.id)}
-                              onCheckedChange={() => toggleAluno(aluno.id)}
-                            />
-                            <div>
-                              <p className="font-medium">{aluno.nomeCompleto}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {aluno.nomeGuerra} • {aluno.idade} anos
-                              </p>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {alunosSelecionados.length} aluno(s) selecionado(s)
-                    </p>
-                  </div>
+                  {usaFrequencia && (
+                    <div>
+                      <Label className="mb-2 block">Alunos da Turma</Label>
+                      <ScrollArea className="h-[200px] border rounded-lg p-4">
+                        <div className="space-y-2">
+                          {alunos.map((aluno) => (
+                            <label
+                              key={aluno.id}
+                              className="flex items-center gap-3 p-2 hover:bg-muted rounded cursor-pointer"
+                            >
+                              <Checkbox
+                                checked={alunosSelecionados.includes(aluno.id)}
+                                onCheckedChange={() => toggleAluno(aluno.id)}
+                              />
+                              <div>
+                                <p className="font-medium">{aluno.nomeCompleto}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {aluno.nomeGuerra} • {aluno.idade} anos
+                                </p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {alunosSelecionados.length} aluno(s) selecionado(s)
+                      </p>
+                    </div>
+                  )}
 
                   <div className="flex gap-3">
                     <Button
@@ -422,10 +425,12 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
                       <Clock className="h-4 w-4" />
                       <span>{turma.turnoNome || 'Turno não definido'}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Users className="h-4 w-4" />
-                      <span>{turma.alunos?.length || 0} aluno(s)</span>
-                    </div>
+                    {usaFrequencia && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        <span>{turma.alunos?.length || 0} aluno(s)</span>
+                      </div>
+                    )}
                     {(!turma.diasSemana || turma.diasSemana.length === 0 || (!turma.turnos?.length && !turma.turno)) && (
                       <Badge variant="destructive" className="text-xs">
                         Configuração incompleta
@@ -502,23 +507,25 @@ const TurmasTab = ({ projeto, onUpdate }: TurmasTabProps) => {
               </div>
             </div>
 
-            <div>
-              <Label className="mb-2 block">Alunos da Turma</Label>
-              <ScrollArea className="h-[200px] border rounded-lg p-4">
-                <div className="space-y-2">
-                  {alunos.map((aluno) => (
-                    <label key={aluno.id} className="flex items-center gap-3 p-2 hover:bg-muted rounded cursor-pointer">
-                      <Checkbox checked={alunosSelecionados.includes(aluno.id)} onCheckedChange={() => toggleAluno(aluno.id)} />
-                      <div>
-                        <p className="font-medium">{aluno.nomeCompleto}</p>
-                        <p className="text-sm text-muted-foreground">{aluno.nomeGuerra} • {aluno.idade} anos</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </ScrollArea>
-              <p className="text-sm text-muted-foreground mt-2">{alunosSelecionados.length} aluno(s) selecionado(s)</p>
-            </div>
+            {usaFrequencia && (
+              <div>
+                <Label className="mb-2 block">Alunos da Turma</Label>
+                <ScrollArea className="h-[200px] border rounded-lg p-4">
+                  <div className="space-y-2">
+                    {alunos.map((aluno) => (
+                      <label key={aluno.id} className="flex items-center gap-3 p-2 hover:bg-muted rounded cursor-pointer">
+                        <Checkbox checked={alunosSelecionados.includes(aluno.id)} onCheckedChange={() => toggleAluno(aluno.id)} />
+                        <div>
+                          <p className="font-medium">{aluno.nomeCompleto}</p>
+                          <p className="text-sm text-muted-foreground">{aluno.nomeGuerra} • {aluno.idade} anos</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </ScrollArea>
+                <p className="text-sm text-muted-foreground mt-2">{alunosSelecionados.length} aluno(s) selecionado(s)</p>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Button
