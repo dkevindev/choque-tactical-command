@@ -302,7 +302,8 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       return;
     }
 
-    if (!turma.turno) {
+    const turnoAtivo = turma.turnos?.[0] || turma.turno;
+    if (!turnoAtivo) {
       toast.error('Esta turma não tem turno configurado');
       return;
     }
@@ -322,7 +323,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       }
       
       // 2. Buscar aulas encerradas do mês para essa turma/turno
-      const aulas = await buscarAulasMes(turma.id, turma.turno, ano, mes);
+      const aulas = await buscarAulasMes(turma.id, turnoAtivo, ano, mes);
       
       // 3. Verificar se projeto usa frequência de alunos
       const usaFrequencia = projeto?.configuracao?.usaFrequencia !== false;
