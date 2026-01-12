@@ -38,6 +38,7 @@ interface AlunoFrequencia {
 }
 
 const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
+  const usaFrequencia = projeto?.configuracao?.usaFrequencia !== false;
   const [instrutoresRelatorio, setInstrutoresRelatorio] = useState<any[]>([]);
   const [alunosFrequencia, setAlunosFrequencia] = useState<AlunoFrequencia[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
@@ -245,9 +246,11 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
 
   return (
     <Tabs defaultValue="instrutores" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className={`grid w-full ${usaFrequencia ? 'grid-cols-4' : 'grid-cols-3'}`}>
         <TabsTrigger value="instrutores">Por Instrutor</TabsTrigger>
-        <TabsTrigger value="frequencia">Frequência Alunos</TabsTrigger>
+        {usaFrequencia && (
+          <TabsTrigger value="frequencia">Frequência Alunos</TabsTrigger>
+        )}
         <TabsTrigger value="calendario">Calendário</TabsTrigger>
         <TabsTrigger value="relatorio">Relatório</TabsTrigger>
       </TabsList>
@@ -332,7 +335,8 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
         </div>
       </TabsContent>
 
-      <TabsContent value="frequencia">
+      {usaFrequencia && (
+        <TabsContent value="frequencia">
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -488,6 +492,7 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
           </Card>
         </div>
       </TabsContent>
+      )}
 
       <TabsContent value="calendario" className="space-y-6">
         <div className="grid grid-cols-3 gap-4">
