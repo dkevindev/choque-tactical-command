@@ -413,12 +413,13 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       const dadosFrequencia = {
         mes: MESES.find(m => m.value === mesSelecionado)?.label.toUpperCase() || '',
         turma: turma.nome,
-        turno: turma.turnoNome || turma.turno.toUpperCase(),
+        turno: turma.turnoNome || turnoAtivo.toUpperCase(),
         conteudo: conteudoCadastrado || 'CONTEÚDO PROGRAMÁTICO',
         projeto: projeto.nome || 'PROJETO CÉLERIS',
+        usaFrequencia: usaFrequencia,
         ...datasPadded,
         instrutores: instrutoresComPresenca,
-        alunos: alunosComPresenca
+        alunos: usaFrequencia ? alunosComPresenca : []
       };
       
       console.log('Dados para frequência mensal:', dadosFrequencia);
