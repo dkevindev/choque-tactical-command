@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Search, ChevronLeft, CheckCircle } from 'lucide-react';
-import { collection, addDoc, updateDoc, doc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, doc, getDocs, query, where, getDoc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 import HistoricoPromocoesTable from './HistoricoPromocoesTable';
@@ -22,6 +22,8 @@ interface Policial {
   NUMERAL?: number;
   numeral?: string;
   'ULTIMA PROMOÇÃO'?: number;
+  'NOME DE GUERRA'?: string;
+  'NOME DE GUERRA1'?: string;
   [key: string]: any;
 }
 
@@ -49,6 +51,75 @@ const TIPOS_PROMOCAO: TipoPromocao[] = [
   { de: 'CAP', para: 'MAJ', label: 'CAP → MAJ' },
   { de: 'MAJ', para: 'TENCEL', label: 'MAJ → TENCEL' },
 ];
+
+// Função para gerar novo ID do documento policial
+const gerarNovoIdPolicial = (postoNovo: string, nomeGuerra: string, numeral: number | string): string => {
+  // Limpar nome de guerra (pegar só o nome, sem posto)
+  const nomeBase = nomeGuerra?.trim() || 'DESCONHECIDO';
+  const numeralStr = String(numeral || '0');
+  // Substituir espaços por underscore e remover caracteres especiais
+  const nomeFormatado = nomeBase.replace(/\s+/g, '_').replace(/[^A-Za-z0-9_]/g, '');
+  return `${postoNovo}_${nomeFormatado}_${numeralStr}`;
+};
+
+// Função para atualizar NOME DE GUERRA1 com novo posto
+const atualizarNomeGuerraCompleto = (nomeGuerra1: string, postoAntigo: string, postoNovo: string): string => {
+  if (!nomeGuerra1) return '';
+  
+  // Tratar variações de formato ("SD KEVIN", "1º SGT ALMEIDA", etc.)
+  // Primeiro, tenta substituir exatamente o posto antigo no início
+  const regex = new RegExp(`^${postoAntigo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'i');
+  
+  if (regex.test(nomeGuerra1)) {
+    return nomeGuerra1.replace(regex, `${postoNovo} `);
+  }
+  
+  // Se não encontrou, retorna com o novo posto + nome original limpo
+  const partes = nomeGuerra1.trim().split(/\s+/);
+  const nomeBase = partes.slice(1).join(' ') || partes[0];
+  return `${postoNovo} ${nomeBase}`;
+};
+
+// Função para atualizar referências em outras coleções
+const atualizarReferenciasPolicial = async (idAntigo: string, idNovo: string) => {
+  const colecoesParaAtualizar = [
+    { colecao: 'cautelas_permanentes', campo: 'policialId' },
+    { colecao: 'projetos_instrutores', campo: 'policialId' },
+    { colecao: 'projetos_gestores', campo: 'policialId' },
+    { colecao: 'projetos_aulas', campo: 'instrutorId' },
+  ];
+  
+  for (const { colecao, campo } of colecoesParaAtualizar) {
+    try {
+      const q = query(collection(db, colecao), where(campo, '==', idAntigo));
+      const snapshot = await getDocs(q);
+      
+      for (const docSnap of snapshot.docs) {
+        await updateDoc(doc(db, colecao, docSnap.id), {
+          [campo]: idNovo
+        });
+      }
+    } catch (error) {
+      console.warn(`Aviso ao atualizar referências em ${colecao}:`, error);
+    }
+  }
+  
+  // Atualizar array de instrutores em projetos_aulas
+  try {
+    const aulasSnapshot = await getDocs(collection(db, 'projetos_aulas'));
+    for (const aulaDoc of aulasSnapshot.docs) {
+      const data = aulaDoc.data();
+      if (data.instrutores && Array.isArray(data.instrutores) && data.instrutores.includes(idAntigo)) {
+        const novosInstrutores = data.instrutores.map((id: string) => id === idAntigo ? idNovo : id);
+        await updateDoc(doc(db, 'projetos_aulas', aulaDoc.id), {
+          instrutores: novosInstrutores
+        });
+      }
+    }
+  } catch (error) {
+    console.warn('Aviso ao atualizar instrutores em projetos_aulas:', error);
+  }
+};
 
 const PromocaoDialog: React.FC<PromocaoDialogProps> = ({ policiais, onClose, onUpdate }) => {
   const [etapa, setEtapa] = useState<'selecao' | 'policiais' | 'confirmacao' | 'historico'>(
@@ -107,30 +178,67 @@ const PromocaoDialog: React.FC<PromocaoDialogProps> = ({ policiais, onClose, onU
       const dataPromocaoDate = new Date(dataPromocao);
 
       for (const policialId of selectedPoliciais) {
-        // Criar registro no histórico de promoções
-        await addDoc(collection(db, 'historico_promocoes'), {
-          policialId,
-          graduacaoAnterior: tipoPromocao.de,
-          graduacaoNova: tipoPromocao.para,
-          dataPromocao: dataPromocaoDate.toISOString(),
-          publicacao,
-          criadoEm: new Date().toISOString()
-        });
-
-        // Atualizar dados do policial
+        // 1. Buscar dados atuais do policial
         const policialRef = doc(db, 'policiais', policialId);
+        const policialSnap = await getDoc(policialRef);
+        
+        if (!policialSnap.exists()) {
+          console.error(`Policial ${policialId} não encontrado`);
+          continue;
+        }
+        
+        const dadosAtuais = policialSnap.data();
+        
+        // 2. Preparar dados atualizados
+        const nomeGuerra = dadosAtuais['NOME DE GUERRA'] || dadosAtuais['NOME'] || '';
+        const nomeGuerra1Atual = dadosAtuais['NOME DE GUERRA1'] || '';
+        const numeral = dadosAtuais.NUMERAL || dadosAtuais.numeral || '';
+        
+        // Atualizar NOME DE GUERRA1 com novo posto
+        const novoNomeGuerra1 = atualizarNomeGuerraCompleto(
+          nomeGuerra1Atual, 
+          tipoPromocao.de, 
+          tipoPromocao.para
+        );
+        
+        // Gerar novo ID do documento
+        const novoId = gerarNovoIdPolicial(tipoPromocao.para, nomeGuerra, numeral);
         
         // Converter data para formato Excel (dias desde 1900-01-01)
         const excelEpoch = new Date(1900, 0, 1);
         const daysSinceEpoch = Math.floor(
           (dataPromocaoDate.getTime() - excelEpoch.getTime()) / (24 * 60 * 60 * 1000)
         ) + 2;
-
-        await updateDoc(policialRef, {
-          'Post/Grad': tipoPromocao.para,
-          'ULTIMA PROMOÇÃO': daysSinceEpoch,
-          dataUltimaPromocao: dataPromocaoDate.toISOString()
+        
+        // 3. Criar registro no histórico de promoções
+        await addDoc(collection(db, 'historico_promocoes'), {
+          policialId: novoId, // Usar novo ID para referência futura
+          policialIdAntigo: policialId,
+          graduacaoAnterior: tipoPromocao.de,
+          graduacaoNova: tipoPromocao.para,
+          dataPromocao: dataPromocaoDate.toISOString(),
+          publicacao,
+          criadoEm: new Date().toISOString()
         });
+        
+        // 4. Criar novo documento com ID atualizado
+        const novoDocRef = doc(db, 'policiais', novoId);
+        const novosDados = {
+          ...dadosAtuais,
+          'Post/Grad': tipoPromocao.para,
+          'NOME DE GUERRA1': novoNomeGuerra1,
+          'ULTIMA PROMOÇÃO': daysSinceEpoch,
+          dataUltimaPromocao: dataPromocaoDate.toISOString(),
+          idAnterior: policialId // Manter referência ao ID antigo
+        };
+        
+        await setDoc(novoDocRef, novosDados);
+        
+        // 5. Deletar documento antigo
+        await deleteDoc(policialRef);
+        
+        // 6. Atualizar referências em outras coleções
+        await atualizarReferenciasPolicial(policialId, novoId);
       }
 
       toast({
@@ -140,11 +248,11 @@ const PromocaoDialog: React.FC<PromocaoDialogProps> = ({ policiais, onClose, onU
 
       onUpdate();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao processar promoções:', error);
       toast({
         title: "Erro",
-        description: "Erro ao processar promoções",
+        description: `Erro ao processar promoções: ${error.message}`,
         variant: "destructive"
       });
     } finally {
