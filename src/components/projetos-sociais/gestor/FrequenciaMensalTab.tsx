@@ -20,7 +20,8 @@ interface Turma {
   descricao?: string;
   alunos: string[];
   diasSemana: string[];
-  turno: string;
+  turno?: string;
+  turnos?: string[];
   turnoNome: string;
 }
 
@@ -521,7 +522,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {turmas.map(turma => {
-                const temConfiguracao = turma.diasSemana?.length > 0 && turma.turno;
+                const temConfiguracao = turma.diasSemana?.length > 0 && (turma.turnos?.length > 0 || turma.turno);
                 const diasAula = calcularDiasAula(
                   parseInt(anoSelecionado),
                   parseInt(mesSelecionado),
