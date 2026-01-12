@@ -343,7 +343,7 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
                   className={`p-6 transition-all ${
                     turnoOcupado 
                       ? 'opacity-50 cursor-not-allowed' 
-                      : `cursor-pointer hover:border-primary ${turnoSelecionado === turno ? 'border-primary border-2' : ''}`
+                      : `cursor-pointer hover:border-green-500 ${turnoSelecionado === turno ? 'border-green-500 border-2 bg-green-500/10' : ''}`
                   }`}
                   onClick={() => !turnoOcupado && setTurnoSelecionado(turno)}
                 >
@@ -384,7 +384,7 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
                   className={`p-6 transition-all ${
                     turmaOcupada 
                       ? 'opacity-50 cursor-not-allowed' 
-                      : `cursor-pointer hover:border-primary ${turmaSelecionada === turma.id ? 'border-primary border-2' : ''}`
+                      : `cursor-pointer hover:border-green-500 ${turmaSelecionada === turma.id ? 'border-green-500 border-2 bg-green-500/10' : ''}`
                   }`}
                   onClick={() => !turmaOcupada && setTurmaSelecionada(turma.id)}
                 >
@@ -432,12 +432,16 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
             {instrutoresDisponiveis.map((instrutor) => (
               <label
                 key={instrutor.id}
-                className="flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted"
+                className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-muted ${
+                  instrutoresSelecionados.includes(instrutor.id) 
+                    ? 'border-green-500 bg-green-500/10' 
+                    : 'border-border'
+                }`}
               >
                 <Checkbox
                   checked={instrutoresSelecionados.includes(instrutor.id)}
                   onCheckedChange={() => toggleInstrutor(instrutor.id)}
-                  className="h-6 w-6"
+                  className="h-6 w-6 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                 />
                 <div className="flex-1">
                   <p className="font-medium">
@@ -480,12 +484,16 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
               {alunosFiltrados.map((aluno) => (
                 <label
                   key={aluno.id}
-                  className="flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted"
+                  className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-muted ${
+                    alunosPresentes.includes(aluno.id) 
+                      ? 'border-green-500 bg-green-500/10' 
+                      : 'border-border'
+                  }`}
                 >
                   <Checkbox
                     checked={alunosPresentes.includes(aluno.id)}
                     onCheckedChange={() => toggleAluno(aluno.id)}
-                    className="h-6 w-6"
+                    className="h-6 w-6 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                   />
                   <div className="flex-1">
                     <p className="font-medium">{aluno.nomeCompleto}</p>
