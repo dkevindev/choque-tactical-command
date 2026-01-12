@@ -132,10 +132,12 @@ const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialL
         </header>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className={`grid w-full ${projetoSelecionado?.configuracao?.usaFrequencia !== false ? 'grid-cols-8' : 'grid-cols-7'}`}>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="configuracao">Configuração</TabsTrigger>
-            <TabsTrigger value="alunos">Alunos</TabsTrigger>
+            {projetoSelecionado?.configuracao?.usaFrequencia !== false && (
+              <TabsTrigger value="alunos">Alunos</TabsTrigger>
+            )}
             <TabsTrigger value="turmas">Turmas</TabsTrigger>
             <TabsTrigger value="conteudos">Conteúdos</TabsTrigger>
             <TabsTrigger value="aulas">Aulas</TabsTrigger>
@@ -144,20 +146,22 @@ const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialL
           </TabsList>
 
           <TabsContent value="overview">
-            <div className="grid grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Alunos Ativos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-3">
-                    <Users className="h-8 w-8 text-primary" />
-                    <p className="text-3xl font-bold">{stats.totalAlunos}</p>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className={`grid gap-6 ${projetoSelecionado?.configuracao?.usaFrequencia !== false ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              {projetoSelecionado?.configuracao?.usaFrequencia !== false && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Alunos Ativos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-3">
+                      <Users className="h-8 w-8 text-primary" />
+                      <p className="text-3xl font-bold">{stats.totalAlunos}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               <Card>
                 <CardHeader className="pb-3">
@@ -207,9 +211,11 @@ const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialL
             <ConfiguracaoProjetoTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
           </TabsContent>
 
-          <TabsContent value="alunos">
-            <CadastroAlunosTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
-          </TabsContent>
+          {projetoSelecionado?.configuracao?.usaFrequencia !== false && (
+            <TabsContent value="alunos">
+              <CadastroAlunosTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
+            </TabsContent>
+          )}
 
           <TabsContent value="turmas">
             <TurmasTab projeto={projetoSelecionado} onUpdate={handleUpdate} />

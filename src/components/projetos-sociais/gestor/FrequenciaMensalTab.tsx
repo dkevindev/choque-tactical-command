@@ -323,20 +323,23 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       // 2. Buscar aulas encerradas do mês para essa turma/turno
       const aulas = await buscarAulasMes(turma.id, turma.turno, ano, mes);
       
-      // 3. Buscar alunos da turma
-      const alunos = await buscarAlunosTurma(turma.alunos || []);
+      // 3. Verificar se projeto usa frequência de alunos
+      const usaFrequencia = projeto?.configuracao?.usaFrequencia !== false;
       
-      // 4. Identificar instrutores que deram aula
+      // 4. Buscar alunos da turma apenas se usa frequência
+      const alunos = usaFrequencia ? await buscarAlunosTurma(turma.alunos || []) : [];
+      
+      // 5. Identificar instrutores que deram aula
       const instrutoresIdsSet = new Set<string>();
       aulas.forEach(aula => {
         (aula.instrutores || []).forEach(id => instrutoresIdsSet.add(id));
       });
       const instrutores = await buscarInstrutores([...instrutoresIdsSet]);
       
-      // 5. Buscar conteúdo cadastrado para o mês
+      // 6. Buscar conteúdo cadastrado para o mês
       const conteudoCadastrado = await buscarConteudoMes(mes, ano);
       
-      // 6. Preparar datas para as colunas (máximo 10)
+      // 7. Preparar datas para as colunas (máximo 10)
       const datasFormatadas = diasAula.slice(0, 10).map(d => format(d, 'dd/MM'));
       
       // Preencher até 10 colunas
@@ -345,9 +348,9 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
         datasPadded[`data${i}`] = datasFormatadas[i - 1] || '';
       }
       
-      // 7. Montar presença dos alunos
+      // 8. Montar presença dos alunos (apenas se usa frequência)
       // Lógica: todos os dias iniciam com "-", só fica vazio (para assinar) quando teve aula E estava presente
-      const alunosComPresenca = alunos.map(aluno => {
+      const alunosComPresenca = usaFrequencia ? alunos.map(aluno => {
         const presencas: Record<string, string> = {};
         
         diasAula.slice(0, 10).forEach((dia, idx) => {
@@ -373,9 +376,9 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           nome: aluno.nomeGuerra || aluno.nomeCompleto,
           ...presencas
         };
-      });
+      }) : [];
       
-      // 8. Montar presença dos instrutores
+      // 9. Montar presença dos instrutores
       // Mesma lógica: só fica vazio quando deu aula naquele dia
       const instrutoresComPresenca = instrutores.map(inst => {
         const presencas: Record<string, string> = {};
@@ -553,10 +556,12 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
                         <span>{turma.turnoNome || 'Turno não definido'}</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        <span>{turmasComContagem.get(turma.id) || 0} aluno(s) ativos</span>
-                      </div>
+                      {projeto?.configuracao?.usaFrequencia !== false && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Users className="h-4 w-4" />
+                          <span>{turmasComContagem.get(turma.id) || 0} aluno(s) ativos</span>
+                        </div>
+                      )}
                       
                       {temConfiguracao && (
                         <div className="text-sm text-muted-foreground">
