@@ -67,7 +67,8 @@ export default function GestorSystem() {
             id: data.projetoId,
             nome: projetoData?.nome || '',
             descricao: projetoData?.descricao || '',
-            ativo: projetoData?.ativo || false
+            ativo: projetoData?.ativo || false,
+            configuracao: projetoData?.configuracao || {}
           };
         })
       );
