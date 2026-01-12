@@ -22,10 +22,15 @@ appFrequenciaMensal.post('/', async (req, res) => {
             return res.status(400).send('Turma, turno e mês são obrigatórios.');
         }
 
-        // Baixar template
+        // Escolher template baseado em usaFrequencia
         const bucket = admin.storage().bucket();
-        const filePath = 'templates/template-frequencia-mensal.docx';
+        const usaFrequencia = data.usaFrequencia !== false;
+        const filePath = usaFrequencia 
+            ? 'templates/template-frequencia-mensal.docx'
+            : 'templates/template-frequencia-mensal-sem-alunos.docx';
         tempFilePath = path.join('/tmp', `freq-mensal-${Date.now()}.docx`);
+        
+        console.log('Usando template:', filePath, '| usaFrequencia:', usaFrequencia);
         
         await bucket.file(filePath).download({ destination: tempFilePath });
         console.log('Template baixado para:', tempFilePath);
