@@ -3,7 +3,8 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, UserCheck, Calendar, Clock } from 'lucide-react';
+import { Users, UserCheck, Calendar, Clock, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import ConfiguracaoProjetoTab from './ConfiguracaoProjetoTab';
 import CadastroAlunosTab from './CadastroAlunosTab';
 import VisualizarAulasTab from './VisualizarAulasTab';
@@ -14,19 +15,19 @@ import FrequenciaMensalTab from './FrequenciaMensalTab';
 
 interface GestorDashboardProps {
   projetos: any[];
+  projetoInicial: any;
   policialLogado: any;
+  onVoltarSelecao?: () => void;
 }
 
-const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorDashboardProps) => {
-  const [projetos, setProjetos] = useState(projetosIniciais);
+const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialLogado, onVoltarSelecao }: GestorDashboardProps) => {
+  const [projetoSelecionado, setProjetoSelecionado] = useState(projetoInicial);
   const [stats, setStats] = useState({
     totalAlunos: 0,
     totalInstrutores: 0,
     aulasMes: 0,
     horasMes: 0
   });
-
-  const projetoSelecionado = projetos[0]; // Por enquanto, pega o primeiro projeto
 
   useEffect(() => {
     if (projetoSelecionado) {
@@ -47,7 +48,7 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
           ...projetoDoc.docs[0].data()
         };
         console.log('Projeto recarregado:', projetoAtualizado);
-        setProjetos([projetoAtualizado]);
+        setProjetoSelecionado(projetoAtualizado);
       }
     } catch (error) {
       console.error('Erro ao recarregar projeto:', error);
@@ -114,7 +115,15 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">
+          <div className="flex items-center gap-4">
+            {onVoltarSelecao && (
+              <Button variant="ghost" size="sm" onClick={onVoltarSelecao}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Trocar Projeto
+              </Button>
+            )}
+          </div>
+          <h1 className="text-3xl font-bold text-foreground mt-2">
             {projetoSelecionado?.nome}
           </h1>
           <p className="text-muted-foreground mt-2">

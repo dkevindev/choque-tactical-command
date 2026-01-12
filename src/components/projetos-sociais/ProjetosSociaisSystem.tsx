@@ -135,7 +135,7 @@ const ProjetosSociaisSystem = () => {
   }
 
   return userType === 'gestor' ? (
-    <GestorDashboard projetos={projetos} policialLogado={policialLogado} />
+    <GestorDashboard projetos={projetos} projetoInicial={projetos[0]} policialLogado={policialLogado} />
   ) : (
     <InstrutorDashboard projetos={projetos} policialLogado={policialLogado} />
   );

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertCircle, FolderOpen, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import GestorDashboard from './gestor/GestorDashboard';
 
 export default function GestorSystem() {
@@ -11,6 +12,7 @@ export default function GestorSystem() {
   const [loading, setLoading] = useState(true);
   const [temAcesso, setTemAcesso] = useState(false);
   const [projetosVinculados, setProjetosVinculados] = useState<any[]>([]);
+  const [projetoSelecionado, setProjetoSelecionado] = useState<any | null>(null);
 
   useEffect(() => {
     verificarAcesso();
@@ -79,6 +81,11 @@ export default function GestorSystem() {
       if (projetosAtivos.length > 0) {
         setProjetosVinculados(projetosAtivos);
         setTemAcesso(true);
+        
+        // Se tiver apenas 1 projeto, seleciona automaticamente
+        if (projetosAtivos.length === 1) {
+          setProjetoSelecionado(projetosAtivos[0]);
+        }
       } else {
         setTemAcesso(false);
       }
@@ -88,6 +95,14 @@ export default function GestorSystem() {
       console.error('Erro ao verificar acesso:', error);
       setLoading(false);
     }
+  };
+
+  const handleSelecionarProjeto = (projeto: any) => {
+    setProjetoSelecionado(projeto);
+  };
+
+  const handleVoltarSelecao = () => {
+    setProjetoSelecionado(null);
   };
 
   if (loading) {
@@ -119,5 +134,56 @@ export default function GestorSystem() {
     );
   }
 
-  return <GestorDashboard projetos={projetosVinculados} policialLogado={localStorage.getItem('usuarioId') || ''} />;
+  // Se tem múltiplos projetos e nenhum selecionado, mostra tela de seleção
+  if (projetosVinculados.length > 1 && !projetoSelecionado) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-4xl mx-auto">
+          <header className="mb-8 text-center">
+            <h1 className="text-3xl font-bold text-foreground">
+              Selecione o Projeto
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              Você é gestor de {projetosVinculados.length} projetos. Selecione qual deseja acessar.
+            </p>
+          </header>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {projetosVinculados.map((projeto) => (
+              <Card 
+                key={projeto.id} 
+                className="cursor-pointer hover:border-primary transition-colors group"
+                onClick={() => handleSelecionarProjeto(projeto)}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <FolderOpen className="h-6 w-6 text-primary" />
+                    {projeto.nome}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    {projeto.descricao || 'Sem descrição'}
+                  </p>
+                  <Button className="w-full group-hover:bg-primary">
+                    Acessar Projeto
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <GestorDashboard 
+      projetos={projetosVinculados} 
+      projetoInicial={projetoSelecionado || projetosVinculados[0]}
+      policialLogado={localStorage.getItem('usuarioId') || ''} 
+      onVoltarSelecao={projetosVinculados.length > 1 ? handleVoltarSelecao : undefined}
+    />
+  );
 }
