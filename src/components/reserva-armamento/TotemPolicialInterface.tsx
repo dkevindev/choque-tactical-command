@@ -208,7 +208,7 @@ const TotemPolicialInterface = () => {
             <img src={logo} alt="Logo Cavalaria" className="h-24 w-auto" />
             <div>
               <h1 className="text-2xl font-bold text-foreground">CAVALARIA PMCE - P4</h1>
-              <h2 className="text-xl font-semibold text-primary">RESERVA DE ARMAMENTO</h2>
+              <h2 className="text-xl font-semibold text-white">RESERVA DE ARMAMENTO</h2>
             </div>
           </div>
           <p className="text-lg text-muted-foreground">Confirmação de Recebimento</p>
