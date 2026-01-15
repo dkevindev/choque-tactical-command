@@ -19,6 +19,7 @@ import { db } from '@/firebase';
 import ModalConfirmacaoPolicial from './ModalConfirmacaoPolicial';
 import ModalQuantidadeMaterial from './ModalQuantidadeMaterial';
 import ModalFechamentoLivro from './ModalFechamentoLivro';
+import ModalAguardandoConfirmacao from './ModalAguardandoConfirmacao';
 import BaixaMaterialSection from './BaixaMaterialSection';
 import HistoricoLivrosSection from './HistoricoLivrosSection';
 import MaterialNaRuaSection from './MaterialNaRuaSection';
@@ -119,6 +120,9 @@ const ArmeiroInterface = () => {
   const [modalConfirmacao, setModalConfirmacao] = useState(false);
   const [modalQuantidade, setModalQuantidade] = useState(false);
   const [modalFechamento, setModalFechamento] = useState(false);
+  const [modalAguardando, setModalAguardando] = useState(false);
+  const [cautelaAguardandoId, setCautelaAguardandoId] = useState<string | null>(null);
+  const [policialAguardandoNome, setPolicialAguardandoNome] = useState("");
   const [materialParaQuantidade, setMaterialParaQuantidade] = useState<Material | null>(null);
   const [tipoQuantidade, setTipoQuantidade] = useState<'municao' | 'arma'>('municao');
   
@@ -601,16 +605,19 @@ const ArmeiroInterface = () => {
         cautelaData.livroId = livroAtivo.id;
       }
 
-      await addDoc(collection(db, 'cautelas_provisorias'), cautelaData);
+      const cautelaRef = await addDoc(collection(db, 'cautelas_provisorias'), cautelaData);
+      
+      // Guardar informações para o modal de aguardando
+      const nomePolicial = `${policialSelecionado['Post/Grad'] || ''} ${nomeGuerra || policialSelecionado.NOME}`.trim();
+      setCautelaAguardandoId(cautelaRef.id);
+      setPolicialAguardandoNome(nomePolicial);
       
       // Limpar seleção
       setMateriaisSelecionados([]);
       setPolicialSelecionado(null);
       
-      toast({
-        title: "⏳ Aguardando Confirmação",
-        description: `Materiais enviados para ${policialSelecionado.NOME} confirmar na tela externa.`,
-      });
+      // Abrir modal de aguardando
+      setModalAguardando(true);
       
     } catch (error) {
       console.error('Erro ao enviar para confirmação:', error);
@@ -622,6 +629,24 @@ const ArmeiroInterface = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Callback quando policial confirmar recebimento
+  const handleConfirmacaoRecebida = () => {
+    toast({
+      title: "✅ Material Recebido",
+      description: `${policialAguardandoNome} confirmou o recebimento.`,
+    });
+    
+    // Recarregar movimentações do dia
+    if (livroAtivo?.id) {
+      carregarMovimentacoesDoDia(livroAtivo.id);
+    }
+    carregarMateriaisDisponiveis();
+    
+    // Limpar estados do modal
+    setCautelaAguardandoId(null);
+    setPolicialAguardandoNome("");
   };
 
   // Confirmar Cautela
@@ -1236,6 +1261,17 @@ const ArmeiroInterface = () => {
           onClose={() => setModalFechamento(false)}
           armeiroNome={livroAtivo.armeiroNome}
           onFechar={handleFecharLivro}
+        />
+      )}
+
+      {/* Modal de Aguardando Confirmação */}
+      {cautelaAguardandoId && (
+        <ModalAguardandoConfirmacao
+          open={modalAguardando}
+          onClose={() => setModalAguardando(false)}
+          cautelaId={cautelaAguardandoId}
+          policialNome={policialAguardandoNome}
+          onConfirmado={handleConfirmacaoRecebida}
         />
       )}
     </div>
