@@ -731,12 +731,13 @@ const ArmeiroInterface = () => {
   const mapearCategoria = (material: Material) => {
     const categoria = (material.categoria || '').toLowerCase();
     
-    // Materiais com número de série vão para a aba "serie"
-    if (material.numeroSerie) return 'serie';
-    
-    // Fallback para categoria
+    // Verificar primeiro pela categoria do material (prioridade)
     if (categoria.includes('munição') || categoria.includes('municao')) return 'municao';
     if (categoria.includes('epi') || categoria.includes('colete')) return 'epi';
+    if (categoria.includes('acessório') || categoria.includes('acessorio')) return 'acessorio';
+    
+    // Materiais com número de série (armas) vão para a aba "serie"
+    if (material.numeroSerie) return 'serie';
     
     return 'acessorio';
   };
