@@ -733,7 +733,12 @@ const ArmeiroInterface = () => {
     
     // Verificar primeiro pela categoria do material (prioridade)
     if (categoria.includes('munição') || categoria.includes('municao')) return 'municao';
-    if (categoria.includes('epi') || categoria.includes('colete')) return 'epi';
+    
+    // Coletes balísticos vão para aba de número de série (junto com armas)
+    if (categoria.includes('colete')) return 'serie';
+    
+    // EPI (exceto coletes)
+    if (categoria.includes('epi')) return 'epi';
     if (categoria.includes('acessório') || categoria.includes('acessorio')) return 'acessorio';
     
     // Materiais com número de série (armas) vão para a aba "serie"
