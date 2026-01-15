@@ -384,6 +384,9 @@ const ArmeiroInterface = () => {
         status: 'aberto'
       });
       
+      // Limpar movimentações do dia anterior ao abrir novo livro
+      setMovimentacoesDoDia([]);
+      
       toast({
         title: "Livro Diário Aberto",
         description: `Livro aberto por ${armeiroNome}.`,

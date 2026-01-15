@@ -318,7 +318,10 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
           <div className="space-y-4 py-4">
             <div className="p-4 bg-muted rounded-lg">
               <div className="font-semibold">
-                {cautela.postoGrad} {cautela.policialNomeGuerra || cautela.policialNome}
+                {cautela.postoGrad && !(cautela.policialNomeGuerra || cautela.policialNome)?.toUpperCase().startsWith(cautela.postoGrad?.toUpperCase()) 
+                  ? `${cautela.postoGrad} ` 
+                  : ''}
+                {cautela.policialNomeGuerra || cautela.policialNome}
               </div>
               <div className="text-sm text-muted-foreground">
                 Mat: {cautela.policialMatricula}

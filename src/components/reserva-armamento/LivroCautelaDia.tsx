@@ -130,7 +130,9 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">
-                        {mov.postoGrad && `${mov.postoGrad} `}
+                        {mov.postoGrad && !mov.policialNomeGuerra?.toUpperCase().startsWith(mov.postoGrad?.toUpperCase()) 
+                          ? `${mov.postoGrad} ` 
+                          : ''}
                         {mov.policialNomeGuerra || mov.policialNome}
                       </div>
                       <div className="text-xs text-muted-foreground space-y-0.5">
