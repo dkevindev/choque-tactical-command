@@ -11,6 +11,7 @@ import CAVBot from "./components/CAVBot";
 import AdminDashboard from "./components/AdminDashboard";
 import UserDashboard from "./components/UserDashboard";
 import ReservaArmamentoSystem from "./components/reserva-armamento/ReservaArmamentoSystem";
+import TotemPolicialInterface from "./components/reserva-armamento/TotemPolicialInterface";
 import LivroGuardaPage from "./components/guarda-quartel/LivroGuardaPage";
 import HistoricoLivrosGuardaPage from "./components/guarda-quartel/HistoricoLivrosGuardaPage";
 import GuardaQuartelHome from "./components/guarda-quartel/GuardaQuartelHome";
@@ -37,6 +38,7 @@ const App = () => (
           <Route path="/gestao-pessoas" element={<GestãoPessoas />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/user-dashboard" element={<UserDashboard />} />
+          <Route path="/reserva-armamento/totem" element={<TotemPolicialInterface />} />
           <Route path="/reserva-armamento/*" element={<ReservaArmamentoSystem />} />
           <Route path="/guarda-quartel" element={<GuardaQuartelHome />} />
           <Route path="/guarda-quartel/novo" element={<LivroGuardaPage />} />

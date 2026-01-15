@@ -550,8 +550,8 @@ const ArmeiroInterface = () => {
     setMateriaisSelecionados(prev => prev.filter(m => m.materialId !== materialId));
   };
 
-  // Enviar para Confirmação
-  const enviarParaConfirmacao = () => {
+  // Enviar para Confirmação - Salvar com status aguardando_confirmacao
+  const enviarParaConfirmacao = async () => {
     if (!policialSelecionado || materiaisSelecionados.length === 0) {
       toast({
         title: "Erro",
@@ -561,7 +561,67 @@ const ArmeiroInterface = () => {
       return;
     }
     
-    setModalConfirmacao(true);
+    try {
+      setLoading(true);
+      
+      // Preparar materiais sem campos undefined
+      const materiaisLimpos = materiaisSelecionados.map(m => ({
+        materialId: m.materialId,
+        nome: m.nome,
+        categoria: m.categoria,
+        quantidade: m.quantidade,
+        ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
+        ...(m.carregadores && { carregadores: m.carregadores }),
+        ...(m.modelo && { modelo: m.modelo }),
+        ...(m.fabricante && { fabricante: m.fabricante })
+      }));
+      
+      const agora = new Date();
+      const horaCautela = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const nomeGuerra = policialSelecionado['NOME DE GUERRA1'] || policialSelecionado['NOME DE GUERRA'] || '';
+      const numeral = policialSelecionado.NUMERAL;
+      
+      // Criar cautela com status aguardando_confirmacao
+      const cautelaData: Record<string, any> = {
+        policialId: policialSelecionado.id,
+        policialNome: policialSelecionado.NOME,
+        policialNomeGuerra: nomeGuerra,
+        policialNumeral: numeral,
+        policialMatricula: String(policialSelecionado['Matrícula'] || ''),
+        postoGrad: policialSelecionado['Post/Grad'],
+        armeiroId: policialLogado?.id || livroAtivo?.armeiroId,
+        materiais: materiaisLimpos,
+        dataCautela: agora,
+        horaCautela,
+        status: 'aguardando_confirmacao', // Status para tela externa
+        sequencial: movimentacoesDoDia.length + 1
+      };
+
+      if (livroAtivo?.id) {
+        cautelaData.livroId = livroAtivo.id;
+      }
+
+      await addDoc(collection(db, 'cautelas_provisorias'), cautelaData);
+      
+      // Limpar seleção
+      setMateriaisSelecionados([]);
+      setPolicialSelecionado(null);
+      
+      toast({
+        title: "⏳ Aguardando Confirmação",
+        description: `Materiais enviados para ${policialSelecionado.NOME} confirmar na tela externa.`,
+      });
+      
+    } catch (error) {
+      console.error('Erro ao enviar para confirmação:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar para confirmação.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Confirmar Cautela
