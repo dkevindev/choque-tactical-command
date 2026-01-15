@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Shield, Package, CheckCircle, 
-  Lock, Loader2
+  Package, CheckCircle, Lock, Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -13,6 +12,7 @@ import {
   doc, getDoc, addDoc
 } from 'firebase/firestore';
 import { db } from '@/firebase';
+import logo from '@/assets/cavalaria-triade.png';
 
 interface MaterialAguardando {
   materialId: string;
@@ -200,15 +200,18 @@ const TotemPolicialInterface = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Shield className="h-12 w-12 text-amber-500" />
-            <h1 className="text-3xl font-bold text-white">RESERVA DE ARMAMENTO</h1>
+          <div className="flex flex-col items-center justify-center gap-4 mb-4">
+            <img src={logo} alt="Logo Cavalaria" className="h-24 w-auto" />
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">CAVALARIA PMCE - P4</h1>
+              <h2 className="text-xl font-semibold text-primary">RESERVA DE ARMAMENTO</h2>
+            </div>
           </div>
-          <p className="text-xl text-slate-300">Confirmação de Recebimento</p>
+          <p className="text-lg text-muted-foreground">Confirmação de Recebimento</p>
         </div>
 
         {/* Mensagem de Sucesso */}
@@ -223,19 +226,19 @@ const TotemPolicialInterface = () => {
 
         {/* Estado: Aguardando Material */}
         {!cautelaAtual && !mensagemSucesso && (
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card className="border-border">
             <CardContent className="p-12 text-center">
               <div className="mb-6">
-                <Loader2 className="h-16 w-16 text-amber-500 mx-auto animate-spin" />
+                <Loader2 className="h-16 w-16 text-primary mx-auto animate-spin" />
               </div>
-              <p className="text-2xl font-semibold text-white mb-2">
+              <p className="text-2xl font-semibold text-foreground mb-2">
                 Aguardando material...
               </p>
-              <p className="text-slate-400">
+              <p className="text-muted-foreground">
                 Quando o armeiro registrar uma cautela,<br />
                 ela aparecerá aqui automaticamente.
               </p>
-              <p className="text-xs text-slate-500 mt-4">
+              <p className="text-xs text-muted-foreground mt-4">
                 Verificando a cada 4 segundos
               </p>
             </CardContent>
@@ -246,19 +249,20 @@ const TotemPolicialInterface = () => {
         {cautelaAtual && !mensagemSucesso && (
           <>
             {/* Identificação do Policial */}
-            <Card className="mb-6 bg-amber-500/20 border-amber-500">
+            <Card className="mb-6 border-primary bg-primary/10">
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center">
-                    <span className="text-2xl font-bold text-white">
+                  <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+                    <span className="text-2xl font-bold text-primary-foreground">
                       {cautelaAtual.policialNumeral || '?'}
                     </span>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white">
-                      {cautelaAtual.postoGrad} {cautelaAtual.policialNomeGuerra || cautelaAtual.policialNome}
+                    <p className="text-2xl font-bold text-foreground">
+                      <span className="text-primary">{cautelaAtual.postoGrad}</span>
+                      <span className="ml-2">{cautelaAtual.policialNomeGuerra || cautelaAtual.policialNome}</span>
                     </p>
-                    <p className="text-slate-300">
+                    <p className="text-muted-foreground">
                       Matrícula: {cautelaAtual.policialMatricula}
                     </p>
                   </div>
@@ -267,10 +271,10 @@ const TotemPolicialInterface = () => {
             </Card>
 
             {/* Materiais para Receber */}
-            <Card className="mb-6 bg-slate-800/50 border-slate-700">
+            <Card className="mb-6 border-border">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <Package className="h-6 w-6 text-amber-500" />
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <Package className="h-6 w-6 text-primary" />
                   MATERIAIS PARA RECEBER
                 </CardTitle>
               </CardHeader>
@@ -279,26 +283,26 @@ const TotemPolicialInterface = () => {
                   {cautelaAtual.materiais.map((material, idx) => (
                     <div
                       key={`${cautelaAtual.id}-${idx}`}
-                      className="p-4 bg-slate-700/50 rounded-lg border border-slate-600"
+                      className="p-4 bg-muted rounded-lg border border-border"
                     >
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-lg font-semibold text-white">
+                          <p className="text-lg font-semibold text-foreground">
                             {material.nome}
                             {material.modelo && ` ${material.modelo}`}
                           </p>
                           <div className="flex flex-wrap gap-2 mt-2">
                             {material.numeroSerie && (
-                              <Badge variant="outline" className="border-amber-500 text-amber-400">
+                              <Badge variant="outline" className="border-primary text-primary">
                                 Série: {material.numeroSerie}
                               </Badge>
                             )}
-                            <Badge variant="outline" className="border-slate-500 text-slate-300">
+                            <Badge variant="outline" className="border-muted-foreground text-muted-foreground">
                               Qtd: {material.quantidade}
                             </Badge>
-                            {material.carregadores && (
-                              <Badge variant="outline" className="border-blue-500 text-blue-400">
-                                {material.carregadores} carregadores
+                            {material.carregadores && material.carregadores > 0 && (
+                              <Badge variant="default" className="bg-blue-600 text-white text-base">
+                                📦 {material.carregadores} carregador(es)
                               </Badge>
                             )}
                           </div>
@@ -311,10 +315,10 @@ const TotemPolicialInterface = () => {
             </Card>
 
             {/* Campo de Senha */}
-            <Card className="bg-slate-800/50 border-slate-700">
+            <Card className="border-border">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <Lock className="h-6 w-6 text-amber-500" />
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <Lock className="h-6 w-6 text-primary" />
                   DIGITE SUA SENHA
                 </CardTitle>
               </CardHeader>
@@ -326,12 +330,12 @@ const TotemPolicialInterface = () => {
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleConfirmarRecebimento()}
-                  className="text-3xl h-20 text-center bg-slate-700 border-slate-600 text-white tracking-widest"
+                  className="text-3xl h-20 text-center bg-muted border-border text-foreground tracking-widest"
                   autoFocus
                 />
                 
-                <p className="text-center text-slate-400 text-sm">
-                  Pressione <span className="text-amber-400 font-bold">ENTER</span> para confirmar
+                <p className="text-center text-muted-foreground text-sm">
+                  Pressione <span className="text-primary font-bold">ENTER</span> para confirmar
                 </p>
                 
                 <Button
@@ -358,8 +362,8 @@ const TotemPolicialInterface = () => {
 
         {/* Footer */}
         <div className="text-center mt-8">
-          <p className="text-sm text-slate-500">
-            Sistema de Reserva de Armamento - Totem de Confirmação
+          <p className="text-sm text-muted-foreground">
+            Cavalaria PMCE - P4 - Reserva de Armamento - Totem de Confirmação
           </p>
         </div>
       </div>

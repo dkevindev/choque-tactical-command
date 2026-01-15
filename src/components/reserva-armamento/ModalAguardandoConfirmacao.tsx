@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, User } from "lucide-react";
+import { Loader2, CheckCircle, User, XCircle } from "lucide-react";
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
 
@@ -11,6 +11,7 @@ interface ModalAguardandoConfirmacaoProps {
   cautelaId: string;
   policialNome: string;
   onConfirmado: () => void;
+  onCancelar: () => void;
 }
 
 const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
@@ -18,7 +19,8 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
   onClose,
   cautelaId,
   policialNome,
-  onConfirmado
+  onConfirmado,
+  onCancelar
 }) => {
   const [confirmado, setConfirmado] = useState(false);
   const [contador, setContador] = useState(0);
@@ -89,6 +91,20 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
             <p className="text-xs text-muted-foreground">
               Atualizando a cada 2 segundos... ({contador} verificações)
             </p>
+
+            <div className="pt-4 border-t border-border">
+              <Button
+                variant="destructive"
+                onClick={onCancelar}
+                className="w-full gap-2"
+              >
+                <XCircle className="h-4 w-4" />
+                CANCELAR
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">
+                Use se o policial identificou algum erro
+              </p>
+            </div>
           </div>
         ) : (
           <div className="text-center py-8 space-y-6">

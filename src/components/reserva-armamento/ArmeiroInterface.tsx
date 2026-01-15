@@ -8,12 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Search, User, Clock, Package, BookOpen, Target, Plus, Minus, 
   CheckCircle, AlertCircle, Lock, Shield, Crosshair, MapPin, 
-  History, RotateCcw 
+  History, RotateCcw, Monitor 
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   collection, query, where, onSnapshot, addDoc, updateDoc, 
-  doc, getDocs, orderBy, getDoc 
+  doc, getDocs, orderBy, getDoc, deleteDoc 
 } from 'firebase/firestore';
 import { db } from '@/firebase';
 import ModalConfirmacaoPolicial from './ModalConfirmacaoPolicial';
@@ -649,6 +649,34 @@ const ArmeiroInterface = () => {
     setPolicialAguardandoNome("");
   };
 
+  // Cancelar cautela pendente
+  const handleCancelarCautela = async () => {
+    if (!cautelaAguardandoId) return;
+    
+    try {
+      // Deletar a cautela provisória
+      await deleteDoc(doc(db, 'cautelas_provisorias', cautelaAguardandoId));
+      
+      // Fechar modal e limpar estados
+      setModalAguardando(false);
+      setCautelaAguardandoId(null);
+      setPolicialAguardandoNome("");
+      
+      toast({
+        title: "Cautela Cancelada",
+        description: "A cautela foi cancelada.",
+        variant: "destructive"
+      });
+    } catch (error) {
+      console.error('Erro ao cancelar cautela:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao cancelar cautela.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Confirmar Cautela
   const handleConfirmarCautela = async () => {
     try {
@@ -889,14 +917,25 @@ const ArmeiroInterface = () => {
                 Abrir Livro Diário
               </Button>
             ) : (
-              <Button 
-                onClick={() => setModalFechamento(true)}
-                disabled={loading}
-                variant="destructive"
-              >
-                <Lock className="h-4 w-4 mr-2" />
-                Fechar Livro Diário
-              </Button>
+              <>
+                <Button 
+                  onClick={() => setModalFechamento(true)}
+                  disabled={loading}
+                  variant="destructive"
+                >
+                  <Lock className="h-4 w-4 mr-2" />
+                  Fechar Livro Diário
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => window.open('/reserva-armamento/totem', '_blank')}
+                  className="gap-2"
+                >
+                  <Monitor className="h-4 w-4" />
+                  Abrir Totem
+                </Button>
+              </>
             )}
           </div>
         </CardContent>
@@ -1272,6 +1311,7 @@ const ArmeiroInterface = () => {
           cautelaId={cautelaAguardandoId}
           policialNome={policialAguardandoNome}
           onConfirmado={handleConfirmacaoRecebida}
+          onCancelar={handleCancelarCautela}
         />
       )}
     </div>
