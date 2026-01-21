@@ -119,6 +119,45 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
     }
   }, [etapa, open, cautelaId]);
 
+  // 🔥 REALTIME: Escutar mudanças no status da cautela para detectar confirmação externa
+  useEffect(() => {
+    if (!open || !cautelaId) return;
+
+    console.log('[ModalAguardando] Iniciando listener realtime para cautela:', cautelaId);
+
+    const unsubscribe = onSnapshot(
+      doc(db, 'cautelas_provisorias', cautelaId),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          
+          // Se o status mudou para 'pendente' e ainda não estamos na etapa confirmado
+          if (data.status === 'pendente' && etapa !== 'confirmado') {
+            console.log('[ModalAguardando] Cautela confirmada via realtime');
+            setEtapa('confirmado');
+            
+            setTimeout(() => {
+              onConfirmado();
+              onClose();
+            }, 2000);
+          }
+        } else {
+          // Documento foi deletado (cautela cancelada)
+          console.log('[ModalAguardando] Cautela removida - fechando modal');
+          onClose();
+        }
+      },
+      (error) => {
+        console.error('[ModalAguardando] Erro no listener realtime:', error);
+      }
+    );
+
+    return () => {
+      console.log('[ModalAguardando] Desconectando listener realtime');
+      unsubscribe();
+    };
+  }, [open, cautelaId, etapa, onConfirmado, onClose]);
+
   // Auto-foco no campo de senha
   useEffect(() => {
     if (open && etapa === 'senha') {
