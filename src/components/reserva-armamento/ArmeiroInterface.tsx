@@ -421,6 +421,11 @@ const ArmeiroInterface = () => {
         )
       );
 
+      // Buscar alterações automáticas do livro (ex: faltas de munição)
+      const livroDoc = await getDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id));
+      const livroData = livroDoc.data();
+      const alteracoesAutomaticas = livroData?.alteracoesAutomaticas || [];
+
       // Criar alertas para materiais pendentes
       if (cautelasPendentesSnapshot.size > 0) {
         for (const cautelaDoc of cautelasPendentesSnapshot.docs) {
@@ -443,11 +448,14 @@ const ArmeiroInterface = () => {
         }
       }
 
-      // Criar alertas para observações/alterações do livro
-      if (alteracoes && alteracoes.length > 0) {
-        for (const alteracao of alteracoes) {
+      // Combinar alterações manuais + automáticas
+      const todasAlteracoes = [...alteracoesAutomaticas, ...alteracoes];
+
+      // Criar alertas para observações/alterações do livro (manuais e automáticas)
+      if (todasAlteracoes && todasAlteracoes.length > 0) {
+        for (const alteracao of todasAlteracoes) {
           await addDoc(collection(db, 'alertas_gestao'), {
-            tipo: 'observacao_livro',
+            tipo: alteracao.tipo || 'observacao_livro',
             dataHora: new Date(),
             observacao: alteracao.descricao,
             armeiroNome: livroAtivo!.armeiroNome,
