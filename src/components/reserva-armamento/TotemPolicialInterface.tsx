@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   Package, CheckCircle, Loader2, KeyRound
 } from "lucide-react";
 import { 
-  collection, query, where, getDocs, doc, onSnapshot
+  collection, query, where, doc, onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/firebase';
 import logo from '@/assets/cavalaria-triade.png';
@@ -47,6 +47,9 @@ const TotemPolicialInterface = () => {
   const [cautelaAtual, setCautelaAtual] = useState<CautelaAguardando | null>(null);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
   const [sessaoDigitacao, setSessaoDigitacao] = useState<SessaoDigitacao | null>(null);
+  
+  // Ref para rastrear a cautela anterior e detectar confirmação
+  const cautelaAnteriorRef = useRef<string | null>(null);
 
   // Calcular tamanhos dinâmicos baseados na quantidade de materiais
   const quantidadeMateriais = cautelaAtual?.materiais?.length || 0;
@@ -58,20 +61,21 @@ const TotemPolicialInterface = () => {
   const tamanhoLogo = quantidadeMateriais > 5 ? 'h-12' : 'h-16';
   const tamanhoTitulo = quantidadeMateriais > 5 ? 'text-base' : 'text-lg';
 
-  // Verificar automaticamente a cada 4 segundos se há cautela aguardando
+  // 🔥 REALTIME: Escutar cautelas aguardando confirmação em tempo real
   useEffect(() => {
-    const verificarCautelaPendente = async () => {
-      try {
-        const snapshot = await getDocs(
-          query(
-            collection(db, 'cautelas_provisorias'),
-            where('status', '==', 'aguardando_confirmacao')
-          )
-        );
-        
+    console.log('[Totem] Iniciando listener realtime para cautelas aguardando...');
+    
+    const unsubscribe = onSnapshot(
+      query(
+        collection(db, 'cautelas_provisorias'),
+        where('status', '==', 'aguardando_confirmacao')
+      ),
+      (snapshot) => {
         if (!snapshot.empty) {
           const docSnap = snapshot.docs[0];
           const data = docSnap.data();
+          
+          console.log('[Totem] Cautela recebida em tempo real:', docSnap.id);
           
           setCautelaAtual({
             id: docSnap.id,
@@ -87,58 +91,41 @@ const TotemPolicialInterface = () => {
             armeiroId: data.armeiroId,
             livroId: data.livroId
           });
-          setMensagemSucesso(""); // Limpar mensagem de sucesso se houver nova cautela
+          
+          // Atualizar sessão de digitação se existir
+          if (data.sessaoDigitacao) {
+            setSessaoDigitacao(data.sessaoDigitacao as SessaoDigitacao);
+          }
+          
+          cautelaAnteriorRef.current = docSnap.id;
+          setMensagemSucesso("");
         } else {
-          // Verificar se a cautela que estava sendo exibida foi confirmada
-          if (cautelaAtual) {
+          // Não há cautela aguardando - verificar se havia uma antes (foi confirmada)
+          if (cautelaAnteriorRef.current) {
+            console.log('[Totem] Cautela confirmada! Exibindo mensagem de sucesso.');
             setMensagemSucesso("RECEBIMENTO CONFIRMADO!");
-            setCautelaAtual(null);
-            setSessaoDigitacao(null);
+            cautelaAnteriorRef.current = null;
             
-            // Limpar mensagem de sucesso após 3 segundos
             setTimeout(() => {
               setMensagemSucesso("");
             }, 3000);
           }
-        }
-      } catch (error) {
-        console.error('Erro ao verificar cautelas:', error);
-      }
-    };
-
-    // Verificar imediatamente
-    verificarCautelaPendente();
-
-    // Verificar a cada 4 segundos
-    const interval = setInterval(verificarCautelaPendente, 4000);
-
-    return () => clearInterval(interval);
-  }, [cautelaAtual]);
-
-  // Escutar em tempo real as mudanças na sessão de digitação
-  useEffect(() => {
-    if (!cautelaAtual?.id) {
-      setSessaoDigitacao(null);
-      return;
-    }
-
-    const unsubscribe = onSnapshot(
-      doc(db, 'cautelas_provisorias', cautelaAtual.id),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.sessaoDigitacao) {
-            setSessaoDigitacao(data.sessaoDigitacao as SessaoDigitacao);
-          }
+          setCautelaAtual(null);
+          setSessaoDigitacao(null);
         }
       },
       (error) => {
-        console.error('Erro ao escutar sessão de digitação:', error);
+        console.error('[Totem] Erro no listener realtime:', error);
       }
     );
 
-    return () => unsubscribe();
-  }, [cautelaAtual?.id]);
+    return () => {
+      console.log('[Totem] Desconectando listener realtime');
+      unsubscribe();
+    };
+  }, []);
+
+  // Nota: A sessão de digitação agora é atualizada no listener principal acima
 
   // Renderizar asteriscos para visualização da senha
   const renderAsteriscos = (length: number) => {
