@@ -270,7 +270,7 @@ const TotemPolicialInterface = () => {
                   <>
                     <p className="text-sm text-muted-foreground mb-3 flex items-center justify-center gap-2">
                       <KeyRound className="h-4 w-4 text-primary" />
-                      DIGITANDO SENHA:
+                      DIGITE A SENHA:
                     </p>
                     
                     {/* Asteriscos animados */}
@@ -278,9 +278,9 @@ const TotemPolicialInterface = () => {
                       {renderAsteriscos(sessaoDigitacao?.senhaLength || 0)}
                     </div>
                     
-                    {/* Erro de senha */}
+                    {/* Erro de senha - espelhado em tempo real */}
                     {sessaoDigitacao?.erro && (
-                      <p className="text-sm text-destructive animate-pulse mb-2 font-medium">
+                      <p className="text-base text-destructive animate-pulse mb-2 font-bold">
                         ❌ {sessaoDigitacao.erro}
                       </p>
                     )}
