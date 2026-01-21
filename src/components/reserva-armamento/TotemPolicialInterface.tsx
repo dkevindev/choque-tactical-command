@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Package, CheckCircle, Loader2
+  Package, CheckCircle, Loader2, KeyRound
 } from "lucide-react";
 import { 
-  collection, query, where, getDocs
+  collection, query, where, getDocs, doc, onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/firebase';
 import logo from '@/assets/cavalaria-triade.png';
@@ -19,6 +19,13 @@ interface MaterialAguardando {
   carregadores?: number;
   modelo?: string;
   fabricante?: string;
+}
+
+interface SessaoDigitacao {
+  etapa: 'senha' | 'primeiro_acesso' | 'resetar_senha' | 'confirmado';
+  senhaLength: number;
+  erro?: string | null;
+  timestamp: number;
 }
 
 interface CautelaAguardando {
@@ -39,6 +46,7 @@ interface CautelaAguardando {
 const TotemPolicialInterface = () => {
   const [cautelaAtual, setCautelaAtual] = useState<CautelaAguardando | null>(null);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
+  const [sessaoDigitacao, setSessaoDigitacao] = useState<SessaoDigitacao | null>(null);
 
   // Calcular tamanhos dinâmicos baseados na quantidade de materiais
   const quantidadeMateriais = cautelaAtual?.materiais?.length || 0;
@@ -85,6 +93,7 @@ const TotemPolicialInterface = () => {
           if (cautelaAtual) {
             setMensagemSucesso("RECEBIMENTO CONFIRMADO!");
             setCautelaAtual(null);
+            setSessaoDigitacao(null);
             
             // Limpar mensagem de sucesso após 3 segundos
             setTimeout(() => {
@@ -105,6 +114,54 @@ const TotemPolicialInterface = () => {
 
     return () => clearInterval(interval);
   }, [cautelaAtual]);
+
+  // Escutar em tempo real as mudanças na sessão de digitação
+  useEffect(() => {
+    if (!cautelaAtual?.id) {
+      setSessaoDigitacao(null);
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      doc(db, 'cautelas_provisorias', cautelaAtual.id),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.sessaoDigitacao) {
+            setSessaoDigitacao(data.sessaoDigitacao as SessaoDigitacao);
+          }
+        }
+      },
+      (error) => {
+        console.error('Erro ao escutar sessão de digitação:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [cautelaAtual?.id]);
+
+  // Renderizar asteriscos para visualização da senha
+  const renderAsteriscos = (length: number) => {
+    if (length === 0) {
+      return (
+        <span className="text-muted-foreground text-sm animate-pulse">
+          Aguardando digitação...
+        </span>
+      );
+    }
+
+    return (
+      <div className="flex justify-center gap-2">
+        {Array.from({ length }).map((_, i) => (
+          <div 
+            key={i}
+            className="w-4 h-4 bg-primary rounded-full animate-pulse"
+            style={{ animationDelay: `${i * 50}ms` }}
+          />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center py-16 px-4">
@@ -217,12 +274,89 @@ const TotemPolicialInterface = () => {
               </CardContent>
             </Card>
 
-            {/* Mensagem simples - sem campo de senha */}
-            <div className="text-center py-2">
-              <p className="text-sm text-muted-foreground animate-pulse">
-                Confirme no terminal do armeiro
-              </p>
-            </div>
+            {/* Área de Digitação Espelhada */}
+            <Card className="mb-2 border-primary/50 bg-card">
+              <CardContent className="p-3 text-center">
+                
+                {/* Etapa: Digitando Senha */}
+                {(!sessaoDigitacao || sessaoDigitacao.etapa === 'senha') && (
+                  <>
+                    <p className="text-sm text-muted-foreground mb-3 flex items-center justify-center gap-2">
+                      <KeyRound className="h-4 w-4 text-primary" />
+                      DIGITANDO SENHA:
+                    </p>
+                    
+                    {/* Asteriscos animados */}
+                    <div className="mb-3 min-h-[24px] flex items-center justify-center">
+                      {renderAsteriscos(sessaoDigitacao?.senhaLength || 0)}
+                    </div>
+                    
+                    {/* Erro de senha */}
+                    {sessaoDigitacao?.erro && (
+                      <p className="text-sm text-destructive animate-pulse mb-2 font-medium">
+                        ❌ {sessaoDigitacao.erro}
+                      </p>
+                    )}
+                    
+                    <p className="text-xs text-muted-foreground">
+                      Pressione ENTER para confirmar
+                    </p>
+                  </>
+                )}
+                
+                {/* Etapa: Primeiro Acesso */}
+                {sessaoDigitacao?.etapa === 'primeiro_acesso' && (
+                  <>
+                    <p className="text-sm text-amber-500 font-medium mb-2 flex items-center justify-center gap-2">
+                      <KeyRound className="h-4 w-4" />
+                      🔑 PRIMEIRO ACESSO
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Definindo nova senha pessoal...
+                    </p>
+                    
+                    {/* Asteriscos para nova senha */}
+                    <div className="mb-2 min-h-[24px] flex items-center justify-center">
+                      {sessaoDigitacao.senhaLength > 0 ? (
+                        <div className="flex justify-center gap-2">
+                          {Array.from({ length: sessaoDigitacao.senhaLength }).map((_, i) => (
+                            <div key={i} className="w-4 h-4 bg-amber-500 rounded-full" />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm animate-pulse">
+                          Aguardando nova senha...
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+                
+                {/* Etapa: Resetando Senha */}
+                {sessaoDigitacao?.etapa === 'resetar_senha' && (
+                  <>
+                    <p className="text-sm text-amber-500 font-medium mb-2 flex items-center justify-center gap-2">
+                      <KeyRound className="h-4 w-4" />
+                      🔑 RESETANDO SENHA
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Aguardando autorização do armeiro...
+                    </p>
+                  </>
+                )}
+                
+                {/* Etapa: Confirmado */}
+                {sessaoDigitacao?.etapa === 'confirmado' && (
+                  <>
+                    <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                    <p className="text-sm text-green-500 font-bold">
+                      ✅ CONFIRMADO!
+                    </p>
+                  </>
+                )}
+                
+              </CardContent>
+            </Card>
           </>
         )}
 
