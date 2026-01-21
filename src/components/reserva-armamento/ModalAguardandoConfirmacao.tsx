@@ -1,128 +1,559 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, User, XCircle } from "lucide-react";
-import { doc, onSnapshot } from 'firebase/firestore';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, CheckCircle, User, XCircle, KeyRound, AlertTriangle, Package } from "lucide-react";
+import { doc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { toast } from '@/hooks/use-toast';
+
+interface MaterialSelecionado {
+  materialId?: string;
+  id?: string;
+  nome: string;
+  quantidade: number;
+  categoria?: string;
+  numeroSerie?: string;
+  carregadores?: number;
+}
 
 interface ModalAguardandoConfirmacaoProps {
   open: boolean;
   onClose: () => void;
   cautelaId: string;
+  policialId: string;
   policialNome: string;
+  materiais: MaterialSelecionado[];
   onConfirmado: () => void;
   onCancelar: () => void;
 }
+
+type Etapa = 'senha' | 'primeiro_acesso' | 'resetar_senha' | 'confirmado';
 
 const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
   open,
   onClose,
   cautelaId,
+  policialId,
   policialNome,
+  materiais,
   onConfirmado,
   onCancelar
 }) => {
-  const [confirmado, setConfirmado] = useState(false);
-  const [contador, setContador] = useState(0);
+  const [etapa, setEtapa] = useState<Etapa>('senha');
+  const [loading, setLoading] = useState(false);
+  
+  // Senha do policial
+  const [senhaPolicial, setSenhaPolicial] = useState('');
+  const [erroSenha, setErroSenha] = useState('');
+  const senhaInputRef = useRef<HTMLInputElement>(null);
+  
+  // Primeiro acesso
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState('');
+  const [erroNovaSenha, setErroNovaSenha] = useState('');
+  
+  // Resetar senha
+  const [senhaArmeiro, setSenhaArmeiro] = useState('');
+  const [erroSenhaArmeiro, setErroSenhaArmeiro] = useState('');
 
-  // Listener em tempo real para verificar confirmação a cada 2 segundos
+  // Reset estados quando modal abre
   useEffect(() => {
-    if (!open || !cautelaId) return;
+    if (open) {
+      setEtapa('senha');
+      setSenhaPolicial('');
+      setErroSenha('');
+      setNovaSenha('');
+      setConfirmarNovaSenha('');
+      setErroNovaSenha('');
+      setSenhaArmeiro('');
+      setErroSenhaArmeiro('');
+      setLoading(false);
+    }
+  }, [open]);
 
-    setConfirmado(false);
-    setContador(0);
+  // Auto-foco no campo de senha
+  useEffect(() => {
+    if (open && etapa === 'senha') {
+      setTimeout(() => senhaInputRef.current?.focus(), 100);
+    }
+  }, [open, etapa]);
 
-    const unsubscribe = onSnapshot(
-      doc(db, 'cautelas_provisorias', cautelaId),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.status === 'pendente') {
-            setConfirmado(true);
-            // Auto-fechar após 3 segundos
-            setTimeout(() => {
-              onConfirmado();
-              onClose();
-            }, 3000);
-          }
-        }
-      },
-      (error) => {
-        console.error('Erro ao monitorar cautela:', error);
+  // Validar senha do policial
+  const handleValidarSenha = async () => {
+    if (!senhaPolicial.trim()) {
+      setErroSenha('Digite a senha do policial');
+      return;
+    }
+
+    if (!policialId) {
+      setErroSenha('ID do policial não encontrado');
+      return;
+    }
+
+    setLoading(true);
+    setErroSenha('');
+
+    try {
+      const policialDoc = await getDoc(doc(db, 'policiais', policialId));
+      
+      if (!policialDoc.exists()) {
+        setErroSenha('Policial não encontrado');
+        setLoading(false);
+        return;
       }
-    );
 
-    // Contador de atualizações
-    const interval = setInterval(() => {
-      setContador(prev => prev + 1);
-    }, 2000);
+      const policialData = policialDoc.data();
 
-    return () => {
-      unsubscribe();
-      clearInterval(interval);
-    };
-  }, [open, cautelaId, onClose, onConfirmado]);
+      // Verificar senha
+      if (policialData.senha !== senhaPolicial) {
+        setErroSenha('Senha incorreta');
+        setSenhaPolicial('');
+        setLoading(false);
+        setTimeout(() => senhaInputRef.current?.focus(), 100);
+        return;
+      }
+
+      // Verificar primeiro acesso
+      if (policialData.primeiroAcesso === true) {
+        setEtapa('primeiro_acesso');
+        setLoading(false);
+        return;
+      }
+
+      // Senha correta - confirmar recebimento
+      await confirmarRecebimento();
+    } catch (error) {
+      console.error('Erro ao validar senha:', error);
+      setErroSenha('Erro ao validar senha. Tente novamente.');
+      setLoading(false);
+    }
+  };
+
+  // Salvar nova senha (primeiro acesso)
+  const handleSalvarNovaSenha = async () => {
+    if (!novaSenha.trim()) {
+      setErroNovaSenha('Digite a nova senha');
+      return;
+    }
+
+    if (novaSenha.length < 4) {
+      setErroNovaSenha('A senha deve ter no mínimo 4 caracteres');
+      return;
+    }
+
+    if (novaSenha !== confirmarNovaSenha) {
+      setErroNovaSenha('As senhas não coincidem');
+      return;
+    }
+
+    setLoading(true);
+    setErroNovaSenha('');
+
+    try {
+      // Atualizar senha do policial
+      await updateDoc(doc(db, 'policiais', policialId), {
+        senha: novaSenha,
+        primeiroAcesso: false
+      });
+
+      toast({
+        title: "✅ Senha definida com sucesso!",
+        description: "A nova senha foi salva."
+      });
+
+      // Confirmar recebimento
+      await confirmarRecebimento();
+    } catch (error) {
+      console.error('Erro ao salvar nova senha:', error);
+      setErroNovaSenha('Erro ao salvar senha. Tente novamente.');
+      setLoading(false);
+    }
+  };
+
+  // Confirmar recebimento (atualiza status da cautela)
+  const confirmarRecebimento = async () => {
+    try {
+      // Atualizar status da cautela para 'pendente' (recebido pelo policial)
+      await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+        status: 'pendente',
+        dataConfirmacao: new Date().toISOString(),
+        horaConfirmacao: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      });
+
+      setEtapa('confirmado');
+      
+      // Auto-fechar após 3 segundos
+      setTimeout(() => {
+        onConfirmado();
+        onClose();
+      }, 3000);
+    } catch (error) {
+      console.error('Erro ao confirmar recebimento:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao confirmar recebimento. Tente novamente.",
+        variant: "destructive"
+      });
+      setLoading(false);
+    }
+  };
+
+  // Validar senha do armeiro para resetar senha do policial
+  const handleResetarSenha = async () => {
+    if (!senhaArmeiro.trim()) {
+      setErroSenhaArmeiro('Digite sua senha de armeiro');
+      return;
+    }
+
+    setLoading(true);
+    setErroSenhaArmeiro('');
+
+    try {
+      // Buscar armeiro logado
+      const userStorage = localStorage.getItem('user');
+      if (!userStorage) {
+        setErroSenhaArmeiro('Usuário não logado');
+        setLoading(false);
+        return;
+      }
+
+      const userData = JSON.parse(userStorage);
+      const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
+
+      if (!armeiroDoc.exists()) {
+        setErroSenhaArmeiro('Armeiro não encontrado');
+        setLoading(false);
+        return;
+      }
+
+      const armeiroData = armeiroDoc.data();
+
+      // Validar senha do armeiro
+      if (armeiroData.senha !== senhaArmeiro) {
+        setErroSenhaArmeiro('Senha do armeiro incorreta');
+        setSenhaArmeiro('');
+        setLoading(false);
+        return;
+      }
+
+      // Buscar dados do policial para obter matrícula
+      const policialDoc = await getDoc(doc(db, 'policiais', policialId));
+      if (!policialDoc.exists()) {
+        setErroSenhaArmeiro('Policial não encontrado');
+        setLoading(false);
+        return;
+      }
+
+      const policialData = policialDoc.data();
+      const matricula = String(policialData['Matrícula'] || policialData.matricula || '');
+
+      // Resetar senha do policial para matrícula + primeiro acesso
+      await updateDoc(doc(db, 'policiais', policialId), {
+        senha: matricula,
+        primeiroAcesso: true
+      });
+
+      toast({
+        title: "🔑 Senha resetada!",
+        description: `A senha de ${policialNome} foi resetada para a matrícula. O policial deve definir uma nova senha.`
+      });
+
+      // Voltar para estado de primeiro acesso
+      setEtapa('primeiro_acesso');
+      setSenhaArmeiro('');
+      setLoading(false);
+    } catch (error) {
+      console.error('Erro ao resetar senha:', error);
+      setErroSenhaArmeiro('Erro ao resetar senha. Tente novamente.');
+      setLoading(false);
+    }
+  };
+
+  // Handle Enter key
+  const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      action();
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
-        {!confirmado ? (
-          <div className="text-center py-8 space-y-6">
-            <div className="relative mx-auto w-20 h-20">
-              <Loader2 className="w-20 h-20 text-primary animate-spin" />
-            </div>
-            
-            <div>
-              <h2 className="text-xl font-bold text-foreground mb-2">
-                ⏳ AGUARDANDO CONFIRMAÇÃO
+      <DialogContent className="sm:max-w-lg" onPointerDownOutside={(e) => e.preventDefault()}>
+        {/* ETAPA: AGUARDANDO SENHA */}
+        {etapa === 'senha' && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <h2 className="text-lg font-bold text-foreground flex items-center justify-center gap-2">
+                <KeyRound className="h-5 w-5 text-primary" />
+                AGUARDANDO CONFIRMAÇÃO
               </h2>
-              
-              <div className="flex items-center justify-center gap-2 text-muted-foreground mb-4">
-                <User className="h-5 w-5" />
-                <span className="font-medium">{policialNome}</span>
+            </div>
+
+            {/* Policial */}
+            <div className="flex items-center justify-center gap-2 p-2 bg-muted rounded-lg">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm">{policialNome}</span>
+            </div>
+
+            {/* Materiais */}
+            {materiais && materiais.length > 0 && (
+              <div className="bg-muted/50 rounded-lg p-3 max-h-32 overflow-y-auto">
+                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  MATERIAIS ({materiais.length}):
+                </p>
+                <div className="space-y-1">
+                  {materiais.map((m, idx) => (
+                    <div key={idx} className="text-xs text-foreground">
+                      • {m.nome}
+                      {m.numeroSerie && <span className="text-muted-foreground"> - Série: {m.numeroSerie}</span>}
+                      {m.quantidade > 1 && <span className="text-muted-foreground"> (Qtd: {m.quantidade})</span>}
+                      {m.carregadores && m.carregadores > 0 && (
+                        <span className="text-muted-foreground"> 📦 {m.carregadores} carreg.</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-              
-              <p className="text-muted-foreground">
-                Aguardando policial confirmar<br />
-                recebimento na tela externa...
+            )}
+
+            {/* Campo de senha */}
+            <div className="space-y-2">
+              <Label htmlFor="senha-policial" className="text-sm">
+                🔐 SENHA DO POLICIAL:
+              </Label>
+              <Input
+                ref={senhaInputRef}
+                id="senha-policial"
+                type="password"
+                value={senhaPolicial}
+                onChange={(e) => setSenhaPolicial(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, handleValidarSenha)}
+                placeholder="Digite a senha..."
+                className="h-12 text-lg text-center"
+                disabled={loading}
+              />
+              {erroSenha && (
+                <p className="text-xs text-destructive text-center">{erroSenha}</p>
+              )}
+              <p className="text-xs text-muted-foreground text-center">
+                Pressione ENTER para confirmar
               </p>
             </div>
-            
-            <p className="text-xs text-muted-foreground">
-              Atualizando a cada 2 segundos... ({contador} verificações)
-            </p>
 
-            <div className="pt-4 border-t border-border">
-              <Button
-                variant="destructive"
-                onClick={onCancelar}
-                className="w-full gap-2"
-              >
-                <XCircle className="h-4 w-4" />
-                CANCELAR
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2">
-                Use se o policial identificou algum erro
+            {/* Botão Confirmar */}
+            <Button
+              onClick={handleValidarSenha}
+              disabled={loading || !senhaPolicial.trim()}
+              className="w-full h-10 gap-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4" />
+              )}
+              CONFIRMAR RECEBIMENTO
+            </Button>
+
+            {/* Divisor */}
+            <div className="border-t border-border pt-3 space-y-2">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEtapa('resetar_senha')}
+                  className="flex-1 text-xs gap-1"
+                  disabled={loading}
+                >
+                  <KeyRound className="h-3 w-3" />
+                  Resetar Senha
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={onCancelar}
+                  className="flex-1 text-xs gap-1"
+                  disabled={loading}
+                >
+                  <XCircle className="h-3 w-3" />
+                  CANCELAR
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Resetar senha requer autorização do armeiro
               </p>
             </div>
           </div>
-        ) : (
-          <div className="text-center py-8 space-y-6">
-            <div className="mx-auto w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-12 h-12 text-green-600" />
+        )}
+
+        {/* ETAPA: PRIMEIRO ACESSO */}
+        {etapa === 'primeiro_acesso' && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <h2 className="text-lg font-bold text-foreground flex items-center justify-center gap-2">
+                <KeyRound className="h-5 w-5 text-amber-500" />
+                PRIMEIRO ACESSO
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Definir nova senha para {policialNome}
+              </p>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                O policial precisa definir uma nova senha pessoal e intransferível.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="nova-senha" className="text-sm">Nova Senha:</Label>
+                <Input
+                  id="nova-senha"
+                  type="password"
+                  value={novaSenha}
+                  onChange={(e) => setNovaSenha(e.target.value)}
+                  placeholder="Digite a nova senha..."
+                  className="h-10"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="confirmar-senha" className="text-sm">Confirmar Senha:</Label>
+                <Input
+                  id="confirmar-senha"
+                  type="password"
+                  value={confirmarNovaSenha}
+                  onChange={(e) => setConfirmarNovaSenha(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, handleSalvarNovaSenha)}
+                  placeholder="Confirme a nova senha..."
+                  className="h-10"
+                  disabled={loading}
+                />
+              </div>
+
+              {erroNovaSenha && (
+                <p className="text-xs text-destructive text-center">{erroNovaSenha}</p>
+              )}
+            </div>
+
+            <Button
+              onClick={handleSalvarNovaSenha}
+              disabled={loading || !novaSenha.trim() || !confirmarNovaSenha.trim()}
+              className="w-full h-10 gap-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4" />
+              )}
+              SALVAR E CONFIRMAR RECEBIMENTO
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={onCancelar}
+              disabled={loading}
+              className="w-full gap-2"
+            >
+              <XCircle className="h-4 w-4" />
+              CANCELAR
+            </Button>
+          </div>
+        )}
+
+        {/* ETAPA: RESETAR SENHA (pede senha do armeiro) */}
+        {etapa === 'resetar_senha' && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <h2 className="text-lg font-bold text-foreground flex items-center justify-center gap-2">
+                <KeyRound className="h-5 w-5 text-amber-500" />
+                RESETAR SENHA
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Resetar senha de {policialNome}
+              </p>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                ⚠️ O policial esqueceu a senha? Digite SUA SENHA (armeiro) para autorizar o reset.
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Após o reset, a senha será a matrícula do policial e ele deverá definir uma nova senha.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="senha-armeiro" className="text-sm">Senha do Armeiro:</Label>
+              <Input
+                id="senha-armeiro"
+                type="password"
+                value={senhaArmeiro}
+                onChange={(e) => setSenhaArmeiro(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, handleResetarSenha)}
+                placeholder="Digite sua senha de armeiro..."
+                className="h-10"
+                disabled={loading}
+                autoFocus
+              />
+              {erroSenhaArmeiro && (
+                <p className="text-xs text-destructive text-center">{erroSenhaArmeiro}</p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleResetarSenha}
+                disabled={loading || !senhaArmeiro.trim()}
+                className="flex-1 h-10 gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <KeyRound className="h-4 w-4" />
+                )}
+                CONFIRMAR RESET
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEtapa('senha');
+                  setSenhaArmeiro('');
+                  setErroSenhaArmeiro('');
+                }}
+                disabled={loading}
+                className="flex-1 h-10"
+              >
+                VOLTAR
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ETAPA: CONFIRMADO */}
+        {etapa === 'confirmado' && (
+          <div className="text-center py-6 space-y-4">
+            <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
             
             <div>
-              <h2 className="text-xl font-bold text-green-600 mb-2">
+              <h2 className="text-lg font-bold text-green-600 mb-1">
                 ✅ MATERIAL RECEBIDO!
               </h2>
               
-              <div className="flex items-center justify-center gap-2 text-muted-foreground mb-4">
-                <User className="h-5 w-5" />
-                <span className="font-medium">{policialNome}</span>
+              <div className="flex items-center justify-center gap-2 text-muted-foreground mb-2">
+                <User className="h-4 w-4" />
+                <span className="font-medium text-sm">{policialNome}</span>
               </div>
               
-              <p className="text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Recebimento confirmado com sucesso!
               </p>
             </div>
@@ -132,7 +563,7 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
                 onConfirmado();
                 onClose();
               }}
-              className="w-full bg-primary hover:bg-primary/90"
+              className="w-full"
             >
               🔄 NOVO ATENDIMENTO
             </Button>

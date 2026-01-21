@@ -122,7 +122,9 @@ const ArmeiroInterface = () => {
   const [modalFechamento, setModalFechamento] = useState(false);
   const [modalAguardando, setModalAguardando] = useState(false);
   const [cautelaAguardandoId, setCautelaAguardandoId] = useState<string | null>(null);
+  const [policialAguardandoId, setPolicialAguardandoId] = useState<string | null>(null);
   const [policialAguardandoNome, setPolicialAguardandoNome] = useState("");
+  const [materiaisAguardando, setMateriaisAguardando] = useState<MaterialSelecionado[]>([]);
   const [materialParaQuantidade, setMaterialParaQuantidade] = useState<Material | null>(null);
   const [tipoQuantidade, setTipoQuantidade] = useState<'municao' | 'arma'>('municao');
   
@@ -617,7 +619,9 @@ const ArmeiroInterface = () => {
       // Guardar informações para o modal de aguardando
       const nomePolicial = `${policialSelecionado['Post/Grad'] || ''} ${nomeGuerra || policialSelecionado.NOME}`.trim();
       setCautelaAguardandoId(cautelaRef.id);
+      setPolicialAguardandoId(policialSelecionado.id);
       setPolicialAguardandoNome(nomePolicial);
+      setMateriaisAguardando(materiaisLimpos);
       
       // Limpar seleção
       setMateriaisSelecionados([]);
@@ -1314,12 +1318,14 @@ const ArmeiroInterface = () => {
       )}
 
       {/* Modal de Aguardando Confirmação */}
-      {cautelaAguardandoId && (
+      {cautelaAguardandoId && policialAguardandoId && (
         <ModalAguardandoConfirmacao
           open={modalAguardando}
           onClose={() => setModalAguardando(false)}
           cautelaId={cautelaAguardandoId}
+          policialId={policialAguardandoId}
           policialNome={policialAguardandoNome}
+          materiais={materiaisAguardando}
           onConfirmado={handleConfirmacaoRecebida}
           onCancelar={handleCancelarCautela}
         />
