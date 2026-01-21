@@ -155,7 +155,7 @@ const TotemPolicialInterface = () => {
         {Array.from({ length }).map((_, i) => (
           <div 
             key={i}
-            className="w-4 h-4 bg-primary rounded-full animate-pulse"
+            className="w-4 h-4 bg-white rounded-full animate-pulse"
             style={{ animationDelay: `${i * 50}ms` }}
           />
         ))}
@@ -253,7 +253,7 @@ const TotemPolicialInterface = () => {
                           </p>
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {material.numeroSerie && (
-                              <Badge variant="outline" className="border-primary text-primary text-[10px] px-1 py-0">
+                              <Badge variant="outline" className="border-white/70 text-white text-[10px] px-1 py-0">
                                 Série: {material.numeroSerie}
                               </Badge>
                             )}
