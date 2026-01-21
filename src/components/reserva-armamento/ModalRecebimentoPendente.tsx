@@ -81,17 +81,25 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
       setLoading(true);
       setSenhaErro('');
 
-      const policialDoc = await getDoc(doc(db, 'policiais', cautela.policialId));
+      // Buscar armeiro logado (não o policial da cautela)
+      const userStorage = localStorage.getItem('user');
+      if (!userStorage) {
+        setSenhaErro('Usuário não logado.');
+        return;
+      }
       
-      if (!policialDoc.exists()) {
-        setSenhaErro('Policial não encontrado.');
+      const userData = JSON.parse(userStorage);
+      const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
+      
+      if (!armeiroDoc.exists()) {
+        setSenhaErro('Armeiro não encontrado.');
         return;
       }
 
-      const policialData = policialDoc.data();
+      const armeiroData = armeiroDoc.data();
       
-      if (policialData.senha !== senha) {
-        setSenhaErro('Senha incorreta. Verifique e tente novamente.');
+      if (armeiroData.senha !== senha) {
+        setSenhaErro('Senha do armeiro incorreta. Verifique e tente novamente.');
         return;
       }
 
@@ -330,12 +338,12 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
 
             <div className="space-y-2">
               <Label htmlFor="senha">
-                Digite a senha do policial para confirmar recebimento:
+                Digite SUA SENHA (armeiro) para confirmar recebimento:
               </Label>
               <Input
                 id="senha"
                 type="password"
-                placeholder="Senha do policial"
+                placeholder="Senha do armeiro"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && validarSenha()}

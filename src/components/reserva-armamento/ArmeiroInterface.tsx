@@ -521,6 +521,13 @@ const ArmeiroInterface = () => {
       title: "Material Adicionado",
       description: `${material.nome} foi adicionado à seleção.`,
     });
+    
+    // Limpar campo de busca e focar novamente
+    setSearchMaterial('');
+    setTimeout(() => {
+      const searchInput = document.getElementById('search-material-input');
+      searchInput?.focus();
+    }, 100);
   };
 
   // Clique em material - verificar tipo para modal
@@ -836,8 +843,10 @@ const ArmeiroInterface = () => {
   const policiaisFiltrados = policiais.filter(p => {
     const filtroLower = searchPolicial.toLowerCase();
     const nomeMatch = (p.NOME?.toLowerCase() || '').includes(filtroLower);
+    const nomeGuerraMatch = (p['NOME DE GUERRA1']?.toLowerCase() || '').includes(filtroLower);
     const matriculaMatch = String(p['Matrícula'] || '').includes(searchPolicial);
-    return nomeMatch || matriculaMatch;
+    const numeralMatch = String(p.NUMERAL || '').includes(searchPolicial);
+    return nomeMatch || nomeGuerraMatch || matriculaMatch || numeralMatch;
   });
 
   // Mapear categoria para o filtro usando tipoArma do Firebase
@@ -1131,6 +1140,7 @@ const ArmeiroInterface = () => {
                       <div className="relative">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
+                          id="search-material-input"
                           placeholder="Buscar por nome ou nº série..."
                           value={searchMaterial}
                           onChange={(e) => setSearchMaterial(e.target.value)}
