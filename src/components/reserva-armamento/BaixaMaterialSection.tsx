@@ -179,9 +179,16 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
            material.categoria?.toLowerCase().includes('municao');
   };
 
-  // Quando clica no checkbox de munição
+  // Verificar se material precisa informar quantidade (munição ou EPI com quantidade > 1)
+  const precisaQuantidade = (material: MaterialCautela) => {
+    const ehMunicao = isMunicao(material);
+    const ehEpiComQuantidade = material.categoria?.toLowerCase() === 'epi' && material.quantidade > 1;
+    return ehMunicao || ehEpiComQuantidade;
+  };
+
+  // Quando clica no checkbox de material
   const handleClickMaterial = (material: MaterialCautela, cautela: CautelaProvisoria) => {
-    if (isMunicao(material)) {
+    if (precisaQuantidade(material)) {
       // Abrir modal de quantidade
       setMaterialMunicao(material);
       setCautelaMunicao(cautela);
@@ -302,30 +309,31 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
 
       await addDoc(collection(db, 'movimentacoes_belicas'), movimentacaoData);
 
-      // Se houver falta de munição, criar alerta
+      // Se houver falta de munição, criar alerta e registrar alteração automática no livro
       if (quantidadeFaltante > 0 && motivoFalta) {
         // Buscar nome do armeiro
         const userStorage = localStorage.getItem('user');
-        let armeiroNome = 'Armeiro';
-        let armeiroId = '';
+        let armeiroNomeLocal = 'Armeiro';
+        let armeiroIdLocal = '';
         if (userStorage) {
           const userData = JSON.parse(userStorage);
-          armeiroId = userData.id;
+          armeiroIdLocal = userData.id;
           const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
           if (armeiroDoc.exists()) {
             const armeiroData = armeiroDoc.data();
-            armeiroNome = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+            armeiroNomeLocal = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
           }
         }
 
+        // Criar alerta de falta de munição
         await addDoc(collection(db, 'alertas_gestao'), {
           tipo: 'falta_municao',
           dataHora: agora,
           policialId: policialSelecionado.id,
           policialNome: policialSelecionado.NOME,
           policialNomeGuerra: policialSelecionado['NOME DE GUERRA1'] || policialSelecionado['NOME DE GUERRA'] || '',
-          armeiroId,
-          armeiroNome,
+          armeiroId: armeiroIdLocal,
+          armeiroNome: armeiroNomeLocal,
           materialNome: materialMunicao.nome,
           quantidadeCautelada: materialMunicao.quantidade,
           quantidadeDevolvida,
@@ -333,6 +341,29 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
           motivoFalta,
           lido: false
         });
+
+        // Registrar alteração automática no livro para aparecer ao fechar
+        if (livroId) {
+          const livroRef = doc(db, 'livros_reserva_armamento', livroId);
+          const livroDoc = await getDoc(livroRef);
+          
+          if (livroDoc.exists()) {
+            const livroData = livroDoc.data();
+            const alteracoesAutomaticas = livroData.alteracoesAutomaticas || [];
+            
+            const policialDisplay = policialSelecionado['NOME DE GUERRA1'] || policialSelecionado['NOME DE GUERRA'] || policialSelecionado.NOME;
+            const novaAlteracao = {
+              id: Date.now().toString(),
+              tipo: 'falta_municao',
+              descricao: `FALTA DE MUNIÇÃO: ${policialDisplay} não devolveu ${quantidadeFaltante}x ${materialMunicao.nome}. Motivo: ${motivoFalta}`,
+              dataHora: agora.toISOString()
+            };
+            
+            await updateDoc(livroRef, {
+              alteracoesAutomaticas: [...alteracoesAutomaticas, novaAlteracao]
+            });
+          }
+        }
       }
 
       toast({
@@ -403,18 +434,28 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       return;
     }
 
+    // Verificar se policialSelecionado existe
+    if (!policialSelecionado) {
+      toast({
+        title: "Erro",
+        description: "Policial não selecionado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
       // Buscar nome do armeiro atual
       const userStorage = localStorage.getItem('user');
-      let armeiroNome = 'Armeiro';
+      let armeiroNomeBaixa = 'Armeiro';
       if (userStorage) {
         const userData = JSON.parse(userStorage);
         const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
         if (armeiroDoc.exists()) {
           const armeiroData = armeiroDoc.data();
-          armeiroNome = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+          armeiroNomeBaixa = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
         }
       }
 
@@ -487,7 +528,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
             status: 'entregue',
             dataBaixa: agora,
             horaBaixa,
-            recebidoPorNome: armeiroNome
+            recebidoPorNome: armeiroNomeBaixa
           });
         } else {
           // BAIXA PARCIAL: Criar nova entrada para materiais devolvidos
@@ -508,7 +549,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
             status: 'entregue',
             dataBaixa: agora,
             horaBaixa,
-            recebidoPorNome: armeiroNome,
+            recebidoPorNome: armeiroNomeBaixa,
             sequencial: proximoSequencial,
             cautelaOriginalId: cautela.id
           });
@@ -520,13 +561,25 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
         }
       }
 
+      // Filtrar materiais removendo campos undefined para evitar erro do Firebase
+      const materiaisLimpos = materiaisDevolvidos.map(m => {
+        const materialLimpo: Record<string, any> = {
+          materialId: m.materialId,
+          nome: m.nome,
+          quantidade: m.quantidade
+        };
+        if (m.categoria) materialLimpo.categoria = m.categoria;
+        if (m.numeroSerie) materialLimpo.numeroSerie = m.numeroSerie;
+        return materialLimpo;
+      });
+
       // Registrar baixa no histórico
       const movimentacaoData: Record<string, any> = {
         tipo: 'baixa',
-        policialId: policialSelecionado!.id,
-        policialNome: policialSelecionado!.NOME,
-        policialMatricula: String(policialSelecionado!['Matrícula'] || ''),
-        materiais: materiaisDevolvidos,
+        policialId: policialSelecionado.id,
+        policialNome: policialSelecionado.NOME || '',
+        policialMatricula: String(policialSelecionado['Matrícula'] || ''),
+        materiais: materiaisLimpos,
         dataBaixa: agora,
         horaBaixa
       };
@@ -659,7 +712,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                     Selecione os materiais para dar baixa:
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Para munições, clique no item para informar a quantidade devolvida.
+                    Para munições e EPIs com quantidade, clique no item para informar a quantidade devolvida.
                   </p>
                   <div className="max-h-60 overflow-y-auto space-y-2">
                     {cautelasAtivas.flatMap(cautela =>
@@ -674,7 +727,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                           onClick={() => handleClickMaterial(material, cautela)}
                         >
                           <div className="flex items-center gap-3">
-                            {!isMunicao(material) && (
+                            {!precisaQuantidade(material) && (
                               <Checkbox 
                                 checked={materiaisSelecionados.includes(material.materialId)}
                                 onCheckedChange={() => toggleMaterial(material.materialId)}
@@ -683,7 +736,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                             <div className="flex-1">
                               <div className="font-medium flex items-center gap-2">
                                 {material.nome}
-                                {isMunicao(material) && (
+                                {precisaQuantidade(material) && (
                                   <Badge variant="outline" className="text-xs">
                                     Clique para devolver
                                   </Badge>

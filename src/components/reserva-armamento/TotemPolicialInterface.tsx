@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Package, CheckCircle, Loader2, KeyRound
+  Package, CheckCircle, Loader2
 } from "lucide-react";
 import { 
   collection, query, where, getDocs
@@ -38,8 +38,17 @@ interface CautelaAguardando {
 
 const TotemPolicialInterface = () => {
   const [cautelaAtual, setCautelaAtual] = useState<CautelaAguardando | null>(null);
-  const [verificando, setVerificando] = useState(true);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
+
+  // Calcular tamanhos dinâmicos baseados na quantidade de materiais
+  const quantidadeMateriais = cautelaAtual?.materiais?.length || 0;
+  
+  // Ajustes dinâmicos para evitar scroll
+  const tamanhoFonteMaterial = quantidadeMateriais > 6 ? 'text-xs' : quantidadeMateriais > 4 ? 'text-sm' : 'text-sm';
+  const espacamentoMaterial = quantidadeMateriais > 6 ? 'space-y-1' : 'space-y-2';
+  const paddingMaterial = quantidadeMateriais > 6 ? 'p-1.5' : 'p-2';
+  const tamanhoLogo = quantidadeMateriais > 5 ? 'h-12' : 'h-16';
+  const tamanhoTitulo = quantidadeMateriais > 5 ? 'text-base' : 'text-lg';
 
   // Verificar automaticamente a cada 4 segundos se há cautela aguardando
   useEffect(() => {
@@ -85,8 +94,6 @@ const TotemPolicialInterface = () => {
         }
       } catch (error) {
         console.error('Erro ao verificar cautelas:', error);
-      } finally {
-        setVerificando(false);
       }
     };
 
@@ -100,26 +107,25 @@ const TotemPolicialInterface = () => {
   }, [cautelaAtual]);
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-2">
+    <div className="min-h-screen bg-background flex items-center justify-center py-16 px-4">
       <div className="w-full max-w-lg">
-        {/* Header - Reduzido 30% */}
-        <div className="text-center mb-4">
-          <div className="flex flex-col items-center justify-center gap-2 mb-2">
-            <img src={logo} alt="Logo Cavalaria" className="h-16 w-auto" />
+        {/* Header - Reduzido dinamicamente */}
+        <div className="text-center mb-3">
+          <div className="flex flex-col items-center justify-center gap-1 mb-1">
+            <img src={logo} alt="Logo Cavalaria" className={`${tamanhoLogo} w-auto`} />
             <div>
-              <h1 className="text-lg font-bold text-foreground">CAVALARIA PMCE - P4</h1>
-              <h2 className="text-base font-semibold text-white">RESERVA DE ARMAMENTO</h2>
+              <h1 className={`${tamanhoTitulo} font-bold text-foreground`}>CAVALARIA PMCE - P4</h1>
+              <h2 className="text-sm font-semibold text-white">RESERVA DE ARMAMENTO</h2>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">Tela de Visualização - Totem</p>
         </div>
 
         {/* Mensagem de Sucesso */}
         {mensagemSucesso && (
-          <Card className="mb-4 border-green-500 bg-green-500/20 animate-pulse">
-            <CardContent className="p-4 text-center">
-              <CheckCircle className="h-14 w-14 text-green-500 mx-auto mb-2" />
-              <p className="text-xl font-bold text-green-400">{mensagemSucesso}</p>
+          <Card className="mb-3 border-green-500 bg-green-500/20 animate-pulse">
+            <CardContent className="p-3 text-center">
+              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-green-400">{mensagemSucesso}</p>
             </CardContent>
           </Card>
         )}
@@ -127,19 +133,16 @@ const TotemPolicialInterface = () => {
         {/* Estado: Aguardando Material */}
         {!cautelaAtual && !mensagemSucesso && (
           <Card className="border-border">
-            <CardContent className="p-6 text-center">
-              <div className="mb-4">
-                <Loader2 className="h-12 w-12 text-primary mx-auto animate-spin" />
+            <CardContent className="p-5 text-center">
+              <div className="mb-3">
+                <Loader2 className="h-10 w-10 text-primary mx-auto animate-spin" />
               </div>
-              <p className="text-lg font-semibold text-foreground mb-1">
+              <p className="text-base font-semibold text-foreground mb-1">
                 Aguardando material...
               </p>
               <p className="text-sm text-muted-foreground">
                 Quando o armeiro registrar uma cautela,<br />
                 ela aparecerá aqui automaticamente.
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Verificando a cada 4 segundos
               </p>
             </CardContent>
           </Card>
@@ -148,21 +151,21 @@ const TotemPolicialInterface = () => {
         {/* Estado: Material Pendente - Apenas Visualização */}
         {cautelaAtual && !mensagemSucesso && (
           <>
-            {/* Identificação do Policial - Reduzido 30% */}
-            <Card className="mb-3 border-primary bg-primary/10">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
-                    <span className="text-lg font-bold text-primary-foreground">
+            {/* Identificação do Policial - Compacto */}
+            <Card className="mb-2 border-primary bg-primary/10">
+              <CardContent className="p-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-primary-foreground">
                       {cautelaAtual.policialNumeral || '?'}
                     </span>
                   </div>
-                  <div>
-                    <p className="text-lg font-bold text-foreground">
+                  <div className="min-w-0">
+                    <p className="text-base font-bold text-foreground truncate">
                       <span className="text-primary">{cautelaAtual.postoGrad}</span>
-                      <span className="ml-2">{cautelaAtual.policialNomeGuerra || cautelaAtual.policialNome}</span>
+                      <span className="ml-1">{cautelaAtual.policialNomeGuerra || cautelaAtual.policialNome}</span>
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Matrícula: {cautelaAtual.policialMatricula}
                     </p>
                   </div>
@@ -170,39 +173,39 @@ const TotemPolicialInterface = () => {
               </CardContent>
             </Card>
 
-            {/* Materiais para Receber - Reduzido 30% */}
-            <Card className="mb-3 border-border">
-              <CardHeader className="py-2 px-3">
-                <CardTitle className="flex items-center gap-2 text-foreground text-base">
-                  <Package className="h-4 w-4 text-primary" />
+            {/* Materiais para Receber - Compacto e Dinâmico */}
+            <Card className="mb-2 border-border">
+              <CardHeader className="py-1.5 px-2.5">
+                <CardTitle className="flex items-center gap-1.5 text-foreground text-sm">
+                  <Package className="h-3.5 w-3.5 text-primary" />
                   MATERIAIS PARA RECEBER
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-3 pb-3">
-                <div className="space-y-2">
+              <CardContent className="px-2.5 pb-2.5">
+                <div className={espacamentoMaterial}>
                   {cautelaAtual.materiais.map((material, idx) => (
                     <div
                       key={`${cautelaAtual.id}-${idx}`}
-                      className="p-2 bg-muted rounded-lg border border-border"
+                      className={`${paddingMaterial} bg-muted rounded border border-border`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">
+                      <div className="flex items-start justify-between gap-1">
+                        <div className="min-w-0 flex-1">
+                          <p className={`${tamanhoFonteMaterial} font-semibold text-foreground truncate`}>
                             {material.nome}
                             {material.modelo && ` ${material.modelo}`}
                           </p>
-                          <div className="flex flex-wrap gap-1 mt-1">
+                          <div className="flex flex-wrap gap-1 mt-0.5">
                             {material.numeroSerie && (
-                              <Badge variant="outline" className="border-primary text-primary text-xs">
+                              <Badge variant="outline" className="border-primary text-primary text-[10px] px-1 py-0">
                                 Série: {material.numeroSerie}
                               </Badge>
                             )}
-                            <Badge variant="outline" className="border-muted-foreground text-muted-foreground text-xs">
+                            <Badge variant="outline" className="border-muted-foreground text-muted-foreground text-[10px] px-1 py-0">
                               Qtd: {material.quantidade}
                             </Badge>
                             {material.carregadores && material.carregadores > 0 && (
-                              <Badge variant="default" className="bg-blue-600 text-white text-xs">
-                                📦 {material.carregadores} carregador(es)
+                              <Badge variant="default" className="bg-blue-600 text-white text-[10px] px-1 py-0">
+                                📦 {material.carregadores}
                               </Badge>
                             )}
                           </div>
@@ -214,27 +217,19 @@ const TotemPolicialInterface = () => {
               </CardContent>
             </Card>
 
-            {/* Instrução para digitar senha no terminal do armeiro */}
-            <Card className="border-amber-500/50 bg-amber-500/10">
-              <CardContent className="p-4 text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <KeyRound className="h-5 w-5 text-amber-500 animate-pulse" />
-                  <span className="text-base font-bold text-amber-500 animate-pulse">
-                    DIGITE SUA SENHA
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  no terminal do armeiro para confirmar recebimento
-                </p>
-              </CardContent>
-            </Card>
+            {/* Mensagem simples - sem campo de senha */}
+            <div className="text-center py-2">
+              <p className="text-sm text-muted-foreground animate-pulse">
+                Confirme no terminal do armeiro
+              </p>
+            </div>
           </>
         )}
 
-        {/* Footer */}
-        <div className="text-center mt-4">
-          <p className="text-xs text-muted-foreground">
-            Cavalaria PMCE - P4 - Reserva de Armamento - Totem de Visualização
+        {/* Footer - Compacto */}
+        <div className="text-center mt-3">
+          <p className="text-[10px] text-muted-foreground">
+            Cavalaria PMCE - P4 - Reserva de Armamento
           </p>
         </div>
       </div>
