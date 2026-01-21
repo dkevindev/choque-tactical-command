@@ -82,55 +82,51 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
     return maiorSequencial + 1;
   };
 
+  // Função reutilizável para carregar policiais com cautela
+  const recarregarPoliciaisComCautela = async () => {
+    try {
+      console.log('[BaixaMaterial] Recarregando lista de policiais...');
+      const querySnapshot = await getDocs(
+        query(collection(db, 'cautelas_provisorias'), where('status', '==', 'pendente'))
+      );
+      
+      console.log('[BaixaMaterial] Cautelas encontradas:', querySnapshot.size);
+      
+      const cautelasData = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          dataCautela: data.dataCautela?.toDate?.() || new Date()
+        } as CautelaProvisoria;
+      });
+
+      // Extrair policiais únicos
+      const policialIds = [...new Set(cautelasData.map(c => c.policialId))];
+      console.log('[BaixaMaterial] IDs de policiais com cautela:', policialIds);
+      
+      // Carregar dados dos policiais
+      const policiaisData: Policial[] = [];
+      for (const policialId of policialIds) {
+        const policialDoc = await getDoc(doc(db, 'policiais', policialId));
+        if (policialDoc.exists()) {
+          policiaisData.push({
+            id: policialDoc.id,
+            ...policialDoc.data()
+          } as Policial);
+        }
+      }
+      
+      console.log('[BaixaMaterial] Lista atualizada:', policiaisData.length, 'policiais');
+      setPoliciaisComCautela(policiaisData);
+    } catch (error) {
+      console.error('[BaixaMaterial] Erro ao recarregar:', error);
+    }
+  };
+
   // Carregar policiais com cautela ativa
   useEffect(() => {
-    const carregarPoliciaisComCautela = async () => {
-      try {
-        console.log('[BaixaMaterial] Buscando cautelas pendentes...');
-        const querySnapshot = await getDocs(
-          query(collection(db, 'cautelas_provisorias'), where('status', '==', 'pendente'))
-        );
-        
-        console.log('[BaixaMaterial] Cautelas encontradas:', querySnapshot.size);
-        
-        const cautelasData = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          console.log('[BaixaMaterial] Cautela:', doc.id, data);
-          return {
-            id: doc.id,
-            ...data,
-            dataCautela: data.dataCautela?.toDate?.() || new Date()
-          } as CautelaProvisoria;
-        });
-
-        // Extrair policiais únicos
-        const policialIds = [...new Set(cautelasData.map(c => c.policialId))];
-        console.log('[BaixaMaterial] IDs de policiais com cautela:', policialIds);
-        
-        // Carregar dados dos policiais
-        const policiaisData: Policial[] = [];
-        for (const policialId of policialIds) {
-          const policialDoc = await getDoc(doc(db, 'policiais', policialId));
-          if (policialDoc.exists()) {
-            const policialData = policialDoc.data();
-            console.log('[BaixaMaterial] Policial encontrado:', policialId, policialData.NOME);
-            policiaisData.push({
-              id: policialDoc.id,
-              ...policialData
-            } as Policial);
-          } else {
-            console.log('[BaixaMaterial] Policial NÃO encontrado:', policialId);
-          }
-        }
-        
-        console.log('[BaixaMaterial] Total de policiais com cautela:', policiaisData.length);
-        setPoliciaisComCautela(policiaisData);
-      } catch (error) {
-        console.error('[BaixaMaterial] Erro ao carregar policiais com cautela:', error);
-      }
-    };
-
-    carregarPoliciaisComCautela();
+    recarregarPoliciaisComCautela();
   }, []);
 
   // Carregar cautelas do policial selecionado
@@ -396,21 +392,10 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
 
       if (cautelasData.length === 0) {
         setPolicialSelecionado(null);
-        // Recarregar lista de policiais
-        const allCautelas = await getDocs(
-          query(collection(db, 'cautelas_provisorias'), where('status', '==', 'pendente'))
-        );
-        
-        const policialIds = [...new Set(allCautelas.docs.map(d => d.data().policialId))];
-        const policiaisData: Policial[] = [];
-        for (const pid of policialIds) {
-          const policialDoc = await getDoc(doc(db, 'policiais', pid));
-          if (policialDoc.exists()) {
-            policiaisData.push({ id: policialDoc.id, ...policialDoc.data() } as Policial);
-          }
-        }
-        setPoliciaisComCautela(policiaisData);
       }
+      
+      // Sempre recarregar lista de policiais após baixa de munição
+      await recarregarPoliciaisComCautela();
 
     } catch (error) {
       console.error('Erro ao devolver munição:', error);
@@ -470,94 +455,124 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       const agora = new Date();
       const horaBaixa = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-      // Processar cada cautela
+      // Coletar TODOS os materiais devolvidos de TODAS as cautelas
+      const cautelasParaAtualizar: { 
+        id: string; 
+        materiaisRestantes: MaterialCautela[];
+        materiaisDevolvidos: MaterialCautela[];
+        cautela: CautelaProvisoria;
+      }[] = [];
+
+      // Processar cada cautela e separar materiais
       for (const cautela of cautelasAtivas) {
         const materiaisParaBaixa = cautela.materiais.filter(m => 
           materiaisSelecionados.includes(m.materialId)
         );
-        
-        if (materiaisParaBaixa.length === 0) continue;
-
-        // Devolver materiais ao estoque
-        for (const material of materiaisParaBaixa) {
-          const materialRef = doc(db, 'materiais_belicos', material.materialId);
-          const materialDoc = await getDoc(materialRef);
-          
-          if (materialDoc.exists()) {
-            const materialData = materialDoc.data();
-            const isMunicaoMaterial = materialData?.categoria?.toLowerCase().includes('munição') || 
-                             materialData?.categoria?.toLowerCase().includes('municao');
-            
-            if (isMunicaoMaterial) {
-              const quantidadeAtual = materialData.quantidade || 0;
-              const novaQuantidade = quantidadeAtual + material.quantidade;
-              await updateDoc(materialRef, {
-                quantidade: novaQuantidade,
-                disponivel: true
-              });
-            } else {
-              await updateDoc(materialRef, {
-                disponivel: true,
-                cauteladoPara: null,
-                dataCautela: null
-              });
-            }
-            
-            materiaisDevolvidos.push({
-              materialId: material.materialId,
-              nome: material.nome,
-              quantidade: material.quantidade,
-              categoria: material.categoria,
-              numeroSerie: material.numeroSerie
-            });
-          }
-        }
-
-        // Verificar se todos os materiais da cautela foram devolvidos
         const materiaisRestantes = cautela.materiais.filter(m =>
           !materiaisSelecionados.includes(m.materialId)
         );
+        
+        if (materiaisParaBaixa.length > 0) {
+          cautelasParaAtualizar.push({
+            id: cautela.id,
+            materiaisRestantes,
+            materiaisDevolvidos: materiaisParaBaixa,
+            cautela
+          });
 
-        const materiaisParaEntrega = cautela.materiais.filter(m =>
-          materiaisSelecionados.includes(m.materialId)
-        );
+          // Devolver materiais ao estoque
+          for (const material of materiaisParaBaixa) {
+            const materialRef = doc(db, 'materiais_belicos', material.materialId);
+            const materialDoc = await getDoc(materialRef);
+            
+            if (materialDoc.exists()) {
+              const materialData = materialDoc.data();
+              const isMunicaoMaterial = materialData?.categoria?.toLowerCase().includes('munição') || 
+                               materialData?.categoria?.toLowerCase().includes('municao');
+              
+              if (isMunicaoMaterial) {
+                const quantidadeAtual = materialData.quantidade || 0;
+                const novaQuantidade = quantidadeAtual + material.quantidade;
+                await updateDoc(materialRef, {
+                  quantidade: novaQuantidade,
+                  disponivel: true
+                });
+              } else {
+                await updateDoc(materialRef, {
+                  disponivel: true,
+                  cauteladoPara: null,
+                  dataCautela: null
+                });
+              }
+              
+              materiaisDevolvidos.push({
+                materialId: material.materialId,
+                nome: material.nome,
+                quantidade: material.quantidade,
+                categoria: material.categoria,
+                numeroSerie: material.numeroSerie
+              });
+            }
+          }
+        }
+      }
 
-        if (materiaisRestantes.length === 0) {
-          // BAIXA TOTAL: marcar cautela como entregue
-          await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
+      // Verificar se TODAS as cautelas foram totalmente baixadas
+      const todasCautelasCompletas = cautelasParaAtualizar.every(c => c.materiaisRestantes.length === 0);
+
+      if (todasCautelasCompletas) {
+        // BAIXA TOTAL: marcar todas as cautelas como entregue
+        for (const { id } of cautelasParaAtualizar) {
+          await updateDoc(doc(db, 'cautelas_provisorias', id), {
             status: 'entregue',
             dataBaixa: agora,
             horaBaixa,
             recebidoPorNome: armeiroNomeBaixa
           });
-        } else {
-          // BAIXA PARCIAL: Criar nova entrada para materiais devolvidos
-          const proximoSequencial = await obterProximoSequencial(livroId);
-          
-          // Criar nova cautela para os materiais devolvidos
-          await addDoc(collection(db, 'cautelas_provisorias'), {
-            livroId,
-            policialId: cautela.policialId,
-            policialNome: cautela.policialNome,
-            policialMatricula: cautela.policialMatricula,
-            policialNomeGuerra: cautela.policialNomeGuerra,
-            postoGrad: cautela.postoGrad,
-            armeiroId: cautela.armeiroId,
-            materiais: materiaisParaEntrega,
-            dataCautela: cautela.dataCautela,
-            horaCautela: cautela.horaCautela,
-            status: 'entregue',
-            dataBaixa: agora,
-            horaBaixa,
-            recebidoPorNome: armeiroNomeBaixa,
-            sequencial: proximoSequencial,
-            cautelaOriginalId: cautela.id
-          });
-          
-          // Atualizar cautela original mantendo apenas materiais pendentes
-          await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
-            materiais: materiaisRestantes
-          });
+        }
+      } else {
+        // BAIXA PARCIAL: Criar UMA ÚNICA cautela para TODOS os materiais devolvidos
+        const todosMateriaisDevolvidos = cautelasParaAtualizar.flatMap(c => c.materiaisDevolvidos);
+        const proximoSequencial = await obterProximoSequencial(livroId);
+        const primeiroItem = cautelasParaAtualizar[0];
+        
+        // Criar nova cautela com todos os materiais devolvidos
+        await addDoc(collection(db, 'cautelas_provisorias'), {
+          livroId,
+          policialId: primeiroItem.cautela.policialId,
+          policialNome: primeiroItem.cautela.policialNome,
+          policialMatricula: primeiroItem.cautela.policialMatricula,
+          policialNomeGuerra: primeiroItem.cautela.policialNomeGuerra,
+          postoGrad: primeiroItem.cautela.postoGrad,
+          armeiroId: primeiroItem.cautela.armeiroId,
+          materiais: todosMateriaisDevolvidos,
+          dataCautela: primeiroItem.cautela.dataCautela,
+          horaCautela: primeiroItem.cautela.horaCautela,
+          status: 'entregue',
+          dataBaixa: agora,
+          horaBaixa,
+          recebidoPorNome: armeiroNomeBaixa,
+          sequencial: proximoSequencial,
+          baixaParcial: true,
+          cautelasOriginais: cautelasParaAtualizar.map(c => c.id)
+        });
+        
+        // Atualizar cautelas originais
+        for (const { id, materiaisRestantes } of cautelasParaAtualizar) {
+          if (materiaisRestantes.length === 0) {
+            // Cautela completamente baixada
+            await updateDoc(doc(db, 'cautelas_provisorias', id), {
+              status: 'entregue',
+              dataBaixa: agora,
+              horaBaixa,
+              recebidoPorNome: armeiroNomeBaixa
+            });
+          } else {
+            // Ainda tem materiais pendentes
+            await updateDoc(doc(db, 'cautelas_provisorias', id), {
+              materiais: materiaisRestantes
+            });
+          }
         }
       }
 
@@ -606,6 +621,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
 
       setMateriaisSelecionados([]);
       setPolicialSelecionado(null);
+      await recarregarPoliciaisComCautela();
       onBaixaRealizada();
 
     } catch (error) {
