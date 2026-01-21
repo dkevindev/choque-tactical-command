@@ -226,7 +226,7 @@ const TotemPolicialInterface = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-2.5 pb-2.5">
-                <div className={espacamentoMaterial}>
+                <div className={`${quantidadeMateriais > 4 ? 'grid grid-cols-2 gap-2' : espacamentoMaterial}`}>
                   {cautelaAtual.materiais.map((material, idx) => (
                     <div
                       key={`${cautelaAtual.id}-${idx}`}
