@@ -58,7 +58,7 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
   const [senhaArmeiro, setSenhaArmeiro] = useState('');
   const [erroSenhaArmeiro, setErroSenhaArmeiro] = useState('');
 
-  // Reset estados quando modal abre
+  // Reset estados quando modal abre e inicializa sessão de digitação
   useEffect(() => {
     if (open) {
       setEtapa('senha');
@@ -70,8 +70,54 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
       setSenhaArmeiro('');
       setErroSenhaArmeiro('');
       setLoading(false);
+
+      // Inicializar sessão de digitação no Firebase para o totem espelhar
+      if (cautelaId) {
+        updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+          sessaoDigitacao: {
+            etapa: 'senha',
+            senhaLength: 0,
+            erro: null,
+            timestamp: Date.now()
+          }
+        }).catch(console.error);
+      }
     }
-  }, [open]);
+  }, [open, cautelaId]);
+
+  // Sincronizar tamanho da senha com Firebase (para o totem espelhar)
+  useEffect(() => {
+    if (open && cautelaId && etapa === 'senha') {
+      updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+        'sessaoDigitacao.senhaLength': senhaPolicial.length,
+        'sessaoDigitacao.erro': null,
+        'sessaoDigitacao.timestamp': Date.now()
+      }).catch(console.error);
+    }
+  }, [senhaPolicial, open, cautelaId, etapa]);
+
+  // Sincronizar tamanho da nova senha (primeiro acesso)
+  useEffect(() => {
+    if (open && cautelaId && etapa === 'primeiro_acesso') {
+      updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+        'sessaoDigitacao.etapa': 'primeiro_acesso',
+        'sessaoDigitacao.senhaLength': novaSenha.length,
+        'sessaoDigitacao.erro': null,
+        'sessaoDigitacao.timestamp': Date.now()
+      }).catch(console.error);
+    }
+  }, [novaSenha, open, cautelaId, etapa]);
+
+  // Atualizar etapa no Firebase quando muda
+  useEffect(() => {
+    if (open && cautelaId) {
+      updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+        'sessaoDigitacao.etapa': etapa,
+        'sessaoDigitacao.senhaLength': 0,
+        'sessaoDigitacao.timestamp': Date.now()
+      }).catch(console.error);
+    }
+  }, [etapa, open, cautelaId]);
 
   // Auto-foco no campo de senha
   useEffect(() => {
@@ -109,6 +155,16 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
       // Verificar senha
       if (policialData.senha !== senhaPolicial) {
         setErroSenha('Senha incorreta');
+        
+        // Notificar totem do erro
+        if (cautelaId) {
+          updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+            'sessaoDigitacao.erro': 'Senha incorreta',
+            'sessaoDigitacao.senhaLength': 0,
+            'sessaoDigitacao.timestamp': Date.now()
+          }).catch(console.error);
+        }
+        
         setSenhaPolicial('');
         setLoading(false);
         setTimeout(() => senhaInputRef.current?.focus(), 100);
