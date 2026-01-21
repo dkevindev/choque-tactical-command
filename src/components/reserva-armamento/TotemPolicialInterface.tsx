@@ -1,17 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { 
-  Package, CheckCircle, Lock, Loader2, AlertTriangle
+  Package, CheckCircle, Loader2, KeyRound
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { 
-  collection, query, where, getDocs, updateDoc, 
-  doc, getDoc, addDoc
+  collection, query, where, getDocs
 } from 'firebase/firestore';
 import { db } from '@/firebase';
 import logo from '@/assets/cavalaria-triade.png';
@@ -44,20 +38,8 @@ interface CautelaAguardando {
 
 const TotemPolicialInterface = () => {
   const [cautelaAtual, setCautelaAtual] = useState<CautelaAguardando | null>(null);
-  const [senha, setSenha] = useState("");
-  const [loading, setLoading] = useState(false);
   const [verificando, setVerificando] = useState(true);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
-  
-  // Modal primeiro acesso
-  const [modalPrimeiroAcesso, setModalPrimeiroAcesso] = useState(false);
-  const [novaSenha, setNovaSenha] = useState("");
-  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
-  const [erroNovaSenha, setErroNovaSenha] = useState("");
-  const [policialPrimeiroAcesso, setPolicialPrimeiroAcesso] = useState<string | null>(null);
-  
-  const senhaInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
 
   // Verificar automaticamente a cada 4 segundos se há cautela aguardando
   useEffect(() => {
@@ -88,8 +70,18 @@ const TotemPolicialInterface = () => {
             armeiroId: data.armeiroId,
             livroId: data.livroId
           });
+          setMensagemSucesso(""); // Limpar mensagem de sucesso se houver nova cautela
         } else {
-          setCautelaAtual(null);
+          // Verificar se a cautela que estava sendo exibida foi confirmada
+          if (cautelaAtual) {
+            setMensagemSucesso("RECEBIMENTO CONFIRMADO!");
+            setCautelaAtual(null);
+            
+            // Limpar mensagem de sucesso após 3 segundos
+            setTimeout(() => {
+              setMensagemSucesso("");
+            }, 3000);
+          }
         }
       } catch (error) {
         console.error('Erro ao verificar cautelas:', error);
@@ -105,208 +97,7 @@ const TotemPolicialInterface = () => {
     const interval = setInterval(verificarCautelaPendente, 4000);
 
     return () => clearInterval(interval);
-  }, []);
-
-  // Captura global de teclado para funcionar em tela estendida
-  useEffect(() => {
-    if (!cautelaAtual || mensagemSucesso || modalPrimeiroAcesso) return;
-    
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ignorar teclas de controle
-      if (e.ctrlKey || e.altKey || e.metaKey) return;
-      if (e.key === 'Tab' || e.key === 'Escape') return;
-      
-      // Se pressionar Enter, confirmar
-      if (e.key === 'Enter') {
-        handleConfirmarRecebimento();
-        return;
-      }
-      
-      // Se pressionar Backspace, remover último caractere
-      if (e.key === 'Backspace') {
-        e.preventDefault();
-        setSenha(prev => prev.slice(0, -1));
-        return;
-      }
-      
-      // Adicionar caractere à senha (apenas caracteres válidos)
-      if (e.key.length === 1) {
-        e.preventDefault();
-        setSenha(prev => prev + e.key);
-      }
-    };
-    
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [cautelaAtual, mensagemSucesso, modalPrimeiroAcesso]);
-
-  // Confirmar recebimento
-  const handleConfirmarRecebimento = async () => {
-    if (!senha.trim()) {
-      toast({
-        title: "Atenção",
-        description: "Digite sua senha para confirmar.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!cautelaAtual) {
-      toast({
-        title: "Atenção",
-        description: "Não há materiais aguardando confirmação.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Validar senha do policial
-      const policialRef = doc(db, 'policiais', cautelaAtual.policialId);
-      const policialDoc = await getDoc(policialRef);
-      
-      if (!policialDoc.exists()) {
-        toast({
-          title: "Erro",
-          description: "Policial não encontrado.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const policialData = policialDoc.data();
-      if (policialData.senha !== senha) {
-        toast({
-          title: "Senha incorreta",
-          description: "A senha digitada não confere.",
-          variant: "destructive",
-        });
-        setSenha("");
-        return;
-      }
-
-      // Verificar se é primeiro acesso
-      if (policialData.primeiroAcesso === true) {
-        setPolicialPrimeiroAcesso(cautelaAtual.policialId);
-        setModalPrimeiroAcesso(true);
-        setLoading(false);
-        return;
-      }
-
-      // Prosseguir com a confirmação
-      await finalizarConfirmacao();
-
-    } catch (error) {
-      console.error('Erro ao confirmar recebimento:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao confirmar recebimento.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Finalizar confirmação (após validar senha ou definir nova senha)
-  const finalizarConfirmacao = async () => {
-    if (!cautelaAtual) return;
-
-    try {
-      setLoading(true);
-
-      // Atualizar status da cautela para "pendente" (confirmado, aguardando devolução)
-      await updateDoc(doc(db, 'cautelas_provisorias', cautelaAtual.id), {
-        status: 'pendente',
-        dataConfirmacao: new Date(),
-        horaConfirmacao: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-      });
-
-      // Registrar movimentação de confirmação
-      await addDoc(collection(db, 'movimentacoes_belicas'), {
-        tipo: 'confirmacao_recebimento',
-        cautelaId: cautelaAtual.id,
-        policialId: cautelaAtual.policialId,
-        policialNome: cautelaAtual.policialNome,
-        materiais: cautelaAtual.materiais,
-        dataConfirmacao: new Date(),
-        livroId: cautelaAtual.livroId
-      });
-
-      setMensagemSucesso("RECEBIMENTO CONFIRMADO!");
-      setSenha("");
-      setCautelaAtual(null);
-      
-      toast({
-        title: "✅ Recebimento Confirmado",
-        description: "Materiais recebidos com sucesso!",
-      });
-
-      // Limpar mensagem de sucesso após 3 segundos
-      setTimeout(() => {
-        setMensagemSucesso("");
-      }, 3000);
-
-    } catch (error) {
-      console.error('Erro ao finalizar confirmação:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao confirmar recebimento.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Salvar nova senha no primeiro acesso
-  const handleSalvarNovaSenha = async () => {
-    setErroNovaSenha("");
-
-    if (!novaSenha || novaSenha.length < 4) {
-      setErroNovaSenha("A senha deve ter no mínimo 4 caracteres.");
-      return;
-    }
-
-    if (novaSenha !== confirmarNovaSenha) {
-      setErroNovaSenha("As senhas não coincidem.");
-      return;
-    }
-
-    if (!policialPrimeiroAcesso) return;
-
-    try {
-      setLoading(true);
-
-      // Atualizar senha e remover flag de primeiro acesso
-      await updateDoc(doc(db, 'policiais', policialPrimeiroAcesso), {
-        senha: novaSenha,
-        primeiroAcesso: false
-      });
-
-      toast({
-        title: "Senha Definida",
-        description: "Sua nova senha foi salva com sucesso!",
-      });
-
-      // Fechar modal e continuar confirmação
-      setModalPrimeiroAcesso(false);
-      setNovaSenha("");
-      setConfirmarNovaSenha("");
-      setPolicialPrimeiroAcesso(null);
-
-      // Finalizar confirmação
-      await finalizarConfirmacao();
-
-    } catch (error) {
-      console.error('Erro ao salvar nova senha:', error);
-      setErroNovaSenha("Erro ao salvar senha. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [cautelaAtual]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-2">
@@ -320,7 +111,7 @@ const TotemPolicialInterface = () => {
               <h2 className="text-base font-semibold text-white">RESERVA DE ARMAMENTO</h2>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">Confirmação de Recebimento</p>
+          <p className="text-sm text-muted-foreground">Tela de Visualização - Totem</p>
         </div>
 
         {/* Mensagem de Sucesso */}
@@ -354,7 +145,7 @@ const TotemPolicialInterface = () => {
           </Card>
         )}
 
-        {/* Estado: Material Pendente para Confirmar */}
+        {/* Estado: Material Pendente - Apenas Visualização */}
         {cautelaAtual && !mensagemSucesso && (
           <>
             {/* Identificação do Policial - Reduzido 30% */}
@@ -423,47 +214,18 @@ const TotemPolicialInterface = () => {
               </CardContent>
             </Card>
 
-            {/* Campo de Senha - Reduzido 30% */}
-            <Card className="border-border">
-              <CardHeader className="py-2 px-3">
-                <CardTitle className="flex items-center gap-2 text-foreground text-base">
-                  <Lock className="h-4 w-4 text-primary" />
-                  <span className="animate-pulse">DIGITE SUA SENHA</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 px-3 pb-3">
-                <Input
-                  ref={senhaInputRef}
-                  type="password"
-                  placeholder="••••••••"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmarRecebimento()}
-                  className="text-xl h-14 text-center bg-muted border-border text-foreground tracking-widest"
-                  autoFocus
-                />
-                
-                <p className="text-center text-muted-foreground text-xs">
-                  Pressione <span className="text-primary font-bold">ENTER</span> para confirmar
+            {/* Instrução para digitar senha no terminal do armeiro */}
+            <Card className="border-amber-500/50 bg-amber-500/10">
+              <CardContent className="p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <KeyRound className="h-5 w-5 text-amber-500 animate-pulse" />
+                  <span className="text-base font-bold text-amber-500 animate-pulse">
+                    DIGITE SUA SENHA
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  no terminal do armeiro para confirmar recebimento
                 </p>
-                
-                <Button
-                  onClick={handleConfirmarRecebimento}
-                  disabled={loading || !senha}
-                  className="w-full h-12 text-base bg-green-600 hover:bg-green-700"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Confirmando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-5 w-5 mr-2" />
-                      CONFIRMAR RECEBIMENTO
-                    </>
-                  )}
-                </Button>
               </CardContent>
             </Card>
           </>
@@ -472,67 +234,10 @@ const TotemPolicialInterface = () => {
         {/* Footer */}
         <div className="text-center mt-4">
           <p className="text-xs text-muted-foreground">
-            Cavalaria PMCE - P4 - Reserva de Armamento - Totem de Confirmação
+            Cavalaria PMCE - P4 - Reserva de Armamento - Totem de Visualização
           </p>
         </div>
       </div>
-
-      {/* Modal Primeiro Acesso */}
-      <Dialog open={modalPrimeiroAcesso} onOpenChange={setModalPrimeiroAcesso}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5" />
-              Primeiro Acesso - Defina sua Senha
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              Esta é sua primeira autenticação. Por segurança, defina uma nova senha pessoal.
-            </p>
-            
-            <div className="space-y-2">
-              <Label htmlFor="novaSenha">Nova Senha</Label>
-              <Input
-                id="novaSenha"
-                type="password"
-                placeholder="Mínimo 4 caracteres"
-                value={novaSenha}
-                onChange={(e) => setNovaSenha(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="confirmarNovaSenha">Confirmar Nova Senha</Label>
-              <Input
-                id="confirmarNovaSenha"
-                type="password"
-                placeholder="Digite novamente"
-                value={confirmarNovaSenha}
-                onChange={(e) => setConfirmarNovaSenha(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSalvarNovaSenha()}
-              />
-            </div>
-            
-            {erroNovaSenha && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertTriangle className="h-4 w-4" />
-                {erroNovaSenha}
-              </p>
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button 
-              onClick={handleSalvarNovaSenha} 
-              disabled={loading || !novaSenha || !confirmarNovaSenha}
-            >
-              {loading ? 'Salvando...' : 'Salvar e Continuar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
