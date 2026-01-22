@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Edit, Search, Filter, Eye, User, Phone, MapPin, CreditCard, Mail, Building, TrendingUp } from 'lucide-react';
-import { doc, updateDoc, FieldPath } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 
@@ -87,30 +87,8 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
     try {
       const policialRef = doc(db, 'policiais', editingPolicial.id);
       
-      // Campos com caracteres especiais precisam de FieldPath
-      const camposEspeciais = ['Post/Grad'];
-      
-      // Separar campos normais dos especiais
-      const dadosNormais: Record<string, any> = {};
-      const dadosEspeciais: { path: FieldPath; value: any }[] = [];
-      
-      Object.entries(updatedData).forEach(([key, value]) => {
-        if (camposEspeciais.includes(key)) {
-          dadosEspeciais.push({ path: new FieldPath(key), value });
-        } else {
-          dadosNormais[key] = value;
-        }
-      });
-      
-      // Atualizar campos normais primeiro
-      if (Object.keys(dadosNormais).length > 0) {
-        await updateDoc(policialRef, dadosNormais);
-      }
-      
-      // Atualizar campos especiais usando FieldPath
-      for (const { path, value } of dadosEspeciais) {
-        await updateDoc(policialRef, { [path as any]: value });
-      }
+      // Usar setDoc com merge para evitar problemas com campos como "Post/Grad"
+      await setDoc(policialRef, updatedData, { merge: true });
 
       toast({
         title: "Sucesso",
