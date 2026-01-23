@@ -3,9 +3,10 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Camera, X, QrCode, Package, MapPin, DollarSign, Hash, Loader2 } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { Camera, X, QrCode, Package, MapPin, DollarSign, Hash, Loader2, Info } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { buscarMelhorMatch, extrairDadosQRCode, type ItemPatrimonio } from '@/lib/patrimonioUtils';
 
 interface ItemEncontrado {
   id: string;
@@ -27,7 +28,9 @@ export default function QRCodeScanner({ open, onClose, onItemFound }: QRCodeScan
   const [scanning, setScanning] = useState(false);
   const [searching, setSearching] = useState(false);
   const [resultado, setResultado] = useState<ItemEncontrado | null>(null);
+  const [matchInfo, setMatchInfo] = useState<{ score: number; matchTipo: string } | null>(null);
   const [naoEncontrado, setNaoEncontrado] = useState<string | null>(null);
+  const [dadosExtraidos, setDadosExtraidos] = useState<{ nome: string; valor: number | null } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,27 +38,30 @@ export default function QRCodeScanner({ open, onClose, onItemFound }: QRCodeScan
   const buscarItem = async (descricao: string) => {
     setSearching(true);
     setResultado(null);
+    setMatchInfo(null);
     setNaoEncontrado(null);
+    setDadosExtraidos(null);
     setErro(null);
 
     try {
-      // Buscar por descrição exata
+      // Extrair dados do QR Code para exibir mesmo se não encontrar
+      const dadosQR = extrairDadosQRCode(descricao);
+      setDadosExtraidos({ nome: dadosQR.nome, valor: dadosQR.valor });
+
+      // Buscar todos os itens
       const itensSnapshot = await getDocs(collection(db, 'patrimonio_itens'));
       const itens = itensSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })) as ItemEncontrado[];
+      })) as ItemPatrimonio[];
 
-      // Buscar correspondência exata ou parcial
-      const descLower = descricao.toLowerCase().trim();
-      const itemEncontrado = itens.find(item => 
-        item.descricao.toLowerCase().trim() === descLower ||
-        item.descricao.toLowerCase().includes(descLower)
-      );
+      // Usar busca inteligente com múltiplos critérios
+      const match = buscarMelhorMatch(descricao, itens);
 
-      if (itemEncontrado) {
-        setResultado(itemEncontrado);
-        onItemFound?.(itemEncontrado);
+      if (match) {
+        setResultado(match.item as ItemEncontrado);
+        setMatchInfo({ score: match.score, matchTipo: match.matchTipo });
+        onItemFound?.(match.item as ItemEncontrado);
       } else {
         setNaoEncontrado(descricao);
       }
@@ -78,8 +84,8 @@ export default function QRCodeScanner({ open, onClose, onItemFound }: QRCodeScan
       await scanner.start(
         { facingMode: 'environment' },
         {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
+          fps: 15, // FPS maior para captura mais rápida
+          qrbox: { width: 180, height: 180 }, // Área menor força aproximação
           aspectRatio: 1,
         },
         async (decodedText) => {
@@ -121,14 +127,18 @@ export default function QRCodeScanner({ open, onClose, onItemFound }: QRCodeScan
   const handleClose = async () => {
     await pararScanner();
     setResultado(null);
+    setMatchInfo(null);
     setNaoEncontrado(null);
+    setDadosExtraidos(null);
     setErro(null);
     onClose();
   };
 
   const novaLeitura = async () => {
     setResultado(null);
+    setMatchInfo(null);
     setNaoEncontrado(null);
+    setDadosExtraidos(null);
     setErro(null);
     await iniciarScanner();
   };
@@ -214,6 +224,17 @@ export default function QRCodeScanner({ open, onClose, onItemFound }: QRCodeScan
                   Item Encontrado!
                 </div>
                 
+                {/* Indicador de confiança do match */}
+                {matchInfo && matchInfo.matchTipo !== 'descrição_exata' && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                    <Info className="h-3 w-3" />
+                    <span>
+                      Match por {matchInfo.matchTipo.replace('_', ' ')} 
+                      ({Math.round(matchInfo.score * 100)}% confiança)
+                    </span>
+                  </div>
+                )}
+                
                 <div className="space-y-2 text-sm">
                   <div className="flex items-start gap-2">
                     <Hash className="h-4 w-4 mt-0.5 text-muted-foreground" />
@@ -276,8 +297,20 @@ export default function QRCodeScanner({ open, onClose, onItemFound }: QRCodeScan
                 <p className="font-semibold text-yellow-700 dark:text-yellow-400 mb-2">
                   Item não cadastrado
                 </p>
+                
+                {/* Mostrar dados extraídos do QR */}
+                {dadosExtraidos && (
+                  <div className="text-left bg-muted/50 p-3 rounded-lg mb-3 text-sm">
+                    <p className="text-xs text-muted-foreground mb-1">Dados extraídos do QR:</p>
+                    <p><strong>Nome:</strong> {dadosExtraidos.nome || '-'}</p>
+                    {dadosExtraidos.valor !== null && (
+                      <p><strong>Valor:</strong> {formatCurrency(dadosExtraidos.valor)}</p>
+                    )}
+                  </div>
+                )}
+                
                 <p className="text-sm text-muted-foreground mb-2">
-                  Nenhum item encontrado com a descrição:
+                  Descrição lida:
                 </p>
                 <p className="text-xs bg-muted p-2 rounded font-mono break-all">
                   "{naoEncontrado}"
@@ -291,9 +324,14 @@ export default function QRCodeScanner({ open, onClose, onItemFound }: QRCodeScan
           )}
 
           {scanning && !erro && (
-            <p className="text-center text-sm text-muted-foreground">
-              Aponte a câmera para o QR Code do tombo
-            </p>
+            <div className="text-center space-y-1">
+              <p className="text-sm text-muted-foreground">
+                Aponte a câmera para o QR Code do tombo
+              </p>
+              <p className="text-xs text-muted-foreground/70">
+                💡 Aproxime bastante a câmera do QR Code
+              </p>
+            </div>
           )}
         </div>
       </DialogContent>

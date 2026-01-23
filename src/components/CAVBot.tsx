@@ -10,6 +10,7 @@ import { buscarViaturasLeves, buscarViaturasPesadas, type ViaturaBasica } from '
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, getDoc, updateDoc, addDoc } from 'firebase/firestore';
 import QRCodeScanner from '@/components/patrimonio/QRCodeScanner';
+import CadastroPatrimonioCavbot from '@/components/patrimonio/CadastroPatrimonioCavbot';
 
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
@@ -103,7 +104,7 @@ const CAVBot = () => {
   const [confirmNovaSenha, setConfirmNovaSenha] = useState('');
   const [trocarSenhaMsg, setTrocarSenhaMsg] = useState('');
   const [showQRScanner, setShowQRScanner] = useState(false);
-
+  const [showCadastroPatrimonio, setShowCadastroPatrimonio] = useState(false);
   // Checklist de Verificação da Viatura
   interface ChecklistViatura {
     oleoMotor: 'abaixo' | 'nivel' | 'acima';
@@ -850,6 +851,32 @@ const CAVBot = () => {
                 >
                   📷 Escanear Patrimônio
                 </button>
+                {/* Cadastrar Patrimônio - só para quem tem acesso Gestão e Logística */}
+                {policialLogado?.acessos?.gestaoLogistica && (
+                  <button 
+                    className="quick-button"
+                    onClick={() => setShowCadastroPatrimonio(true)}
+                  >
+                    📦 Cadastrar Patrimônio
+                  </button>
+                )}
+                {/* Botão para solicitar acesso ao cadastro */}
+                {!policialLogado?.acessos?.gestaoLogistica && (
+                  <button 
+                    className="quick-button"
+                    onClick={() => {
+                      if (!policialLogado) {
+                        // Iniciar fluxo de autenticação para cadastrar patrimônio
+                        setFlow({ active: true, type: 'avarias', stage: 'ask_matricula' });
+                        pushBot('Para cadastrar patrimônio, preciso verificar suas credenciais. Informe sua matrícula:');
+                      } else {
+                        pushBot('🔒 Você não tem permissão para cadastrar patrimônio. Solicite acesso ao administrador.');
+                      }
+                    }}
+                  >
+                    📦 Cadastrar Patrimônio
+                  </button>
+                )}
                 <button
                   className="quick-button"
                   onClick={async () => {
@@ -1846,6 +1873,15 @@ const CAVBot = () => {
         onItemFound={(item) => {
           const valor = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor);
           pushBot(`✅ **Item Encontrado!**\n\n📦 ${item.nome}\n🏷️ Tombo: ${item.numeroTombo}\n📍 Seção: ${item.secaoNome}\n💰 Valor: ${valor}`);
+        }}
+      />
+
+      {/* Cadastro de Patrimônio via CAVBot */}
+      <CadastroPatrimonioCavbot
+        open={showCadastroPatrimonio}
+        onClose={() => setShowCadastroPatrimonio(false)}
+        onSuccess={() => {
+          pushBot('✅ Item de patrimônio cadastrado com sucesso!');
         }}
       />
     </>
