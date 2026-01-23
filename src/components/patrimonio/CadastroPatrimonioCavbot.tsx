@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Camera, Loader2, Package, Save, X, QrCode, CheckCircle } from 'lucide-react';
+import { Camera, Loader2, Package, Save, X, QrCode, CheckCircle, Plus } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -14,6 +14,12 @@ import { extrairDadosQRCode } from '@/lib/patrimonioUtils';
 import { toast } from 'sonner';
 
 interface Secao {
+  id: string;
+  nome: string;
+  cor: string;
+}
+
+interface Categoria {
   id: string;
   nome: string;
   cor: string;
@@ -27,9 +33,15 @@ interface CadastroPatrimonioCavbotProps {
 
 export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: CadastroPatrimonioCavbotProps) {
   const [secoes, setSecoes] = useState<Secao[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+  
+  // Nova categoria inline
+  const [showNovaCategoria, setShowNovaCategoria] = useState(false);
+  const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
+  const [salvandoCategoria, setSalvandoCategoria] = useState(false);
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -37,6 +49,7 @@ export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: C
     valor: '',
     numeroTombo: '',
     secaoId: '',
+    categoriaId: '',
     observacoes: ''
   });
   
@@ -45,28 +58,67 @@ export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: C
 
   useEffect(() => {
     if (open) {
-      carregarSecoes();
+      carregarDados();
     }
     return () => {
       pararScanner();
     };
   }, [open]);
 
-  const carregarSecoes = async () => {
+  const carregarDados = async () => {
     try {
-      const snap = await getDocs(collection(db, 'patrimonio_secoes'));
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Secao[];
-      setSecoes(data);
+      const [secSnap, catSnap] = await Promise.all([
+        getDocs(collection(db, 'patrimonio_secoes')),
+        getDocs(collection(db, 'patrimonio_categorias'))
+      ]);
+      setSecoes(secSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Secao[]);
+      setCategorias(catSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Categoria[]);
     } catch (e) {
-      console.error('Erro ao carregar seções:', e);
+      console.error('Erro ao carregar dados:', e);
+    }
+  };
+
+  const handleNovaCategoria = async () => {
+    if (!novaCategoriaNome.trim()) {
+      toast.error('Digite o nome da categoria');
+      return;
+    }
+    setSalvandoCategoria(true);
+    try {
+      const docRef = await addDoc(collection(db, 'patrimonio_categorias'), {
+        nome: novaCategoriaNome.trim(),
+        cor: '#6366f1', // Cor padrão
+        createdAt: new Date().toISOString()
+      });
+      const novaCat = { id: docRef.id, nome: novaCategoriaNome.trim(), cor: '#6366f1' };
+      setCategorias(prev => [...prev, novaCat]);
+      setFormData(prev => ({ ...prev, categoriaId: docRef.id }));
+      setNovaCategoriaNome('');
+      setShowNovaCategoria(false);
+      toast.success('Categoria criada!');
+    } catch (e) {
+      console.error('Erro ao criar categoria:', e);
+      toast.error('Erro ao criar categoria');
+    } finally {
+      setSalvandoCategoria(false);
     }
   };
 
   const iniciarScanner = async () => {
-    if (!containerRef.current) return;
+    // Aguardar o DOM estar pronto
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    const container = document.getElementById('qr-scanner-cadastro');
+    if (!container) {
+      console.error('Container do scanner não encontrado');
+      toast.error('Erro ao iniciar câmera. Tente novamente.');
+      return;
+    }
     
     try {
       setScanSuccess(false);
+      setScanning(true);
+      
       const scanner = new Html5Qrcode('qr-scanner-cadastro');
       scannerRef.current = scanner;
       
@@ -74,23 +126,30 @@ export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: C
         { facingMode: 'environment' },
         {
           fps: 15,
-          qrbox: { width: 200, height: 200 },
+          qrbox: { width: 150, height: 150 }, // Área menor força aproximação máxima
           aspectRatio: 1,
+          videoConstraints: {
+            facingMode: 'environment',
+            advanced: [
+              { zoom: 2.5 } as any, // Zoom 2.5x para QR codes pequenos
+              { focusMode: 'continuous' } as any // Foco contínuo automático
+            ]
+          }
         },
         async (decodedText) => {
-          // QR Code lido com sucesso
           await pararScanner();
           processarQRCode(decodedText);
         },
-        () => {
-          // Erro de leitura (normal enquanto procura)
-        }
+        () => {}
       );
-      
-      setScanning(true);
     } catch (error: any) {
       console.error('Erro ao iniciar scanner:', error);
-      toast.error('Erro ao acessar a câmera');
+      setScanning(false);
+      if (error.toString().includes('NotAllowedError')) {
+        toast.error('Permita o acesso à câmera nas configurações');
+      } else {
+        toast.error('Erro ao acessar a câmera');
+      }
     }
   };
 
@@ -138,6 +197,7 @@ export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: C
     setSaving(true);
     try {
       const secaoSelecionada = secoes.find(s => s.id === formData.secaoId);
+      const categoriaSelecionada = categorias.find(c => c.id === formData.categoriaId);
       
       // Converter valor para número
       let valorNumerico = 0;
@@ -153,8 +213,8 @@ export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: C
         numeroTombo: formData.numeroTombo.trim(),
         secaoId: formData.secaoId,
         secaoNome: secaoSelecionada?.nome || '',
-        categoriaId: '',
-        categoria: '',
+        categoriaId: formData.categoriaId || '',
+        categoria: categoriaSelecionada?.nome || '',
         observacoes: formData.observacoes.trim(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -169,6 +229,7 @@ export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: C
         valor: '',
         numeroTombo: '',
         secaoId: '',
+        categoriaId: '',
         observacoes: ''
       });
       setScanSuccess(false);
@@ -191,9 +252,12 @@ export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: C
       valor: '',
       numeroTombo: '',
       secaoId: '',
+      categoriaId: '',
       observacoes: ''
     });
     setScanSuccess(false);
+    setShowNovaCategoria(false);
+    setNovaCategoriaNome('');
     onClose();
   };
 
@@ -327,6 +391,78 @@ export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: C
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Categoria */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Categoria</Label>
+                {!showNovaCategoria && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => setShowNovaCategoria(true)}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Nova
+                  </Button>
+                )}
+              </div>
+              
+              {showNovaCategoria ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={novaCategoriaNome}
+                    onChange={(e) => setNovaCategoriaNome(e.target.value)}
+                    placeholder="Nome da categoria"
+                    className="text-base flex-1"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleNovaCategoria}
+                    disabled={salvandoCategoria}
+                  >
+                    {salvandoCategoria ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Criar'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowNovaCategoria(false);
+                      setNovaCategoriaNome('');
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Select 
+                  value={formData.categoriaId || "__none__"} 
+                  onValueChange={(v) => setFormData({ ...formData, categoriaId: v === "__none__" ? "" : v })}
+                >
+                  <SelectTrigger className="text-base">
+                    <SelectValue placeholder="Selecione a categoria..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Selecione...</SelectItem>
+                    {categorias.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: cat.cor }}
+                          />
+                          {cat.nome}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2">
