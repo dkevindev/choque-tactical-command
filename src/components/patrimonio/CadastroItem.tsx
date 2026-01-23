@@ -172,14 +172,14 @@ export default function CadastroItem({ item, categorias, secoes, defaultSecaoId,
             <div className="space-y-2">
               <Label>Categoria</Label>
               <Select 
-                value={formData.categoriaId} 
-                onValueChange={(v) => setFormData({ ...formData, categoriaId: v })}
+                value={formData.categoriaId || "__none__"} 
+                onValueChange={(v) => setFormData({ ...formData, categoriaId: v === "__none__" ? "" : v })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem categoria</SelectItem>
+                  <SelectItem value="__none__">Sem categoria</SelectItem>
                   {categorias.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       <div className="flex items-center gap-2">

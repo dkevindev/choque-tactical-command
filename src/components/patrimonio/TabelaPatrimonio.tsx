@@ -109,12 +109,12 @@ export default function TabelaPatrimonio({ itens, secoes, categorias, onUpdate, 
               />
             </div>
 
-            <Select value={filtroSecao} onValueChange={setFiltroSecao}>
+            <Select value={filtroSecao || "__all__"} onValueChange={(v) => setFiltroSecao(v === "__all__" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Todas as seções" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas as seções</SelectItem>
+                <SelectItem value="__all__">Todas as seções</SelectItem>
                 {secoes.map((secao) => (
                   <SelectItem key={secao.id} value={secao.id}>
                     <div className="flex items-center gap-2">
@@ -126,12 +126,12 @@ export default function TabelaPatrimonio({ itens, secoes, categorias, onUpdate, 
               </SelectContent>
             </Select>
 
-            <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+            <Select value={filtroCategoria || "__all__"} onValueChange={(v) => setFiltroCategoria(v === "__all__" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Todas as categorias" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas as categorias</SelectItem>
+                <SelectItem value="__all__">Todas as categorias</SelectItem>
                 {categorias.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     <div className="flex items-center gap-2">
