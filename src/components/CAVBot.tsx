@@ -9,6 +9,7 @@ import { Mic, MicOff, Send } from 'lucide-react';
 import { buscarViaturasLeves, buscarViaturasPesadas, type ViaturaBasica } from '@/lib/viaturaUtils';
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, getDoc, updateDoc, addDoc } from 'firebase/firestore';
+import QRCodeScanner from '@/components/patrimonio/QRCodeScanner';
 
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
@@ -101,6 +102,7 @@ const CAVBot = () => {
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmNovaSenha, setConfirmNovaSenha] = useState('');
   const [trocarSenhaMsg, setTrocarSenhaMsg] = useState('');
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   // Checklist de Verificação da Viatura
   interface ChecklistViatura {
@@ -841,6 +843,12 @@ const CAVBot = () => {
                   onClick={() => handleQuickAction('Avarias')}
                 >
                   🚗 Iniciar Serviço
+                </button>
+                <button 
+                  className="quick-button"
+                  onClick={() => setShowQRScanner(true)}
+                >
+                  📷 Escanear Patrimônio
                 </button>
                 <button
                   className="quick-button"
@@ -1830,6 +1838,16 @@ const CAVBot = () => {
           }
         }
       `}</style>
+
+      {/* QR Code Scanner para Patrimônio */}
+      <QRCodeScanner
+        open={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onItemFound={(item) => {
+          const valor = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor);
+          pushBot(`✅ **Item Encontrado!**\n\n📦 ${item.nome}\n🏷️ Tombo: ${item.numeroTombo}\n📍 Seção: ${item.secaoNome}\n💰 Valor: ${valor}`);
+        }}
+      />
     </>
   );
 };
