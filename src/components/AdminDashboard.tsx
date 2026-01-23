@@ -34,6 +34,7 @@ import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferid
 import ColetesTab from '@/components/admin-belico/ColetesTab';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import ReservaAdminPage from '@/components/admin/ReservaAdminPage';
+import PatrimonioPage from '@/components/patrimonio/PatrimonioPage';
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -731,19 +732,7 @@ const DashboardOverview = () => {
   );
 };
 
-const PatrimonioContent = () => (
-  <Card className="bg-card border-border shadow-tactical">
-    <CardHeader>
-      <CardTitle className="text-foreground">GESTÃO DE PATRIMÔNIO</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-muted-foreground">
-        Módulo de controle patrimonial em desenvolvimento...
-      </p>
-    </CardContent>
-  </Card>
-);
-
+const PatrimonioContent = () => <PatrimonioPage />;
 const BelicoContent = () => {
   return (
     <div className="space-y-6">
