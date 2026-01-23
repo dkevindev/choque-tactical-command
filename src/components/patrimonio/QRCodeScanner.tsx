@@ -84,9 +84,16 @@ export default function QRCodeScanner({ open, onClose, onItemFound }: QRCodeScan
       await scanner.start(
         { facingMode: 'environment' },
         {
-          fps: 15, // FPS maior para captura mais rápida
-          qrbox: { width: 180, height: 180 }, // Área menor força aproximação
+          fps: 15,
+          qrbox: { width: 150, height: 150 }, // Área menor força aproximação máxima
           aspectRatio: 1,
+          videoConstraints: {
+            facingMode: 'environment',
+            advanced: [
+              { zoom: 2.5 } as any, // Zoom 2.5x para QR codes pequenos
+              { focusMode: 'continuous' } as any // Foco contínuo automático
+            ]
+          }
         },
         async (decodedText) => {
           // QR Code lido com sucesso
@@ -328,8 +335,8 @@ export default function QRCodeScanner({ open, onClose, onItemFound }: QRCodeScan
               <p className="text-sm text-muted-foreground">
                 Aponte a câmera para o QR Code do tombo
               </p>
-              <p className="text-xs text-muted-foreground/70">
-                💡 Aproxime bastante a câmera do QR Code
+              <p className="text-xs text-amber-600 font-medium">
+                ⚠️ Aproxime BEM a câmera! QR Codes pequenos precisam estar bem perto
               </p>
             </div>
           )}
