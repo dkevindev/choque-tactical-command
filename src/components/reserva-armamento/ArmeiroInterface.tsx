@@ -298,9 +298,43 @@ const ArmeiroInterface = () => {
         console.error('Erro ao verificar livro ativo:', error);
       }
     };
+
+    // Verificar cautelas aguardando confirmação (para recuperar modal ao reabrir página)
+    const verificarCautelasAguardando = async () => {
+      try {
+        const cautelasAguardandoSnapshot = await getDocs(
+          query(
+            collection(db, 'cautelas_provisorias'),
+            where('status', '==', 'aguardando_confirmacao')
+          )
+        );
+
+        if (!cautelasAguardandoSnapshot.empty) {
+          // Pegar a primeira cautela aguardando
+          const cautelaDoc = cautelasAguardandoSnapshot.docs[0];
+          const cautelaData = cautelaDoc.data();
+          
+          console.log('[Armeiro] Recuperando cautela aguardando confirmação:', cautelaDoc.id);
+          
+          // Recuperar dados para reabrir o modal
+          const nomePolicial = `${cautelaData.postoGrad || ''} ${cautelaData.policialNomeGuerra || cautelaData.policialNome}`.trim();
+          
+          setCautelaAguardandoId(cautelaDoc.id);
+          setPolicialAguardandoId(cautelaData.policialId);
+          setPolicialAguardandoNome(nomePolicial);
+          setMateriaisAguardando(cautelaData.materiais || []);
+          
+          // Reabrir modal de aguardando
+          setModalAguardando(true);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar cautelas aguardando:', error);
+      }
+    };
     
     carregarPolicialLogado();
     verificarLivroAtivo();
+    verificarCautelasAguardando();
   }, [carregarMovimentacoesDoDia]);
 
   // Carregar policiais do Firebase
