@@ -102,11 +102,12 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
       updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
         'sessaoDigitacao.etapa': 'primeiro_acesso',
         'sessaoDigitacao.senhaLength': novaSenha.length,
+        'sessaoDigitacao.confirmarSenhaLength': confirmarNovaSenha.length,
         'sessaoDigitacao.erro': null,
         'sessaoDigitacao.timestamp': Date.now()
       }).catch(console.error);
     }
-  }, [novaSenha, open, cautelaId, etapa]);
+  }, [novaSenha, confirmarNovaSenha, open, cautelaId, etapa]);
 
   // Atualizar etapa no Firebase quando muda
   useEffect(() => {
