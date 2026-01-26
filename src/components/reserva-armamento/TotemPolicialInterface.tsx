@@ -24,6 +24,7 @@ interface MaterialAguardando {
 interface SessaoDigitacao {
   etapa: 'senha' | 'primeiro_acesso' | 'resetar_senha' | 'confirmado';
   senhaLength: number;
+  confirmarSenhaLength?: number;
   erro?: string | null;
   timestamp: number;
 }
@@ -302,19 +303,40 @@ const TotemPolicialInterface = () => {
                       Definindo nova senha pessoal...
                     </p>
                     
-                    {/* Asteriscos para nova senha */}
-                    <div className="mb-2 min-h-[24px] flex items-center justify-center">
-                      {sessaoDigitacao.senhaLength > 0 ? (
-                        <div className="flex justify-center gap-2">
-                          {Array.from({ length: sessaoDigitacao.senhaLength }).map((_, i) => (
-                            <div key={i} className="w-4 h-4 bg-amber-500 rounded-full" />
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm animate-pulse">
-                          Aguardando nova senha...
-                        </span>
-                      )}
+                    {/* Campo: Nova Senha */}
+                    <div className="mb-3">
+                      <p className="text-xs text-muted-foreground mb-1">Nova Senha:</p>
+                      <div className="min-h-[24px] flex items-center justify-center">
+                        {sessaoDigitacao.senhaLength > 0 ? (
+                          <div className="flex justify-center gap-2">
+                            {Array.from({ length: sessaoDigitacao.senhaLength }).map((_, i) => (
+                              <div key={i} className="w-4 h-4 bg-amber-500 rounded-full" />
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm animate-pulse">
+                            Aguardando...
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Campo: Confirmar Senha */}
+                    <div className="mb-2">
+                      <p className="text-xs text-muted-foreground mb-1">Confirmar Senha:</p>
+                      <div className="min-h-[24px] flex items-center justify-center">
+                        {(sessaoDigitacao.confirmarSenhaLength || 0) > 0 ? (
+                          <div className="flex justify-center gap-2">
+                            {Array.from({ length: sessaoDigitacao.confirmarSenhaLength || 0 }).map((_, i) => (
+                              <div key={i} className="w-4 h-4 bg-amber-500 rounded-full" />
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm animate-pulse">
+                            Aguardando...
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
