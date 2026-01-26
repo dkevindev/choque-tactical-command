@@ -166,7 +166,8 @@ const ArmeiroInterface = () => {
         }
       });
       
-      const movimentacoes: MovimentacaoDia[] = [];
+      // Mapa para agrupar cautelas do mesmo policial, status e horário
+      const gruposMap = new Map<string, MovimentacaoDia>();
       
       // Processar cautelas
       for (const docSnap of cautelasSnapshot.docs) {
@@ -207,24 +208,76 @@ const ArmeiroInterface = () => {
           }
         }
         
-        movimentacoes.push({
-          id: docSnap.id,
-          cautelaId: docSnap.id,
-          policialNome: data.policialNome || '',
-          policialNomeGuerra: nomeGuerra,
-          policialMatricula: data.policialMatricula,
-          policialNumeral: numeral,
-          postoGrad: postoGrad,
-          materiais: data.materiais || [],
-          dataCautela,
-          horaCautela,
-          dataBaixa: status === 'entregue' ? (baixaInfo?.dataBaixa || data.dataBaixa?.toDate?.()) : undefined,
-          horaBaixa: status === 'entregue' ? (baixaInfo?.horaBaixa || data.horaBaixa) : undefined,
-          recebidoPorNome: status === 'entregue' ? data.recebidoPorNome : undefined,
-          status,
-          sequencial: 0
-        });
+        // Chave de agrupamento: policial + status + horário de cautela
+        // Isso agrupa itens do mesmo policial, mesmo status (pendente ou entregue) e mesmo horário
+        const groupKey = `${data.policialId}_${status}_${horaCautela}`;
+        
+        const existingGroup = gruposMap.get(groupKey);
+        
+        if (existingGroup) {
+          // Adicionar materiais ao grupo existente
+          const materiaisAtuais = data.materiais || [];
+          materiaisAtuais.forEach((mat: any) => {
+            // Verificar se o material já existe no grupo (por nome e série)
+            const existingMat = existingGroup.materiais.find(
+              m => m.nome === mat.nome && m.numeroSerie === mat.numeroSerie
+            );
+            if (existingMat) {
+              // Somar quantidade
+              existingMat.quantidade += mat.quantidade || 1;
+            } else {
+              existingGroup.materiais.push({
+                nome: mat.nome,
+                quantidade: mat.quantidade || 1,
+                numeroSerie: mat.numeroSerie,
+                categoria: mat.categoria
+              });
+            }
+          });
+          
+          // Atualizar data de baixa se for mais recente
+          if (status === 'entregue') {
+            const novaBaixa = baixaInfo?.dataBaixa || data.dataBaixa?.toDate?.();
+            if (novaBaixa && existingGroup.dataBaixa && novaBaixa > existingGroup.dataBaixa) {
+              existingGroup.dataBaixa = novaBaixa;
+              existingGroup.horaBaixa = baixaInfo?.horaBaixa || data.horaBaixa;
+            } else if (novaBaixa && !existingGroup.dataBaixa) {
+              existingGroup.dataBaixa = novaBaixa;
+              existingGroup.horaBaixa = baixaInfo?.horaBaixa || data.horaBaixa;
+            }
+            if (data.recebidoPorNome) {
+              existingGroup.recebidoPorNome = data.recebidoPorNome;
+            }
+          }
+        } else {
+          // Criar novo grupo
+          gruposMap.set(groupKey, {
+            id: docSnap.id,
+            cautelaId: docSnap.id,
+            policialNome: data.policialNome || '',
+            policialNomeGuerra: nomeGuerra,
+            policialMatricula: data.policialMatricula,
+            policialNumeral: numeral,
+            postoGrad: postoGrad,
+            materiais: (data.materiais || []).map((mat: any) => ({
+              nome: mat.nome,
+              quantidade: mat.quantidade || 1,
+              numeroSerie: mat.numeroSerie,
+              categoria: mat.categoria
+            })),
+            dataCautela,
+            horaCautela,
+            dataBaixa: status === 'entregue' ? (baixaInfo?.dataBaixa || data.dataBaixa?.toDate?.()) : undefined,
+            horaBaixa: status === 'entregue' ? (baixaInfo?.horaBaixa || data.horaBaixa) : undefined,
+            recebidoPorNome: status === 'entregue' ? data.recebidoPorNome : undefined,
+            status,
+            sequencial: 0
+          });
+        }
       }
+      
+      // Converter mapa em array
+      const movimentacoes = Array.from(gruposMap.values());
       
       // Ordenar por data e atribuir sequencial
       movimentacoes.sort((a, b) => {

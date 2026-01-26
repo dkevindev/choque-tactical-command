@@ -190,10 +190,25 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
       }
 
       const policialData = policialDoc.data();
+      const matricula = String(policialData['Matrícula'] || policialData.matricula || '');
+      
+      // Verificar se é primeiro acesso (não tem senha ou primeiroAcesso é true)
+      const isPrimeiroAcesso = policialData.primeiroAcesso === true || !policialData.senha;
+      
+      // No primeiro acesso, a senha é a matrícula
+      // Caso contrário, verificar a senha salva
+      let senhaValida = false;
+      
+      if (isPrimeiroAcesso) {
+        // Primeiro acesso: senha deve ser a matrícula
+        senhaValida = senhaPolicial === matricula;
+      } else {
+        // Acesso normal: verificar senha cadastrada
+        senhaValida = policialData.senha === senhaPolicial;
+      }
 
-      // Verificar senha
-      if (policialData.senha !== senhaPolicial) {
-        setErroSenha('Senha incorreta');
+      if (!senhaValida) {
+        setErroSenha(isPrimeiroAcesso ? 'Senha incorreta. No primeiro acesso, use sua matrícula.' : 'Senha incorreta');
         
         // Notificar totem do erro
         if (cautelaId) {
@@ -210,8 +225,8 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
         return;
       }
 
-      // Verificar primeiro acesso
-      if (policialData.primeiroAcesso === true) {
+      // Verificar se precisa criar nova senha (primeiro acesso)
+      if (isPrimeiroAcesso) {
         setEtapa('primeiro_acesso');
         setLoading(false);
         return;
