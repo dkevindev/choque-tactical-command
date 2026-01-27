@@ -105,20 +105,26 @@ export default function CadastroPatrimonioCavbot({ open, onClose, onSuccess }: C
   };
 
   const iniciarScanner = async () => {
-    // Aguardar o DOM estar pronto
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Primeiro, ativar o estado de scanning para renderizar o container
+    setScanSuccess(false);
+    setScanning(true);
     
-    const container = document.getElementById('qr-scanner-cadastro');
+    // Aguardar múltiplas tentativas para o DOM estar pronto
+    let container = null;
+    for (let i = 0; i < 10; i++) {
+      container = document.getElementById('qr-scanner-cadastro');
+      if (container) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
     if (!container) {
-      console.error('Container do scanner não encontrado');
+      console.error('Container do scanner não encontrado após 10 tentativas');
       toast.error('Erro ao iniciar câmera. Tente novamente.');
+      setScanning(false);
       return;
     }
     
     try {
-      setScanSuccess(false);
-      setScanning(true);
-      
       const scanner = new Html5Qrcode('qr-scanner-cadastro');
       scannerRef.current = scanner;
       
