@@ -90,12 +90,14 @@ const PolicialAvatar = ({
       }}
       onClick={onClick}
     >
-      {/* Balão de Fala */}
+      {/* Balão de Fala - só aparece no hover ou click */}
       <div className={cn(
         "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 rounded-lg",
         "bg-card/95 backdrop-blur-sm border border-border shadow-lg",
         "min-w-[120px] max-w-[160px] text-xs",
-        "opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-200",
+        "opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100",
+        "pointer-events-none group-hover:pointer-events-auto",
+        "transition-all duration-300 ease-out",
         "group-hover:shadow-xl group-hover:z-50"
       )}>
         <div className="space-y-0.5">
