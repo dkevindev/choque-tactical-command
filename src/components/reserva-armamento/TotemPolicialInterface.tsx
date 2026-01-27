@@ -52,13 +52,19 @@ const TotemPolicialInterface = () => {
   // Ref para rastrear a cautela anterior e detectar confirmação
   const cautelaAnteriorRef = useRef<string | null>(null);
 
+  // Definir idioma do documento para pt-BR
+  useEffect(() => {
+    document.documentElement.lang = 'pt-BR';
+  }, []);
+
   // Calcular tamanhos dinâmicos baseados na quantidade de materiais
   const quantidadeMateriais = cautelaAtual?.materiais?.length || 0;
   
-  // Ajustes dinâmicos para evitar scroll
-  const tamanhoFonteMaterial = quantidadeMateriais > 6 ? 'text-xs' : quantidadeMateriais > 4 ? 'text-sm' : 'text-sm';
+  // Ajustes dinâmicos para evitar scroll - fontes maiores para legibilidade
+  const tamanhoFonteMaterial = quantidadeMateriais > 6 ? 'text-sm' : quantidadeMateriais > 4 ? 'text-base' : 'text-lg';
+  const tamanhoFonteBadge = quantidadeMateriais > 6 ? 'text-xs' : 'text-sm';
   const espacamentoMaterial = quantidadeMateriais > 6 ? 'space-y-1' : 'space-y-2';
-  const paddingMaterial = quantidadeMateriais > 6 ? 'p-1.5' : 'p-2';
+  const paddingMaterial = quantidadeMateriais > 6 ? 'p-2' : 'p-3';
   const tamanhoLogo = quantidadeMateriais > 5 ? 'h-12' : 'h-16';
   const tamanhoTitulo = quantidadeMateriais > 5 ? 'text-base' : 'text-lg';
 
@@ -239,17 +245,17 @@ const TotemPolicialInterface = () => {
                             {material.nome}
                             {material.modelo && ` ${material.modelo}`}
                           </p>
-                          <div className="flex flex-wrap gap-1 mt-0.5">
+                          <div className="flex flex-wrap gap-1.5 mt-1">
                             {material.numeroSerie && (
-                              <Badge variant="outline" className="border-white/70 text-white text-[10px] px-1 py-0">
+                              <Badge variant="outline" className={`border-white/70 text-white ${tamanhoFonteBadge} px-1.5 py-0.5`}>
                                 Série: {material.numeroSerie}
                               </Badge>
                             )}
-                            <Badge variant="outline" className="border-muted-foreground text-muted-foreground text-[10px] px-1 py-0">
+                            <Badge variant="outline" className={`border-amber-400 text-amber-400 font-bold ${tamanhoFonteBadge} px-2 py-0.5`}>
                               Qtd: {material.quantidade}
                             </Badge>
                             {material.carregadores && material.carregadores > 0 && (
-                              <Badge variant="default" className="bg-blue-600 text-white text-[10px] px-1 py-0">
+                              <Badge variant="default" className={`bg-blue-600 text-white ${tamanhoFonteBadge} px-1.5 py-0.5`}>
                                 📦 {material.carregadores}
                               </Badge>
                             )}
