@@ -36,29 +36,33 @@ const GerarCorpoEmailOS = ({ onBack }: GerarCorpoEmailOSProps) => {
   }, []);
 
   const carregarOrdensServico = async () => {
-    try {
-      setLoading(true);
-      const querySnapshot = await getDocs(
-        query(collection(db, 'ordensDeServico'), orderBy('dataOS', 'desc'))
-      );
-      
-      const osData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as OrdemServico));
-      
-      setOrdensServico(osData);
-    } catch (error) {
-      console.error('Erro ao carregar ordens de serviço:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar ordens de serviço.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
+
+    const querySnapshot = await getDocs(
+      query(
+        collection(db, 'ordensDeServico'),
+        orderBy('dataCriacao', 'desc') // asc = mais antiga primeiro
+      )
+    );
+
+    const osData = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as OrdemServico));
+
+    setOrdensServico(osData);
+  } catch (error) {
+    console.error('Erro ao carregar ordens de serviço:', error);
+    toast({
+      title: "Erro",
+      description: "Erro ao carregar ordens de serviço.",
+      variant: "destructive",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const toggleOS = (osId: string) => {
     setOsSelecionadas(prev => 
@@ -116,7 +120,7 @@ const GerarCorpoEmailOS = ({ onBack }: GerarCorpoEmailOSProps) => {
       const placa = os.placaViatura || 'S/N';
       const valor = os.valorOS;
       
-      return `- OF ${oficio} - OS ${numeroOS}/2026 - ${prefixo} de placa ${placa} - VALOR ${valor}`;
+      return `- OF ${oficio}/2026 - OS ${numeroOS} - ${prefixo} de placa ${placa} - VALOR ${valor}`;
     }).join('\n');
 
     const corpo = `${saudacao},
@@ -233,7 +237,7 @@ Auxiliar da 4° seção do RPMONT`;
                       <span>OF {os.numeroOficina || 'S/N'}</span>
                       <span>{os.cadastroViatura || '-'}</span>
                       <span className="text-muted-foreground">{os.placaViatura || '-'}</span>
-                      <span className="font-medium text-right">{formatarValor(os.valorOS)}</span>
+                      <span className="font-medium text-right">{os.valorOS}</span>
                     </div>
                   </div>
                 ))}
