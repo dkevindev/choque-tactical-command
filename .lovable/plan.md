@@ -1,183 +1,164 @@
 
-## Plano de Correção: Três Problemas no Sistema
+## Plano de Implementação: Três Melhorias no Sistema
 
-### Problema 1: Oficiais sem NUMERAL causam erro na cautela provisória
+---
 
-**Diagnóstico:**
-Ao criar uma cautela provisória, o campo `policialNumeral` recebe o valor `undefined` para oficiais que não possuem esse campo. O Firebase não aceita valores `undefined`, gerando erro ao tentar salvar o documento.
+### 1. Botão "Calibre 12 - Não possui carregador" na Reserva de Armamento
 
-**Arquivos afetados:**
+**Problema:** Ao cautelar uma espingarda Calibre 12, o sistema abre o modal solicitando quantidade de carregadores, mas esse tipo de arma não utiliza carregadores.
+
+**Solução:** Adicionar lógica especial no `ModalQuantidadeMaterial.tsx` para detectar armas Calibre 12 e pular a configuração de carregadores.
+
+**Arquivos a modificar:**
+- `src/components/reserva-armamento/ModalQuantidadeMaterial.tsx`
+
+**Alterações técnicas:**
+1. Detectar se o material é Calibre 12 através do campo `material.calibre`
+2. Se for Calibre 12:
+   - Exibir um botão destacado (cor laranja/amber) indicando "Calibre 12 - Sem Carregador"
+   - Não mostrar o seletor de quantidade de carregadores
+   - Confirmar automaticamente com 0 carregadores
+3. Para outras armas, manter o comportamento atual
+
+**Visual esperado:**
+
+```
+┌─────────────────────────────────────────┐
+│ Configurar Armamento                    │
+├─────────────────────────────────────────┤
+│ Espingarda Cal 12                       │
+│ Arma - Calibre: 12                      │
+├─────────────────────────────────────────┤
+│                                         │
+│  ┌─────────────────────────────────┐    │
+│  │  🔶 CALIBRE 12                  │    │
+│  │     Não possui carregador       │    │  ← Botão destacado em amber
+│  └─────────────────────────────────┘    │
+│                                         │
+│  [Cancelar]            [Adicionar]      │
+└─────────────────────────────────────────┘
+```
+
+---
+
+### 2. Correção de Livros Duplicados no Histórico
+
+**Problema:** Ao fechar livros, estão aparecendo múltiplos registros duplicados para o mesmo dia e armeiro no histórico.
+
+**Diagnóstico:** O botão "Fechar Livro" pode estar sendo clicado múltiplas vezes antes da operação ser concluída, ou há uma condição de corrida (race condition) que permite múltiplos fechamentos.
+
+**Solução:** Implementar proteção contra cliques duplos e validação de estado.
+
+**Arquivos a modificar:**
+- `src/components/reserva-armamento/ModalFechamentoLivro.tsx`
 - `src/components/reserva-armamento/ArmeiroInterface.tsx`
 
-**Solução:**
-Modificar a função `enviarParaConfirmacao` para omitir o campo `policialNumeral` quando ele for `undefined`. Aplicar a mesma lógica usada para os materiais (spread condicional).
+**Alterações técnicas:**
 
-**Código atual (linha 690-697):**
-```typescript
-const numeral = policialSelecionado.NUMERAL;
+No `ModalFechamentoLivro.tsx`:
+1. Desabilitar o botão imediatamente ao clicar
+2. Fechar o modal automaticamente após sucesso (já feito)
 
-const cautelaData: Record<string, any> = {
-  policialNumeral: numeral, // ❌ Pode ser undefined
-  ...
-};
-```
-
-**Código corrigido:**
-```typescript
-const numeral = policialSelecionado.NUMERAL;
-
-const cautelaData: Record<string, any> = {
-  ...(numeral !== undefined && { policialNumeral: numeral }), // ✅ Só inclui se existir
-  ...
-};
-```
-
-Mesma correção aplicada em todas as funções que criam cautelas (3 locais no arquivo).
+No `ArmeiroInterface.tsx`:
+1. Verificar se o livro ainda está ativo antes de fechar
+2. Adicionar flag para prevenir múltiplos cliques
+3. Verificar no Firebase se o livro já foi fechado antes de tentar fechar novamente
 
 ---
 
-### Problema 2: Material Na Rua mostrando detalhes por padrão
+### 3. Funcionalidade "Enviar OS por Email" no Menu Documentos
 
-**Diagnóstico:**
-O componente `PolicialAvatar` exibe o balão com materiais sempre visível. Isso polui a tela e causa sobreposição com outros avatares.
+**Problema:** Após criar OS, os auxiliares precisam manualmente montar o corpo do email com todas as informações. Isso é repetitivo e propenso a erros.
 
-**Arquivos afetados:**
-- `src/components/reserva-armamento/MaterialNaRuaSection.tsx`
+**Solução:** Criar uma nova aba/seção no `DocumentosPage` que permite selecionar múltiplas OS e gerar automaticamente o corpo do email formatado.
 
-**Solução:**
-Alterar o comportamento do balão de materiais para:
-1. Ficar oculto por padrão
-2. Aparecer somente ao clicar ou hover no ícone do policial
-3. Manter a informação de QRA (nome de guerra) sempre visível abaixo do ícone
+**Arquivos a criar:**
+- `src/components/motorizado/GerarCorpoEmailOS.tsx`
 
-**Código atual (linhas 94-109):**
-```typescript
-{/* Balão de Fala */}
-<div className={cn(
-  "absolute bottom-full ... opacity-90 ..."  // ❌ Sempre visível
-)}>
-  {materiaisResumo.map(...)}
-</div>
+**Arquivos a modificar:**
+- `src/components/DocumentosPaga.tsx`
+
+**Estrutura do novo componente:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ ENVIAR OS POR EMAIL                                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ Selecione o Auxiliar:                                           │
+│ ┌───────────┐  ┌───────────┐                                    │
+│ │ CB KEVIN  │  │ SD SOUSA  │   ← Botões de seleção              │
+│ └───────────┘  └───────────┘                                    │
+│                                                                 │
+│ Ordens de Serviço disponíveis:                     [Filtrar ▼]  │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ ☐ OS 51726 | OF 006/2026 | CAV 12 | SBQ0D65 | R$ 993,08     │ │
+│ │ ☑ OS 51445 | OF 007/2026 | DUSTER | PNK8927 | R$ 1.043,25   │ │
+│ │ ☑ OS 51447 | OF 008/2026 | CO20   | PNM9507 | R$ 1.195,35   │ │
+│ │ ☐ OS 7622764 | OF 009/2026 | CAV 08 | ORZ3930 | R$ 1.244,00 │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ [Gerar Corpo do Email]                                          │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Boa tarde,                                                  │ │
+│ │                                                             │ │
+│ │ Segue em anexo ofício para solicitação de pagamento de      │ │
+│ │ ordens de serviços mecânicos realizados nos veículos        │ │
+│ │ PERTENCENTE a este RPMONT.                                  │ │
+│ │                                                             │ │
+│ │ - OF 007/2026 - OS 51445 - DUSTER de placa PNK8927 -        │ │
+│ │   VALOR R$ 1.043,25                                         │ │
+│ │ - OF 008/2026 - OS 51447 - CO20 de placa PNM9507 -          │ │
+│ │   VALOR R$ 1.195,35                                         │ │
+│ │                                                             │ │
+│ │ --                                                          │ │
+│ │                                                             │ │
+│ │ Respeitosamente,                                            │ │
+│ │                                                             │ │
+│ │ CB KEVIN                                                    │ │
+│ │ Auxiliar da 4° seção do RPMONT                              │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│                                        [Copiar para Área de Transferência]
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Código corrigido:**
-```typescript
-{/* Balão de Fala - só aparece no hover ou click */}
-<div className={cn(
-  "absolute bottom-full ...",
-  "opacity-0 group-hover:opacity-100",  // ✅ Invisível por padrão, visível no hover
-  "pointer-events-none group-hover:pointer-events-auto",
-  "transition-all duration-300"
-)}>
-  {materiaisResumo.map(...)}
-</div>
-```
+**Lógica do componente:**
 
----
+1. Buscar todas as OS da coleção `ordensDeServico` no Firebase
+2. Exibir lista com checkboxes para seleção múltipla
+3. Permitir filtrar por mês/data
+4. Ao clicar em "Gerar Corpo do Email":
+   - Verificar hora atual: antes das 12h = "Bom dia", depois = "Boa tarde"
+   - Montar texto com todas as OS selecionadas no formato especificado
+   - Usar campos: `numeroOficina`, `numeroOS`, `cadastroViatura` (prefixo), `placaViatura`, `valorOS`
+   - Adicionar assinatura do auxiliar selecionado
+5. Botão para copiar texto para a área de transferência
 
-### Problema 3: Câmera do Scanner QR Code não abre no CAVBot
-
-**Diagnóstico:**
-O console mostra "Container do scanner não encontrado". Isso indica que o elemento DOM com `id="qr-scanner-cadastro"` não está pronto quando a função `iniciarScanner` é chamada.
-
-**Arquivos afetados:**
-- `src/components/patrimonio/CadastroPatrimonioCavbot.tsx`
-
-**Solução:**
-1. Usar `useEffect` para iniciar o scanner somente após o componente de scan ser renderizado
-2. Adicionar verificação robusta do container DOM com retry
-3. Aplicar as mesmas configurações de câmera do `QRCodeScanner.tsx` (zoom 2.5x, focusMode: continuous)
-
-**Código atual:**
-```typescript
-const iniciarScanner = async () => {
-  await new Promise(resolve => setTimeout(resolve, 100)); // ❌ Delay fixo insuficiente
-  
-  const container = document.getElementById('qr-scanner-cadastro');
-  if (!container) {
-    toast.error('Erro ao iniciar câmera...');
-    return;
-  }
-  ...
-};
-```
-
-**Código corrigido:**
-```typescript
-const iniciarScanner = async () => {
-  // Aguardar múltiplas tentativas para o DOM estar pronto
-  let container = null;
-  for (let i = 0; i < 10; i++) {
-    container = document.getElementById('qr-scanner-cadastro');
-    if (container) break;
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  
-  if (!container) {
-    console.error('Container do scanner não encontrado após 10 tentativas');
-    toast.error('Erro ao iniciar câmera. Tente novamente.');
-    setScanning(false);
-    return;
-  }
-  
-  try {
-    const scanner = new Html5Qrcode('qr-scanner-cadastro');
-    scannerRef.current = scanner;
-    
-    await scanner.start(
-      { facingMode: 'environment' },
-      {
-        fps: 15,
-        qrbox: { width: 150, height: 150 },
-        aspectRatio: 1,
-        videoConstraints: {
-          facingMode: 'environment',
-          advanced: [
-            { zoom: 2.5 } as any,
-            { focusMode: 'continuous' } as any
-          ]
-        }
-      },
-      ...
-    );
-  } catch (error) {
-    ...
-  }
-};
-```
-
-Além disso, garantir que `setScanning(true)` seja chamado **antes** de renderizar o container do scanner, para que o elemento exista no DOM quando `iniciarScanner` for chamado.
+**Campos utilizados das OS:**
+- `numeroOficina` → "OF 006/2026"
+- `numeroOS` → "OS 51726"
+- `cadastroViatura` → "CAV 12" (prefixo da viatura)
+- `placaViatura` → "SBQ0D65"
+- `valorOS` → "R$ 993,08"
 
 ---
 
 ### Resumo das Alterações
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `ArmeiroInterface.tsx` | Usar spread condicional para `policialNumeral` em 3 locais onde cautelas são criadas |
-| `MaterialNaRuaSection.tsx` | Alterar balão de materiais para aparecer apenas no hover/click |
-| `CadastroPatrimonioCavbot.tsx` | Adicionar retry para encontrar container DOM + manter `setScanning(true)` antes da busca do container |
+| Arquivo | Tipo | Descrição |
+|---------|------|-----------|
+| `ModalQuantidadeMaterial.tsx` | Modificar | Adicionar detecção de Calibre 12 e botão especial sem carregador |
+| `ModalFechamentoLivro.tsx` | Modificar | Adicionar proteção contra cliques duplos |
+| `ArmeiroInterface.tsx` | Modificar | Validar estado do livro antes de fechar |
+| `GerarCorpoEmailOS.tsx` | Criar | Novo componente para geração de corpo de email |
+| `DocumentosPaga.tsx` | Modificar | Adicionar nova opção "Enviar OS Email" na aba Motorizado |
 
 ---
 
-### Fluxo Visual do "Material Na Rua" após correção
+### Ordem de Implementação
 
-```
-┌───────────────────────────────────────────────┐
-│   ÁREA OPERACIONAL                            │
-│                                               │
-│      👮‍♂️             👮‍♂️                        │
-│    SD SOUSA        CB KEVIN                   │
-│                                               │
-│                       ┌────────────────┐      │
-│                       │ 🔫 Pistola .40 │◄──── hover/click  
-│                       │ 💥 Munição 60  │      mostra balão
-│                       │ 🛡️ Colete      │      
-│                       └────────────────┘      │
-│                                               │
-│      👮‍♂️             👮‍♂️                        │
-│   SGT PAULO        SD LIMA                    │
-│                                               │
-└───────────────────────────────────────────────┘
-```
-
+1. **Calibre 12** - Alteração simples no modal de quantidade
+2. **Livros Duplicados** - Correção de proteção contra cliques duplos
+3. **Email OS** - Nova funcionalidade mais complexa
