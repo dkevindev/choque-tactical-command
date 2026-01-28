@@ -111,10 +111,10 @@ const GerarCorpoEmailOS = ({ onBack }: GerarCorpoEmailOSProps) => {
     // Gerar linhas das OS
     const linhasOS = osFiltradas.map(os => {
       const oficio = os.numeroOficina || 'S/N';
-      const numeroOS = os.numeroOS || 'S/N';
+      const numeroOS = os.numeroOS + '/2026' || 'S/N';
       const prefixo = os.cadastroViatura || 'S/N';
       const placa = os.placaViatura || 'S/N';
-      const valor = formatarValor(os.valorOS);
+      const valor = os.valorOS;
       
       return `- OF ${oficio} - OS ${numeroOS} - ${prefixo} de placa ${placa} - VALOR ${valor}`;
     }).join('\n');
