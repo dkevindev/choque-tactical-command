@@ -50,6 +50,9 @@ const ModalFechamentoLivro = ({
   };
 
   const handleFechar = async () => {
+    // Proteção contra cliques duplos
+    if (loading) return;
+    
     if (!senha.trim()) {
       setErro('Digite sua senha para fechar o livro.');
       return;
