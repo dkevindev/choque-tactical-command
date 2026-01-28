@@ -12,13 +12,14 @@ import GerarBaixaCautelaForm from './admin-belico/documentos/GerarBaixaCautelaFo
 import GerarTransferenciaCautelaForm from './admin-belico/documentos/GerarTransferenciaCautelaForm';
 import GerarTermoEntregaForm from './admin-belico/documentos/GerarTermoEntregaForm';
 import GerarNadaConstaForm from './admin-belico/documentos/GerarNadaConstaForm';
+import GerarCorpoEmailOS from './motorizado/GerarCorpoEmailOS';
 
 interface DocumentosPageProps {
   locationState?: any;
 }
 
 const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
-  const [subsection, setSubsection] = useState<'menu' | 'nova-os'>('menu');
+  const [subsection, setSubsection] = useState<'menu' | 'nova-os' | 'email-os'>('menu');
   const [activeTab, setActiveTab] = useState('belico');
   const [belicoSubsection, setBelicoSubsection] = useState<'menu' | 'baixa-cautela' | 'transferencia-cautela' | 'termo-entrega' | 'nada-consta'>('menu');
 
@@ -107,10 +108,14 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
             {subsection === 'menu' && (
               <div className="space-y-4">
                 <p className="text-muted-foreground mb-2">Selecione o tipo de documento:</p>
-                <Button variant="outline" onClick={() => setSubsection('nova-os')}>
-                  + Nova OS
-                </Button>
-                {/* Você pode adicionar mais botões aqui para outros documentos */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button variant="outline" onClick={() => setSubsection('nova-os')}>
+                    + Nova OS
+                  </Button>
+                  <Button variant="outline" onClick={() => setSubsection('email-os')}>
+                    📧 Enviar OS por Email
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -119,6 +124,10 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
                 onBack={() => setSubsection('menu')} 
                 prefilledData={locationState?.prefilledData}
               />
+            )}
+
+            {subsection === 'email-os' && (
+              <GerarCorpoEmailOS onBack={() => setSubsection('menu')} />
             )}
           </TabsContent>
 

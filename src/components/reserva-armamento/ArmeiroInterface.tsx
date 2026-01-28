@@ -498,7 +498,42 @@ const ArmeiroInterface = () => {
 
   // Fechar Livro Diário
   const handleFecharLivro = async (senha: string, alteracoes: any[]) => {
+    if (!policialLogado || !livroAtivo) return false;
+    
+    // Verificar senha do armeiro
+    if (senha !== policialLogado.senha) {
+      toast({
+        title: "Senha Incorreta",
+        description: "A senha digitada não corresponde à sua senha.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
     try {
+      // PROTEÇÃO: Verificar se o livro ainda está aberto no Firebase
+      const livroDocCheck = await getDoc(doc(db, 'livros_reserva_armamento', livroAtivo.id));
+      if (!livroDocCheck.exists()) {
+        toast({
+          title: "Erro",
+          description: "O livro não foi encontrado.",
+          variant: "destructive",
+        });
+        setLivroAtivo(null);
+        return false;
+      }
+      
+      const livroDataCheck = livroDocCheck.data();
+      if (livroDataCheck.status === 'fechado') {
+        toast({
+          title: "Livro já fechado",
+          description: "Este livro já foi fechado anteriormente.",
+          variant: "destructive",
+        });
+        setLivroAtivo(null);
+        return false;
+      }
+      
       // Buscar cautelas pendentes do livro
       const cautelasPendentesSnapshot = await getDocs(
         query(
