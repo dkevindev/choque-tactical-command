@@ -143,6 +143,11 @@ const GerarTermoEntregaForm = () => {
     try {
       // Formatar materiais em formato tabular para o template DOCX
       const materiais: Array<{ qtd: string; nome: string; modelo: string; serie: string }> = [];
+      
+      // Rastrear se já adicionamos munições/carregadores de um armamento
+      // para evitar duplicação com itens separados
+      const processedCarregadores = new Set<string>();
+      const processedMunicoes = new Set<string>();
 
       transferencia.materiaisDevolvidos.forEach((m) => {
         if (m.categoria === 'Armamento') {
@@ -154,7 +159,7 @@ const GerarTermoEntregaForm = () => {
             serie: m.numeroSerie || '-'
           });
 
-          // 2. Carregadores (se houver)
+          // 2. Carregadores (se houver) - marcar como processado
           if (m.quantidadeCarregadores && m.quantidadeCarregadores > 0) {
             materiais.push({
               qtd: String(m.quantidadeCarregadores).padStart(2, '0'),
@@ -162,9 +167,11 @@ const GerarTermoEntregaForm = () => {
               modelo: m.fabricante || '-',
               serie: '-'
             });
+            // Marcar este calibre como já processado
+            if (m.calibre) processedCarregadores.add(m.calibre.toLowerCase());
           }
 
-          // 3. Munições (se houver)
+          // 3. Munições (se houver) - marcar como processado
           if (m.quantidadeMunicoes && m.quantidadeMunicoes > 0) {
             materiais.push({
               qtd: String(m.quantidadeMunicoes).padStart(2, '0'),
@@ -172,23 +179,31 @@ const GerarTermoEntregaForm = () => {
               modelo: '-',
               serie: '-'
             });
+            // Marcar este calibre como já processado
+            if (m.calibre) processedMunicoes.add(m.calibre.toLowerCase());
           }
         } else if (m.categoria === 'Acessório' && m.nome?.toLowerCase().includes('carregador')) {
-          // Carregador separado (fallback para dados antigos)
-          materiais.push({
-            qtd: String(m.quantidade).padStart(2, '0'),
-            nome: `Carregadores ${m.calibre || ''}`.trim(),
-            modelo: m.fabricante || '-',
-            serie: '-'
-          });
+          // Carregador separado - só adicionar se não foi processado no armamento
+          const calibreLower = m.calibre?.toLowerCase() || '';
+          if (!processedCarregadores.has(calibreLower)) {
+            materiais.push({
+              qtd: String(m.quantidade).padStart(2, '0'),
+              nome: `Carregadores ${m.calibre || ''}`.trim(),
+              modelo: m.fabricante || '-',
+              serie: '-'
+            });
+          }
         } else if (m.categoria === 'Munição') {
-          // Munição separada (fallback para dados antigos)
-          materiais.push({
-            qtd: String(m.quantidade).padStart(2, '0'),
-            nome: `Munições ${m.calibre || ''}`.trim(),
-            modelo: '-',
-            serie: '-'
-          });
+          // Munição separada - só adicionar se não foi processada no armamento
+          const calibreLower = m.calibre?.toLowerCase() || '';
+          if (!processedMunicoes.has(calibreLower)) {
+            materiais.push({
+              qtd: String(m.quantidade).padStart(2, '0'),
+              nome: `Munições ${m.calibre || ''}`.trim(),
+              modelo: '-',
+              serie: '-'
+            });
+          }
         } else if (m.categoria === 'Colete Balístico') {
           // Colete - nome + tamanho + sexo
           const sexoAbrev = m.sexo === 'Masculino' ? 'Masc' : m.sexo === 'Feminino' ? 'Fem' : '';
@@ -209,6 +224,9 @@ const GerarTermoEntregaForm = () => {
         }
       });
 
+      // Converter itensAdicionais para array de strings (a Cloud Function espera strings)
+      const itensAdicionaisStrings = itensAdicionais.map(item => item.descricao);
+
       const response = await fetch('https://gerartermoentregadocx-owvlmrnsjq-uc.a.run.app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -223,7 +241,7 @@ const GerarTermoEntregaForm = () => {
           transferidoPara: transferencia.localDestino,
           publicacao: transferencia.publicacao,
           materiais,
-          itensAdicionais
+          itensAdicionais: itensAdicionaisStrings
         })
       });
 
