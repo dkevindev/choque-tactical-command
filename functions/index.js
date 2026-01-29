@@ -406,6 +406,20 @@ appTermoEntrega.post('/', async (req, res) => {
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
+        // Formatar materiais para a tabela 1 (Materiais Bélicos)
+        const materiaisFormatados = (data.materiais || []).map(m => ({
+            qtd: m.qtd || '01',
+            nome: m.nome || '-',
+            modelo: m.modelo || '-',
+            serie: m.serie || '-'
+        }));
+
+        // Formatar itens adicionais para a tabela 2 (Outros Materiais)
+        const outrosMateriais = (data.itensAdicionais || []).map(item => ({
+            qtd: '01',
+            descricao: (item.descricao || item || '').toUpperCase()
+        }));
+
         const templateData = {
             grad: data.policial.grad || '',
             nomedopolicial: data.policial.nome || '',
@@ -414,8 +428,8 @@ appTermoEntrega.post('/', async (req, res) => {
             numerotermo: data.numeroTermo || '',
             transferidopara: data.transferidoPara || '',
             publicacao: data.publicacao || '',
-            materiais: data.materiais || [],
-            itensadicionais: data.itensAdicionais || []
+            materiais: materiaisFormatados,
+            outrosmateriais: outrosMateriais
         };
 
         doc.render(templateData);
