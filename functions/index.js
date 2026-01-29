@@ -415,10 +415,14 @@ appTermoEntrega.post('/', async (req, res) => {
         }));
 
         // Formatar itens adicionais para a tabela 2 (Outros Materiais)
-        const outrosMateriais = (data.itensAdicionais || []).map(item => ({
-            qtd: '01',
-            descricao: (item.descricao || item || '').toUpperCase()
-        }));
+        const outrosMateriais = (data.itensAdicionais || []).map(item => {
+            // Suportar tanto string direta quanto objeto { descricao: string }
+            const descricaoRaw = typeof item === 'string' ? item : (item?.descricao || '');
+            return {
+                qtd: '01',
+                descricao: descricaoRaw.toUpperCase() || '-'
+            };
+        });
 
         const templateData = {
             grad: data.policial.grad || '',
