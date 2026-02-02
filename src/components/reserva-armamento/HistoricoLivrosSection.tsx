@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { History, BookOpen, Calendar, User, FileDown, Loader2 } from "lucide-react";
-import { collection, query, orderBy, getDocs, limit, where } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, limit, where, getDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from "sonner";
 import ModalDetalhesLivro from './ModalDetalhesLivro';
@@ -42,17 +42,31 @@ const HistoricoLivrosSection = () => {
           )
         );
 
-        const livrosData = querySnapshot.docs.map(doc => {
-          const data = doc.data();
+        const livrosData = querySnapshot.docs.map(docSnap => {
+          const data = docSnap.data();
+          
+          // Processar alterações normais
+          const alteracoesNormais = (data.alteracoes || []).map((a: any) => ({
+            ...a,
+            dataHora: typeof a.dataHora === 'string' 
+              ? new Date(a.dataHora) 
+              : (a.dataHora?.toDate?.() || new Date())
+          }));
+          
+          // Processar alterações automáticas (falta de munição, etc)
+          const alteracoesAuto = (data.alteracoesAutomaticas || []).map((a: any) => ({
+            ...a,
+            dataHora: typeof a.dataHora === 'string' 
+              ? new Date(a.dataHora) 
+              : (a.dataHora?.toDate?.() || new Date())
+          }));
+          
           return {
-            id: doc.id,
+            id: docSnap.id,
             ...data,
             dataAbertura: data.dataAbertura?.toDate?.() || new Date(),
             dataFechamento: data.dataFechamento?.toDate?.() || null,
-            alteracoes: (data.alteracoes || []).map((a: any) => ({
-              ...a,
-              dataHora: a.dataHora?.toDate?.() || new Date()
-            }))
+            alteracoes: [...alteracoesNormais, ...alteracoesAuto]
           } as LivroDiario;
         });
 
@@ -80,6 +94,27 @@ const HistoricoLivrosSection = () => {
     setExportando(livro.id);
     
     try {
+      // Buscar dados completos do livro incluindo alteracoesAutomaticas
+      const livroDoc = await getDoc(doc(db, 'livros_reserva_armamento', livro.id));
+      const livroData = livroDoc.data();
+      
+      // Processar alterações automáticas do Firebase
+      const alteracoesAutomaticas = (livroData?.alteracoesAutomaticas || []).map((a: any) => ({
+        descricao: a.descricao,
+        dataHora: typeof a.dataHora === 'string' 
+          ? a.dataHora 
+          : (a.dataHora?.toDate?.()?.toISOString() || new Date().toISOString())
+      }));
+      
+      // Combinar com alterações manuais do livro carregado
+      const todasAlteracoes = [
+        ...livro.alteracoes.map(a => ({
+          descricao: a.descricao,
+          dataHora: a.dataHora.toISOString()
+        })),
+        ...alteracoesAutomaticas
+      ];
+      
       // Buscar movimentações do livro
       const querySnapshot = await getDocs(
         query(
@@ -88,8 +123,8 @@ const HistoricoLivrosSection = () => {
         )
       );
 
-      const movimentacoes = querySnapshot.docs.map(doc => {
-        const data = doc.data();
+      const movimentacoes = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
         let status: 'pendente' | 'entregue' = 'pendente';
         if (data.status === 'entregue' || data.status === 'baixado') {
           status = 'entregue';
@@ -119,10 +154,7 @@ const HistoricoLivrosSection = () => {
         dataAbertura: livro.dataAbertura.toISOString(),
         dataFechamento: livro.dataFechamento?.toISOString() || null,
         movimentacoes,
-        alteracoes: livro.alteracoes.map(a => ({
-          descricao: a.descricao,
-          dataHora: a.dataHora.toISOString()
-        })),
+        alteracoes: todasAlteracoes,
         armeiroResponsavel: livro.armeiroNome
       };
 
