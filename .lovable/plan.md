@@ -1,191 +1,200 @@
 
-## Plano de Correção: Termo de Entrega
 
-### Problema Identificado
+## Plano de Correção: Salvamento de Alterações no Livro de Reserva
 
-O documento de Termo de Entrega está saindo incorreto porque:
-1. O frontend envia dados em formato `descricaoCompleta` (texto único)
-2. O template DOCX espera colunas separadas: `QTD | NOME | MODELO | Nº SÉRIE`
-3. As regras de formatação do modelo não estão sendo aplicadas corretamente
+### Problemas Identificados
 
-### Modelo Correto (MODELO.docx)
+Analisando o código, encontrei **3 problemas específicos** que estão causando as alterações não serem salvas/exibidas:
 
-O documento deve ter duas tabelas:
+| # | Problema | Arquivo | Linha | Descrição |
+|---|----------|---------|-------|-----------|
+| 1 | Alterações manuais não sendo salvas | `ArmeiroInterface.tsx` | 593 | O código salva apenas `alteracoes` (array vazio do modal) ao invés de `todasAlteracoes` |
+| 2 | Histórico não carrega alterações automáticas | `HistoricoLivrosSection.tsx` | 52-56 | Só busca campo `alteracoes`, ignora `alteracoesAutomaticas` |
+| 3 | Exportação Word ignora automáticas | `HistoricoLivrosSection.tsx` | 122-125 | Só envia `livro.alteracoes`, não busca `alteracoesAutomaticas` do Firebase |
 
-**Tabela 1 - Materiais Bélicos:**
-| QTD | NOME | MODELO | Nº SÉRIE |
-|-----|------|--------|----------|
-| 01 | Pistola .40 | SIGSAUER | 58H16975 |
-| 03 | Carregadores .40 | SIGSAUER | - |
-| 30 | Munições .40 | - | - |
-| 01 | Colete balístico Tamanho M Masc | PROTECTA | 15G15SFSW152 |
+### Detalhes Técnicos
 
-**Tabela 2 - Outros Materiais:**
-| QTD | OUTROS MATERIAIS |
-|-----|------------------|
-| 01 | BOTA DE MONTARIA TAMANHO 43 |
+**Problema 1 - ArmeiroInterface.tsx linha 593:**
 
-### Regras de Formatação
+O código corretamente combina as alterações na linha 574:
+```typescript
+const todasAlteracoes = [...alteracoesAutomaticas, ...alteracoes];
+```
 
-| Tipo | Coluna NOME | Coluna MODELO | Coluna Nº SÉRIE |
-|------|-------------|---------------|-----------------|
-| Armamento | nome + calibre (ex: "Pistola .40") | fabricante/modelo | numeroSerie |
-| Munição | "Munições" + calibre (ex: "Munições .40") | "-" | "-" |
-| Carregador | "Carregadores" + calibre (ex: "Carregadores .40") | fabricante | "-" |
-| Colete | nome + tamanho + sexo (ex: "Colete balístico Tamanho M Masc") | fabricante | numeroSerie |
-| Sem info | usar "-" para campos vazios | "-" | "-" |
+Porém ao salvar no Firebase (linha 593), usa apenas `alteracoes`:
+```typescript
+await updateDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id), {
+  status: 'fechado',
+  dataFechamento: new Date(),
+  alteracoes,  // ← BUG: deveria ser todasAlteracoes
+  ...
+});
+```
+
+**Problema 2 - HistoricoLivrosSection.tsx linhas 52-56:**
+
+Ao carregar histórico, só busca o campo `alteracoes`:
+```typescript
+alteracoes: (data.alteracoes || []).map((a: any) => ({
+  ...a,
+  dataHora: a.dataHora?.toDate?.() || new Date()
+}))
+```
+
+Deveria combinar `alteracoes` + `alteracoesAutomaticas`.
+
+**Problema 3 - HistoricoLivrosSection.tsx linhas 122-125:**
+
+Ao exportar para Word, envia apenas:
+```typescript
+alteracoes: livro.alteracoes.map(a => ({
+  descricao: a.descricao,
+  dataHora: a.dataHora.toISOString()
+}))
+```
+
+Precisa buscar `alteracoesAutomaticas` do Firebase e combinar.
 
 ---
 
 ### Alterações Necessárias
 
-#### 1. Frontend (GerarTermoEntregaForm.tsx)
+#### 1. ArmeiroInterface.tsx - Linha 593
 
-Modificar a função `handleGerar` para enviar dados em formato tabular:
+Trocar `alteracoes` por `todasAlteracoes`:
 
-**Código atual:**
 ```typescript
-materiais.push({
-  descricaoCompleta: `${m.nome || 'Pistola'}, Marca: ${m.fabricante || 'N/D'}...`
+await updateDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id), {
+  status: 'fechado',
+  dataFechamento: new Date(),
+  alteracoes: todasAlteracoes,  // ← Corrigido
+  totalCautelas: totalCautelasHoje,
+  totalBaixas: totalBaixasHoje,
+  materiaisPendentes: cautelasPendentesSnapshot.size
 });
 ```
 
-**Código corrigido:**
+#### 2. HistoricoLivrosSection.tsx - Linhas 45-56
+
+Combinar alterações manuais + automáticas ao carregar:
+
 ```typescript
-// Para Armamento
-materiais.push({
-  qtd: '01',
-  nome: `${m.nome} ${m.calibre || ''}`.trim(),  // Ex: "Pistola .40"
-  modelo: m.fabricante || m.modelo || '-',
-  serie: m.numeroSerie || '-'
-});
-
-// Para Carregadores
-if (m.quantidadeCarregadores > 0) {
-  materiais.push({
-    qtd: String(m.quantidadeCarregadores).padStart(2, '0'),
-    nome: `Carregadores ${m.calibre || ''}`.trim(),
-    modelo: m.fabricante || '-',
-    serie: '-'  // Carregadores não têm série
-  });
-}
-
-// Para Munição
-if (m.quantidadeMunicoes > 0) {
-  materiais.push({
-    qtd: String(m.quantidadeMunicoes).padStart(2, '0'),
-    nome: `Munições ${m.calibre || ''}`.trim(),
-    modelo: '-',
-    serie: '-'
-  });
-}
-
-// Para Colete
-materiais.push({
-  qtd: '01',
-  nome: `${m.nome} Tamanho ${m.tamanhoColete || '-'} ${m.sexo === 'Masculino' ? 'Masc' : 'Fem'}`.trim(),
-  modelo: m.fabricante || '-',
-  serie: m.numeroSerie || '-'
+const livrosData = querySnapshot.docs.map(doc => {
+  const data = doc.data();
+  
+  // Processar alterações normais
+  const alteracoesNormais = (data.alteracoes || []).map((a: any) => ({
+    ...a,
+    dataHora: typeof a.dataHora === 'string' 
+      ? new Date(a.dataHora) 
+      : (a.dataHora?.toDate?.() || new Date())
+  }));
+  
+  // Processar alterações automáticas
+  const alteracoesAuto = (data.alteracoesAutomaticas || []).map((a: any) => ({
+    ...a,
+    dataHora: typeof a.dataHora === 'string' 
+      ? new Date(a.dataHora) 
+      : (a.dataHora?.toDate?.() || new Date())
+  }));
+  
+  return {
+    id: doc.id,
+    ...data,
+    dataAbertura: data.dataAbertura?.toDate?.() || new Date(),
+    dataFechamento: data.dataFechamento?.toDate?.() || null,
+    alteracoes: [...alteracoesNormais, ...alteracoesAuto]  // Combina todas
+  } as LivroDiario;
 });
 ```
 
-#### 2. Cloud Function (functions/index.js)
+#### 3. HistoricoLivrosSection.tsx - Função exportarLivro (linhas 78-127)
 
-Atualizar a função `gerarTermoEntregaDocx` para usar os novos campos:
+Buscar `alteracoesAutomaticas` diretamente do Firebase antes de exportar:
 
-**Código atual (linha 409-418):**
-```javascript
-const templateData = {
-  ...
-  materiais: data.materiais || [],
-  itensadicionais: data.itensAdicionais || []
-};
-```
-
-**Código corrigido:**
-```javascript
-// Formatar materiais para a tabela
-const materiaisFormatados = (data.materiais || []).map(m => ({
-  qtd: m.qtd || '01',
-  nome: m.nome || '-',
-  modelo: m.modelo || '-',
-  serie: m.serie || '-'
-}));
-
-// Formatar itens adicionais para a segunda tabela
-const outrosMateriais = (data.itensAdicionais || []).map(item => ({
-  qtd: '01',
-  descricao: item.descricao?.toUpperCase() || item.toUpperCase()
-}));
-
-const templateData = {
-  ...
-  materiais: materiaisFormatados,
-  outrosmateriais: outrosMateriais
-};
-```
-
-#### 3. Template DOCX (template-termo-entrega.docx)
-
-O template no Firebase Storage precisa ter os placeholders corretos:
-
-**Tabela 1:**
-```
-{#materiais}
-| {qtd} | {nome} | {modelo} | {serie} |
-{/materiais}
-```
-
-**Tabela 2:**
-```
-{#outrosmateriais}
-| {qtd} | {descricao} |
-{/outrosmateriais}
+```typescript
+const exportarLivro = async (livro: LivroDiario, e: React.MouseEvent) => {
+  e.stopPropagation();
+  setExportando(livro.id);
+  
+  try {
+    // Buscar dados completos do livro incluindo alteracoesAutomaticas
+    const livroDoc = await getDoc(doc(db, 'livros_reserva_armamento', livro.id));
+    const livroData = livroDoc.data();
+    
+    // Processar alterações automáticas do Firebase
+    const alteracoesAutomaticas = (livroData?.alteracoesAutomaticas || []).map((a: any) => ({
+      descricao: a.descricao,
+      dataHora: typeof a.dataHora === 'string' ? a.dataHora : new Date().toISOString()
+    }));
+    
+    // Combinar com alterações manuais do livro carregado
+    const todasAlteracoes = [
+      ...livro.alteracoes.map(a => ({
+        descricao: a.descricao,
+        dataHora: a.dataHora.toISOString()
+      })),
+      ...alteracoesAutomaticas
+    ];
+    
+    // ... resto do código ...
+    
+    const dados = {
+      armeiroNome: livro.armeiroNome,
+      dataAbertura: livro.dataAbertura.toISOString(),
+      dataFechamento: livro.dataFechamento?.toISOString() || null,
+      movimentacoes,
+      alteracoes: todasAlteracoes,  // ← Envia todas combinadas
+      armeiroResponsavel: livro.armeiroNome
+    };
 ```
 
 ---
 
-### Arquivos a Modificar
+### Resumo das Alterações
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/admin-belico/documentos/GerarTermoEntregaForm.tsx` | Refatorar formatação dos materiais para estrutura tabular |
-| `functions/index.js` | Atualizar processamento dos dados na função `gerarTermoEntregaDocx` |
+| Arquivo | Linha(s) | Alteração |
+|---------|----------|-----------|
+| `ArmeiroInterface.tsx` | 593 | Trocar `alteracoes` por `todasAlteracoes` no updateDoc |
+| `HistoricoLivrosSection.tsx` | 6 | Adicionar import `getDoc, doc` |
+| `HistoricoLivrosSection.tsx` | 45-56 | Combinar `alteracoes` + `alteracoesAutomaticas` ao carregar |
+| `HistoricoLivrosSection.tsx` | 78-127 | Buscar `alteracoesAutomaticas` do Firebase e combinar antes de exportar |
 
 ---
 
-### Fluxo de Dados Corrigido
+### Fluxo Corrigido
 
 ```
-Frontend (GerarTermoEntregaForm)
-         │
-         ▼
-┌─────────────────────────────────┐
-│ materiais: [                    │
-│   { qtd: "01",                  │
-│     nome: "Pistola .40",        │
-│     modelo: "SIGSAUER",         │
-│     serie: "58H16975" },        │
-│   { qtd: "03",                  │
-│     nome: "Carregadores .40",   │
-│     modelo: "SIGSAUER",         │
-│     serie: "-" },               │
-│   { qtd: "30",                  │
-│     nome: "Munições .40",       │
-│     modelo: "-",                │
-│     serie: "-" }                │
-│ ]                               │
-│ itensAdicionais: [              │
-│   { descricao: "BOTA..." }      │
-│ ]                               │
-└─────────────────────────────────┘
-         │
-         ▼
-Cloud Function (gerarTermoEntregaDocx)
-         │
-         ▼
-┌─────────────────────────────────┐
-│ Template DOCX renderizado com   │
-│ duas tabelas formatadas         │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. Durante o Turno                                              │
+├─────────────────────────────────────────────────────────────────┤
+│ Dar baixa com falta de munição → Salva em alteracoesAutomaticas │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 2. Ao Fechar Livro (ArmeiroInterface)                           │
+├─────────────────────────────────────────────────────────────────┤
+│ Modal exibe alterações manuais adicionadas                      │
+│ + alterações automáticas (falta munição)                        │
+│ → Salva TODAS em campo `alteracoes`                             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 3. Visualizar Histórico (HistoricoLivrosSection)                │
+├─────────────────────────────────────────────────────────────────┤
+│ Carrega `alteracoes` + `alteracoesAutomaticas`                  │
+│ Exibe todas combinadas na interface                             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 4. Exportar Word                                                │
+├─────────────────────────────────────────────────────────────────┤
+│ Busca do Firebase: alteracoes + alteracoesAutomaticas           │
+│ Combina e envia para Cloud Function                             │
+│ Documento Word inclui TODAS as alterações                       │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
