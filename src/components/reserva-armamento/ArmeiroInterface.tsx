@@ -590,7 +590,7 @@ const ArmeiroInterface = () => {
       await updateDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id), {
         status: 'fechado',
         dataFechamento: new Date(),
-        alteracoes,
+        alteracoes: todasAlteracoes,
         totalCautelas: totalCautelasHoje,
         totalBaixas: totalBaixasHoje,
         materiaisPendentes: cautelasPendentesSnapshot.size
