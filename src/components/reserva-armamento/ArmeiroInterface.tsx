@@ -138,6 +138,14 @@ const ArmeiroInterface = () => {
   // Tab ativa
   const [tabAtiva, setTabAtiva] = useState("livro");
   
+  // Alterações automáticas para modal de fechamento
+  const [alteracoesAutomaticasModal, setAlteracoesAutomaticasModal] = useState<Array<{
+    id: string;
+    descricao: string;
+    dataHora: Date;
+    tipo?: string;
+  }>>([]);
+  
   const { toast } = useToast();
 
   // Carregar movimentações do dia do Firebase
@@ -614,6 +622,29 @@ const ArmeiroInterface = () => {
     }
   };
 
+  // Abrir modal de fechamento com alterações automáticas carregadas
+  const abrirModalFechamento = async () => {
+    if (!livroAtivo) return;
+    
+    try {
+      const livroDoc = await getDoc(doc(db, 'livros_reserva_armamento', livroAtivo.id));
+      const livroData = livroDoc.data();
+      const autoAlteracoes = (livroData?.alteracoesAutomaticas || []).map((a: any) => ({
+        id: a.id || Date.now().toString(),
+        descricao: a.descricao,
+        dataHora: typeof a.dataHora === 'string' ? new Date(a.dataHora) : (a.dataHora?.toDate?.() || new Date()),
+        tipo: a.tipo
+      }));
+      
+      setAlteracoesAutomaticasModal(autoAlteracoes);
+      setModalFechamento(true);
+    } catch (error) {
+      console.error('Erro ao carregar alterações:', error);
+      // Mesmo com erro, abre o modal
+      setModalFechamento(true);
+    }
+  };
+
   // Selecionar Policial
   const selecionarPolicial = (policial: Policial) => {
     setPolicialSelecionado(policial);
@@ -1062,7 +1093,7 @@ const ArmeiroInterface = () => {
             ) : (
               <>
                 <Button 
-                  onClick={() => setModalFechamento(true)}
+                  onClick={abrirModalFechamento}
                   disabled={loading}
                   variant="destructive"
                 >
@@ -1444,6 +1475,7 @@ const ArmeiroInterface = () => {
           onClose={() => setModalFechamento(false)}
           armeiroNome={livroAtivo.armeiroNome}
           onFechar={handleFecharLivro}
+          alteracoesAutomaticas={alteracoesAutomaticasModal}
         />
       )}
 
