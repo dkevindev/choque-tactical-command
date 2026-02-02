@@ -1,200 +1,209 @@
 
 
-## Plano de Correção: Salvamento de Alterações no Livro de Reserva
+## Plano de Correção: Alterações no Livro de Reserva de Armamento
 
 ### Problemas Identificados
 
-Analisando o código, encontrei **3 problemas específicos** que estão causando as alterações não serem salvas/exibidas:
+Ao analisar o código, identifiquei os seguintes problemas:
 
-| # | Problema | Arquivo | Linha | Descrição |
-|---|----------|---------|-------|-----------|
-| 1 | Alterações manuais não sendo salvas | `ArmeiroInterface.tsx` | 593 | O código salva apenas `alteracoes` (array vazio do modal) ao invés de `todasAlteracoes` |
-| 2 | Histórico não carrega alterações automáticas | `HistoricoLivrosSection.tsx` | 52-56 | Só busca campo `alteracoes`, ignora `alteracoesAutomaticas` |
-| 3 | Exportação Word ignora automáticas | `HistoricoLivrosSection.tsx` | 122-125 | Só envia `livro.alteracoes`, não busca `alteracoesAutomaticas` do Firebase |
+| # | Problema | Descrição |
+|---|----------|-----------|
+| 1 | Modal não mostra alterações automáticas | O `ModalFechamentoLivro` só mostra alterações adicionadas manualmente, não exibe as automáticas (falta de munição) |
+| 2 | Alterações automáticas não carregadas ao abrir modal | Quando o modal abre, não busca as `alteracoesAutomaticas` do Firebase para exibir |
+| 3 | Usuário não sabe o que será salvo | Não há preview das alterações automáticas antes de confirmar o fechamento |
 
-### Detalhes Técnicos
+### Fluxo Atual (com Problemas)
 
-**Problema 1 - ArmeiroInterface.tsx linha 593:**
-
-O código corretamente combina as alterações na linha 574:
-```typescript
-const todasAlteracoes = [...alteracoesAutomaticas, ...alteracoes];
 ```
-
-Porém ao salvar no Firebase (linha 593), usa apenas `alteracoes`:
-```typescript
-await updateDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id), {
-  status: 'fechado',
-  dataFechamento: new Date(),
-  alteracoes,  // ← BUG: deveria ser todasAlteracoes
-  ...
-});
+Dar Baixa Parcial de Munição
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ Salva em alteracoesAutomaticas ✓   │
+│ (BaixaMaterialSection)             │
+└─────────────────────────────────────┘
+         │
+         ▼
+Clicar "Fechar Livro"
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ Abre ModalFechamentoLivro          │
+│ Mostra apenas alterações manuais   │  ← BUG: não mostra automáticas
+│ (não carrega alteracoesAutomaticas)│
+└─────────────────────────────────────┘
+         │
+         ▼
+Confirmar Fechamento
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ handleFecharLivro busca automáticas│
+│ Combina e salva corretamente ✓     │
+└─────────────────────────────────────┘
 ```
-
-**Problema 2 - HistoricoLivrosSection.tsx linhas 52-56:**
-
-Ao carregar histórico, só busca o campo `alteracoes`:
-```typescript
-alteracoes: (data.alteracoes || []).map((a: any) => ({
-  ...a,
-  dataHora: a.dataHora?.toDate?.() || new Date()
-}))
-```
-
-Deveria combinar `alteracoes` + `alteracoesAutomaticas`.
-
-**Problema 3 - HistoricoLivrosSection.tsx linhas 122-125:**
-
-Ao exportar para Word, envia apenas:
-```typescript
-alteracoes: livro.alteracoes.map(a => ({
-  descricao: a.descricao,
-  dataHora: a.dataHora.toISOString()
-}))
-```
-
-Precisa buscar `alteracoesAutomaticas` do Firebase e combinar.
 
 ---
 
-### Alterações Necessárias
+### Solução
 
-#### 1. ArmeiroInterface.tsx - Linha 593
+Modificar o `ModalFechamentoLivro` para receber e exibir as alterações automáticas, e modificar o `ArmeiroInterface` para carregar e passar essas alterações quando o modal for aberto.
 
-Trocar `alteracoes` por `todasAlteracoes`:
+#### 1. ArmeiroInterface.tsx
 
+**Adicionar estado para alterações automáticas:**
 ```typescript
-await updateDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id), {
-  status: 'fechado',
-  dataFechamento: new Date(),
-  alteracoes: todasAlteracoes,  // ← Corrigido
-  totalCautelas: totalCautelasHoje,
-  totalBaixas: totalBaixasHoje,
-  materiaisPendentes: cautelasPendentesSnapshot.size
-});
+const [alteracoesAutomaticas, setAlteracoesAutomaticas] = useState<Alteracao[]>([]);
 ```
 
-#### 2. HistoricoLivrosSection.tsx - Linhas 45-56
-
-Combinar alterações manuais + automáticas ao carregar:
-
+**Criar função para carregar alterações automáticas antes de abrir o modal:**
 ```typescript
-const livrosData = querySnapshot.docs.map(doc => {
-  const data = doc.data();
-  
-  // Processar alterações normais
-  const alteracoesNormais = (data.alteracoes || []).map((a: any) => ({
-    ...a,
-    dataHora: typeof a.dataHora === 'string' 
-      ? new Date(a.dataHora) 
-      : (a.dataHora?.toDate?.() || new Date())
-  }));
-  
-  // Processar alterações automáticas
-  const alteracoesAuto = (data.alteracoesAutomaticas || []).map((a: any) => ({
-    ...a,
-    dataHora: typeof a.dataHora === 'string' 
-      ? new Date(a.dataHora) 
-      : (a.dataHora?.toDate?.() || new Date())
-  }));
-  
-  return {
-    id: doc.id,
-    ...data,
-    dataAbertura: data.dataAbertura?.toDate?.() || new Date(),
-    dataFechamento: data.dataFechamento?.toDate?.() || null,
-    alteracoes: [...alteracoesNormais, ...alteracoesAuto]  // Combina todas
-  } as LivroDiario;
-});
-```
-
-#### 3. HistoricoLivrosSection.tsx - Função exportarLivro (linhas 78-127)
-
-Buscar `alteracoesAutomaticas` diretamente do Firebase antes de exportar:
-
-```typescript
-const exportarLivro = async (livro: LivroDiario, e: React.MouseEvent) => {
-  e.stopPropagation();
-  setExportando(livro.id);
+const abrirModalFechamento = async () => {
+  if (!livroAtivo) return;
   
   try {
-    // Buscar dados completos do livro incluindo alteracoesAutomaticas
-    const livroDoc = await getDoc(doc(db, 'livros_reserva_armamento', livro.id));
+    const livroDoc = await getDoc(doc(db, 'livros_reserva_armamento', livroAtivo.id));
     const livroData = livroDoc.data();
-    
-    // Processar alterações automáticas do Firebase
-    const alteracoesAutomaticas = (livroData?.alteracoesAutomaticas || []).map((a: any) => ({
+    const autoAlteracoes = (livroData?.alteracoesAutomaticas || []).map((a: any) => ({
+      id: a.id,
       descricao: a.descricao,
-      dataHora: typeof a.dataHora === 'string' ? a.dataHora : new Date().toISOString()
+      dataHora: typeof a.dataHora === 'string' ? new Date(a.dataHora) : (a.dataHora?.toDate?.() || new Date()),
+      tipo: a.tipo
     }));
     
-    // Combinar com alterações manuais do livro carregado
-    const todasAlteracoes = [
-      ...livro.alteracoes.map(a => ({
-        descricao: a.descricao,
-        dataHora: a.dataHora.toISOString()
-      })),
-      ...alteracoesAutomaticas
-    ];
-    
-    // ... resto do código ...
-    
-    const dados = {
-      armeiroNome: livro.armeiroNome,
-      dataAbertura: livro.dataAbertura.toISOString(),
-      dataFechamento: livro.dataFechamento?.toISOString() || null,
-      movimentacoes,
-      alteracoes: todasAlteracoes,  // ← Envia todas combinadas
-      armeiroResponsavel: livro.armeiroNome
-    };
+    setAlteracoesAutomaticas(autoAlteracoes);
+    setModalFechamento(true);
+  } catch (error) {
+    console.error('Erro ao carregar alterações:', error);
+    setModalFechamento(true);
+  }
+};
+```
+
+**Modificar botão de fechar livro:**
+```typescript
+<Button 
+  onClick={abrirModalFechamento}  // ← Chamar nova função
+  disabled={loading}
+  variant="destructive"
+>
+```
+
+**Passar alterações automáticas para o modal:**
+```typescript
+<ModalFechamentoLivro
+  open={modalFechamento}
+  onClose={() => setModalFechamento(false)}
+  armeiroNome={livroAtivo.armeiroNome}
+  onFechar={handleFecharLivro}
+  alteracoesAutomaticas={alteracoesAutomaticas}  // ← Nova prop
+/>
+```
+
+#### 2. ModalFechamentoLivro.tsx
+
+**Adicionar prop para alterações automáticas:**
+```typescript
+interface ModalFechamentoLivroProps {
+  open: boolean;
+  onClose: () => void;
+  armeiroNome: string;
+  onFechar: (senha: string, alteracoes: Alteracao[]) => Promise<boolean>;
+  alteracoesAutomaticas?: Alteracao[];  // ← Nova prop
+}
+```
+
+**Exibir alterações automáticas no modal:**
+```typescript
+{/* Alterações Automáticas (falta de munição, etc) */}
+{alteracoesAutomaticas && alteracoesAutomaticas.length > 0 && (
+  <div className="space-y-2">
+    <Label className="text-amber-600">Alterações automáticas ({alteracoesAutomaticas.length})</Label>
+    <div className="max-h-40 overflow-y-auto space-y-2">
+      {alteracoesAutomaticas.map((alteracao) => (
+        <div 
+          key={alteracao.id}
+          className="p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded"
+        >
+          <p className="text-sm text-amber-800 dark:text-amber-200">{alteracao.descricao}</p>
+          <p className="text-xs text-amber-600">
+            {alteracao.dataHora.toLocaleTimeString()}
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 ```
 
 ---
 
 ### Resumo das Alterações
 
-| Arquivo | Linha(s) | Alteração |
-|---------|----------|-----------|
-| `ArmeiroInterface.tsx` | 593 | Trocar `alteracoes` por `todasAlteracoes` no updateDoc |
-| `HistoricoLivrosSection.tsx` | 6 | Adicionar import `getDoc, doc` |
-| `HistoricoLivrosSection.tsx` | 45-56 | Combinar `alteracoes` + `alteracoesAutomaticas` ao carregar |
-| `HistoricoLivrosSection.tsx` | 78-127 | Buscar `alteracoesAutomaticas` do Firebase e combinar antes de exportar |
+| Arquivo | Alteração |
+|---------|-----------|
+| `ArmeiroInterface.tsx` | Adicionar estado `alteracoesAutomaticas` e função `abrirModalFechamento` |
+| `ArmeiroInterface.tsx` | Modificar botão "Fechar Livro" para usar nova função |
+| `ArmeiroInterface.tsx` | Passar `alteracoesAutomaticas` como prop para o modal |
+| `ModalFechamentoLivro.tsx` | Adicionar prop `alteracoesAutomaticas` na interface |
+| `ModalFechamentoLivro.tsx` | Exibir seção de alterações automáticas com estilo diferenciado |
 
 ---
 
 ### Fluxo Corrigido
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. Durante o Turno                                              │
-├─────────────────────────────────────────────────────────────────┤
-│ Dar baixa com falta de munição → Salva em alteracoesAutomaticas │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 2. Ao Fechar Livro (ArmeiroInterface)                           │
-├─────────────────────────────────────────────────────────────────┤
-│ Modal exibe alterações manuais adicionadas                      │
-│ + alterações automáticas (falta munição)                        │
-│ → Salva TODAS em campo `alteracoes`                             │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 3. Visualizar Histórico (HistoricoLivrosSection)                │
-├─────────────────────────────────────────────────────────────────┤
-│ Carrega `alteracoes` + `alteracoesAutomaticas`                  │
-│ Exibe todas combinadas na interface                             │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 4. Exportar Word                                                │
-├─────────────────────────────────────────────────────────────────┤
-│ Busca do Firebase: alteracoes + alteracoesAutomaticas           │
-│ Combina e envia para Cloud Function                             │
-│ Documento Word inclui TODAS as alterações                       │
-└─────────────────────────────────────────────────────────────────┘
+Dar Baixa Parcial de Munição
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ Salva em alteracoesAutomaticas ✓   │
+└─────────────────────────────────────┘
+         │
+         ▼
+Clicar "Fechar Livro"
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ abrirModalFechamento() carrega     │
+│ alteracoesAutomaticas do Firebase  │
+│ Passa para o modal via prop        │
+└─────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ ModalFechamentoLivro exibe:        │
+│ - Alterações automáticas (amarelo) │
+│ - Alterações manuais (azul)        │
+│ Armeiro pode adicionar mais        │
+└─────────────────────────────────────┘
+         │
+         ▼
+Confirmar Fechamento
+         │
+         ▼
+┌─────────────────────────────────────┐
+│ handleFecharLivro combina todas    │
+│ Salva em campo `alteracoes`        │
+│ Documento Word inclui todas ✓      │
+└─────────────────────────────────────┘
 ```
+
+---
+
+### Resultado Esperado
+
+Após as correções:
+
+1. **Ao clicar "Fechar Livro":** Sistema carrega alterações automáticas do Firebase
+2. **Modal mostra preview:** Armeiro vê alterações automáticas (falta de munição) + pode adicionar manuais
+3. **Ao confirmar:** Todas as alterações são combinadas e salvas
+4. **Documento Word:** Inclui todas as alterações (automáticas + manuais)
+
+**Exemplo visual no modal:**
+
+| Tipo | Aparência | Conteúdo |
+|------|-----------|----------|
+| Automática | Fundo amarelo | "FALTA DE MUNIÇÃO: SD KEVIN não devolveu 5x Munição .40. Motivo: Disparo em ocorrência" |
+| Manual | Fundo azul | "Substituição de colete danificado" |
 
