@@ -8,7 +8,7 @@ import { doc, onSnapshot, getDoc, updateDoc, collection, getDocs, query, where }
 import { db } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
 import SeletorMateriaisModal from './SeletorMateriaisModal';
-
+import ModalQuantidadeMaterial from './ModalQuantidadeMaterial';
 interface MaterialSelecionado {
   materialId?: string;
   id?: string;
@@ -79,6 +79,11 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
   const [quantidadeMaterial, setQuantidadeMaterial] = useState(1);
   const [loadingMateriais, setLoadingMateriais] = useState(false);
   
+  // Modal de quantidade (munição ou arma com carregadores)
+  const [modalQuantidade, setModalQuantidade] = useState(false);
+  const [materialParaQuantidade, setMaterialParaQuantidade] = useState<Material | null>(null);
+  const [tipoQuantidade, setTipoQuantidade] = useState<'municao' | 'arma'>('municao');
+  
   // Sincronizar materiais quando props mudam
   useEffect(() => {
     setMateriaisAtuais(materiais);
@@ -144,29 +149,18 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
     }
   };
   
-  // Adicionar material à cautela
-  const handleAdicionarMaterial = async () => {
-    if (!materialSelecionado) {
-      toast({
-        title: "Atenção",
-        description: "Selecione um material para adicionar.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const material = materiaisDisponiveis.find(m => m.id === materialSelecionado);
-    if (!material) return;
-    
+  // Adicionar material à cautela (com quantidade e carregadores opcionais)
+  const adicionarMaterialACautela = async (material: Material, quantidade: number, carregadores?: number) => {
     try {
       setLoading(true);
       
       const novoMaterial: MaterialSelecionado = {
         materialId: material.id,
         nome: material.nome,
-        quantidade: quantidadeMaterial,
+        quantidade: quantidade,
         categoria: material.categoria,
-        numeroSerie: material.numeroSerie
+        numeroSerie: material.numeroSerie,
+        ...(carregadores !== undefined && { carregadores })
       };
       
       const novosMateriaisAtuais = [...materiaisAtuais, novoMaterial];
@@ -179,7 +173,7 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
           quantidade: m.quantidade,
           categoria: m.categoria,
           ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
-          ...(m.carregadores && { carregadores: m.carregadores })
+          ...(m.carregadores !== undefined && { carregadores: m.carregadores })
         }))
       });
       
@@ -188,7 +182,7 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
                        material.categoria?.toLowerCase().includes('municao');
       
       if (isMunicao && material.quantidade) {
-        const novaQuantidade = Math.max(0, material.quantidade - quantidadeMaterial);
+        const novaQuantidade = Math.max(0, material.quantidade - quantidade);
         await updateDoc(doc(db, 'materiais_belicos', material.id), {
           quantidade: novaQuantidade,
           ...(novaQuantidade <= 0 && { disponivel: false })
@@ -204,6 +198,9 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
       // Atualizar estado local
       setMateriaisAtuais(novosMateriaisAtuais);
       onMateriaisAtualizados?.(novosMateriaisAtuais);
+      
+      // Remover da lista de disponíveis
+      setMateriaisDisponiveis(prev => prev.filter(m => m.id !== material.id));
       
       toast({
         title: "Material Adicionado",
@@ -224,6 +221,26 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handler para clique no material (igual ao ArmeiroInterface)
+  const handleSelecionarMaterial = (material: Material) => {
+    const categoriaNorm = (material.categoria || '').toLowerCase();
+    
+    if (categoriaNorm.includes('munição') || categoriaNorm.includes('municao')) {
+      // Munição: abrir modal de quantidade
+      setMaterialParaQuantidade(material);
+      setTipoQuantidade('municao');
+      setModalQuantidade(true);
+    } else if (categoriaNorm.includes('arma')) {
+      // Arma: abrir modal de carregadores
+      setMaterialParaQuantidade(material);
+      setTipoQuantidade('arma');
+      setModalQuantidade(true);
+    } else {
+      // Outros itens: adicionar direto com quantidade 1
+      adicionarMaterialACautela(material, 1);
     }
   };
 
@@ -828,71 +845,15 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
               </div>
             )}
 
-            {/* Seletor de Materiais com Abas */}
+            {/* Seletor de Materiais com Abas - clique adiciona direto ou abre modal */}
             <SeletorMateriaisModal
               materiaisDisponiveis={materiaisDisponiveis}
               materiaisExcluidos={materiaisAtuais.map(m => m.materialId || m.id || '')}
-              onSelecionarMaterial={(material) => {
-                setMaterialSelecionado(material.id);
-                // Verificar se é munição para mostrar quantidade
-                const isMunicao = material.categoria?.toLowerCase().includes('munição') || 
-                                 material.categoria?.toLowerCase().includes('municao');
-                if (isMunicao) {
-                  setQuantidadeMaterial(30); // Valor padrão para munição
-                } else {
-                  setQuantidadeMaterial(1);
-                }
-              }}
+              onSelecionarMaterial={handleSelecionarMaterial}
               loading={loadingMateriais}
             />
 
-            {/* Quantidade para o material selecionado */}
-            {materialSelecionado && (
-              <div className="space-y-2 p-3 bg-primary/5 rounded-lg border">
-                <div className="font-medium text-sm">
-                  {materiaisDisponiveis.find(m => m.id === materialSelecionado)?.nome}
-                </div>
-                <div className="flex items-center gap-3">
-                  <Label className="text-sm">Quantidade:</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setQuantidadeMaterial(Math.max(1, quantidadeMaterial - 1))}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    type="number"
-                    value={quantidadeMaterial}
-                    onChange={(e) => setQuantidadeMaterial(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-20 text-center"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setQuantidadeMaterial(quantidadeMaterial + 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-
             <div className="flex gap-2 pt-2">
-              <Button
-                onClick={handleAdicionarMaterial}
-                disabled={loading || !materialSelecionado || loadingMateriais}
-                className="flex-1 gap-2"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-                ADICIONAR
-              </Button>
               <Button
                 variant="outline"
                 onClick={() => {
@@ -943,6 +904,24 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
           </div>
         )}
       </DialogContent>
+
+      {/* Modal de Quantidade para Munição ou Carregadores para Armas */}
+      <ModalQuantidadeMaterial
+        open={modalQuantidade}
+        onClose={() => {
+          setModalQuantidade(false);
+          setMaterialParaQuantidade(null);
+        }}
+        material={materialParaQuantidade}
+        tipo={tipoQuantidade}
+        onConfirmar={(quantidade, carregadores) => {
+          if (materialParaQuantidade) {
+            adicionarMaterialACautela(materialParaQuantidade, quantidade, carregadores);
+          }
+          setModalQuantidade(false);
+          setMaterialParaQuantidade(null);
+        }}
+      />
     </Dialog>
   );
 };
