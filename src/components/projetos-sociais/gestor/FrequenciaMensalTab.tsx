@@ -394,8 +394,41 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       // 3. Verificar se projeto usa frequência de alunos
       const usaFrequencia = projeto?.configuracao?.usaFrequencia !== false;
       
-      // 4. Buscar alunos da turma apenas se usa frequência
-      const alunos = usaFrequencia ? await buscarAlunosTurma(turma.alunos || []) : [];
+      // 4. Buscar alunos da turma (normais) + alunos com horário especial que participam desta turma
+      let todosAlunos: Aluno[] = [];
+      
+      if (usaFrequencia) {
+        // 4.1 Buscar alunos normais da turma (excluindo os que têm horário especial)
+        const alunosNormais = await buscarAlunosTurma(turma.alunos || []);
+        const alunosNormaisFiltrados = alunosNormais.filter(a => !a.horarioEspecial);
+        
+        // 4.2 Buscar alunos com horário especial que participam DESTA turma
+        const qEspeciais = query(
+          collection(db, 'projetos_alunos'),
+          where('projetoId', '==', projeto.id),
+          where('ativo', '==', true),
+          where('horarioEspecial', '==', true)
+        );
+        const snapEspeciais = await getDocs(qEspeciais);
+        const alunosEspeciaisDaTurma = snapEspeciais.docs
+          .map(docSnap => {
+            const data = docSnap.data();
+            return {
+              id: docSnap.id,
+              nomeGuerra: data.nomeGuerra || data.nomeCompleto,
+              nomeCompleto: data.nomeCompleto,
+              horarioEspecial: true,
+              diasEspeciais: data.diasEspeciais || []
+            } as Aluno;
+          })
+          .filter(aluno => {
+            // Aluno tem algum dia configurado para ESTA turma
+            return aluno.diasEspeciais?.some((d: any) => d.turmaId === turma.id);
+          });
+        
+        // 4.3 Combinar listas
+        todosAlunos = [...alunosNormaisFiltrados, ...alunosEspeciaisDaTurma];
+      }
       
       // 5. Identificar instrutores que deram aula
       const instrutoresIdsSet = new Set<string>();
@@ -419,7 +452,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       // 8. Montar presença dos alunos (apenas se usa frequência)
       // Lógica: todos os dias iniciam com "-", só fica vazio (para assinar) quando teve aula E estava presente
       // Considera horário especial: se aluno tem diasEspeciais, verifica se deve estar neste dia/turma
-      const alunosComPresenca = usaFrequencia ? alunos.map(aluno => {
+      const alunosComPresenca = usaFrequencia ? todosAlunos.map(aluno => {
         const presencas: Record<string, string> = {};
         
         diasAula.slice(0, 10).forEach((dia, idx) => {

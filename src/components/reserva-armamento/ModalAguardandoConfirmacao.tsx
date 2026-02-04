@@ -3,11 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, CheckCircle, User, XCircle, KeyRound, AlertTriangle, Package, Plus, Minus } from "lucide-react";
 import { doc, onSnapshot, getDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
+import SeletorMateriaisModal from './SeletorMateriaisModal';
 
 interface MaterialSelecionado {
   materialId?: string;
@@ -828,61 +828,55 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
               </div>
             )}
 
-            {loadingMateriais ? (
-              <div className="text-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-                <p className="text-xs text-muted-foreground mt-2">Carregando materiais...</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label className="text-sm">Selecione o Material:</Label>
-                  <Select value={materialSelecionado} onValueChange={setMaterialSelecionado}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Escolher material..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {materiaisDisponiveis.map((mat) => (
-                        <SelectItem key={mat.id} value={mat.id}>
-                          {mat.nome}
-                          {mat.numeroSerie && ` - ${mat.numeroSerie}`}
-                          {mat.quantidade && ` (Est: ${mat.quantidade})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            {/* Seletor de Materiais com Abas */}
+            <SeletorMateriaisModal
+              materiaisDisponiveis={materiaisDisponiveis}
+              materiaisExcluidos={materiaisAtuais.map(m => m.materialId || m.id || '')}
+              onSelecionarMaterial={(material) => {
+                setMaterialSelecionado(material.id);
+                // Verificar se é munição para mostrar quantidade
+                const isMunicao = material.categoria?.toLowerCase().includes('munição') || 
+                                 material.categoria?.toLowerCase().includes('municao');
+                if (isMunicao) {
+                  setQuantidadeMaterial(30); // Valor padrão para munição
+                } else {
+                  setQuantidadeMaterial(1);
+                }
+              }}
+              loading={loadingMateriais}
+            />
 
-                {/* Quantidade para munição */}
-                {materialSelecionado && (
-                  <div className="space-y-2">
-                    <Label className="text-sm">Quantidade:</Label>
-                    <div className="flex items-center gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setQuantidadeMaterial(Math.max(1, quantidadeMaterial - 1))}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={quantidadeMaterial}
-                        onChange={(e) => setQuantidadeMaterial(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-20 text-center"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setQuantidadeMaterial(quantidadeMaterial + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
+            {/* Quantidade para o material selecionado */}
+            {materialSelecionado && (
+              <div className="space-y-2 p-3 bg-primary/5 rounded-lg border">
+                <div className="font-medium text-sm">
+                  {materiaisDisponiveis.find(m => m.id === materialSelecionado)?.nome}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Label className="text-sm">Quantidade:</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setQuantidadeMaterial(Math.max(1, quantidadeMaterial - 1))}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    type="number"
+                    value={quantidadeMaterial}
+                    onChange={(e) => setQuantidadeMaterial(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-20 text-center"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setQuantidadeMaterial(quantidadeMaterial + 1)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
 
