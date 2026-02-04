@@ -6,8 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar as CalendarIcon, Eye, Users, ChevronDown, ChevronRight, Copy } from 'lucide-react';
-import { format, isSameDay, subMonths } from 'date-fns';
+import { Calendar as CalendarIcon, Eye, Users, ChevronDown, ChevronRight, Copy, Star } from 'lucide-react';
+import { format, isSameDay, subMonths, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,12 @@ interface AlunoFrequencia {
   faltas: number;
   percentualPresenca: number;
   turmaId?: string;
+  horarioEspecial?: boolean;
+  diasEspeciais?: Array<{
+    diaSemana: string;
+    turmaId: string;
+    turno: string;
+  }>;
 }
 
 const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
@@ -49,6 +55,7 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
   const [dataSelecionada, setDataSelecionada] = useState<Date>();
   const [mesSelecionado, setMesSelecionado] = useState(new Date());
   const [turmasAbertas, setTurmasAbertas] = useState<string[]>([]);
+  const [alunosHorarioEspecial, setAlunosHorarioEspecial] = useState<AlunoFrequencia[]>([]);
   
   // Estado para o dialog de detalhes do instrutor
   const [instrutorSelecionado, setInstrutorSelecionado] = useState<any>(null);
@@ -139,25 +146,72 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
         });
       });
 
-      const alunosData = alunosSnapshot.docs.map(doc => {
-        const aluno = doc.data();
-        const totalAulas = aulas.length;
-        const aulasPresentes = aulas.filter(a => 
-          a.alunosPresentes?.includes(doc.id)
-        ).length;
-        const percentual = totalAulas > 0 ? (aulasPresentes / totalAulas) * 100 : 0;
+      // Função auxiliar para obter dia da semana
+      const getDiaSemana = (date: Date): string => {
+        const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+        return dias[getDay(date)];
+      };
 
-        return {
-          id: doc.id,
-          nomeCompleto: aluno.nomeCompleto,
-          aulasParticipadas: aulasPresentes,
-          faltas: totalAulas - aulasPresentes,
-          percentualPresenca: percentual,
-          turmaId: alunoTurmaMap[doc.id]
-        };
+      // Separar alunos normais e com horário especial
+      const alunosNormais: AlunoFrequencia[] = [];
+      const alunosEspeciais: AlunoFrequencia[] = [];
+
+      alunosSnapshot.docs.forEach(doc => {
+        const aluno = doc.data();
+        const isEspecial = aluno.horarioEspecial === true;
+        const diasEspeciais = aluno.diasEspeciais || [];
+        
+        if (isEspecial && diasEspeciais.length > 0) {
+          // Calcular frequência correta para aluno com horário especial
+          let totalAulasPossiveis = 0;
+          let totalPresencas = 0;
+          
+          diasEspeciais.forEach((diaConfig: any) => {
+            // Pegar aulas desta turma neste dia da semana
+            const aulasDesteDia = aulas.filter(aula => {
+              const dataAula = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
+              const diaSemanaAula = getDiaSemana(dataAula);
+              return aula.turmaId === diaConfig.turmaId && diaSemanaAula === diaConfig.diaSemana;
+            });
+            
+            totalAulasPossiveis += aulasDesteDia.length;
+            totalPresencas += aulasDesteDia.filter((a: any) => 
+              a.alunosPresentes?.includes(doc.id)
+            ).length;
+          });
+          
+          const percentual = totalAulasPossiveis > 0 ? (totalPresencas / totalAulasPossiveis) * 100 : 0;
+          
+          alunosEspeciais.push({
+            id: doc.id,
+            nomeCompleto: aluno.nomeCompleto,
+            aulasParticipadas: totalPresencas,
+            faltas: totalAulasPossiveis - totalPresencas,
+            percentualPresenca: percentual,
+            horarioEspecial: true,
+            diasEspeciais: diasEspeciais
+          });
+        } else {
+          // Cálculo normal para alunos sem horário especial
+          const totalAulas = aulas.filter((a: any) => a.turmaId === alunoTurmaMap[doc.id]).length;
+          const aulasPresentes = aulas.filter((a: any) => 
+            a.alunosPresentes?.includes(doc.id) && a.turmaId === alunoTurmaMap[doc.id]
+          ).length;
+          const percentual = totalAulas > 0 ? (aulasPresentes / totalAulas) * 100 : 0;
+
+          alunosNormais.push({
+            id: doc.id,
+            nomeCompleto: aluno.nomeCompleto,
+            aulasParticipadas: aulasPresentes,
+            faltas: totalAulas - aulasPresentes,
+            percentualPresenca: percentual,
+            turmaId: alunoTurmaMap[doc.id]
+          });
+        }
       });
 
-      setAlunosFrequencia(alunosData.sort((a, b) => b.percentualPresenca - a.percentualPresenca));
+      setAlunosFrequencia(alunosNormais.sort((a, b) => b.percentualPresenca - a.percentualPresenca));
+      setAlunosHorarioEspecial(alunosEspeciais.sort((a, b) => b.percentualPresenca - a.percentualPresenca));
       setLoading(false);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -562,6 +616,73 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
                               {getAlunosSemTurma().map((aluno) => (
                                 <TableRow key={aluno.id}>
                                   <TableCell className="font-medium">{aluno.nomeCompleto}</TableCell>
+                                  <TableCell>
+                                    <span className={`font-medium ${
+                                      aluno.percentualPresenca >= 80 ? 'text-green-600' :
+                                      aluno.percentualPresenca >= 60 ? 'text-yellow-600' :
+                                      'text-red-600'
+                                    }`}>
+                                      {aluno.percentualPresenca.toFixed(1)}%
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>{aluno.aulasParticipadas}</TableCell>
+                                  <TableCell>{aluno.faltas}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+
+                  {/* Alunos com Horário Especial */}
+                  {alunosHorarioEspecial.length > 0 && (
+                    <Collapsible 
+                      open={turmasAbertas.includes('horario-especial')} 
+                      onOpenChange={() => toggleTurma('horario-especial')}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between p-4 bg-amber-500/10 rounded-lg cursor-pointer hover:bg-amber-500/20 transition-colors border border-amber-500/30">
+                          <div className="flex items-center gap-3">
+                            {turmasAbertas.includes('horario-especial') ? (
+                              <ChevronDown className="h-5 w-5 text-amber-600" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-amber-600" />
+                            )}
+                            <Star className="h-5 w-5 text-amber-500" />
+                            <div>
+                              <p className="font-medium text-amber-700">Horário Especial</p>
+                              <p className="text-sm text-amber-600/70">
+                                {alunosHorarioEspecial.length} aluno(s) com frequência personalizada
+                              </p>
+                            </div>
+                          </div>
+                          <Badge className="bg-amber-500/20 text-amber-700 border-amber-500/30">
+                            Média: {(alunosHorarioEspecial.reduce((sum, a) => sum + a.percentualPresenca, 0) / alunosHorarioEspecial.length).toFixed(1)}%
+                          </Badge>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="border-x border-b rounded-b-lg overflow-hidden border-amber-500/30">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-amber-500/5">
+                                <TableHead>Aluno</TableHead>
+                                <TableHead>Presença (%)</TableHead>
+                                <TableHead>Aulas Participadas</TableHead>
+                                <TableHead>Faltas</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {alunosHorarioEspecial.map((aluno) => (
+                                <TableRow key={aluno.id}>
+                                  <TableCell className="font-medium">
+                                    <div className="flex items-center gap-2">
+                                      {aluno.nomeCompleto}
+                                      <Star className="h-3 w-3 text-amber-500" />
+                                    </div>
+                                  </TableCell>
                                   <TableCell>
                                     <span className={`font-medium ${
                                       aluno.percentualPresenca >= 80 ? 'text-green-600' :
