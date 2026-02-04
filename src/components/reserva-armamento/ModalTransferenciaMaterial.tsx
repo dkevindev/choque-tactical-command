@@ -75,8 +75,8 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
   const [searchPolicial, setSearchPolicial] = useState('');
   const [policialDestino, setPolicialDestino] = useState<Policial | null>(null);
   
-  // Seleção de materiais - usa índice do array para evitar duplicatas
-  const [materiaisSelecionados, setMateriaisSelecionados] = useState<number[]>([]);
+  // Seleção de materiais
+  const [materiaisSelecionados, setMateriaisSelecionados] = useState<string[]>([]);
   
   // Estados para confirmação com senha
   const [senhaPolicial, setSenhaPolicial] = useState('');
@@ -218,11 +218,11 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
     sincronizarEtapa();
   }, [etapaTotem, etapa]);
 
-  const toggleMaterial = (index: number) => {
+  const toggleMaterial = (materialId: string) => {
     setMateriaisSelecionados(prev =>
-      prev.includes(index)
-        ? prev.filter(i => i !== index)
-        : [...prev, index]
+      prev.includes(materialId)
+        ? prev.filter(id => id !== materialId)
+        : [...prev, materialId]
     );
   };
 
@@ -241,8 +241,8 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
         setEtapaTotem(primeiroAcesso ? 'primeiro_acesso' : 'senha');
       }
 
-      const materiaisParaTransferir = cautela.materiais.filter((_, index) =>
-        materiaisSelecionados.includes(index)
+      const materiaisParaTransferir = cautela.materiais.filter(m =>
+        materiaisSelecionados.includes(m.materialId)
       );
 
       const nomeGuerraDestino = policialDestino['NOME DE GUERRA1'] || policialDestino['NOME DE GUERRA'] || policialDestino.NOME;
@@ -255,6 +255,8 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
           policialNome: policialDestino.NOME,
           policialNomeGuerra: nomeGuerraDestino,
           policialMatricula: String(policialDestino['Matrícula'] || ''),
+          policialNumeral: policialDestino.NUMERAL,
+          postoGrad: policialDestino['Post/Grad'],
           materiais: materiaisParaTransferir.map(m => ({
             materialId: m.materialId,
             nome: m.nome,
@@ -262,10 +264,7 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
             ...(m.categoria && { categoria: m.categoria }),
             ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
             ...(m.carregadores !== undefined && { carregadores: m.carregadores })
-          })),
-          // Campos opcionais protegidos contra undefined
-          ...(policialDestino.NUMERAL !== undefined && { policialNumeral: policialDestino.NUMERAL }),
-          ...(policialDestino['Post/Grad'] && { postoGrad: policialDestino['Post/Grad'] })
+          }))
         },
         sessaoDigitacao: {
           etapa: isPrimeiroAcesso ? 'primeiro_acesso' : 'senha',
@@ -338,11 +337,11 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
       }
 
       // Processar transferência
-      const materiaisParaTransferir = cautela.materiais.filter((_, index) =>
-        materiaisSelecionados.includes(index)
+      const materiaisParaTransferir = cautela.materiais.filter(m =>
+        materiaisSelecionados.includes(m.materialId)
       );
-      const materiaisRestantes = cautela.materiais.filter((_, index) =>
-        !materiaisSelecionados.includes(index)
+      const materiaisRestantes = cautela.materiais.filter(m =>
+        !materiaisSelecionados.includes(m.materialId)
       );
 
       const agora = new Date();
@@ -356,6 +355,8 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
         policialNome: policialDestino.NOME,
         policialMatricula: String(policialDestino['Matrícula'] || ''),
         policialNomeGuerra: nomeGuerraDestino,
+        policialNumeral: policialDestino.NUMERAL,
+        postoGrad: policialDestino['Post/Grad'],
         armeiroId: cautela.armeiroId,
         materiais: materiaisParaTransferir.map(m => ({
           materialId: m.materialId,
@@ -371,14 +372,9 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
         transferidoDe: {
           policialId: policialOrigem.id,
           policialNome: policialOrigem.NOME,
-          cautelaId: cautela.id,
-          ...((policialOrigem['NOME DE GUERRA1'] || policialOrigem['NOME DE GUERRA']) && {
-            policialNomeGuerra: policialOrigem['NOME DE GUERRA1'] || policialOrigem['NOME DE GUERRA']
-          })
-        },
-        // Campos opcionais protegidos contra undefined
-        ...(policialDestino.NUMERAL !== undefined && { policialNumeral: policialDestino.NUMERAL }),
-        ...(policialDestino['Post/Grad'] && { postoGrad: policialDestino['Post/Grad'] })
+          policialNomeGuerra: policialOrigem['NOME DE GUERRA1'] || policialOrigem['NOME DE GUERRA'],
+          cautelaId: cautela.id
+        }
       });
 
       // Atualizar cautela original
@@ -592,20 +588,20 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
             <div className="space-y-2">
               <Label>Selecione os materiais a transferir:</Label>
               <div className="max-h-60 overflow-y-auto space-y-2">
-                {cautela.materiais.map((material, index) => (
+                {cautela.materiais.map((material) => (
                   <div
-                    key={`${material.materialId}-${index}`}
+                    key={material.materialId}
                     className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      materiaisSelecionados.includes(index)
+                      materiaisSelecionados.includes(material.materialId)
                         ? 'bg-primary/10 border-primary'
                         : 'hover:bg-accent'
                     }`}
-                    onClick={() => toggleMaterial(index)}
+                    onClick={() => toggleMaterial(material.materialId)}
                   >
                     <div className="flex items-center gap-3">
                       <Checkbox 
-                        checked={materiaisSelecionados.includes(index)}
-                        onCheckedChange={() => toggleMaterial(index)}
+                        checked={materiaisSelecionados.includes(material.materialId)}
+                        onCheckedChange={() => toggleMaterial(material.materialId)}
                       />
                       <div className="flex-1">
                         <div className="font-medium">{material.nome}</div>
@@ -640,7 +636,7 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
               <p className="text-sm font-medium">Transferir para {nomeGuerraDestino}:</p>
               <ul className="mt-2 space-y-1 text-sm">
                 {cautela.materiais
-                  .filter((_, index) => materiaisSelecionados.includes(index))
+                  .filter(m => materiaisSelecionados.includes(m.materialId))
                   .map((m, idx) => (
                     <li key={idx}>• {m.nome} {m.quantidade > 1 && `(${m.quantidade})`}</li>
                   ))

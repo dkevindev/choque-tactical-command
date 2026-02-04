@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FrotaPage from '@/components/FrotaPage';
 import DocumentosPage from './DocumentosPaga';
-import OrdensServicoPage from '@/components/frota/OrdensServicoPage';
+import OrdemServicoPage from '@/components/OrdemServicoPage';
 import GestaoAcesso from '@/components/GestaoAcesso';
 import ServicosPage from '@/components/frota/ServicosPage';
 import CadastroMateriais from '@/components/admin-belico/CadastroMateriais';
@@ -69,8 +69,8 @@ const AdminDashboard = () => {
         return <ReservaAdminPage />;
       case 'documentos':
         return <DocumentosContent locationState={location.state} />;
-      case 'ordens-servico':
-        return <OrdensServicoPage />;
+      case 'ordens-servico': // <--- Adicione este novo case
+        return <OrdemServicoPage />; // <--- Renderiza o novo componente
       case 'servicos':
         return <ServicosPage />;
       case 'projetos-sociais':

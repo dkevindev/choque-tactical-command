@@ -48,7 +48,7 @@ const PendenciasAnterioresSection = ({ livroAtualId, onRecebimentoRealizado, arm
   const [loading, setLoading] = useState(true);
   const [modalRecebimento, setModalRecebimento] = useState(false);
   const [cautelaSelecionada, setCautelaSelecionada] = useState<CautelaPendente | null>(null);
-  const [minimizado, setMinimizado] = useState(true);
+  const [minimizado, setMinimizado] = useState(false);
 
   useEffect(() => {
     carregarPendencias();

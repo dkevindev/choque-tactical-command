@@ -82,8 +82,6 @@ const OrdensServicoPage = () => {
   const fetchCotaMes = async () => {
     try {
       setLoadingCota(true);
-      
-      // Primeiro tenta buscar da coleção saldoOficina (específica por mês)
       const saldosSnap = await getDocs(
         query(
           collection(db, 'saldoOficina'),
@@ -103,23 +101,7 @@ const OrdensServicoPage = () => {
           valorRestante: saldoData.valorRestante || saldoData.valorInicial || 0
         });
       } else {
-        // Se não encontrou, busca da configuração de saldos (frota_leve)
-        const configSnap = await getDocs(collection(db, 'saldos_config'));
-        const frotaLeveConfig = configSnap.docs.find(doc => doc.data().tipo === 'frota_leve');
-        
-        if (frotaLeveConfig) {
-          const configData = frotaLeveConfig.data();
-          setCotaValor({
-            id: frotaLeveConfig.id,
-            mes: cotaMes + 1,
-            ano: cotaAno,
-            valorInicial: configData.saldoMensal || 0,
-            valorUtilizado: 0,
-            valorRestante: configData.saldoMensal || 0
-          });
-        } else {
-          setCotaValor(null);
-        }
+        setCotaValor(null);
       }
     } catch (error) {
       console.error('Erro ao buscar cota:', error);
@@ -180,13 +162,13 @@ const OrdensServicoPage = () => {
 
     if (filtros.numeroOS) {
       ordens = ordens.filter(os => 
-        (os.numeroOS || '').toLowerCase().includes(filtros.numeroOS.toLowerCase())
+        os.numeroOS.toLowerCase().includes(filtros.numeroOS.toLowerCase())
       );
     }
 
     if (filtros.placa) {
       ordens = ordens.filter(os => 
-        (os.placaViatura || '').toLowerCase().includes(filtros.placa.toLowerCase())
+        os.placaViatura.toLowerCase().includes(filtros.placa.toLowerCase())
       );
     }
 
@@ -200,13 +182,13 @@ const OrdensServicoPage = () => {
 
     if (filtros.tipoServico) {
       ordens = ordens.filter(os => 
-        (os.observacao || '').toLowerCase().includes(filtros.tipoServico.toLowerCase())
+        os.observacao.toLowerCase().includes(filtros.tipoServico.toLowerCase())
       );
     }
 
     if (filtros.oficina) {
       ordens = ordens.filter(os => 
-        (os.oficinaResponsavel || '').toLowerCase().includes(filtros.oficina.toLowerCase())
+        os.oficinaResponsavel.toLowerCase().includes(filtros.oficina.toLowerCase())
       );
     }
 
@@ -223,8 +205,8 @@ const OrdensServicoPage = () => {
     });
   };
 
-  const getTipoServico = (observacao: string | undefined) => {
-    const obs = (observacao || '').toLowerCase();
+  const getTipoServico = (observacao: string) => {
+    const obs = observacao.toLowerCase();
     if (obs.includes('óleo') || obs.includes('oleo')) return 'MANUTENÇÃO';
     if (obs.includes('pneu') || obs.includes('roda')) return 'PNEUS';
     if (obs.includes('farol') || obs.includes('luz')) return 'ELÉTRICA';
@@ -388,6 +370,46 @@ const OrdensServicoPage = () => {
             </div>
           </div>
 
+          {/* Resumo */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <FileText className="h-8 w-8 text-primary" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total de OS</p>
+                    <p className="text-2xl font-bold">{ordensFiltered.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="h-8 w-8 text-green-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Total</p>
+                    <p className="text-2xl font-bold">R$ {totalGasto.toLocaleString()}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-8 w-8 text-blue-500" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Médio</p>
+                    <p className="text-2xl font-bold">
+                      R$ {ordensFiltered.length > 0 ? (totalGasto / ordensFiltered.length).toLocaleString() : '0'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Tabela */}
           <div className="border rounded-lg overflow-hidden">
