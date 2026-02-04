@@ -356,8 +356,6 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
         policialNome: policialDestino.NOME,
         policialMatricula: String(policialDestino['Matrícula'] || ''),
         policialNomeGuerra: nomeGuerraDestino,
-        policialNumeral: policialDestino.NUMERAL,
-        postoGrad: policialDestino['Post/Grad'],
         armeiroId: cautela.armeiroId,
         materiais: materiaisParaTransferir.map(m => ({
           materialId: m.materialId,
@@ -377,7 +375,10 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
           ...((policialOrigem['NOME DE GUERRA1'] || policialOrigem['NOME DE GUERRA']) && {
             policialNomeGuerra: policialOrigem['NOME DE GUERRA1'] || policialOrigem['NOME DE GUERRA']
           })
-        }
+        },
+        // Campos opcionais protegidos contra undefined
+        ...(policialDestino.NUMERAL !== undefined && { policialNumeral: policialDestino.NUMERAL }),
+        ...(policialDestino['Post/Grad'] && { postoGrad: policialDestino['Post/Grad'] })
       });
 
       // Atualizar cautela original
