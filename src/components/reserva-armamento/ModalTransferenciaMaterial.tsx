@@ -255,8 +255,6 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
           policialNome: policialDestino.NOME,
           policialNomeGuerra: nomeGuerraDestino,
           policialMatricula: String(policialDestino['Matrícula'] || ''),
-          policialNumeral: policialDestino.NUMERAL,
-          postoGrad: policialDestino['Post/Grad'],
           materiais: materiaisParaTransferir.map(m => ({
             materialId: m.materialId,
             nome: m.nome,
@@ -264,7 +262,10 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
             ...(m.categoria && { categoria: m.categoria }),
             ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
             ...(m.carregadores !== undefined && { carregadores: m.carregadores })
-          }))
+          })),
+          // Campos opcionais protegidos contra undefined
+          ...(policialDestino.NUMERAL !== undefined && { policialNumeral: policialDestino.NUMERAL }),
+          ...(policialDestino['Post/Grad'] && { postoGrad: policialDestino['Post/Grad'] })
         },
         sessaoDigitacao: {
           etapa: isPrimeiroAcesso ? 'primeiro_acesso' : 'senha',
