@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, updateDoc, collection, getDocs, query, where, addDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, getDocs, query, where, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,9 +7,23 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Save, UserPlus, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Save, UserPlus, Trash2, CalendarOff, CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 import PolicialSearchCombobox from '@/components/guarda-quartel/PolicialSearchCombobox';
+
+interface DiaSemAula {
+  id: string;
+  projetoId: string;
+  data: Date;
+  motivo: string;
+  criadoEm: Date;
+}
 
 interface ConfiguracaoProjetoTabProps {
   projeto: any;
@@ -28,11 +42,18 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedPolicialId, setSelectedPolicialId] = useState('');
+  
+  // Dias sem aula
+  const [diasSemAula, setDiasSemAula] = useState<DiaSemAula[]>([]);
+  const [dialogDiaSemAulaOpen, setDialogDiaSemAulaOpen] = useState(false);
+  const [novaDataSemAula, setNovaDataSemAula] = useState<Date | undefined>(undefined);
+  const [novoMotivo, setNovoMotivo] = useState('Feriado Nacional');
 
   useEffect(() => {
     if (projeto) {
       carregarConfiguracaoProjeto();
       carregarInstrutores();
+      carregarDiasSemAula();
     }
   }, [projeto?.id]);
 
@@ -91,6 +112,67 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
       setInstrutores(instrutoresData);
     } catch (error) {
       console.error('Erro ao carregar instrutores:', error);
+    }
+  };
+
+  const carregarDiasSemAula = async () => {
+    try {
+      const q = query(
+        collection(db, 'projetos_dias_sem_aula'),
+        where('projetoId', '==', projeto.id)
+      );
+      const snapshot = await getDocs(q);
+      const dias = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          projetoId: data.projetoId,
+          data: data.data?.toDate ? data.data.toDate() : new Date(data.data),
+          motivo: data.motivo,
+          criadoEm: data.criadoEm?.toDate ? data.criadoEm.toDate() : new Date()
+        };
+      });
+      // Ordenar por data
+      dias.sort((a, b) => a.data.getTime() - b.data.getTime());
+      setDiasSemAula(dias);
+    } catch (error) {
+      console.error('Erro ao carregar dias sem aula:', error);
+    }
+  };
+
+  const adicionarDiaSemAula = async () => {
+    if (!novaDataSemAula) {
+      toast.error('Selecione uma data');
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'projetos_dias_sem_aula'), {
+        projetoId: projeto.id,
+        data: Timestamp.fromDate(novaDataSemAula),
+        motivo: novoMotivo,
+        criadoEm: Timestamp.now()
+      });
+      
+      toast.success('Dia sem aula adicionado!');
+      setDialogDiaSemAulaOpen(false);
+      setNovaDataSemAula(undefined);
+      setNovoMotivo('Feriado Nacional');
+      carregarDiasSemAula();
+    } catch (error) {
+      console.error('Erro ao adicionar dia sem aula:', error);
+      toast.error('Erro ao adicionar dia sem aula');
+    }
+  };
+
+  const removerDiaSemAula = async (diaId: string) => {
+    try {
+      await deleteDoc(doc(db, 'projetos_dias_sem_aula', diaId));
+      toast.success('Dia sem aula removido!');
+      carregarDiasSemAula();
+    } catch (error) {
+      console.error('Erro ao remover dia sem aula:', error);
+      toast.error('Erro ao remover');
     }
   };
 
@@ -300,6 +382,117 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
             <Save className="mr-2 h-4 w-4" />
             Salvar Configuração
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Dias Sem Aula */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarOff className="h-5 w-5" />
+            Dias Sem Aula
+          </CardTitle>
+          <CardDescription>
+            Feriados, recessos e dias sem aula não contam como falta
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {diasSemAula.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhum dia sem aula cadastrado
+              </p>
+            ) : (
+              diasSemAula.map((dia) => (
+                <div
+                  key={dia.id}
+                  className="flex items-center justify-between p-3 border rounded"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {format(dia.data, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{dia.motivo}</p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => removerDiaSemAula(dia.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+
+            <Dialog open={dialogDiaSemAulaOpen} onOpenChange={setDialogDiaSemAulaOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <CalendarOff className="mr-2 h-4 w-4" />
+                  Adicionar Dia Sem Aula
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Adicionar Dia Sem Aula</DialogTitle>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div>
+                    <Label>Data</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal mt-1",
+                            !novaDataSemAula && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {novaDataSemAula ? (
+                            format(novaDataSemAula, "dd/MM/yyyy")
+                          ) : (
+                            <span>Selecionar data</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={novaDataSemAula}
+                          onSelect={setNovaDataSemAula}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div>
+                    <Label>Motivo</Label>
+                    <Select value={novoMotivo} onValueChange={setNovoMotivo}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Feriado Nacional">Feriado Nacional</SelectItem>
+                        <SelectItem value="Feriado Estadual">Feriado Estadual</SelectItem>
+                        <SelectItem value="Feriado Municipal">Feriado Municipal</SelectItem>
+                        <SelectItem value="Recesso">Recesso</SelectItem>
+                        <SelectItem value="Reunião Pedagógica">Reunião Pedagógica</SelectItem>
+                        <SelectItem value="Evento Especial">Evento Especial</SelectItem>
+                        <SelectItem value="Outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button onClick={adicionarDiaSemAula} className="w-full">
+                    Adicionar
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardContent>
       </Card>
 

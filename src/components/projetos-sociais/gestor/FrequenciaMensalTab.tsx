@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { FileText, Calendar, Users, Clock, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface FrequenciaMensalTabProps {
@@ -29,6 +29,12 @@ interface Aluno {
   id: string;
   nomeGuerra: string;
   nomeCompleto: string;
+  horarioEspecial?: boolean;
+  diasEspeciais?: Array<{
+    diaSemana: string;
+    turmaId: string;
+    turno: string;
+  }>;
 }
 
 interface Aula {
@@ -154,6 +160,33 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
     return todosDias.filter(dia => diasNumericos.includes(getDay(dia)));
   };
 
+  const buscarDiasSemAula = async (ano: number, mes: number): Promise<Date[]> => {
+    try {
+      const q = query(
+        collection(db, 'projetos_dias_sem_aula'),
+        where('projetoId', '==', projeto.id)
+      );
+      const snapshot = await getDocs(q);
+      const inicio = startOfMonth(new Date(ano, mes - 1));
+      const fim = endOfMonth(new Date(ano, mes - 1));
+      
+      return snapshot.docs
+        .map(doc => {
+          const data = doc.data().data;
+          return data?.toDate ? data.toDate() : new Date(data);
+        })
+        .filter(data => data >= inicio && data <= fim);
+    } catch (error) {
+      console.error('Erro ao buscar dias sem aula:', error);
+      return [];
+    }
+  };
+
+  const getDiaSemana = (date: Date): string => {
+    const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+    return dias[getDay(date)];
+  };
+
   const buscarAlunosTurma = async (alunosIds: string[]): Promise<Aluno[]> => {
     if (!alunosIds || alunosIds.length === 0) return [];
     
@@ -165,11 +198,16 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
     const snapshot = await getDocs(q);
     return snapshot.docs
       .filter(doc => alunosIds.includes(doc.id))
-      .map(doc => ({
-        id: doc.id,
-        nomeGuerra: doc.data().nomeGuerra || doc.data().nomeCompleto,
-        nomeCompleto: doc.data().nomeCompleto
-      }));
+      .map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          nomeGuerra: data.nomeGuerra || data.nomeCompleto,
+          nomeCompleto: data.nomeCompleto,
+          horarioEspecial: data.horarioEspecial || false,
+          diasEspeciais: data.diasEspeciais || []
+        };
+      });
   };
 
   const buscarAulasMes = async (turmaId: string, turnoString: string, ano: number, mes: number): Promise<Aula[]> => {
@@ -315,10 +353,16 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       const mes = parseInt(mesSelecionado);
       
       // 1. Calcular dias de aula do mês
-      const diasAula = calcularDiasAula(ano, mes, turma.diasSemana);
+      let diasAula = calcularDiasAula(ano, mes, turma.diasSemana);
+      
+      // 1.1 Buscar e filtrar dias sem aula (feriados, etc.)
+      const diasSemAula = await buscarDiasSemAula(ano, mes);
+      diasAula = diasAula.filter(dia => 
+        !diasSemAula.some(dsa => isSameDay(dsa, dia))
+      );
       
       if (diasAula.length === 0) {
-        toast.error('Nenhum dia de aula encontrado para este mês');
+        toast.error('Nenhum dia de aula encontrado para este mês (considerando feriados)');
         return;
       }
       
@@ -352,20 +396,36 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       
       // 8. Montar presença dos alunos (apenas se usa frequência)
       // Lógica: todos os dias iniciam com "-", só fica vazio (para assinar) quando teve aula E estava presente
+      // Considera horário especial: se aluno tem diasEspeciais, verifica se deve estar neste dia/turma
       const alunosComPresenca = usaFrequencia ? alunos.map(aluno => {
         const presencas: Record<string, string> = {};
         
         diasAula.slice(0, 10).forEach((dia, idx) => {
           const dataStr = format(dia, 'dd/MM');
-          // Verificar se houve aula neste dia
-          const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
+          const diaSemana = getDiaSemana(dia);
           
-          if (aulaData && aulaData.alunosPresentes.includes(aluno.id)) {
-            // Teve aula E aluno estava presente → vazio (disponível para assinar)
-            presencas[`p${idx + 1}`] = '';
-          } else {
-            // Não teve aula OU aluno faltou → "-"
+          // Verificar se aluno deveria estar neste dia (horário especial)
+          let deveEstarNoDia = true;
+          if (aluno.horarioEspecial && aluno.diasEspeciais && aluno.diasEspeciais.length > 0) {
+            // Se tem horário especial configurado, verifica se está configurado para este dia e turma
+            const diaConfig = aluno.diasEspeciais.find(d => d.diaSemana === diaSemana);
+            deveEstarNoDia = diaConfig?.turmaId === turma.id;
+          }
+          
+          if (!deveEstarNoDia) {
+            // Não é dia deste aluno nesta turma
             presencas[`p${idx + 1}`] = '-';
+          } else {
+            // Verificar se houve aula neste dia
+            const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
+            
+            if (aulaData && aulaData.alunosPresentes.includes(aluno.id)) {
+              // Teve aula E aluno estava presente → vazio (disponível para assinar)
+              presencas[`p${idx + 1}`] = '';
+            } else {
+              // Não teve aula OU aluno faltou → "-"
+              presencas[`p${idx + 1}`] = '-';
+            }
           }
         });
         
