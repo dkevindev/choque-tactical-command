@@ -557,52 +557,79 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
                     ...materiaisAdicionados.map(m => m.materialId)
                   ]}
                   onSelecionarMaterial={(material) => {
-                    setMaterialSelecionado(material.id);
-                    // Verificar se é munição para ajustar quantidade padrão
-                    const isMunicao = material.categoria?.toLowerCase().includes('munição') || 
-                                     material.categoria?.toLowerCase().includes('municao');
+                    const categoriaNorm = (material.categoria || '').toLowerCase();
+                    const isMunicao = categoriaNorm.includes('munição') || categoriaNorm.includes('municao');
+                    
                     if (isMunicao) {
+                      // Munição: selecionar para ajuste de quantidade
+                      setMaterialSelecionado(material.id);
                       setQuantidadeMaterial(30);
                     } else {
-                      setQuantidadeMaterial(1);
+                      // Outros itens (armas, HT, coletes, EPI, acessórios): adicionar direto com quantidade 1
+                      const novoMaterial: MaterialSelecionado = {
+                        materialId: material.id,
+                        nome: material.nome,
+                        quantidade: 1,
+                        categoria: material.categoria,
+                        numeroSerie: material.numeroSerie
+                      };
+                      
+                      setMateriaisAdicionados(prev => [...prev, novoMaterial]);
+                      
+                      // Remover da lista de disponíveis
+                      setMateriaisDisponiveis(prev => prev.filter(m => m.id !== material.id));
+                      
+                      toast({
+                        title: "Material Adicionado",
+                        description: `${material.nome} foi adicionado à lista.`
+                      });
                     }
                   }}
                   loading={loadingMateriais}
                 />
 
-                {materialSelecionado && (
-                  <div className="p-3 bg-primary/5 rounded-lg border space-y-2">
-                    <div className="font-medium text-sm">
-                      {materiaisDisponiveis.find(m => m.id === materialSelecionado)?.nome}
+                {/* Controles de quantidade apenas para munição */}
+                {materialSelecionado && (() => {
+                  const material = materiaisDisponiveis.find(m => m.id === materialSelecionado);
+                  const categoriaNorm = (material?.categoria || '').toLowerCase();
+                  const isMunicao = categoriaNorm.includes('munição') || categoriaNorm.includes('municao');
+                  
+                  if (!isMunicao) return null;
+                  
+                  return (
+                    <div className="p-3 bg-primary/5 rounded-lg border space-y-2">
+                      <div className="font-medium text-sm">
+                        {material?.nome}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Label className="text-sm">Qtd:</Label>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setQuantidadeMaterial(Math.max(1, quantidadeMaterial - 1))}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          value={quantidadeMaterial}
+                          onChange={(e) => setQuantidadeMaterial(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-16 text-center"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setQuantidadeMaterial(quantidadeMaterial + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={handleAdicionarALista}>
+                          Adicionar
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Label className="text-sm">Qtd:</Label>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setQuantidadeMaterial(Math.max(1, quantidadeMaterial - 1))}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={quantidadeMaterial}
-                        onChange={(e) => setQuantidadeMaterial(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-16 text-center"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setQuantidadeMaterial(quantidadeMaterial + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                      <Button onClick={handleAdicionarALista}>
-                        Adicionar
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
