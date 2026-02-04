@@ -162,13 +162,13 @@ const OrdensServicoPage = () => {
 
     if (filtros.numeroOS) {
       ordens = ordens.filter(os => 
-        os.numeroOS.toLowerCase().includes(filtros.numeroOS.toLowerCase())
+        (os.numeroOS || '').toLowerCase().includes(filtros.numeroOS.toLowerCase())
       );
     }
 
     if (filtros.placa) {
       ordens = ordens.filter(os => 
-        os.placaViatura.toLowerCase().includes(filtros.placa.toLowerCase())
+        (os.placaViatura || '').toLowerCase().includes(filtros.placa.toLowerCase())
       );
     }
 
