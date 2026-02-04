@@ -1546,15 +1546,18 @@ const ArmeiroInterface = () => {
                     const policialDoc = await getDoc(doc(db, 'policiais', cautelaData.policialId));
                     if (policialDoc.exists()) {
                       const policialData = policialDoc.data();
-                      setTransferenciaPolicialOrigem({
+                      const policialOrigem: any = {
                         id: policialDoc.id,
                         NOME: policialData.NOME,
                         'Matrícula': policialData['Matrícula'],
                         'Post/Grad': policialData['Post/Grad'],
-                        'NOME DE GUERRA': policialData['NOME DE GUERRA'],
-                        'NOME DE GUERRA1': policialData['NOME DE GUERRA1'],
-                        NUMERAL: policialData.NUMERAL
-                      });
+                        NUMERAL: policialData.NUMERAL,
+                        senha: policialData.senha || '',
+                        SITUAÇÃO: policialData['SITUAÇÃO'] || 'ATIVO'
+                      };
+                      if (policialData['NOME DE GUERRA']) policialOrigem['NOME DE GUERRA'] = policialData['NOME DE GUERRA'];
+                      if (policialData['NOME DE GUERRA1']) policialOrigem['NOME DE GUERRA1'] = policialData['NOME DE GUERRA1'];
+                      setTransferenciaPolicialOrigem(policialOrigem);
                     }
                     
                     setModalTransferencia(true);
