@@ -25,6 +25,7 @@ import HistoricoLivrosSection from './HistoricoLivrosSection';
 import MaterialNaRuaSection from './MaterialNaRuaSection';
 import PendenciasAnterioresSection from './PendenciasAnterioresSection';
 import LivroCautelaDia from './LivroCautelaDia';
+import ModalComplementarCautela from './ModalComplementarCautela';
 import ConsultaMaterialPolicial from '@/components/consultas/ConsultaMaterialPolicial';
 
 interface Policial {
@@ -145,6 +146,13 @@ const ArmeiroInterface = () => {
     dataHora: Date;
     tipo?: string;
   }>>([]);
+  
+  // Modal de complementar cautela
+  const [modalComplementar, setModalComplementar] = useState(false);
+  const [complementarCautelaId, setComplementarCautelaId] = useState('');
+  const [complementarPolicialId, setComplementarPolicialId] = useState('');
+  const [complementarPolicialNome, setComplementarPolicialNome] = useState('');
+  const [complementarMateriais, setComplementarMateriais] = useState<any[]>([]);
   
   const { toast } = useToast();
 
@@ -1121,6 +1129,7 @@ const ArmeiroInterface = () => {
           {/* Pendências de Turnos Anteriores */}
           <PendenciasAnterioresSection 
             livroAtualId={livroAtivo.id}
+            armeiroLogadoId={policialLogado?.id}
             onRecebimentoRealizado={() => {
               if (livroAtivo?.id) {
                 carregarMovimentacoesDoDia(livroAtivo.id);
@@ -1427,6 +1436,19 @@ const ArmeiroInterface = () => {
                 movimentacoes={movimentacoesDoDia}
                 dataAbertura={livroAtivo.dataAbertura}
                 armeiroNome={livroAtivo.armeiroNome}
+                onComplementarCautela={(cautelaId, policialId, policialNome, materiais) => {
+                  setComplementarCautelaId(cautelaId);
+                  setComplementarPolicialId(policialId);
+                  setComplementarPolicialNome(policialNome);
+                  setComplementarMateriais(materiais.map(m => ({
+                    materialId: m.materialId || m.id,
+                    nome: m.nome,
+                    quantidade: m.quantidade,
+                    categoria: m.categoria,
+                    numeroSerie: m.numeroSerie
+                  })));
+                  setModalComplementar(true);
+                }}
               />
             </TabsContent>
 
@@ -1492,6 +1514,22 @@ const ArmeiroInterface = () => {
           onCancelar={handleCancelarCautela}
         />
       )}
+
+      {/* Modal de Complementar Cautela */}
+      <ModalComplementarCautela
+        open={modalComplementar}
+        onClose={() => setModalComplementar(false)}
+        cautelaId={complementarCautelaId}
+        policialId={complementarPolicialId}
+        policialNome={complementarPolicialNome}
+        materiaisAtuais={complementarMateriais}
+        onComplementado={() => {
+          if (livroAtivo?.id) {
+            carregarMovimentacoesDoDia(livroAtivo.id);
+          }
+          carregarMateriaisDisponiveis();
+        }}
+      />
     </div>
   );
 };
