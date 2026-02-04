@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, Package, Clock, CheckCircle } from "lucide-react";
+import { AlertTriangle, Package, Clock, CheckCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import ModalRecebimentoPendente from './ModalRecebimentoPendente';
@@ -47,6 +48,7 @@ const PendenciasAnterioresSection = ({ livroAtualId, onRecebimentoRealizado, arm
   const [loading, setLoading] = useState(true);
   const [modalRecebimento, setModalRecebimento] = useState(false);
   const [cautelaSelecionada, setCautelaSelecionada] = useState<CautelaPendente | null>(null);
+  const [minimizado, setMinimizado] = useState(false);
 
   useEffect(() => {
     carregarPendencias();
@@ -133,85 +135,97 @@ const PendenciasAnterioresSection = ({ livroAtualId, onRecebimentoRealizado, arm
   return (
     <>
       <Card className="border-yellow-500 bg-yellow-950/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-yellow-500">
-            <AlertTriangle className="h-5 w-5" />
-            Material Pendente de Devolução (Turno Anterior)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted">
-                  <TableHead className="w-[50px] text-center">Nº</TableHead>
-                  <TableHead>Policial</TableHead>
-                  <TableHead>Materiais</TableHead>
-                  <TableHead className="text-center">Saída</TableHead>
-                  <TableHead className="text-center">Turno</TableHead>
-                  <TableHead className="w-[120px] text-center">Ação</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pendencias.map((pendencia) => (
-                  <TableRow key={pendencia.id} className="bg-card hover:bg-accent/30">
-                    <TableCell className="text-center font-mono font-bold">
-                      {String(pendencia.sequencial).padStart(3, '0')}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">
-                        {pendencia.postoGrad && `${pendencia.postoGrad} `}
-                        {pendencia.policialNomeGuerra || pendencia.policialNome}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Mat: {pendencia.policialMatricula}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {pendencia.materiais.map((mat, idx) => (
-                          <div key={idx} className="text-sm flex items-center gap-1">
-                            <Package className="h-3 w-3 text-muted-foreground" />
-                            <span className="font-medium">{mat.nome}</span>
-                            <span className="text-muted-foreground">
-                              (Qtd: {mat.quantidade})
-                            </span>
+        <Collapsible open={!minimizado} onOpenChange={(open) => setMinimizado(!open)}>
+          <CardHeader className="pb-3">
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between cursor-pointer group">
+                <CardTitle className="flex items-center gap-2 text-yellow-500">
+                  <AlertTriangle className="h-5 w-5" />
+                  Material Pendente de Devolução (Turno Anterior)
+                  <Badge variant="secondary" className="ml-2">{pendencias.length}</Badge>
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="group-hover:bg-yellow-500/20">
+                  {minimizado ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                </Button>
+              </div>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted">
+                      <TableHead className="w-[50px] text-center">Nº</TableHead>
+                      <TableHead>Policial</TableHead>
+                      <TableHead>Materiais</TableHead>
+                      <TableHead className="text-center">Saída</TableHead>
+                      <TableHead className="text-center">Turno</TableHead>
+                      <TableHead className="w-[120px] text-center">Ação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendencias.map((pendencia) => (
+                      <TableRow key={pendencia.id} className="bg-card hover:bg-accent/30">
+                        <TableCell className="text-center font-mono font-bold">
+                          {String(pendencia.sequencial).padStart(3, '0')}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">
+                            {pendencia.postoGrad && `${pendencia.postoGrad} `}
+                            {pendencia.policialNomeGuerra || pendencia.policialNome}
                           </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="text-sm">
-                        <div className="font-medium">{pendencia.horaCautela}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatarData(pendencia.dataCautela)}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {pendencia.livroInfo && (
-                        <div className="text-xs text-muted-foreground">
-                          <div>Armeiro: {pendencia.livroInfo.armeiroNome}</div>
-                          <div>{formatarData(pendencia.livroInfo.dataAbertura)}</div>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        size="sm"
-                        onClick={() => handleReceber(pendencia)}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Receber
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
+                          <div className="text-xs text-muted-foreground">
+                            Mat: {pendencia.policialMatricula}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {pendencia.materiais.map((mat, idx) => (
+                              <div key={idx} className="text-sm flex items-center gap-1">
+                                <Package className="h-3 w-3 text-muted-foreground" />
+                                <span className="font-medium">{mat.nome}</span>
+                                <span className="text-muted-foreground">
+                                  (Qtd: {mat.quantidade})
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="text-sm">
+                            <div className="font-medium">{pendencia.horaCautela}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatarData(pendencia.dataCautela)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {pendencia.livroInfo && (
+                            <div className="text-xs text-muted-foreground">
+                              <div>Armeiro: {pendencia.livroInfo.armeiroNome}</div>
+                              <div>{formatarData(pendencia.livroInfo.dataAbertura)}</div>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            size="sm"
+                            onClick={() => handleReceber(pendencia)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Receber
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
 
       <ModalRecebimentoPendente

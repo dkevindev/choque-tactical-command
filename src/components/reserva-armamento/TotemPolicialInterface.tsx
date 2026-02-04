@@ -72,7 +72,8 @@ const TotemPolicialInterface = () => {
   useEffect(() => {
     console.log('[Totem] Iniciando listener realtime para cautelas aguardando...');
     
-    const unsubscribe = onSnapshot(
+    // Listener para cautelas novas aguardando confirmação
+    const unsubscribeNova = onSnapshot(
       query(
         collection(db, 'cautelas_provisorias'),
         where('status', '==', 'aguardando_confirmacao')
@@ -126,9 +127,56 @@ const TotemPolicialInterface = () => {
       }
     );
 
+    // Listener para complemento de cautelas (adicionar materiais a cautela existente)
+    const unsubscribeComplemento = onSnapshot(
+      query(
+        collection(db, 'cautelas_provisorias'),
+        where('statusComplemento', '==', 'aguardando_confirmacao')
+      ),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docSnap = snapshot.docs[0];
+          const data = docSnap.data();
+          
+          console.log('[Totem] Complemento de cautela detectado:', docSnap.id);
+          
+          // Usar materiais do complemento para exibição
+          const materiaisComplemento = data.materiaisComplemento || [];
+          
+          setCautelaAtual({
+            id: docSnap.id,
+            policialId: data.policialId,
+            policialNome: data.policialNome,
+            policialNomeGuerra: data.policialNomeGuerra,
+            policialMatricula: data.policialMatricula,
+            policialNumeral: data.policialNumeral,
+            postoGrad: data.postoGrad,
+            materiais: materiaisComplemento, // Mostrar apenas materiais a adicionar
+            dataCautela: data.dataCautela?.toDate?.() || new Date(),
+            horaCautela: data.horaCautela,
+            armeiroId: data.armeiroId,
+            livroId: data.livroId
+          });
+          
+          // Atualizar sessão de digitação se existir
+          if (data.sessaoDigitacao) {
+            setSessaoDigitacao(data.sessaoDigitacao as SessaoDigitacao);
+          }
+          
+          cautelaAnteriorRef.current = docSnap.id;
+          setMensagemSucesso("");
+        }
+        // Não limpar cautelaAtual aqui - deixar o listener principal gerenciar
+      },
+      (error) => {
+        console.error('[Totem] Erro no listener de complemento:', error);
+      }
+    );
+
     return () => {
-      console.log('[Totem] Desconectando listener realtime');
-      unsubscribe();
+      console.log('[Totem] Desconectando listeners realtime');
+      unsubscribeNova();
+      unsubscribeComplemento();
     };
   }, []);
 
@@ -247,15 +295,15 @@ const TotemPolicialInterface = () => {
                           </p>
                           <div className="flex flex-wrap gap-1.5 mt-1">
                             {material.numeroSerie && (
-                              <Badge variant="outline" className={`border-white/70 text-white ${tamanhoFonteBadge} px-1.5 py-0.5`}>
+                              <Badge variant="outline" className={`border-muted-foreground text-foreground ${tamanhoFonteBadge} px-1.5 py-0.5`}>
                                 Série: {material.numeroSerie}
                               </Badge>
                             )}
-                            <Badge variant="outline" className={`border-amber-400 text-amber-400 font-bold ${tamanhoFonteBadge} px-2 py-0.5`}>
+                            <Badge variant="secondary" className={`font-bold ${tamanhoFonteBadge} px-2 py-0.5`}>
                               Qtd: {material.quantidade}
                             </Badge>
                             {material.carregadores && material.carregadores > 0 && (
-                              <Badge variant="default" className={`bg-blue-600 text-white ${tamanhoFonteBadge} px-1.5 py-0.5`}>
+                              <Badge variant="default" className={`${tamanhoFonteBadge} px-1.5 py-0.5`}>
                                 📦 {material.carregadores}
                               </Badge>
                             )}

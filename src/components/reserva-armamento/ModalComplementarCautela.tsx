@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, CheckCircle, Package, Plus, Minus, KeyRound } from "lucide-react";
-import { doc, getDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { Loader2, CheckCircle, Package, Plus, Minus, KeyRound, RotateCcw, X } from "lucide-react";
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, onSnapshot, deleteField } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
 import SeletorMateriaisModal from './SeletorMateriaisModal';
+import { buscarPolicialPorId } from '@/lib/policialUtils';
 
 interface Material {
   id: string;
@@ -38,6 +39,8 @@ interface ModalComplementarCautelaProps {
   onComplementado: () => void;
 }
 
+type Etapa = 'selecao' | 'aguardando' | 'confirmado';
+
 const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
   open,
   onClose,
@@ -47,7 +50,7 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
   materiaisAtuais,
   onComplementado
 }) => {
-  const [etapa, setEtapa] = useState<'selecao' | 'confirmacao'>('selecao');
+  const [etapa, setEtapa] = useState<Etapa>('selecao');
   const [loading, setLoading] = useState(false);
   const [loadingMateriais, setLoadingMateriais] = useState(false);
   
@@ -56,20 +59,127 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
   const [quantidadeMaterial, setQuantidadeMaterial] = useState(1);
   const [materiaisAdicionados, setMateriaisAdicionados] = useState<MaterialSelecionado[]>([]);
   
+  // Estados para integração com Totem
   const [senhaPolicial, setSenhaPolicial] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
   const [erroSenha, setErroSenha] = useState('');
+  const [isPrimeiroAcesso, setIsPrimeiroAcesso] = useState(false);
+  const [etapaTotem, setEtapaTotem] = useState<'senha' | 'primeiro_acesso' | 'resetar_senha'>('senha');
+  const [senhaArmeiro, setSenhaArmeiro] = useState('');
+  const [armeiroId, setArmeiroId] = useState<string | null>(null);
+  
+  const inputSenhaRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       carregarMateriaisDisponiveis();
+      carregarArmeiroId();
       setEtapa('selecao');
       setMaterialSelecionado('');
       setQuantidadeMaterial(1);
       setMateriaisAdicionados([]);
       setSenhaPolicial('');
+      setConfirmarSenha('');
       setErroSenha('');
+      setIsPrimeiroAcesso(false);
+      setEtapaTotem('senha');
+      setSenhaArmeiro('');
     }
   }, [open]);
+
+  const carregarArmeiroId = async () => {
+    try {
+      // Buscar o livro aberto atual para obter o armeiroId
+      const livrosSnap = await getDocs(
+        query(collection(db, 'livros_reserva_armamento'), where('status', '==', 'aberto'))
+      );
+      if (!livrosSnap.empty) {
+        const livroData = livrosSnap.docs[0].data();
+        setArmeiroId(livroData.armeiroId);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar armeiroId:', error);
+    }
+  };
+
+  // Listener para detectar quando o complemento foi confirmado
+  useEffect(() => {
+    if (etapa !== 'aguardando' || !cautelaId) return;
+
+    const unsubscribe = onSnapshot(
+      doc(db, 'cautelas_provisorias', cautelaId),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          // Se statusComplemento foi removido ou é 'confirmado', significa que foi processado
+          if (!data.statusComplemento || data.statusComplemento === 'confirmado') {
+            setEtapa('confirmado');
+            setTimeout(() => {
+              onComplementado();
+              onClose();
+            }, 1500);
+          }
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [etapa, cautelaId]);
+
+  // Sincronizar digitação de senha com Firebase (para o Totem)
+  useEffect(() => {
+    if (etapa !== 'aguardando') return;
+
+    const sincronizar = async () => {
+      try {
+        await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+          'sessaoDigitacao.senhaLength': senhaPolicial.length,
+          'sessaoDigitacao.confirmarSenhaLength': confirmarSenha.length,
+          'sessaoDigitacao.timestamp': Date.now()
+        });
+      } catch (error) {
+        console.error('Erro ao sincronizar digitação:', error);
+      }
+    };
+
+    sincronizar();
+  }, [senhaPolicial, confirmarSenha, etapa]);
+
+  // Sincronizar erro com Firebase
+  useEffect(() => {
+    if (etapa !== 'aguardando') return;
+
+    const sincronizarErro = async () => {
+      try {
+        await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+          'sessaoDigitacao.erro': erroSenha || null,
+          'sessaoDigitacao.timestamp': Date.now()
+        });
+      } catch (error) {
+        console.error('Erro ao sincronizar erro:', error);
+      }
+    };
+
+    sincronizarErro();
+  }, [erroSenha, etapa]);
+
+  // Sincronizar etapa com Firebase
+  useEffect(() => {
+    if (etapa !== 'aguardando') return;
+
+    const sincronizarEtapa = async () => {
+      try {
+        await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+          'sessaoDigitacao.etapa': etapaTotem,
+          'sessaoDigitacao.timestamp': Date.now()
+        });
+      } catch (error) {
+        console.error('Erro ao sincronizar etapa:', error);
+      }
+    };
+
+    sincronizarEtapa();
+  }, [etapaTotem, etapa]);
 
   const carregarMateriaisDisponiveis = async () => {
     try {
@@ -144,9 +254,59 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
     }
   };
 
+  const handleIniciarConfirmacao = async () => {
+    try {
+      setLoading(true);
+
+      // Verificar se é primeiro acesso do policial
+      const policial = await buscarPolicialPorId(policialId);
+      if (policial) {
+        const senhaPol = policial.senha;
+        const primeiroAcesso = policial.primeiroAcesso === true || !senhaPol || senhaPol === '';
+        setIsPrimeiroAcesso(primeiroAcesso);
+        setEtapaTotem(primeiroAcesso ? 'primeiro_acesso' : 'senha');
+      }
+
+      // Atualizar cautela com status de complemento aguardando
+      await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+        statusComplemento: 'aguardando_confirmacao',
+        materiaisComplemento: materiaisAdicionados.map(m => ({
+          materialId: m.materialId,
+          nome: m.nome,
+          quantidade: m.quantidade,
+          categoria: m.categoria,
+          ...(m.numeroSerie && { numeroSerie: m.numeroSerie })
+        })),
+        sessaoDigitacao: {
+          etapa: isPrimeiroAcesso ? 'primeiro_acesso' : 'senha',
+          senhaLength: 0,
+          confirmarSenhaLength: 0,
+          erro: null,
+          timestamp: Date.now()
+        }
+      });
+
+      setEtapa('aguardando');
+      
+      // Focar no input de senha
+      setTimeout(() => {
+        inputSenhaRef.current?.focus();
+      }, 100);
+    } catch (error) {
+      console.error('Erro ao iniciar confirmação:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao iniciar confirmação. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleConfirmarComSenha = async () => {
     if (!senhaPolicial.trim()) {
-      setErroSenha('Digite a senha do policial');
+      setErroSenha('Digite a senha');
       return;
     }
 
@@ -154,23 +314,51 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
       setLoading(true);
       setErroSenha('');
 
-      // Validar senha do policial
-      const policialDoc = await getDoc(doc(db, 'policiais', policialId));
-      if (!policialDoc.exists()) {
+      // Buscar policial com fallback
+      const policial = await buscarPolicialPorId(policialId);
+      
+      if (!policial) {
         setErroSenha('Policial não encontrado');
         setLoading(false);
         return;
       }
 
-      const policialData = policialDoc.data();
-      if (policialData.senha !== senhaPolicial) {
-        setErroSenha('Senha incorreta');
-        setSenhaPolicial('');
-        setLoading(false);
-        return;
+      // Verificar primeiro acesso
+      const senhaPol = policial.senha;
+      const primeiroAcesso = policial.primeiroAcesso === true || !senhaPol || senhaPol === '';
+
+      if (primeiroAcesso) {
+        // Primeiro acesso: definir nova senha
+        if (confirmarSenha !== senhaPolicial) {
+          setErroSenha('Senhas não conferem');
+          setSenhaPolicial('');
+          setConfirmarSenha('');
+          setLoading(false);
+          return;
+        }
+
+        // Salvar nova senha
+        const policialDocRef = doc(db, 'policiais', policial.id);
+        await updateDoc(policialDocRef, {
+          senha: senhaPolicial,
+          primeiroAcesso: false
+        });
+      } else {
+        // Validar senha normal
+        if (senhaPol !== senhaPolicial) {
+          setErroSenha('Senha incorreta');
+          setSenhaPolicial('');
+          setLoading(false);
+          return;
+        }
       }
 
-      // Atualizar cautela no Firebase
+      // Atualizar sessão para confirmado
+      await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+        'sessaoDigitacao.etapa': 'confirmado'
+      });
+
+      // Atualizar cautela no Firebase com os novos materiais
       const novosMateriais = [...materiaisAtuais, ...materiaisAdicionados];
       
       await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
@@ -180,7 +368,10 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
           quantidade: m.quantidade,
           categoria: m.categoria,
           ...(m.numeroSerie && { numeroSerie: m.numeroSerie })
-        }))
+        })),
+        statusComplemento: deleteField(),
+        materiaisComplemento: deleteField(),
+        sessaoDigitacao: deleteField()
       });
 
       // Marcar novos materiais como indisponíveis
@@ -214,8 +405,12 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
         description: `${materiaisAdicionados.length} material(is) adicionado(s) à cautela.`
       });
 
-      onComplementado();
-      onClose();
+      setEtapa('confirmado');
+      
+      setTimeout(() => {
+        onComplementado();
+        onClose();
+      }, 1500);
     } catch (error) {
       console.error('Erro ao complementar cautela:', error);
       toast({
@@ -228,8 +423,73 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
     }
   };
 
+  const handleResetarSenha = async () => {
+    if (!senhaArmeiro.trim()) {
+      setErroSenha('Digite a senha do armeiro');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Verificar senha do armeiro
+      if (armeiroId) {
+        const armeiroDoc = await getDoc(doc(db, 'policiais', armeiroId));
+        if (armeiroDoc.exists()) {
+          const armeiroData = armeiroDoc.data();
+          if (armeiroData.senha !== senhaArmeiro) {
+            setErroSenha('Senha do armeiro incorreta');
+            setSenhaArmeiro('');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      // Resetar senha do policial
+      const policial = await buscarPolicialPorId(policialId);
+      if (policial) {
+        await updateDoc(doc(db, 'policiais', policial.id), {
+          senha: '',
+          primeiroAcesso: true
+        });
+
+        setIsPrimeiroAcesso(true);
+        setEtapaTotem('primeiro_acesso');
+        setSenhaArmeiro('');
+        setSenhaPolicial('');
+        setConfirmarSenha('');
+        setErroSenha('');
+
+        toast({
+          title: "Senha Resetada",
+          description: "O policial deve definir uma nova senha."
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao resetar senha:', error);
+      setErroSenha('Erro ao resetar senha');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelar = async () => {
+    try {
+      // Limpar status de complemento no Firebase
+      await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+        statusComplemento: deleteField(),
+        materiaisComplemento: deleteField(),
+        sessaoDigitacao: deleteField()
+      });
+    } catch (error) {
+      console.error('Erro ao cancelar:', error);
+    }
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleCancelar}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -349,19 +609,20 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
             <DialogFooter className="pt-4">
               <Button variant="outline" onClick={onClose}>Cancelar</Button>
               <Button 
-                onClick={() => setEtapa('confirmacao')} 
-                disabled={materiaisAdicionados.length === 0}
+                onClick={handleIniciarConfirmacao} 
+                disabled={materiaisAdicionados.length === 0 || loading}
               >
+                {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Continuar ({materiaisAdicionados.length})
               </Button>
             </DialogFooter>
           </div>
         )}
 
-        {etapa === 'confirmacao' && (
+        {etapa === 'aguardando' && (
           <div className="space-y-4">
             <div className="p-3 bg-primary/10 rounded-lg">
-              <p className="text-sm font-medium">Confirmar adição de:</p>
+              <p className="text-sm font-medium">Adicionar à cautela de {policialNome}:</p>
               <ul className="mt-2 space-y-1 text-sm">
                 {materiaisAdicionados.map((m, idx) => (
                   <li key={idx}>• {m.nome} {m.quantidade > 1 && `(${m.quantidade})`}</li>
@@ -369,30 +630,143 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
               </ul>
             </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <KeyRound className="h-4 w-4" />
-                Senha do Policial:
-              </Label>
-              <Input
-                type="password"
-                value={senhaPolicial}
-                onChange={(e) => setSenhaPolicial(e.target.value)}
-                placeholder="Digite a senha..."
-                onKeyDown={(e) => e.key === 'Enter' && handleConfirmarComSenha()}
-              />
-              {erroSenha && (
-                <p className="text-sm text-destructive">{erroSenha}</p>
-              )}
-            </div>
+            {/* Etapa: Senha Normal ou Primeiro Acesso */}
+            {(etapaTotem === 'senha' || etapaTotem === 'primeiro_acesso') && (
+              <div className="space-y-3">
+                {isPrimeiroAcesso && (
+                  <div className="p-2 bg-amber-500/20 rounded text-sm text-center text-amber-500 font-medium">
+                    🔑 PRIMEIRO ACESSO - Definir nova senha
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4" />
+                    {isPrimeiroAcesso ? 'Nova Senha:' : 'Senha do Policial:'}
+                  </Label>
+                  <Input
+                    ref={inputSenhaRef}
+                    type="password"
+                    value={senhaPolicial}
+                    onChange={(e) => setSenhaPolicial(e.target.value)}
+                    placeholder="Digite a senha..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (isPrimeiroAcesso) {
+                          // Focar no campo de confirmação
+                          const confirmarInput = document.getElementById('confirmar-senha');
+                          confirmarInput?.focus();
+                        } else {
+                          handleConfirmarComSenha();
+                        }
+                      }
+                    }}
+                  />
+                </div>
+
+                {isPrimeiroAcesso && (
+                  <div className="space-y-2">
+                    <Label>Confirmar Senha:</Label>
+                    <Input
+                      id="confirmar-senha"
+                      type="password"
+                      value={confirmarSenha}
+                      onChange={(e) => setConfirmarSenha(e.target.value)}
+                      placeholder="Confirme a senha..."
+                      onKeyDown={(e) => e.key === 'Enter' && handleConfirmarComSenha()}
+                    />
+                  </div>
+                )}
+
+                {erroSenha && (
+                  <p className="text-sm text-destructive font-bold">{erroSenha}</p>
+                )}
+
+                {!isPrimeiroAcesso && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() => setEtapaTotem('resetar_senha')}
+                    className="text-amber-500"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Resetar Senha
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Etapa: Resetar Senha */}
+            {etapaTotem === 'resetar_senha' && (
+              <div className="space-y-3">
+                <div className="p-2 bg-amber-500/20 rounded text-sm text-center text-amber-500 font-medium">
+                  🔑 RESETAR SENHA DO POLICIAL
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4" />
+                    Senha do Armeiro:
+                  </Label>
+                  <Input
+                    type="password"
+                    value={senhaArmeiro}
+                    onChange={(e) => setSenhaArmeiro(e.target.value)}
+                    placeholder="Digite a senha do armeiro..."
+                    onKeyDown={(e) => e.key === 'Enter' && handleResetarSenha()}
+                  />
+                </div>
+
+                {erroSenha && (
+                  <p className="text-sm text-destructive font-bold">{erroSenha}</p>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEtapaTotem('senha');
+                      setSenhaArmeiro('');
+                      setErroSenha('');
+                    }}
+                  >
+                    Voltar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleResetarSenha}
+                    disabled={loading}
+                  >
+                    {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                    Confirmar Reset
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <DialogFooter className="pt-4">
-              <Button variant="outline" onClick={() => setEtapa('selecao')}>Voltar</Button>
-              <Button onClick={handleConfirmarComSenha} disabled={loading}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                Confirmar
+              <Button variant="outline" onClick={handleCancelar}>
+                <X className="h-4 w-4 mr-2" />
+                Cancelar
               </Button>
+              {(etapaTotem === 'senha' || etapaTotem === 'primeiro_acesso') && (
+                <Button onClick={handleConfirmarComSenha} disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                  Confirmar
+                </Button>
+              )}
             </DialogFooter>
+          </div>
+        )}
+
+        {etapa === 'confirmado' && (
+          <div className="py-8 text-center space-y-4">
+            <CheckCircle className="h-16 w-16 text-green-500 mx-auto animate-pulse" />
+            <p className="text-xl font-bold text-green-500">COMPLEMENTO CONFIRMADO!</p>
+            <p className="text-sm text-muted-foreground">
+              {materiaisAdicionados.length} material(is) adicionado(s).
+            </p>
           </div>
         )}
       </DialogContent>
