@@ -29,6 +29,16 @@ interface SessaoDigitacao {
   timestamp: number;
 }
 
+interface TransferenciaPara {
+  policialId: string;
+  policialNome: string;
+  policialNomeGuerra?: string;
+  policialMatricula?: string;
+  policialNumeral?: number;
+  postoGrad?: string;
+  materiais: MaterialAguardando[];
+}
+
 interface CautelaAguardando {
   id: string;
   policialId: string;
@@ -42,6 +52,9 @@ interface CautelaAguardando {
   horaCautela: string;
   armeiroId?: string;
   livroId?: string;
+  isTransferencia?: boolean;
+  transferenciaDe?: string;
+  transferenciaPara?: TransferenciaPara;
 }
 
 const TotemPolicialInterface = () => {
@@ -173,10 +186,57 @@ const TotemPolicialInterface = () => {
       }
     );
 
+    // Listener para transferências de material
+    const unsubscribeTransferencia = onSnapshot(
+      query(
+        collection(db, 'cautelas_provisorias'),
+        where('statusTransferencia', '==', 'aguardando_confirmacao')
+      ),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docSnap = snapshot.docs[0];
+          const data = docSnap.data();
+          
+          console.log('[Totem] Transferência de material detectada:', docSnap.id);
+          
+          const transferenciaPara = data.transferenciaPara;
+          if (transferenciaPara) {
+            setCautelaAtual({
+              id: docSnap.id,
+              policialId: transferenciaPara.policialId,
+              policialNome: transferenciaPara.policialNome,
+              policialNomeGuerra: transferenciaPara.policialNomeGuerra,
+              policialMatricula: transferenciaPara.policialMatricula,
+              policialNumeral: transferenciaPara.policialNumeral,
+              postoGrad: transferenciaPara.postoGrad,
+              materiais: transferenciaPara.materiais || [],
+              dataCautela: data.dataCautela?.toDate?.() || new Date(),
+              horaCautela: data.horaCautela,
+              armeiroId: data.armeiroId,
+              livroId: data.livroId,
+              isTransferencia: true,
+              transferenciaDe: data.policialNomeGuerra || data.policialNome
+            });
+            
+            if (data.sessaoDigitacao) {
+              setSessaoDigitacao(data.sessaoDigitacao as SessaoDigitacao);
+            }
+            
+            cautelaAnteriorRef.current = docSnap.id;
+            setMensagemSucesso("");
+          }
+        }
+      },
+      (error) => {
+        console.error('[Totem] Erro no listener de transferência:', error);
+      }
+    );
+
     return () => {
       console.log('[Totem] Desconectando listeners realtime');
       unsubscribeNova();
       unsubscribeComplemento();
+      unsubscribeTransferencia();
     };
   }, []);
 
@@ -277,7 +337,10 @@ const TotemPolicialInterface = () => {
               <CardHeader className="py-1.5 px-2.5">
                 <CardTitle className="flex items-center gap-1.5 text-foreground text-sm">
                   <Package className="h-3.5 w-3.5 text-primary" />
-                  MATERIAIS PARA RECEBER
+                  {cautelaAtual.isTransferencia 
+                    ? `RECEBENDO DE ${cautelaAtual.transferenciaDe?.toUpperCase()}`
+                    : 'MATERIAIS PARA RECEBER'
+                  }
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-2.5 pb-2.5">

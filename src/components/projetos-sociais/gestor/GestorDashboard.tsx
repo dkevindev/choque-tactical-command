@@ -3,7 +3,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, UserCheck, Calendar, Clock, ArrowLeft } from 'lucide-react';
+import { Users, UserCheck, Calendar, Clock, ArrowLeft, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ConfiguracaoProjetoTab from './ConfiguracaoProjetoTab';
 import CadastroAlunosTab from './CadastroAlunosTab';
@@ -12,6 +12,7 @@ import RelatoriosGestorTab from './RelatoriosGestorTab';
 import TurmasTab from './TurmasTab';
 import ConteudosAulaTab from './ConteudosAulaTab';
 import FrequenciaMensalTab from './FrequenciaMensalTab';
+import LancarAulaRetroativaTab from './LancarAulaRetroativaTab';
 
 interface GestorDashboardProps {
   projetos: any[];
@@ -132,7 +133,7 @@ const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialL
         </header>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className={`grid w-full ${projetoSelecionado?.configuracao?.usaFrequencia !== false ? 'grid-cols-8' : 'grid-cols-7'}`}>
+          <TabsList className={`grid w-full ${projetoSelecionado?.configuracao?.usaFrequencia !== false ? 'grid-cols-9' : 'grid-cols-8'}`}>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="configuracao">Configuração</TabsTrigger>
             {projetoSelecionado?.configuracao?.usaFrequencia !== false && (
@@ -141,6 +142,10 @@ const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialL
             <TabsTrigger value="turmas">Turmas</TabsTrigger>
             <TabsTrigger value="conteudos">Conteúdos</TabsTrigger>
             <TabsTrigger value="aulas">Aulas</TabsTrigger>
+            <TabsTrigger value="lancar-aula" className="flex items-center gap-1">
+              <CalendarPlus className="h-3 w-3" />
+              Lançar Aula
+            </TabsTrigger>
             <TabsTrigger value="frequencia">Frequência</TabsTrigger>
             <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
           </TabsList>
@@ -227,6 +232,10 @@ const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialL
 
           <TabsContent value="aulas">
             <VisualizarAulasTab projeto={projetoSelecionado} />
+          </TabsContent>
+
+          <TabsContent value="lancar-aula">
+            <LancarAulaRetroativaTab projeto={projetoSelecionado} onSuccess={handleUpdate} />
           </TabsContent>
 
           <TabsContent value="frequencia">

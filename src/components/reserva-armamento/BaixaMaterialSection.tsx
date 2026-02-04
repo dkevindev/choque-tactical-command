@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, User, Package, CheckCircle, RotateCcw } from "lucide-react";
+import { Search, User, Package, CheckCircle, RotateCcw, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, getDocs, updateDoc, doc, addDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import ModalDevolucaoMunicao from './ModalDevolucaoMunicao';
+import ModalTransferenciaMaterial from './ModalTransferenciaMaterial';
 
 interface MaterialCautela {
   materialId: string;
@@ -61,6 +62,10 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
   const [modalMunicao, setModalMunicao] = useState(false);
   const [materialMunicao, setMaterialMunicao] = useState<MaterialCautela | null>(null);
   const [cautelaMunicao, setCautelaMunicao] = useState<CautelaProvisoria | null>(null);
+  
+  // Modal de transferência
+  const [modalTransferencia, setModalTransferencia] = useState(false);
+  const [cautelaTransferencia, setCautelaTransferencia] = useState<CautelaProvisoria | null>(null);
   
   const { toast } = useToast();
 
@@ -715,6 +720,19 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                   }}>
                     Alterar
                   </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={() => {
+                      if (cautelasAtivas.length > 0) {
+                        setCautelaTransferencia(cautelasAtivas[0]);
+                        setModalTransferencia(true);
+                      }
+                    }}
+                  >
+                    <ArrowRight className="h-4 w-4 mr-1" />
+                    Transferir
+                  </Button>
                 </div>
               </div>
 
@@ -798,6 +816,28 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
         material={materialMunicao}
         onConfirmar={handleConfirmarMunicao}
       />
+
+      {/* Modal de Transferência de Material */}
+      {cautelaTransferencia && policialSelecionado && (
+        <ModalTransferenciaMaterial
+          open={modalTransferencia}
+          onClose={() => {
+            setModalTransferencia(false);
+            setCautelaTransferencia(null);
+          }}
+          cautela={cautelaTransferencia}
+          policialOrigem={policialSelecionado}
+          livroId={livroId}
+          onTransferido={() => {
+            setModalTransferencia(false);
+            setCautelaTransferencia(null);
+            setPolicialSelecionado(null);
+            setMateriaisSelecionados([]);
+            recarregarPoliciaisComCautela();
+            onBaixaRealizada();
+          }}
+        />
+      )}
     </>
   );
 };
