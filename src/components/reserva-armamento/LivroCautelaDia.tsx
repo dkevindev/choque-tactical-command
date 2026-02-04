@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BookOpen, Clock, CheckCircle, Plus, ArrowRightLeft } from "lucide-react";
+import { BookOpen, Clock, CheckCircle, Plus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +42,7 @@ interface LivroCautelaDiaProps {
   dataAbertura: Date;
   armeiroNome: string;
   onComplementarCautela?: (cautelaId: string, policialId: string, policialNome: string, materiais: any[]) => void;
-  onTransferirMaterial?: (cautelaId: string, policialId: string, policialNome: string, materiais: any[]) => void;
+  
 }
 
 const formatarAssinatura = (data: Date, hora: string) => {
@@ -81,7 +81,7 @@ const formatarDevolucao = (data: Date, hora: string, armeiroNome?: string) => {
   );
 };
 
-const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome, onComplementarCautela, onTransferirMaterial }: LivroCautelaDiaProps) => {
+const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome, onComplementarCautela }: LivroCautelaDiaProps) => {
   if (movimentacoes.length === 0) {
     return (
       <Card>
@@ -129,7 +129,7 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome, onComplemen
                   <TableHead className="w-[100px] text-center">Status</TableHead>
                   <TableHead className="min-w-[180px] text-center">Assinatura Saída</TableHead>
                   <TableHead className="min-w-[180px] text-center">Devolução</TableHead>
-                  {(onComplementarCautela || onTransferirMaterial) && <TableHead className="w-[100px] text-center">Ações</TableHead>}
+                  {onComplementarCautela && <TableHead className="w-[100px] text-center">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -193,44 +193,22 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome, onComplemen
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </TableCell>
-                    {(onComplementarCautela || onTransferirMaterial) && (
+                    {onComplementarCautela && (
                       <TableCell className="text-center">
                         {mov.status === 'pendente' && mov.cautelaId && mov.policialId ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {onComplementarCautela && (
-                                <DropdownMenuItem
-                                  onClick={() => onComplementarCautela(
-                                    mov.cautelaId!,
-                                    mov.policialId!,
-                                    `${mov.postoGrad || ''} ${mov.policialNomeGuerra || mov.policialNome}`.trim(),
-                                    mov.materiais
-                                  )}
-                                >
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Complementar
-                                </DropdownMenuItem>
-                              )}
-                              {onTransferirMaterial && (
-                                <DropdownMenuItem
-                                  onClick={() => onTransferirMaterial(
-                                    mov.cautelaId!,
-                                    mov.policialId!,
-                                    `${mov.postoGrad || ''} ${mov.policialNomeGuerra || mov.policialNome}`.trim(),
-                                    mov.materiais
-                                  )}
-                                >
-                                  <ArrowRightLeft className="h-4 w-4 mr-2" />
-                                  Transferir
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onComplementarCautela(
+                              mov.cautelaId!,
+                              mov.policialId!,
+                              `${mov.postoGrad || ''} ${mov.policialNomeGuerra || mov.policialNome}`.trim(),
+                              mov.materiais
+                            )}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Compl.
+                          </Button>
                         ) : (
                           <span className="text-muted-foreground text-xs">-</span>
                         )}
