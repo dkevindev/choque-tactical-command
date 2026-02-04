@@ -1,159 +1,330 @@
 
-# Plano: Correção do Seletor de Materiais no Modal de Complementar Cautela
 
-## Problema Identificado
+# Plano de Implementacao: Correcoes e Novas Funcionalidades
 
-Ao adicionar materiais a uma cautela já recebida através do `ModalComplementarCautela`, o sistema está mostrando controles de quantidade para TODOS os materiais, incluindo itens com número de série como "HT" (rádios) que deveriam ser adicionados diretamente com quantidade = 1.
+## Resumo das Solicitacoes
 
-### Comportamento Atual (Incorreto)
-
-```text
-1. Usuário clica em "HT" (rádio)
-2. Sistema mostra: "Qtd: [-] 1 [+]" + botão "Adicionar"
-3. Qualquer ajuste modifica a quantidade indevidamente
-```
-
-### Comportamento Esperado (Como funciona no ArmeiroInterface)
-
-```text
-1. Usuário clica em "HT" (item com nº série)
-   → Adiciona diretamente com quantidade = 1
-
-2. Usuário clica em "Munição .40"
-   → Abre modal de quantidade (padrão 30)
-   → Usuário ajusta e confirma
-```
+| Sistema | Funcionalidade | Tipo | Prioridade |
+|---------|----------------|------|------------|
+| Reserva de Armamento | Corrigir erro "undefined" ao complementar cautela | Correcao | Alta |
+| Reserva de Armamento | Opcao de Transferir Material entre policiais | Nova Feature | Alta |
+| Projetos Sociais | Gestor lancar aula retroativa | Nova Feature | Media |
+| Ordem de Servico | Editar data da OS para cota correta | Nova Feature | Media |
 
 ---
 
-## Solução
+## 1. CORRECAO: Erro ao Complementar Cautela
 
-Replicar exatamente a lógica do `ArmeiroInterface.handleClickMaterial` no `ModalComplementarCautela`:
+### Diagnostico
 
-1. **Para itens com número de série** (armas, coletes, HTs, etc.):
-   - Adicionar diretamente com `quantidade = 1`
-   - Sem exibir controles de quantidade
-
-2. **Para munição**:
-   - Exibir controles de quantidade (padrão 30)
-   - Permitir ajuste antes de adicionar
-
-3. **Para EPIs e Acessórios sem série**:
-   - Adicionar diretamente com `quantidade = 1`
-
----
-
-## Implementação Técnica
-
-### Modificar `ModalComplementarCautela.tsx`
-
-Alterar o callback `onSelecionarMaterial` do `SeletorMateriaisModal` para:
+O erro `"Function updateDoc() called with invalid data. Unsupported field value: undefined"` ocorre na linha 284 do `ModalComplementarCautela.tsx`:
 
 ```typescript
-onSelecionarMaterial={(material) => {
-  const categoriaNorm = (material.categoria || '').toLowerCase();
-  const isMunicao = categoriaNorm.includes('munição') || categoriaNorm.includes('municao');
-  
-  if (isMunicao) {
-    // Munição: selecionar para ajuste de quantidade
-    setMaterialSelecionado(material.id);
-    setQuantidadeMaterial(30);
-  } else {
-    // Outros itens: adicionar direto com quantidade 1
-    const novoMaterial: MaterialSelecionado = {
-      materialId: material.id,
-      nome: material.nome,
-      quantidade: 1,
-      categoria: material.categoria,
-      numeroSerie: material.numeroSerie
-    };
-    
-    setMateriaisAdicionados(prev => [...prev, novoMaterial]);
-    
-    // Remover da lista de disponíveis
-    setMateriaisDisponiveis(prev => prev.filter(m => m.id !== material.id));
-    
-    toast({
-      title: "Material Adicionado",
-      description: `${material.nome} foi adicionado à lista.`
-    });
+materiaisComplemento: materiaisAdicionados.map(m => ({
+  materialId: m.materialId,
+  nome: m.nome,
+  quantidade: m.quantidade,
+  categoria: m.categoria,  // <-- PODE SER UNDEFINED
+  ...(m.numeroSerie && { numeroSerie: m.numeroSerie })
+})),
+```
+
+### Solucao
+
+Aplicar o mesmo padrao de protecao contra `undefined` usado no `ModalAguardandoConfirmacao.tsx`:
+
+```typescript
+materiaisComplemento: materiaisAdicionados.map(m => ({
+  materialId: m.materialId,
+  nome: m.nome,
+  quantidade: m.quantidade,
+  ...(m.categoria && { categoria: m.categoria }),
+  ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
+  ...(m.carregadores !== undefined && { carregadores: m.carregadores })
+})),
+```
+
+### Arquivos a Modificar
+
+| Arquivo | Linhas | Modificacao |
+|---------|--------|-------------|
+| `ModalComplementarCautela.tsx` | 280-286 | Proteger campos opcionais contra undefined |
+| `ModalComplementarCautela.tsx` | 371-378 | Mesmo padrao ao salvar materiais finais |
+
+---
+
+## 2. NOVA FEATURE: Transferir Material entre Policiais
+
+### Fluxo Proposto
+
+```text
+ARMEIRO                                           TOTEM
+   |                                                  |
+   | 1. Seleciona policial de ORIGEM (com material)   |
+   |                                                  |
+   | 2. Clica em "Transferir Material"                |
+   |                                                  |
+   | 3. Seleciona policial de DESTINO                 |
+   |                                                  |
+   | 4. Seleciona materiais a transferir              |
+   |                                                  |
+   | 5. Clica "Confirmar Transferencia"               |
+   |    ──────────────────────────────────────────►   |
+   |                                                  |
+   |        Firebase: statusTransferencia =           |
+   |              'aguardando_confirmacao'            |
+   |                                                  |
+   |                           ◄───────────────────── | 6. Totem detecta
+   |                                                  |
+   |   7. Policial DESTINO ve materiais               | 7. Exibe materiais
+   |      e digita senha no terminal armeiro          |    a receber
+   |      ──────────────────────────────────────────► |
+   |                                                  |
+   |   8. Sistema:                                    | 8. "TRANSFERENCIA
+   |      - Marca devolvido para policial ORIGEM      |     CONFIRMADA!"
+   |      - Cria nova cautela para policial DESTINO   |
+   |                                                  |
+```
+
+### Componentes Necessarios
+
+| Componente | Tipo | Descricao |
+|------------|------|-----------|
+| `ModalTransferenciaMaterial.tsx` | NOVO | Modal para selecionar destino e materiais |
+| `BaixaMaterialSection.tsx` | MODIFICAR | Adicionar botao "Transferir" |
+| `TotemPolicialInterface.tsx` | MODIFICAR | Detectar `statusTransferencia` |
+| `ArmeiroInterface.tsx` | MODIFICAR | Importar e gerenciar modal |
+
+### Estrutura do Modal de Transferencia
+
+```typescript
+interface ModalTransferenciaMaterialProps {
+  open: boolean;
+  onClose: () => void;
+  cautelaOrigem: CautelaProvisoria;
+  policialOrigem: Policial;
+  livroId: string;
+  onTransferido: () => void;
+}
+
+// Estados do modal:
+type EtapaTransferencia = 
+  | 'selecao_destino'      // Buscar e selecionar policial destino
+  | 'selecao_materiais'    // Marcar materiais a transferir
+  | 'aguardando'           // Aguardando confirmacao no Totem
+  | 'confirmado';          // Transferencia concluida
+```
+
+### Dados no Firebase (durante transferencia)
+
+```typescript
+// Atualizar cautela_provisoria do policial ORIGEM:
+{
+  statusTransferencia: 'aguardando_confirmacao',
+  transferenciaPara: {
+    policialId: 'ID_DESTINO',
+    policialNome: 'Nome do Destino',
+    policialNomeGuerra: 'Nome de Guerra',
+    materiais: [/* materiais selecionados */]
+  },
+  sessaoDigitacao: {
+    etapa: 'senha',
+    senhaLength: 0,
+    erro: null,
+    timestamp: Date.now()
   }
-}}
+}
 ```
 
-### Ajustar a exibição condicional
+### Logica de Confirmacao
 
-Mostrar os controles de quantidade APENAS quando:
-1. Existe um `materialSelecionado`
-2. O material é do tipo munição
+1. Policial DESTINO confirma com senha
+2. Sistema busca materiais da transferencia
+3. Para cada material transferido:
+   - Remove da cautela ORIGEM
+   - Se cautela ORIGEM ficar vazia, marca como 'entregue'
+4. Cria nova cautela para policial DESTINO com os materiais
+5. Remove campos de transferencia da cautela origem
+6. Registra movimentacao de transferencia no historico
+
+### Modificacao no Totem
 
 ```typescript
-{materialSelecionado && isMaterialMunicao(materialSelecionado) && (
-  <div className="p-3 bg-primary/5 rounded-lg border space-y-2">
-    {/* Controles de quantidade */}
-  </div>
-)}
+// Adicionar ao listener do Totem:
+if (data.statusTransferencia === 'aguardando_confirmacao') {
+  // Exibir materiais sendo transferidos
+  const transferencia = data.transferenciaPara;
+  // Mostrar: "Recebendo materiais de [ORIGEM]"
+  // Listar materiais
+  // Campo de senha para DESTINO confirmar
+}
 ```
 
 ---
 
-## Arquivos a Modificar
+## 3. NOVA FEATURE: Gestor Lancar Aula Retroativa
 
-| Arquivo | Modificação |
-|---------|-------------|
-| `ModalComplementarCautela.tsx` | Alterar lógica de seleção de material para comportamento idêntico ao ArmeiroInterface |
+### Problema
 
----
+Quando instrutor esquece de lancar aula, se lancar depois o sistema registra com data errada (data atual em vez da data real).
 
-## Fluxo Corrigido
+### Solucao
+
+Criar aba/botao no GestorDashboard para "Lancar Aula" com selecao de data retroativa.
+
+### Componente Necessario
+
+| Componente | Tipo | Descricao |
+|------------|------|-----------|
+| `LancarAulaRetroativaTab.tsx` | NOVO | Wizard para gestor lancar aula de dia passado |
+| `GestorDashboard.tsx` | MODIFICAR | Adicionar nova aba/botao |
+
+### Fluxo do Wizard
 
 ```text
-ModalComplementarCautela
+┌──────────────────────────────────────────────────────────────────┐
+│ LANCAR AULA RETROATIVA                                           │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Etapa 1: SELECIONAR DATA                                        │
+│  ┌────────────────────────────────────┐                          │
+│  │  Calendario (somente dias passados)│                          │
+│  │  [Calendario com datas anteriores] │                          │
+│  └────────────────────────────────────┘                          │
+│                                                                  │
+│  Etapa 2: SELECIONAR TURNO                                       │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐                             │
+│  │ Manha   │ │ Tarde   │ │ Noite   │                             │
+│  └─────────┘ └─────────┘ └─────────┘                             │
+│                                                                  │
+│  Etapa 3: SELECIONAR TURMA (se projeto usar turmas)              │
+│  ┌─────────────────────────────────────┐                         │
+│  │ [Lista de turmas disponiveis]       │                         │
+│  └─────────────────────────────────────┘                         │
+│                                                                  │
+│  Etapa 4: SELECIONAR INSTRUTORES                                 │
+│  (Gestor NAO entra como instrutor)                               │
+│  ┌─────────────────────────────────────┐                         │
+│  │ [ ] CB Fulano                       │                         │
+│  │ [ ] SD Ciclano                      │                         │
+│  │ [ ] SD Beltrano                     │                         │
+│  └─────────────────────────────────────┘                         │
+│                                                                  │
+│  Etapa 5: MARCAR ALUNOS PRESENTES                                │
+│  ┌─────────────────────────────────────┐                         │
+│  │ [ ] Joao da Silva                   │                         │
+│  │ [ ] Maria Santos                    │                         │
+│  │ [ ] Pedro Oliveira                  │                         │
+│  └─────────────────────────────────────┘                         │
+│                                                                  │
+│  [CANCELAR]                     [LANCAR AULA]                    │
+└──────────────────────────────────────────────────────────────────┘
+```
 
-┌─────────────────────────────────────────────────────────────┐
-│ COMPLEMENTAR CAUTELA - SD Kevin                             │
-├─────────────────────────────────────────────────────────────┤
-│ Materiais atuais (2):                                       │
-│   • Pistola Glock .40                                       │
-│   • Colete Balístico                                        │
-├─────────────────────────────────────────────────────────────┤
-│ Materiais a adicionar (1):                                  │
-│   • HT Motorola (1)                           [X]           │
-├─────────────────────────────────────────────────────────────┤
-│ Adicionar material:                                         │
-│ ┌─────────┬──────────┬─────┬────────────┐                  │
-│ │ Nº Série│ Munição  │ EPI │ Acessórios │                  │
-│ └─────────┴──────────┴─────┴────────────┘                  │
-│                                                             │
-│ 🔍 [Buscar...]                                              │
-│                                                             │
-│ ┌─────────────────────────────────────────────────────────┐│
-│ │ HT Motorola GP3500 - Série: HT001              [+]      ││ → Clica e adiciona direto
-│ │ Fuzil 5.56 - Série: FZ001                      [+]      ││ → Clica e adiciona direto
-│ └─────────────────────────────────────────────────────────┘│
-│                                                             │
-│ [Cancelar]                         [Continuar (1)]          │
-└─────────────────────────────────────────────────────────────┘
+### Diferencas do IniciarAulaWizard
 
-Se clicar na aba "Munição":
+| Aspecto | IniciarAulaWizard (Instrutor) | LancarAulaRetroativa (Gestor) |
+|---------|-------------------------------|-------------------------------|
+| Data | Sempre HOJE | Selecao de data PASSADA |
+| Status | 'em_andamento' | 'encerrada' (ja finalizada) |
+| Gestor como Instrutor | Sim (se for instrutor) | NAO (apenas registra) |
+| horaInicio/horaFim | Registra em tempo real | Valores estimados ou vazios |
 
-│ ┌─────────────────────────────────────────────────────────┐│
-│ │ Munição .40 CBC - Est: 1000                    [+]      ││ → Clica e mostra controle:
-│ └─────────────────────────────────────────────────────────┘│
-│                                                             │
-│ ┌───────────────────────────────────────────────────────┐  │
-│ │ Munição .40 CBC                                       │  │
-│ │ Qtd: [-] 30 [+]           [Adicionar]                 │  │
-│ └───────────────────────────────────────────────────────┘  │
+### Dados a Salvar
+
+```typescript
+const aulaData = {
+  projetoId: projeto.id,
+  data: dataSelecionada,  // Data retroativa selecionada
+  turno: turnoSelecionado,
+  turnoNome: turnosNomeclatura[turnoSelecionado - 1],
+  instrutores: instrutoresSelecionados,
+  instrutoresCompleto: instrutoresSelecionados.length === config.maxInstrutoresPorTurno,
+  maxInstrutores: config.maxInstrutoresPorTurno,
+  status: 'encerrada',  // Ja encerrada
+  horaInicio: dataSelecionada,  // Estimativa
+  horaFim: dataSelecionada,
+  alunosPresentes: alunosPresentes,
+  lancadoRetroativamente: true,  // Flag para identificar
+  lancadoPor: gestorId,
+  dataLancamento: new Date()
+};
 ```
 
 ---
 
-## Resumo
+## 4. NOVA FEATURE: Editar Data da Ordem de Servico
 
-| Item | Comportamento |
-|------|---------------|
-| Itens com nº série (armas, HT, coletes) | Adiciona direto com qtd = 1 |
-| Munição | Mostra controles de quantidade |
-| EPI sem série | Adiciona direto com qtd = 1 |
-| Acessórios sem série | Adiciona direto com qtd = 1 |
+### Problema
+
+OS lancada retroativamente entra na cota do mes atual em vez do mes correto.
+
+### Solucao
+
+Adicionar botao de edicao nas OS existentes para alterar a data e recalcular a cota.
+
+### Implementacao
+
+Modificar a tela de listagem de OS ou criar modal de edicao:
+
+```typescript
+// Modal de Edicao de OS
+interface ModalEditarOSProps {
+  os: OrdemServico;
+  onSalvar: () => void;
+  onClose: () => void;
+}
+
+// Campos editaveis:
+// - dataOS (com recalculo automatico de cota/saldo)
+```
+
+### Logica de Recalculo
+
+1. Ao alterar a data da OS:
+   - Verificar novo mes de referencia
+   - Buscar saldo/cota do novo mes
+   - Atualizar registro na colecao `saldoOficina`
+   - Atualizar campo `dataOS` no documento
+
+### Componentes a Modificar
+
+| Arquivo | Modificacao |
+|---------|-------------|
+| `NovaOSForm.tsx` ou novo componente | Adicionar modal/funcao de edicao de data |
+| `OrdensServicoPage.tsx` | Adicionar botao "Editar" na listagem |
+
+---
+
+## Resumo de Arquivos
+
+### Novos Arquivos a Criar
+
+| Arquivo | Sistema |
+|---------|---------|
+| `ModalTransferenciaMaterial.tsx` | Reserva de Armamento |
+| `LancarAulaRetroativaTab.tsx` | Projetos Sociais |
+| `ModalEditarOS.tsx` | Ordem de Servico |
+
+### Arquivos a Modificar
+
+| Arquivo | Modificacoes |
+|---------|--------------|
+| `ModalComplementarCautela.tsx` | Corrigir campos undefined |
+| `BaixaMaterialSection.tsx` | Adicionar botao Transferir |
+| `TotemPolicialInterface.tsx` | Detectar statusTransferencia |
+| `ArmeiroInterface.tsx` | Gerenciar modal transferencia |
+| `GestorDashboard.tsx` | Adicionar tab/botao Lancar Aula |
+| `OrdensServicoPage.tsx` | Adicionar botao Editar OS |
+
+---
+
+## Ordem de Implementacao Sugerida
+
+| Prioridade | Tarefa | Complexidade |
+|------------|--------|--------------|
+| 1 | Corrigir erro undefined no ModalComplementarCautela | Baixa |
+| 2 | Transferir Material entre policiais | Alta |
+| 3 | Gestor lancar aula retroativa | Media |
+| 4 | Editar data da OS | Media |
+
