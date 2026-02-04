@@ -182,13 +182,13 @@ const OrdensServicoPage = () => {
 
     if (filtros.tipoServico) {
       ordens = ordens.filter(os => 
-        os.observacao.toLowerCase().includes(filtros.tipoServico.toLowerCase())
+        (os.observacao || '').toLowerCase().includes(filtros.tipoServico.toLowerCase())
       );
     }
 
     if (filtros.oficina) {
       ordens = ordens.filter(os => 
-        os.oficinaResponsavel.toLowerCase().includes(filtros.oficina.toLowerCase())
+        (os.oficinaResponsavel || '').toLowerCase().includes(filtros.oficina.toLowerCase())
       );
     }
 
@@ -205,8 +205,8 @@ const OrdensServicoPage = () => {
     });
   };
 
-  const getTipoServico = (observacao: string) => {
-    const obs = observacao.toLowerCase();
+  const getTipoServico = (observacao: string | undefined) => {
+    const obs = (observacao || '').toLowerCase();
     if (obs.includes('óleo') || obs.includes('oleo')) return 'MANUTENÇÃO';
     if (obs.includes('pneu') || obs.includes('roda')) return 'PNEUS';
     if (obs.includes('farol') || obs.includes('luz')) return 'ELÉTRICA';
