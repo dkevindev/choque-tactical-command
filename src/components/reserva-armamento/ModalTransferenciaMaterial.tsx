@@ -187,8 +187,9 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
 
     const sincronizarErro = async () => {
       try {
+        // Usar string vazia em vez de null para evitar erro de undefined no Firebase
         await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
-          'sessaoDigitacao.erro': erroSenha || null,
+          'sessaoDigitacao.erro': erroSenha || '',
           'sessaoDigitacao.timestamp': Date.now()
         });
       } catch (error) {
@@ -269,7 +270,7 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
           etapa: isPrimeiroAcesso ? 'primeiro_acesso' : 'senha',
           senhaLength: 0,
           confirmarSenhaLength: 0,
-          erro: null,
+          erro: '',
           timestamp: Date.now()
         }
       });
