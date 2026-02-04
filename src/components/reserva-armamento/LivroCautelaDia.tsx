@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BookOpen, Clock, CheckCircle, Plus, ArrowRightLeft } from "lucide-react";
+import { BookOpen, Clock, CheckCircle, Plus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -214,19 +214,6 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome, onComplemen
                                 >
                                   <Plus className="h-4 w-4 mr-2" />
                                   Complementar
-                                </DropdownMenuItem>
-                              )}
-                              {onTransferirMaterial && (
-                                <DropdownMenuItem
-                                  onClick={() => onTransferirMaterial(
-                                    mov.cautelaId!,
-                                    mov.policialId!,
-                                    `${mov.postoGrad || ''} ${mov.policialNomeGuerra || mov.policialNome}`.trim(),
-                                    mov.materiais
-                                  )}
-                                >
-                                  <ArrowRightLeft className="h-4 w-4 mr-2" />
-                                  Transferir
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
