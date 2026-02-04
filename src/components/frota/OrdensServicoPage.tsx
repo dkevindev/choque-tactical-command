@@ -20,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Filter, Calendar, FileText, DollarSign } from 'lucide-react';
+import { Search, Filter, Calendar, FileText, DollarSign, Pencil } from 'lucide-react';
+import ModalEditarOS from './ModalEditarOS';
 
 interface OrdemServico {
   id: string;
@@ -32,6 +33,7 @@ interface OrdemServico {
   observacao: string;
   oficinaResponsavel: string;
   dataCriacao: any;
+  saldoId?: string;
 }
 
 const OrdensServicoPage = () => {
@@ -45,6 +47,10 @@ const OrdensServicoPage = () => {
     oficina: ''
   });
   const [loading, setLoading] = useState(true);
+  
+  // Modal de edição
+  const [modalEditar, setModalEditar] = useState(false);
+  const [osParaEditar, setOsParaEditar] = useState<OrdemServico | null>(null);
 
   useEffect(() => {
     fetchOrdensServico();
@@ -295,6 +301,7 @@ const OrdensServicoPage = () => {
                   <TableHead>Valor</TableHead>
                   <TableHead>Oficina</TableHead>
                   <TableHead>Observações</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -318,6 +325,18 @@ const OrdensServicoPage = () => {
                     <TableCell className="max-w-md truncate" title={os.observacao}>
                       {os.observacao}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setOsParaEditar(os);
+                          setModalEditar(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -331,6 +350,21 @@ const OrdensServicoPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Edição */}
+      {osParaEditar && (
+        <ModalEditarOS
+          open={modalEditar}
+          onClose={() => {
+            setModalEditar(false);
+            setOsParaEditar(null);
+          }}
+          os={osParaEditar}
+          onSalvar={() => {
+            fetchOrdensServico();
+          }}
+        />
+      )}
     </div>
   );
 };

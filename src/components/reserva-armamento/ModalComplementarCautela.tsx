@@ -281,8 +281,9 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
           materialId: m.materialId,
           nome: m.nome,
           quantidade: m.quantidade,
-          categoria: m.categoria,
-          ...(m.numeroSerie && { numeroSerie: m.numeroSerie })
+          ...(m.categoria && { categoria: m.categoria }),
+          ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
+          ...(m.carregadores !== undefined && { carregadores: m.carregadores })
         })),
         sessaoDigitacao: {
           etapa: isPrimeiroAcesso ? 'primeiro_acesso' : 'senha',
@@ -373,8 +374,9 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
           materialId: m.materialId,
           nome: m.nome,
           quantidade: m.quantidade,
-          categoria: m.categoria,
-          ...(m.numeroSerie && { numeroSerie: m.numeroSerie })
+          ...(m.categoria && { categoria: m.categoria }),
+          ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
+          ...(m.carregadores !== undefined && { carregadores: m.carregadores })
         })),
         statusComplemento: deleteField(),
         materiaisComplemento: deleteField(),
