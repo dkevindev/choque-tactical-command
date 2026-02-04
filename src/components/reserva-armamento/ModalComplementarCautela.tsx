@@ -8,6 +8,7 @@ import { doc, getDoc, updateDoc, collection, getDocs, query, where, onSnapshot, 
 import { db } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
 import SeletorMateriaisModal from './SeletorMateriaisModal';
+import ModalQuantidadeMaterial from './ModalQuantidadeMaterial';
 import { buscarPolicialPorId } from '@/lib/policialUtils';
 
 interface Material {
@@ -27,6 +28,7 @@ interface MaterialSelecionado {
   quantidade: number;
   categoria?: string;
   numeroSerie?: string;
+  carregadores?: number;
 }
 
 interface ModalComplementarCautelaProps {
@@ -58,6 +60,11 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
   const [materialSelecionado, setMaterialSelecionado] = useState<string>('');
   const [quantidadeMaterial, setQuantidadeMaterial] = useState(1);
   const [materiaisAdicionados, setMateriaisAdicionados] = useState<MaterialSelecionado[]>([]);
+  
+  // Modal de quantidade (munição ou arma com carregadores)
+  const [modalQuantidade, setModalQuantidade] = useState(false);
+  const [materialParaQuantidade, setMaterialParaQuantidade] = useState<Material | null>(null);
+  const [tipoQuantidade, setTipoQuantidade] = useState<'municao' | 'arma'>('municao');
   
   // Estados para integração com Totem
   const [senhaPolicial, setSenhaPolicial] = useState('');
@@ -558,14 +565,19 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
                   ]}
                   onSelecionarMaterial={(material) => {
                     const categoriaNorm = (material.categoria || '').toLowerCase();
-                    const isMunicao = categoriaNorm.includes('munição') || categoriaNorm.includes('municao');
                     
-                    if (isMunicao) {
-                      // Munição: selecionar para ajuste de quantidade
-                      setMaterialSelecionado(material.id);
-                      setQuantidadeMaterial(30);
+                    if (categoriaNorm.includes('munição') || categoriaNorm.includes('municao')) {
+                      // Munição: abrir modal de quantidade
+                      setMaterialParaQuantidade(material);
+                      setTipoQuantidade('municao');
+                      setModalQuantidade(true);
+                    } else if (categoriaNorm.includes('arma')) {
+                      // Arma: abrir modal de carregadores
+                      setMaterialParaQuantidade(material);
+                      setTipoQuantidade('arma');
+                      setModalQuantidade(true);
                     } else {
-                      // Outros itens (armas, HT, coletes, EPI, acessórios): adicionar direto com quantidade 1
+                      // Outros itens (HT, coletes, EPI, acessórios): adicionar direto com quantidade 1
                       const novoMaterial: MaterialSelecionado = {
                         materialId: material.id,
                         nome: material.nome,
@@ -587,49 +599,6 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
                   }}
                   loading={loadingMateriais}
                 />
-
-                {/* Controles de quantidade apenas para munição */}
-                {materialSelecionado && (() => {
-                  const material = materiaisDisponiveis.find(m => m.id === materialSelecionado);
-                  const categoriaNorm = (material?.categoria || '').toLowerCase();
-                  const isMunicao = categoriaNorm.includes('munição') || categoriaNorm.includes('municao');
-                  
-                  if (!isMunicao) return null;
-                  
-                  return (
-                    <div className="p-3 bg-primary/5 rounded-lg border space-y-2">
-                      <div className="font-medium text-sm">
-                        {material?.nome}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Label className="text-sm">Qtd:</Label>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setQuantidadeMaterial(Math.max(1, quantidadeMaterial - 1))}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <Input
-                          type="number"
-                          value={quantidadeMaterial}
-                          onChange={(e) => setQuantidadeMaterial(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-16 text-center"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setQuantidadeMaterial(quantidadeMaterial + 1)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                        <Button onClick={handleAdicionarALista}>
-                          Adicionar
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
             )}
 
@@ -797,6 +766,45 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
           </div>
         )}
       </DialogContent>
+      
+      {/* Modal de Quantidade para Munição ou Carregadores para Armas */}
+      <ModalQuantidadeMaterial
+        open={modalQuantidade}
+        onClose={() => {
+          setModalQuantidade(false);
+          setMaterialParaQuantidade(null);
+        }}
+        material={materialParaQuantidade}
+        tipo={tipoQuantidade}
+        onConfirmar={(quantidade, carregadores) => {
+          if (materialParaQuantidade) {
+            const novoMaterial: MaterialSelecionado = {
+              materialId: materialParaQuantidade.id,
+              nome: materialParaQuantidade.nome,
+              quantidade: quantidade,
+              categoria: materialParaQuantidade.categoria,
+              numeroSerie: materialParaQuantidade.numeroSerie,
+              ...(carregadores !== undefined && { carregadores })
+            };
+            
+            setMateriaisAdicionados(prev => [...prev, novoMaterial]);
+            
+            // Remover da lista de disponíveis (se não for munição)
+            const isMunicao = materialParaQuantidade.categoria?.toLowerCase().includes('munição') || 
+                             materialParaQuantidade.categoria?.toLowerCase().includes('municao');
+            if (!isMunicao) {
+              setMateriaisDisponiveis(prev => prev.filter(m => m.id !== materialParaQuantidade.id));
+            }
+            
+            toast({
+              title: "Material Adicionado",
+              description: `${materialParaQuantidade.nome} foi adicionado à lista.`
+            });
+          }
+          setModalQuantidade(false);
+          setMaterialParaQuantidade(null);
+        }}
+      />
     </Dialog>
   );
 };
