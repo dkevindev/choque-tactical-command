@@ -1,511 +1,285 @@
 
-# Plano de Melhorias: Reserva de Armamento e Projetos Sociais
+# Plano: Correção Completa de Alunos com Horário Especial
 
-## Resumo Executivo
+## Resumo do Problema
 
-Este plano abrange 6 melhorias solicitadas em dois sistemas:
+Atualmente, alunos com "Horário Especial" (que frequentam dias de turmas diferentes) enfrentam os seguintes problemas:
 
-| Sistema | Melhoria | Complexidade |
-|---------|----------|--------------|
-| Reserva de Armamento | Adicionar itens enquanto aguarda senha | Média |
-| Reserva de Armamento | Adicionar itens a cautela já confirmada (antes da baixa) | Média |
-| Reserva de Armamento | Corrigir erro "usuário não logado" na baixa de pendentes anteriores | Baixa |
-| Projetos Sociais | Alunos em múltiplas turmas (horário especial) | Alta |
-| Projetos Sociais | Definir feriados/dias sem aula | Média |
-| Projetos Sociais | Seletor de mês + botão copiar no relatório de horas por instrutor | Baixa |
+| Problema | Local | Impacto |
+|----------|-------|---------|
+| Aluno aparece apenas na turma principal | IniciarAulaWizard | Instrutor nao consegue marcar presença do aluno nas outras turmas |
+| Frequencia calcula faltas incorretas | RelatoriosGestorTab | Aluno leva falta em dias que nao deveria comparecer |
+| Lista de frequencia mensal inclui em uma unica turma | FrequenciaMensalTab | Documento para assinatura nao reflete realidade |
+| Sem visao consolidada | Nenhum | Gestor nao consegue ver frequencia real desses alunos |
+
+## Fluxo Atual (Problematico)
+
+```text
+Aluno Maria configurada com Horario Especial:
+  - Segunda: Turma 1 (Manha)
+  - Terca: Turma 3 (Manha)
+
+Problemas:
+1. No IniciarAulaWizard da Turma 3, Maria NAO aparece na lista
+2. Na frequencia mensal da Turma 1, Maria aparece em TODOS os dias (leva falta na Quarta)
+3. Nao ha quadro especifico para gerar documento de Maria
+```
+
+## Solucao Proposta
+
+### 1. IniciarAulaWizard - Incluir Alunos com Horario Especial na Chamada
+
+**Modificacao:** Ao carregar alunos para uma turma, buscar tambem alunos com `horarioEspecial=true` que tenham esta turma configurada em `diasEspeciais` para o dia atual.
+
+**Logica:**
+```text
+carregarAlunos():
+  1. Buscar alunos da turma (atual)
+  2. Buscar TODOS alunos com horarioEspecial=true do projeto
+  3. Filtrar: aluno.diasEspeciais tem config para:
+     - turmaId = turma selecionada
+     - diaSemana = dia atual (segunda, terca, etc)
+  4. Combinar listas (sem duplicar)
+  5. Marcar alunos especiais com badge indicativo
+```
+
+**Resultado:** Maria aparece na Turma 3 apenas na terca-feira.
 
 ---
 
-## 1. RESERVA DE ARMAMENTO
+### 2. FrequenciaMensalTab - Excluir Alunos Especiais da Turma Principal
 
-### 1.1 Adicionar Itens Enquanto Aguarda Senha
+**Modificacao:** Alunos com `horarioEspecial=true` NAO devem aparecer na lista de frequencia da turma principal - apenas no quadro de Horario Especial.
 
-**Problema:** Quando o armeiro envia a cautela para confirmação e percebe que esqueceu algum material, precisa cancelar tudo e começar do zero.
-
-**Solução:** Adicionar botão "Adicionar Material" no `ModalAguardandoConfirmacao` que:
-1. Abre um mini-seletor de materiais
-2. Atualiza o documento do Firebase adicionando os novos materiais
-3. Atualiza a lista exibida no modal e no totem
-
-**Arquivos a modificar:**
-- `src/components/reserva-armamento/ModalAguardandoConfirmacao.tsx`
-- `src/components/reserva-armamento/ArmeiroInterface.tsx` (passar materiais disponíveis como prop)
-
-**Implementação:**
-
+**Ajuste na funcao `gerarFrequenciaMensal`:**
+```text
+// Filtrar alunos: excluir os que tem horario especial
+const alunosTurma = alunos.filter(a => !a.horarioEspecial);
 ```
-ModalAguardandoConfirmacao.tsx:
-┌────────────────────────────────────────┐
-│ AGUARDANDO CONFIRMAÇÃO                 │
-│                                        │
-│ Policial: SD Kevin                     │
-│                                        │
-│ MATERIAIS (3):                         │
-│ • Pistola Glock 19                     │
-│ • Munição .40 (30 un)                  │
-│ • Colete Balístico                     │
-│                                        │
-│ 🔐 SENHA DO POLICIAL: [________]       │
-│                                        │
-│ [+ Adicionar Material]  ← NOVO BOTÃO   │
-│                                        │
-│ [Resetar Senha] [❌ CANCELAR]          │
-└────────────────────────────────────────┘
-```
-
-**Nova prop no modal:**
-```typescript
-interface ModalAguardandoConfirmacaoProps {
-  // ... props existentes
-  onAdicionarMaterial: (material: MaterialSelecionado) => Promise<void>;
-  materiaisDisponiveis: Material[];
-}
-```
-
-**Lógica do botão:**
-1. Abre um Dialog com lista de materiais disponíveis
-2. Ao selecionar, chama `updateDoc` no Firebase para adicionar ao array de materiais
-3. Atualiza o estado local `materiais`
-4. O totem recebe via `onSnapshot` automaticamente
 
 ---
 
-### 1.2 Adicionar Itens a Cautela Já Confirmada (Antes da Baixa)
+### 3. FrequenciaMensalTab - Novo Quadro "Alunos com Horario Especial"
 
-**Problema:** Após o policial confirmar com senha, se lembrar que esqueceu algo, precisa criar nova cautela.
+**Adicionar secao separada** com cards para cada aluno com horario especial, mostrando:
+- Nome do aluno
+- Dias configurados (ex: "Segunda/Turma 1, Terca/Turma 3")
+- Botao "Gerar Lista de Frequencia"
 
-**Solução:** Adicionar botão "Complementar Cautela" na tabela do Livro do Dia para cautelas com status `pendente`.
-
-**Arquivos a modificar:**
-- `src/components/reserva-armamento/LivroCautelaDia.tsx`
-- `src/components/reserva-armamento/ArmeiroInterface.tsx` (criar modal e lógica)
-
-**Implementação:**
-
-```
-LivroCautelaDia.tsx - Nova coluna de ações:
-┌────┬──────────┬─────────────┬─────────┬───────────┬───────────┬──────────┐
-│ Nº │ Policial │ Materiais   │ Status  │ Assinat.  │ Devolução │ Ações    │
-├────┼──────────┼─────────────┼─────────┼───────────┼───────────┼──────────┤
-│001 │ SD Kevin │ Pistola     │PENDENTE │ Assinado  │ -         │[+ Compl.]│  ← NOVO
-│002 │ CB Silva │ Pistola     │ENTREGUE │ Assinado  │ Devolvido │    -     │  ← Sem botão após baixa
-└────┴──────────┴─────────────┴─────────┴───────────┴───────────┴──────────┘
+**Logica de geracao:**
+```text
+Para aluno Maria (Segunda/Turma1, Terca/Turma3):
+  1. Calcular dias do mes que sao Segunda + dias que sao Terca
+  2. Filtrar dias sem aula (feriados)
+  3. Buscar aulas:
+     - Da Turma 1 nos dias Segunda
+     - Da Turma 3 nos dias Terca
+  4. Verificar presenca de Maria em cada aula
+  5. Gerar documento com TODOS os dias ordenados
 ```
 
-**Nova interface:**
-```typescript
-interface LivroCautelaDiaProps {
-  movimentacoes: MovimentacaoDia[];
-  dataAbertura: Date;
-  armeiroNome: string;
-  onComplementarCautela?: (cautelaId: string, policialId: string) => void;  // NOVO
-}
+**Documento gerado:**
+```text
+| Data    | Dia     | Turma   | Presenca |
+|---------|---------|---------|----------|
+| 03/02   | Segunda | Turma 1 | [assina] |
+| 04/02   | Terca   | Turma 3 | [assina] |
+| 10/02   | Segunda | Turma 1 | [assina] |
+| 11/02   | Terca   | Turma 3 | [assina] |
+| ...     | ...     | ...     | ...      |
 ```
-
-**Regra:** Botão só aparece quando `status === 'pendente'` (antes da baixa).
-
-**Modal de Complemento:**
-```
-ModalComplementarCautela.tsx (NOVO):
-┌────────────────────────────────────────┐
-│ COMPLEMENTAR CAUTELA                   │
-│                                        │
-│ Policial: SD Kevin                     │
-│ Materiais atuais: 2                    │
-│                                        │
-│ [Selecionar materiais adicionais...]   │
-│                                        │
-│ Materiais selecionados:                │
-│ • Munição .40 (30 un)                  │
-│                                        │
-│ 🔐 SENHA DO POLICIAL: [________]       │
-│ (Confirmar adição com senha)           │
-│                                        │
-│ [Cancelar] [Confirmar Adição]          │
-└────────────────────────────────────────┘
-```
-
-**Fluxo:**
-1. Armeiro clica em "Complementar"
-2. Seleciona novos materiais
-3. Policial confirma com sua senha
-4. Sistema adiciona materiais na cautela existente via `updateDoc`
-5. Atualiza disponibilidade dos materiais
 
 ---
 
-### 1.3 Corrigir Erro "Usuário Não Logado" na Baixa de Pendentes
+### 4. RelatoriosGestorTab - Novo Quadro "Frequencia Alunos com Horario Especial"
 
-**Problema:** Ao clicar em "Receber" no alerta de pendências anteriores, dá erro de "usuário não logado".
+**Adicionar Collapsible** na aba "Frequencia Alunos" para alunos com horario especial:
 
-**Causa identificada:** O `PendenciasAnterioresSection` passa a cautela para `ModalRecebimentoPendente`, mas o componente não recebe o ID do armeiro logado diretamente - busca do localStorage que pode estar inconsistente.
-
-**Arquivo:** `src/components/reserva-armamento/PendenciasAnterioresSection.tsx`
-
-**Solução:** Passar o ID do armeiro logado como prop do componente pai (`ArmeiroInterface`), garantindo que está sempre disponível.
-
-**Implementação:**
-```typescript
-// PendenciasAnterioresSection.tsx
-interface PendenciasAnterioresSectionProps {
-  livroAtualId: string;
-  onRecebimentoRealizado: () => void;
-  armeiroLogadoId: string;  // NOVO
-}
-
-// Passar para ModalRecebimentoPendente
-<ModalRecebimentoPendente
-  ...
-  armeiroLogadoId={armeiroLogadoId}  // NOVO
-/>
+```text
+Frequencia dos Alunos por Turma
+├── Turma 1 (15 alunos) - Media: 85.2%
+├── Turma 2 (12 alunos) - Media: 78.4%
+├── Turma 3 (18 alunos) - Media: 82.1%
+└── Horario Especial (3 alunos) - Media: 90.5%  ← NOVO
+    ├── Maria da Silva - 95% (19 de 20 aulas)
+    ├── João Santos - 85% (17 de 20 aulas)
+    └── Ana Costa - 91.6% (22 de 24 aulas)
 ```
 
-```typescript
-// ModalRecebimentoPendente.tsx
-interface ModalRecebimentoPendenteProps {
-  ...
-  armeiroLogadoId?: string;  // NOVO
-}
+**Calculo de frequencia correto:**
+```text
+Para Maria (Segunda/Turma1, Terca/Turma3):
+  totalAulas = aulas Turma1 em Segundas + aulas Turma3 em Tercas
+  presencas = aulas onde Maria.id in alunosPresentes
+  percentual = (presencas / totalAulas) * 100
+```
 
-// Na função validarSenha, usar armeiroLogadoId ao invés de buscar do localStorage
-const validarSenha = async () => {
-  const armeiroId = armeiroLogadoId || JSON.parse(localStorage.getItem('user') || '{}').id;
-  if (!armeiroId) {
-    setSenhaErro('Usuário não logado.');
-    return;
+---
+
+## Arquivos a Modificar
+
+| Arquivo | Modificacao |
+|---------|-------------|
+| `IniciarAulaWizard.tsx` | Incluir alunos com horario especial na chamada |
+| `FrequenciaMensalTab.tsx` | Excluir alunos especiais da turma, adicionar quadro especial |
+| `RelatoriosGestorTab.tsx` | Adicionar secao de frequencia para alunos especiais |
+| `gerar-frequencia-mensal.js` | Suportar geracao para aluno individual com multiplas turmas |
+
+---
+
+## Detalhamento Tecnico
+
+### 4.1 IniciarAulaWizard.tsx - Carregar Alunos com Horario Especial
+
+```typescript
+const carregarAlunos = async () => {
+  try {
+    let alunosData: any[] = [];
+    
+    if (usaTurmas && turmaSelecionada) {
+      // 1. Buscar alunos da turma
+      const turmaDoc = await getDocs(...);
+      const turmaData = turmaDoc.docs[0].data();
+      const alunosIds = turmaData.alunos || [];
+      
+      // Buscar detalhes dos alunos da turma
+      const alunosTurma = await Promise.all(...);
+      
+      // 2. Buscar alunos com horario especial
+      const qEspeciais = query(
+        collection(db, 'projetos_alunos'),
+        where('projetoId', '==', projeto.id),
+        where('ativo', '==', true),
+        where('horarioEspecial', '==', true)
+      );
+      const snapEspeciais = await getDocs(qEspeciais);
+      
+      // 3. Filtrar: devem ter esta turma configurada para o dia atual
+      const diaAtual = diasSemana[hoje.getDay()]; // "segunda", "terca"...
+      
+      const alunosEspeciaisFiltrados = snapEspeciais.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(aluno => {
+          // Verificar se tem config para esta turma e este dia
+          return aluno.diasEspeciais?.some(
+            (d: any) => d.turmaId === turmaSelecionada && d.diaSemana === diaAtual
+          );
+        })
+        // Excluir se ja esta na lista da turma
+        .filter(aluno => !alunosIds.includes(aluno.id));
+      
+      // 4. Combinar e marcar
+      alunosData = [
+        ...alunosTurma.filter(a => a !== null),
+        ...alunosEspeciaisFiltrados.map(a => ({
+          ...a,
+          isHorarioEspecial: true  // Flag para UI
+        }))
+      ];
+    }
+    
+    setAlunos(alunosData);
+  } catch (error) {
+    console.error('Erro ao carregar alunos:', error);
   }
-  // ... resto da lógica
 };
 ```
 
----
+### 4.2 FrequenciaMensalTab.tsx - Quadro de Horario Especial
 
-## 2. PROJETOS SOCIAIS
-
-### 2.1 Alunos em Múltiplas Turmas (Horário Especial)
-
-**Problema:** Alguns alunos têm conflito de horário com a escola e precisam frequentar dias de turmas diferentes. Exemplo:
-- Turma 1: Segunda e Quarta
-- Turma 3: Segunda e Terça
-- Aluna Maria: só pode Segunda e Terça → frequenta Segunda da Turma 1 + Terça da Turma 3
-
-**Solução proposta:** Criar conceito de "Horário Especial" para alunos:
-
-1. **Campo no aluno:** `horarioEspecial: boolean` e `diasEspeciais: { diaSemana: string, turmaId: string, turno: string }[]`
-2. **UI no cadastro de alunos:** Opção de marcar "Horário Especial" com seletor de dias/turmas
-3. **Frequência:** Ao gerar lista, verificar se aluno tem horário especial e incluir apenas nos dias configurados
-
-**Arquivos a modificar:**
-- `src/components/projetos-sociais/gestor/CadastroAlunosTab.tsx`
-- `src/components/projetos-sociais/gestor/FrequenciaMensalTab.tsx`
-- Cloud Function `gerar-frequencia-mensal.js`
-
-**Nova estrutura do aluno:**
 ```typescript
-interface Aluno {
-  id: string;
-  nomeCompleto: string;
-  nomeGuerra: string;
-  idade: number;
-  // ... outros campos
-  horarioEspecial?: boolean;
-  diasEspeciais?: Array<{
-    diaSemana: string;      // "segunda", "terca", etc
-    turmaId: string;        // ID da turma que frequenta nesse dia
-    turno: string;          // "manha", "tarde"
-  }>;
-}
-```
+// Estado para alunos especiais
+const [alunosHorarioEspecial, setAlunosHorarioEspecial] = useState<any[]>([]);
+const [gerandoEspecial, setGerandoEspecial] = useState<string | null>(null);
 
-**UI no cadastro:**
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Editar Aluno                                                │
-│                                                             │
-│ Nome Completo: Maria da Silva                               │
-│ Nome de Guerra: Maria                                       │
-│ Turma Principal: [Turma 1 ▼]                               │
-│                                                             │
-│ ☑ Horário Especial (frequenta dias de outras turmas)       │
-│                                                             │
-│ ┌─────────────────────────────────────────────────────────┐│
-│ │ Configuração de Dias:                                   ││
-│ │                                                         ││
-│ │ Segunda-feira: [Turma 1 ▼] Turno: [Manhã ▼]            ││
-│ │ Terça-feira:   [Turma 3 ▼] Turno: [Manhã ▼]            ││
-│ │                                                         ││
-│ │ [+ Adicionar Dia]                                       ││
-│ └─────────────────────────────────────────────────────────┘│
-│                                                             │
-│ [Cancelar] [Salvar]                                         │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Lógica na frequência:**
-```typescript
-// FrequenciaMensalTab.tsx - ao gerar frequência
-const alunosComPresenca = alunos.map(aluno => {
-  const presencas: Record<string, string> = {};
-  
-  diasAula.slice(0, 10).forEach((dia, idx) => {
-    const diaSemana = getDayName(dia);  // "segunda", "terca", etc
-    
-    // Verificar se aluno deveria estar neste dia
-    let deveEstarNoDia = true;
-    if (aluno.horarioEspecial && aluno.diasEspeciais) {
-      const diaConfig = aluno.diasEspeciais.find(d => d.diaSemana === diaSemana);
-      // Só inclui se o dia especial pertence a esta turma
-      deveEstarNoDia = diaConfig?.turmaId === turma.id;
-    }
-    
-    if (!deveEstarNoDia) {
-      presencas[`p${idx + 1}`] = '-';  // Não é dia deste aluno
-    } else {
-      // Lógica normal de presença
-      const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
-      if (aulaData && aulaData.alunosPresentes.includes(aluno.id)) {
-        presencas[`p${idx + 1}`] = '';
-      } else {
-        presencas[`p${idx + 1}`] = '-';
-      }
-    }
-  });
-  
-  return { nome: aluno.nomeGuerra, ...presencas };
-});
-```
-
----
-
-### 2.2 Definir Feriados/Dias Sem Aula
-
-**Problema:** Dias de feriado são contados como falta para os alunos na frequência.
-
-**Solução:** Criar cadastro de "Dias Sem Aula" (feriados, recesso, etc.) por projeto.
-
-**Arquivos a criar/modificar:**
-- `src/components/projetos-sociais/gestor/ConfiguracaoProjetoTab.tsx` (adicionar seção)
-- `src/components/projetos-sociais/gestor/FrequenciaMensalTab.tsx`
-- Cloud Function `gerar-frequencia-mensal.js`
-
-**Nova coleção Firebase:** `projetos_dias_sem_aula`
-```typescript
-interface DiaSemAula {
-  id: string;
-  projetoId: string;
-  data: Date;
-  motivo: string;  // "Feriado Nacional", "Recesso", "Reunião Pedagógica"
-  criadoPor: string;
-  criadoEm: Date;
-}
-```
-
-**UI na aba de Configuração:**
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Configuração do Projeto                                     │
-│                                                             │
-│ ┌─────────────────────────────────────────────────────────┐│
-│ │ 📅 Dias Sem Aula (Feriados e Recessos)                  ││
-│ │                                                         ││
-│ │ 24/02/2026 - Carnaval                          [🗑️]    ││
-│ │ 18/04/2026 - Sexta-feira Santa                [🗑️]    ││
-│ │ 20/04/2026 - Tiradentes                        [🗑️]    ││
-│ │                                                         ││
-│ │ [+ Adicionar Dia Sem Aula]                              ││
-│ └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Modal para adicionar:**
-```
-┌────────────────────────────────────────┐
-│ Adicionar Dia Sem Aula                 │
-│                                        │
-│ Data: [📅 Selecionar]                  │
-│                                        │
-│ Motivo: [Feriado Nacional ▼]           │
-│   - Feriado Nacional                   │
-│   - Feriado Estadual                   │
-│   - Feriado Municipal                  │
-│   - Recesso                            │
-│   - Reunião Pedagógica                 │
-│   - Outro                              │
-│                                        │
-│ [Cancelar] [Salvar]                    │
-└────────────────────────────────────────┘
-```
-
-**Lógica na frequência:**
-```typescript
-// FrequenciaMensalTab.tsx
-const buscarDiasSemAula = async (projetoId: string, ano: number, mes: number) => {
-  const inicio = startOfMonth(new Date(ano, mes - 1));
-  const fim = endOfMonth(new Date(ano, mes - 1));
-  
+// Carregar ao montar
+const carregarAlunosEspeciais = async () => {
   const q = query(
-    collection(db, 'projetos_dias_sem_aula'),
-    where('projetoId', '==', projetoId)
+    collection(db, 'projetos_alunos'),
+    where('projetoId', '==', projeto.id),
+    where('ativo', '==', true),
+    where('horarioEspecial', '==', true)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs
-    .map(doc => doc.data().data.toDate())
-    .filter(data => data >= inicio && data <= fim);
+  const alunos = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+  setAlunosHorarioEspecial(alunos);
 };
 
-// Ao gerar frequência, excluir dias sem aula
-const diasSemAula = await buscarDiasSemAula(projeto.id, ano, mes);
-const diasAulaFiltrados = diasAula.filter(dia => 
-  !diasSemAula.some(dsa => isSameDay(dsa, dia))
-);
+// Funcao para gerar frequencia de aluno especial
+const gerarFrequenciaAlunoEspecial = async (aluno: any) => {
+  // Logica detalhada para combinar dias de multiplas turmas
+  // e gerar documento personalizado
+};
 ```
 
----
-
-### 2.3 Seletor de Mês + Botão Copiar no Relatório de Horas por Instrutor
-
-**Problema:** O relatório de horas por instrutor sempre mostra o mês atual, sem opção de ver meses anteriores. Também falta botão de copiar para WhatsApp.
-
-**Arquivo:** `src/components/projetos-sociais/gestor/RelatoriosGestorTab.tsx`
-
-**Solução:**
-
-1. **Adicionar seletor de mês:** Dropdown para escolher mês de referência
-2. **Adicionar botão copiar:** Similar ao existente no relatório do instrutor
-
-**Implementação:**
+### 4.3 RelatoriosGestorTab.tsx - Calculo Correto de Frequencia
 
 ```typescript
-// Novos estados
-const [mesRelatorioInstrutores, setMesRelatorioInstrutores] = useState<Date>(new Date());
-
-// Modificar cálculo de aulasMes
-const aulasMesInstrutores = useMemo(() => {
-  const primeiroDiaMes = new Date(mesRelatorioInstrutores.getFullYear(), mesRelatorioInstrutores.getMonth(), 1);
-  const ultimoDiaMes = new Date(mesRelatorioInstrutores.getFullYear(), mesRelatorioInstrutores.getMonth() + 1, 0, 23, 59, 59);
+// Calcular frequencia de alunos com horario especial
+const calcularFrequenciaAlunoEspecial = (aluno: any) => {
+  const diasEspeciais = aluno.diasEspeciais || [];
+  let totalAulasPossiveis = 0;
+  let totalPresencas = 0;
   
-  return todasAulas.filter(aula => {
-    const dataAula = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
-    return dataAula >= primeiroDiaMes && dataAula <= ultimoDiaMes;
-  });
-}, [todasAulas, mesRelatorioInstrutores]);
-
-// Recalcular instrutores com base no mês selecionado
-const instrutoresRelatorioMes = useMemo(() => {
-  return instrutoresRelatorio.map(instrutor => {
-    const aulasInstrutorMes = aulasMesInstrutores.filter(a => 
-      a.instrutores?.includes(instrutor.id)
-    );
-    return {
-      ...instrutor,
-      aulasMes: aulasInstrutorMes.length,
-      horasMes: aulasInstrutorMes.length * 3
-    };
-  });
-}, [instrutoresRelatorio, aulasMesInstrutores]);
-```
-
-**UI modificada:**
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│ Horas por Instrutor                                                     │
-│                                                                         │
-│ Mês de Referência: [Janeiro 2026 ▼]  [📋 Copiar Resumo]  ← NOVOS       │
-│                                                                         │
-│ ┌─────────────────┬────────────┬────────────┬───────────────┐          │
-│ │ Instrutor       │ Aulas (Mês)│ Horas (Mês)│ Total Acumulado│          │
-│ ├─────────────────┼────────────┼────────────┼───────────────┤          │
-│ │ CB Santos  👁   │ 8          │ 24h        │ 96h           │          │
-│ │ SD Lima    👁   │ 6          │ 18h        │ 72h           │          │
-│ └─────────────────┴────────────┴────────────┴───────────────┘          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-**Dialog de detalhes (também atualizado):**
-```
-┌────────────────────────────────────────────────────────────────┐
-│ Aulas de CB Santos - Janeiro/2026                              │
-│                                                                │
-│ ┌──────────────┬──────────┐                                   │
-│ │ Data         │ Turno    │                                   │
-│ ├──────────────┼──────────┤                                   │
-│ │ 06/01/2026   │ Manhã    │                                   │
-│ │ 08/01/2026   │ Manhã    │                                   │
-│ │ 13/01/2026   │ Manhã    │                                   │
-│ │ ...          │ ...      │                                   │
-│ └──────────────┴──────────┘                                   │
-│                                                                │
-│ Total: 8 aulas • 24h                                           │
-│                                                                │
-│ [📋 Copiar Detalhes]  ← NOVO BOTÃO                             │
-└────────────────────────────────────────────────────────────────┘
-```
-
-**Função de copiar:**
-```typescript
-const copiarResumoInstrutores = () => {
-  const mesNome = format(mesRelatorioInstrutores, 'MMMM/yyyy', { locale: ptBR });
-  let texto = `📊 *RELATÓRIO DE HORAS - ${mesNome.toUpperCase()}*\n\n`;
-  
-  instrutoresRelatorioMes.forEach(inst => {
-    texto += `👤 ${inst.nome}\n`;
-    texto += `   📚 Aulas: ${inst.aulasMes}\n`;
-    texto += `   ⏱️ Horas: ${inst.horasMes}h\n\n`;
+  diasEspeciais.forEach(diaConfig => {
+    // Pegar aulas desta turma neste dia da semana
+    const aulasDesteDia = todasAulas.filter(aula => {
+      const dataAula = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
+      const diaSemanaAula = getDiaSemana(dataAula);
+      return aula.turmaId === diaConfig.turmaId && 
+             diaSemanaAula === diaConfig.diaSemana;
+    });
+    
+    totalAulasPossiveis += aulasDesteDia.length;
+    totalPresencas += aulasDesteDia.filter(a => 
+      a.alunosPresentes?.includes(aluno.id)
+    ).length;
   });
   
-  const totalHoras = instrutoresRelatorioMes.reduce((sum, i) => sum + i.horasMes, 0);
-  texto += `\n*TOTAL: ${totalHoras}h ministradas*`;
-  
-  navigator.clipboard.writeText(texto);
-  toast.success('Resumo copiado para a área de transferência!');
-};
-
-const copiarDetalhesInstrutor = () => {
-  const mesNome = format(mesRelatorioInstrutores, 'MMMM/yyyy', { locale: ptBR });
-  let texto = `📊 *AULAS DE ${instrutorSelecionado.nome.toUpperCase()}*\n`;
-  texto += `📅 Referência: ${mesNome}\n\n`;
-  
-  aulasInstrutor.forEach(aula => {
-    const data = formatarDataAula(aula.data);
-    texto += `• ${data} - ${aula.turnoNome || `Turno ${aula.turno}`}\n`;
-  });
-  
-  texto += `\n*Total: ${aulasInstrutor.length} aulas • ${aulasInstrutor.length * 3}h*`;
-  
-  navigator.clipboard.writeText(texto);
-  toast.success('Detalhes copiados!');
+  return {
+    ...aluno,
+    aulasParticipadas: totalPresencas,
+    faltas: totalAulasPossiveis - totalPresencas,
+    percentualPresenca: totalAulasPossiveis > 0 
+      ? (totalPresencas / totalAulasPossiveis) * 100 
+      : 0
+  };
 };
 ```
 
 ---
 
-## Resumo de Arquivos a Modificar
+## Fluxo Corrigido
 
-| Arquivo | Modificações |
-|---------|--------------|
-| `ModalAguardandoConfirmacao.tsx` | Adicionar botão e modal para adicionar materiais |
-| `ArmeiroInterface.tsx` | Passar props extras, criar handler de complemento |
-| `LivroCautelaDia.tsx` | Nova coluna de ações com botão "Complementar" |
-| `ModalComplementarCautela.tsx` | **NOVO** - Modal para adicionar itens a cautela existente |
-| `PendenciasAnterioresSection.tsx` | Receber `armeiroLogadoId` como prop |
-| `ModalRecebimentoPendente.tsx` | Usar prop `armeiroLogadoId` |
-| `CadastroAlunosTab.tsx` | Adicionar seção de horário especial |
-| `ConfiguracaoProjetoTab.tsx` | Adicionar seção de dias sem aula |
-| `FrequenciaMensalTab.tsx` | Considerar feriados e horários especiais |
-| `RelatoriosGestorTab.tsx` | Seletor de mês + botões de copiar |
+```text
+Aluno Maria configurada com Horario Especial:
+  - Segunda: Turma 1 (Manha)
+  - Terca: Turma 3 (Manha)
+
+Agora:
+1. IniciarAulaWizard Turma 1 (Segunda): Maria APARECE
+2. IniciarAulaWizard Turma 3 (Terca): Maria APARECE
+3. IniciarAulaWizard Turma 1 (Quarta): Maria NAO aparece
+4. IniciarAulaWizard Turma 3 (Quinta): Maria NAO aparece
+5. Lista Frequencia Turma 1: Maria NAO esta (excluida)
+6. Lista Frequencia Turma 3: Maria NAO esta (excluida)
+7. Lista Frequencia Horario Especial: Maria tem documento proprio
+8. Relatorio Frequencia: Maria aparece no quadro "Horario Especial" com percentual correto
+```
 
 ---
 
-## Ordem de Implementação Sugerida
+## Resumo de Implementacao
 
-1. **Fase 1 - Correções Rápidas**
-   - Corrigir erro "usuário não logado" (baixa complexidade)
-   - Seletor de mês + copiar no relatório de instrutores (baixa complexidade)
-
-2. **Fase 2 - Reserva de Armamento**
-   - Adicionar materiais enquanto aguarda senha
-   - Complementar cautela antes da baixa
-
-3. **Fase 3 - Projetos Sociais**
-   - Cadastro de feriados/dias sem aula
-   - Horário especial para alunos (mais complexo)
+| Etapa | Descricao | Complexidade |
+|-------|-----------|--------------|
+| 1 | Modificar carregarAlunos no IniciarAulaWizard | Media |
+| 2 | Adicionar badge visual para alunos especiais | Baixa |
+| 3 | Excluir alunos especiais da geracao de turma | Baixa |
+| 4 | Criar secao "Horario Especial" no FrequenciaMensalTab | Media |
+| 5 | Implementar geracao de documento personalizado | Alta |
+| 6 | Adicionar collapsible no RelatoriosGestorTab | Media |
+| 7 | Implementar calculo de frequencia correto | Media |
