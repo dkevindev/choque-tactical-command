@@ -158,8 +158,9 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
 
     const sincronizarErro = async () => {
       try {
+        // Usar string vazia em vez de null para evitar undefined
         await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
-          'sessaoDigitacao.erro': erroSenha || null,
+          'sessaoDigitacao.erro': erroSenha || '',
           'sessaoDigitacao.timestamp': Date.now()
         });
       } catch (error) {
@@ -168,7 +169,7 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
     };
 
     sincronizarErro();
-  }, [erroSenha, etapa]);
+  }, [erroSenha, etapa, cautelaId]);
 
   // Sincronizar etapa com Firebase
   useEffect(() => {
@@ -275,6 +276,7 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
       }
 
       // Atualizar cautela com status de complemento aguardando
+      const primeiroAcessoAtual = isPrimeiroAcesso;
       await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
         statusComplemento: 'aguardando_confirmacao',
         materiaisComplemento: materiaisAdicionados.map(m => ({
@@ -286,10 +288,10 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
           ...(m.carregadores !== undefined && { carregadores: m.carregadores })
         })),
         sessaoDigitacao: {
-          etapa: isPrimeiroAcesso ? 'primeiro_acesso' : 'senha',
+          etapa: primeiroAcessoAtual ? 'primeiro_acesso' : 'senha',
           senhaLength: 0,
           confirmarSenhaLength: 0,
-          erro: null,
+          erro: '',
           timestamp: Date.now()
         }
       });

@@ -81,6 +81,9 @@ const TotemPolicialInterface = () => {
   const tamanhoLogo = quantidadeMateriais > 5 ? 'h-12' : 'h-16';
   const tamanhoTitulo = quantidadeMateriais > 5 ? 'text-base' : 'text-lg';
 
+  // Estado para rastrear qual tipo de cautela está ativa
+  const tipoAtualRef = useRef<'nova' | 'complemento' | 'transferencia' | null>(null);
+
   // 🔥 REALTIME: Escutar cautelas aguardando confirmação em tempo real
   useEffect(() => {
     console.log('[Totem] Iniciando listener realtime para cautelas aguardando...');
@@ -97,6 +100,7 @@ const TotemPolicialInterface = () => {
           const data = docSnap.data();
           
           console.log('[Totem] Cautela recebida em tempo real:', docSnap.id);
+          tipoAtualRef.current = 'nova';
           
           setCautelaAtual({
             id: docSnap.id,
@@ -122,17 +126,19 @@ const TotemPolicialInterface = () => {
           setMensagemSucesso("");
         } else {
           // Não há cautela aguardando - verificar se havia uma antes (foi confirmada)
-          if (cautelaAnteriorRef.current) {
+          if (tipoAtualRef.current === 'nova' && cautelaAnteriorRef.current) {
             console.log('[Totem] Cautela confirmada! Exibindo mensagem de sucesso.');
             setMensagemSucesso("RECEBIMENTO CONFIRMADO!");
             cautelaAnteriorRef.current = null;
+            tipoAtualRef.current = null;
             
             setTimeout(() => {
               setMensagemSucesso("");
             }, 3000);
+            
+            setCautelaAtual(null);
+            setSessaoDigitacao(null);
           }
-          setCautelaAtual(null);
-          setSessaoDigitacao(null);
         }
       },
       (error) => {
@@ -152,6 +158,7 @@ const TotemPolicialInterface = () => {
           const data = docSnap.data();
           
           console.log('[Totem] Complemento de cautela detectado:', docSnap.id);
+          tipoAtualRef.current = 'complemento';
           
           // Usar materiais do complemento para exibição
           const materiaisComplemento = data.materiaisComplemento || [];
@@ -178,8 +185,16 @@ const TotemPolicialInterface = () => {
           
           cautelaAnteriorRef.current = docSnap.id;
           setMensagemSucesso("");
+        } else {
+          // Complemento foi cancelado ou confirmado
+          if (tipoAtualRef.current === 'complemento') {
+            console.log('[Totem] Complemento cancelado ou confirmado');
+            setCautelaAtual(null);
+            setSessaoDigitacao(null);
+            cautelaAnteriorRef.current = null;
+            tipoAtualRef.current = null;
+          }
         }
-        // Não limpar cautelaAtual aqui - deixar o listener principal gerenciar
       },
       (error) => {
         console.error('[Totem] Erro no listener de complemento:', error);
@@ -198,6 +213,7 @@ const TotemPolicialInterface = () => {
           const data = docSnap.data();
           
           console.log('[Totem] Transferência de material detectada:', docSnap.id);
+          tipoAtualRef.current = 'transferencia';
           
           const transferenciaPara = data.transferenciaPara;
           if (transferenciaPara) {
@@ -224,6 +240,15 @@ const TotemPolicialInterface = () => {
             
             cautelaAnteriorRef.current = docSnap.id;
             setMensagemSucesso("");
+          }
+        } else {
+          // Transferência foi cancelada ou confirmada
+          if (tipoAtualRef.current === 'transferencia') {
+            console.log('[Totem] Transferência cancelada ou confirmada');
+            setCautelaAtual(null);
+            setSessaoDigitacao(null);
+            cautelaAnteriorRef.current = null;
+            tipoAtualRef.current = null;
           }
         }
       },
