@@ -10,12 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Save, UserPlus, Trash2, CalendarOff, CalendarIcon } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Save, UserPlus, Trash2, CalendarOff, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import PolicialSearchCombobox from '@/components/guarda-quartel/PolicialSearchCombobox';
+import type { DateRange } from 'react-day-picker';
 
 interface DiaSemAula {
   id: string;
@@ -45,8 +47,11 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
   
   // Dias sem aula
   const [diasSemAula, setDiasSemAula] = useState<DiaSemAula[]>([]);
+  const [diasSemAulaAberto, setDiasSemAulaAberto] = useState(false);
   const [dialogDiaSemAulaOpen, setDialogDiaSemAulaOpen] = useState(false);
+  const [modoSelecao, setModoSelecao] = useState<'unico' | 'intervalo'>('unico');
   const [novaDataSemAula, setNovaDataSemAula] = useState<Date | undefined>(undefined);
+  const [intervaloDatasSemAula, setIntervaloDatasSemAula] = useState<DateRange | undefined>(undefined);
   const [novoMotivo, setNovoMotivo] = useState('Feriado Nacional');
 
   useEffect(() => {
@@ -141,22 +146,50 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
   };
 
   const adicionarDiaSemAula = async () => {
-    if (!novaDataSemAula) {
-      toast.error('Selecione uma data');
-      return;
-    }
-
     try {
-      await addDoc(collection(db, 'projetos_dias_sem_aula'), {
-        projetoId: projeto.id,
-        data: Timestamp.fromDate(novaDataSemAula),
-        motivo: novoMotivo,
-        criadoEm: Timestamp.now()
-      });
+      if (modoSelecao === 'unico') {
+        if (!novaDataSemAula) {
+          toast.error('Selecione uma data');
+          return;
+        }
+        
+        await addDoc(collection(db, 'projetos_dias_sem_aula'), {
+          projetoId: projeto.id,
+          data: Timestamp.fromDate(novaDataSemAula),
+          motivo: novoMotivo,
+          criadoEm: Timestamp.now()
+        });
+        
+        toast.success('Dia sem aula adicionado!');
+      } else {
+        // Modo intervalo
+        if (!intervaloDatasSemAula?.from || !intervaloDatasSemAula?.to) {
+          toast.error('Selecione o período completo (início e fim)');
+          return;
+        }
+        
+        // Gerar todos os dias do intervalo
+        const diasDoIntervalo = eachDayOfInterval({
+          start: intervaloDatasSemAula.from,
+          end: intervaloDatasSemAula.to
+        });
+        
+        // Adicionar cada dia
+        for (const dia of diasDoIntervalo) {
+          await addDoc(collection(db, 'projetos_dias_sem_aula'), {
+            projetoId: projeto.id,
+            data: Timestamp.fromDate(dia),
+            motivo: novoMotivo,
+            criadoEm: Timestamp.now()
+          });
+        }
+        
+        toast.success(`${diasDoIntervalo.length} dias sem aula adicionados!`);
+      }
       
-      toast.success('Dia sem aula adicionado!');
       setDialogDiaSemAulaOpen(false);
       setNovaDataSemAula(undefined);
+      setIntervaloDatasSemAula(undefined);
       setNovoMotivo('Feriado Nacional');
       carregarDiasSemAula();
     } catch (error) {
@@ -403,26 +436,49 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
                 Nenhum dia sem aula cadastrado
               </p>
             ) : (
-              diasSemAula.map((dia) => (
-                <div
-                  key={dia.id}
-                  className="flex items-center justify-between p-3 border rounded"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {format(dia.data, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{dia.motivo}</p>
+              <Collapsible open={diasSemAulaAberto} onOpenChange={setDiasSemAulaAberto}>
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                    <div className="flex items-center gap-3">
+                      {diasSemAulaAberto ? (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      )}
+                      <div>
+                        <p className="font-medium">{diasSemAula.length} dia(s) sem aula cadastrado(s)</p>
+                        <p className="text-sm text-muted-foreground">
+                          Clique para {diasSemAulaAberto ? 'minimizar' : 'expandir'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => removerDiaSemAula(dia.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3">
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                    {diasSemAula.map((dia) => (
+                      <div
+                        key={dia.id}
+                        className="flex items-center justify-between p-3 border rounded"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {format(dia.data, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                          </p>
+                          <p className="text-sm text-muted-foreground">{dia.motivo}</p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removerDiaSemAula(dia.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             <Dialog open={dialogDiaSemAulaOpen} onOpenChange={setDialogDiaSemAulaOpen}>
@@ -432,40 +488,105 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
                   Adicionar Dia Sem Aula
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Adicionar Dia Sem Aula</DialogTitle>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
+                  {/* Seletor de modo */}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={modoSelecao === 'unico' ? 'default' : 'outline'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setModoSelecao('unico')}
+                    >
+                      Dia Único
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={modoSelecao === 'intervalo' ? 'default' : 'outline'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setModoSelecao('intervalo')}
+                    >
+                      Período (Intervalo)
+                    </Button>
+                  </div>
+
                   <div>
-                    <Label>Data</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal mt-1",
-                            !novaDataSemAula && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {novaDataSemAula ? (
-                            format(novaDataSemAula, "dd/MM/yyyy")
-                          ) : (
-                            <span>Selecionar data</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={novaDataSemAula}
-                          onSelect={setNovaDataSemAula}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <Label>{modoSelecao === 'unico' ? 'Data' : 'Período'}</Label>
+                    {modoSelecao === 'unico' ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal mt-1",
+                              !novaDataSemAula && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {novaDataSemAula ? (
+                              format(novaDataSemAula, "dd/MM/yyyy")
+                            ) : (
+                              <span>Selecionar data</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={novaDataSemAula}
+                            onSelect={setNovaDataSemAula}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal mt-1",
+                              !intervaloDatasSemAula?.from && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {intervaloDatasSemAula?.from ? (
+                              intervaloDatasSemAula.to ? (
+                                <>
+                                  {format(intervaloDatasSemAula.from, "dd/MM/yyyy")} -{" "}
+                                  {format(intervaloDatasSemAula.to, "dd/MM/yyyy")}
+                                </>
+                              ) : (
+                                format(intervaloDatasSemAula.from, "dd/MM/yyyy")
+                              )
+                            ) : (
+                              <span>Selecionar período</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="range"
+                            selected={intervaloDatasSemAula}
+                            onSelect={setIntervaloDatasSemAula}
+                            numberOfMonths={2}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                    {modoSelecao === 'intervalo' && intervaloDatasSemAula?.from && intervaloDatasSemAula?.to && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {eachDayOfInterval({ start: intervaloDatasSemAula.from, end: intervaloDatasSemAula.to }).length} dia(s) serão adicionados
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -487,7 +608,7 @@ const ConfiguracaoProjetoTab = ({ projeto, onUpdate }: ConfiguracaoProjetoTabPro
                   </div>
 
                   <Button onClick={adicionarDiaSemAula} className="w-full">
-                    Adicionar
+                    {modoSelecao === 'unico' ? 'Adicionar' : 'Adicionar Período'}
                   </Button>
                 </div>
               </DialogContent>
