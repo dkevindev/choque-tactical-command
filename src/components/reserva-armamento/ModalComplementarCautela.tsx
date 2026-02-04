@@ -43,6 +43,13 @@ interface ModalComplementarCautelaProps {
 
 type Etapa = 'selecao' | 'aguardando' | 'confirmado';
 
+// Função helper para limpar campos undefined antes de salvar no Firebase
+const limparUndefined = (obj: Record<string, any>): Record<string, any> => {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([_, v]) => v !== undefined)
+  );
+};
+
 const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
   open,
   onClose,
@@ -279,13 +286,13 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
       const primeiroAcessoAtual = isPrimeiroAcesso;
       await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
         statusComplemento: 'aguardando_confirmacao',
-        materiaisComplemento: materiaisAdicionados.map(m => ({
+        materiaisComplemento: materiaisAdicionados.map(m => limparUndefined({
           materialId: m.materialId,
           nome: m.nome,
           quantidade: m.quantidade,
-          ...(m.categoria && { categoria: m.categoria }),
-          ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
-          ...(m.carregadores !== undefined && { carregadores: m.carregadores })
+          categoria: m.categoria,
+          numeroSerie: m.numeroSerie,
+          carregadores: m.carregadores
         })),
         sessaoDigitacao: {
           etapa: primeiroAcessoAtual ? 'primeiro_acesso' : 'senha',
@@ -372,13 +379,13 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
       const novosMateriais = [...materiaisAtuais, ...materiaisAdicionados];
       
       await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
-        materiais: novosMateriais.map(m => ({
+        materiais: novosMateriais.map(m => limparUndefined({
           materialId: m.materialId,
           nome: m.nome,
           quantidade: m.quantidade,
-          ...(m.categoria && { categoria: m.categoria }),
-          ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
-          ...(m.carregadores !== undefined && { carregadores: m.carregadores })
+          categoria: m.categoria,
+          numeroSerie: m.numeroSerie,
+          carregadores: m.carregadores
         })),
         statusComplemento: deleteField(),
         materiaisComplemento: deleteField(),

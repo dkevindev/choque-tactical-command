@@ -373,6 +373,7 @@ const ArmeiroInterface = () => {
     // Verificar cautelas aguardando confirmação (para recuperar modal ao reabrir página)
     const verificarCautelasAguardando = async () => {
       try {
+        // 1. Verificar cautelas novas aguardando confirmação
         const cautelasAguardandoSnapshot = await getDocs(
           query(
             collection(db, 'cautelas_provisorias'),
@@ -381,22 +382,66 @@ const ArmeiroInterface = () => {
         );
 
         if (!cautelasAguardandoSnapshot.empty) {
-          // Pegar a primeira cautela aguardando
           const cautelaDoc = cautelasAguardandoSnapshot.docs[0];
           const cautelaData = cautelaDoc.data();
           
           console.log('[Armeiro] Recuperando cautela aguardando confirmação:', cautelaDoc.id);
           
-          // Recuperar dados para reabrir o modal
           const nomePolicial = `${cautelaData.postoGrad || ''} ${cautelaData.policialNomeGuerra || cautelaData.policialNome}`.trim();
           
           setCautelaAguardandoId(cautelaDoc.id);
           setPolicialAguardandoId(cautelaData.policialId);
           setPolicialAguardandoNome(nomePolicial);
           setMateriaisAguardando(cautelaData.materiais || []);
-          
-          // Reabrir modal de aguardando
           setModalAguardando(true);
+          return;
+        }
+
+        // 2. Verificar complementos pendentes
+        const complementosSnapshot = await getDocs(
+          query(
+            collection(db, 'cautelas_provisorias'),
+            where('statusComplemento', '==', 'aguardando_confirmacao')
+          )
+        );
+
+        if (!complementosSnapshot.empty) {
+          const cautelaDoc = complementosSnapshot.docs[0];
+          const data = cautelaDoc.data();
+          
+          console.log('[Armeiro] Recuperando complemento aguardando confirmação:', cautelaDoc.id);
+          
+          const nomePolicial = `${data.postoGrad || ''} ${data.policialNomeGuerra || data.policialNome}`.trim();
+          
+          // Mapear materiais existentes limpando undefined
+          const materiaisExistentes = (data.materiais || []).map((m: any) => {
+            const mat: any = { materialId: m.materialId, nome: m.nome, quantidade: m.quantidade };
+            if (m.categoria) mat.categoria = m.categoria;
+            if (m.numeroSerie) mat.numeroSerie = m.numeroSerie;
+            if (m.carregadores !== undefined) mat.carregadores = m.carregadores;
+            return mat;
+          });
+          
+          setComplementarCautelaId(cautelaDoc.id);
+          setComplementarPolicialId(data.policialId);
+          setComplementarPolicialNome(nomePolicial);
+          setComplementarMateriais(materiaisExistentes);
+          setModalComplementar(true);
+          return;
+        }
+
+        // 3. Verificar transferências pendentes
+        const transferenciasSnapshot = await getDocs(
+          query(
+            collection(db, 'cautelas_provisorias'),
+            where('statusTransferencia', '==', 'aguardando_confirmacao')
+          )
+        );
+
+        if (!transferenciasSnapshot.empty) {
+          console.log('[Armeiro] Transferência pendente detectada - recarregar movimentações');
+          // Transferências são tratadas pelo BaixaMaterialSection ao carregar
+          // Aqui apenas forçamos recarregar os dados para o modal aparecer
         }
       } catch (error) {
         console.error('Erro ao verificar cautelas aguardando:', error);
@@ -1442,13 +1487,18 @@ const ArmeiroInterface = () => {
                   setComplementarCautelaId(cautelaId);
                   setComplementarPolicialId(policialId);
                   setComplementarPolicialNome(policialNome);
-                  setComplementarMateriais(materiais.map(m => ({
-                    materialId: m.materialId || m.id,
-                    nome: m.nome,
-                    quantidade: m.quantidade,
-                    categoria: m.categoria,
-                    numeroSerie: m.numeroSerie
-                  })));
+                  // Limpar undefined dos materiais para evitar erro no Firebase
+                  setComplementarMateriais(materiais.map(m => {
+                    const material: any = {
+                      materialId: m.materialId || m.id,
+                      nome: m.nome,
+                      quantidade: m.quantidade
+                    };
+                    if (m.categoria) material.categoria = m.categoria;
+                    if (m.numeroSerie) material.numeroSerie = m.numeroSerie;
+                    if (m.carregadores !== undefined) material.carregadores = m.carregadores;
+                    return material;
+                  }));
                   setModalComplementar(true);
                 }}
               />
