@@ -1,18 +1,21 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BookOpen, Clock, CheckCircle } from "lucide-react";
+import { BookOpen, Clock, CheckCircle, Plus } from "lucide-react";
 
 interface MovimentacaoDia {
   id: string;
   cautelaId?: string;
+  policialId?: string;
   policialNome: string;
   policialNomeGuerra?: string;
   policialMatricula?: string;
   policialNumeral?: number;
   postoGrad?: string;
   materiais: Array<{
+    materialId?: string;
     nome: string;
     quantidade: number;
     numeroSerie?: string;
@@ -31,6 +34,7 @@ interface LivroCautelaDiaProps {
   movimentacoes: MovimentacaoDia[];
   dataAbertura: Date;
   armeiroNome: string;
+  onComplementarCautela?: (cautelaId: string, policialId: string, policialNome: string, materiais: any[]) => void;
 }
 
 const formatarAssinatura = (data: Date, hora: string) => {
@@ -69,7 +73,7 @@ const formatarDevolucao = (data: Date, hora: string, armeiroNome?: string) => {
   );
 };
 
-const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCautelaDiaProps) => {
+const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome, onComplementarCautela }: LivroCautelaDiaProps) => {
   if (movimentacoes.length === 0) {
     return (
       <Card>
@@ -117,6 +121,7 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                   <TableHead className="w-[100px] text-center">Status</TableHead>
                   <TableHead className="min-w-[180px] text-center">Assinatura Saída</TableHead>
                   <TableHead className="min-w-[180px] text-center">Devolução</TableHead>
+                  {onComplementarCautela && <TableHead className="w-[100px] text-center">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -180,6 +185,28 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </TableCell>
+                    {onComplementarCautela && (
+                      <TableCell className="text-center">
+                        {mov.status === 'pendente' && mov.cautelaId && mov.policialId ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onComplementarCautela(
+                              mov.cautelaId!,
+                              mov.policialId!,
+                              `${mov.postoGrad || ''} ${mov.policialNomeGuerra || mov.policialNome}`.trim(),
+                              mov.materiais
+                            )}
+                            className="text-xs gap-1"
+                          >
+                            <Plus className="h-3 w-3" />
+                            Compl.
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

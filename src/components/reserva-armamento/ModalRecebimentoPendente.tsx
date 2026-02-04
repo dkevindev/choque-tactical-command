@@ -37,6 +37,7 @@ interface ModalRecebimentoPendenteProps {
   onClose: () => void;
   cautela: CautelaPendente | null;
   onRecebimentoConcluido: () => void;
+  armeiroLogadoId?: string;
 }
 
 interface MaterialDevolucao {
@@ -48,7 +49,7 @@ interface MaterialDevolucao {
   motivoFalta?: string;
 }
 
-const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConcluido }: ModalRecebimentoPendenteProps) => {
+const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConcluido, armeiroLogadoId }: ModalRecebimentoPendenteProps) => {
   const [etapa, setEtapa] = useState<'senha' | 'materiais'>('senha');
   const [senha, setSenha] = useState('');
   const [senhaErro, setSenhaErro] = useState('');
@@ -82,14 +83,23 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
       setSenhaErro('');
 
       // Buscar armeiro logado (não o policial da cautela)
-      const userStorage = localStorage.getItem('user');
-      if (!userStorage) {
+      // Priorizar armeiroLogadoId passado via prop, fallback para localStorage
+      let armeiroIdToUse = armeiroLogadoId;
+      
+      if (!armeiroIdToUse) {
+        const userStorage = localStorage.getItem('user');
+        if (userStorage) {
+          const userData = JSON.parse(userStorage);
+          armeiroIdToUse = userData.id;
+        }
+      }
+      
+      if (!armeiroIdToUse) {
         setSenhaErro('Usuário não logado.');
         return;
       }
       
-      const userData = JSON.parse(userStorage);
-      const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
+      const armeiroDoc = await getDoc(doc(db, 'policiais', armeiroIdToUse));
       
       if (!armeiroDoc.exists()) {
         setSenhaErro('Armeiro não encontrado.');

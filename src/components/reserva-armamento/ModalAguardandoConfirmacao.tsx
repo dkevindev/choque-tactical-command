@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, CheckCircle, User, XCircle, KeyRound, AlertTriangle, Package } from "lucide-react";
-import { doc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, CheckCircle, User, XCircle, KeyRound, AlertTriangle, Package, Plus, Minus } from "lucide-react";
+import { doc, onSnapshot, getDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
 
@@ -18,6 +19,17 @@ interface MaterialSelecionado {
   carregadores?: number;
 }
 
+interface Material {
+  id: string;
+  nome: string;
+  categoria: string;
+  tipoArma?: string;
+  calibre?: string;
+  numeroSerie?: string;
+  quantidade?: number;
+  disponivel: boolean;
+}
+
 interface ModalAguardandoConfirmacaoProps {
   open: boolean;
   onClose: () => void;
@@ -27,9 +39,10 @@ interface ModalAguardandoConfirmacaoProps {
   materiais: MaterialSelecionado[];
   onConfirmado: () => void;
   onCancelar: () => void;
+  onMateriaisAtualizados?: (materiais: MaterialSelecionado[]) => void;
 }
 
-type Etapa = 'senha' | 'primeiro_acesso' | 'resetar_senha' | 'confirmado';
+type Etapa = 'senha' | 'primeiro_acesso' | 'resetar_senha' | 'confirmado' | 'adicionar_material';
 
 const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
   open,
@@ -39,10 +52,12 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
   policialNome,
   materiais,
   onConfirmado,
-  onCancelar
+  onCancelar,
+  onMateriaisAtualizados
 }) => {
   const [etapa, setEtapa] = useState<Etapa>('senha');
   const [loading, setLoading] = useState(false);
+  const [materiaisAtuais, setMateriaisAtuais] = useState<MaterialSelecionado[]>(materiais);
   
   // Senha do policial
   const [senhaPolicial, setSenhaPolicial] = useState('');
@@ -57,7 +72,18 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
   // Resetar senha
   const [senhaArmeiro, setSenhaArmeiro] = useState('');
   const [erroSenhaArmeiro, setErroSenhaArmeiro] = useState('');
-
+  
+  // Adicionar material
+  const [materiaisDisponiveis, setMateriaisDisponiveis] = useState<Material[]>([]);
+  const [materialSelecionado, setMaterialSelecionado] = useState<string>('');
+  const [quantidadeMaterial, setQuantidadeMaterial] = useState(1);
+  const [loadingMateriais, setLoadingMateriais] = useState(false);
+  
+  // Sincronizar materiais quando props mudam
+  useEffect(() => {
+    setMateriaisAtuais(materiais);
+  }, [materiais]);
+  
   // Reset estados quando modal abre e inicializa sessão de digitação
   useEffect(() => {
     if (open) {
@@ -70,6 +96,9 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
       setSenhaArmeiro('');
       setErroSenhaArmeiro('');
       setLoading(false);
+      setMaterialSelecionado('');
+      setQuantidadeMaterial(1);
+      setMateriaisAtuais(materiais);
 
       // Inicializar sessão de digitação no Firebase para o totem espelhar
       if (cautelaId) {
@@ -83,7 +112,120 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
         }).catch(console.error);
       }
     }
-  }, [open, cautelaId]);
+  }, [open, cautelaId, materiais]);
+  
+  // Carregar materiais disponíveis quando entra na etapa de adicionar material
+  const carregarMateriaisDisponiveis = async () => {
+    try {
+      setLoadingMateriais(true);
+      const querySnapshot = await getDocs(
+        query(collection(db, 'materiais_belicos'), where('disponivel', '==', true))
+      );
+      
+      const materiaisData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Material));
+      
+      // Filtrar materiais que já estão na cautela (exceto munição que pode ser adicionada)
+      const materiaisJaNaCautela = materiaisAtuais.map(m => m.materialId);
+      const materiaisFiltrados = materiaisData.filter(m => {
+        const isMunicao = m.categoria?.toLowerCase().includes('munição') || 
+                         m.categoria?.toLowerCase().includes('municao');
+        // Munição pode ser adicionada novamente, outros materiais não
+        return isMunicao || !materiaisJaNaCautela.includes(m.id);
+      });
+      
+      setMateriaisDisponiveis(materiaisFiltrados);
+    } catch (error) {
+      console.error('Erro ao carregar materiais:', error);
+    } finally {
+      setLoadingMateriais(false);
+    }
+  };
+  
+  // Adicionar material à cautela
+  const handleAdicionarMaterial = async () => {
+    if (!materialSelecionado) {
+      toast({
+        title: "Atenção",
+        description: "Selecione um material para adicionar.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const material = materiaisDisponiveis.find(m => m.id === materialSelecionado);
+    if (!material) return;
+    
+    try {
+      setLoading(true);
+      
+      const novoMaterial: MaterialSelecionado = {
+        materialId: material.id,
+        nome: material.nome,
+        quantidade: quantidadeMaterial,
+        categoria: material.categoria,
+        numeroSerie: material.numeroSerie
+      };
+      
+      const novosMateriaisAtuais = [...materiaisAtuais, novoMaterial];
+      
+      // Atualizar no Firebase
+      await updateDoc(doc(db, 'cautelas_provisorias', cautelaId), {
+        materiais: novosMateriaisAtuais.map(m => ({
+          materialId: m.materialId || m.id,
+          nome: m.nome,
+          quantidade: m.quantidade,
+          categoria: m.categoria,
+          ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
+          ...(m.carregadores && { carregadores: m.carregadores })
+        }))
+      });
+      
+      // Marcar material como indisponível (se não for munição)
+      const isMunicao = material.categoria?.toLowerCase().includes('munição') || 
+                       material.categoria?.toLowerCase().includes('municao');
+      
+      if (isMunicao && material.quantidade) {
+        const novaQuantidade = Math.max(0, material.quantidade - quantidadeMaterial);
+        await updateDoc(doc(db, 'materiais_belicos', material.id), {
+          quantidade: novaQuantidade,
+          ...(novaQuantidade <= 0 && { disponivel: false })
+        });
+      } else {
+        await updateDoc(doc(db, 'materiais_belicos', material.id), {
+          disponivel: false,
+          cauteladoPara: policialId,
+          dataCautela: new Date()
+        });
+      }
+      
+      // Atualizar estado local
+      setMateriaisAtuais(novosMateriaisAtuais);
+      onMateriaisAtualizados?.(novosMateriaisAtuais);
+      
+      toast({
+        title: "Material Adicionado",
+        description: `${material.nome} foi adicionado à cautela.`
+      });
+      
+      // Voltar para etapa de senha
+      setMaterialSelecionado('');
+      setQuantidadeMaterial(1);
+      setEtapa('senha');
+      
+    } catch (error) {
+      console.error('Erro ao adicionar material:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao adicionar material. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Sincronizar tamanho da senha com Firebase (para o totem espelhar)
   useEffect(() => {
@@ -410,14 +552,14 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
             </div>
 
             {/* Materiais */}
-            {materiais && materiais.length > 0 && (
+            {materiaisAtuais && materiaisAtuais.length > 0 && (
               <div className="bg-muted/50 rounded-lg p-3 max-h-32 overflow-y-auto">
                 <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                   <Package className="h-3 w-3" />
-                  MATERIAIS ({materiais.length}):
+                  MATERIAIS ({materiaisAtuais.length}):
                 </p>
                 <div className="space-y-1">
-                  {materiais.map((m, idx) => (
+                  {materiaisAtuais.map((m, idx) => (
                     <div key={idx} className="text-xs text-foreground">
                       • {m.nome}
                       {m.numeroSerie && <span className="text-muted-foreground"> - Série: {m.numeroSerie}</span>}
@@ -475,6 +617,19 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => {
+                    carregarMateriaisDisponiveis();
+                    setEtapa('adicionar_material');
+                  }}
+                  className="flex-1 text-xs gap-1"
+                  disabled={loading}
+                >
+                  <Plus className="h-3 w-3" />
+                  Adicionar Material
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setEtapa('resetar_senha')}
                   className="flex-1 text-xs gap-1"
                   disabled={loading}
@@ -482,20 +637,17 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
                   <KeyRound className="h-3 w-3" />
                   Resetar Senha
                 </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={onCancelar}
-                  className="flex-1 text-xs gap-1"
-                  disabled={loading}
-                >
-                  <XCircle className="h-3 w-3" />
-                  CANCELAR
-                </Button>
               </div>
-              <p className="text-xs text-muted-foreground text-center">
-                Resetar senha requer autorização do armeiro
-              </p>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onCancelar}
+                className="w-full text-xs gap-1"
+                disabled={loading}
+              >
+                <XCircle className="h-3 w-3" />
+                CANCELAR
+              </Button>
             </div>
           </div>
         )}
@@ -640,6 +792,122 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
                 }}
                 disabled={loading}
                 className="flex-1 h-10"
+              >
+                VOLTAR
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ETAPA: ADICIONAR MATERIAL */}
+        {etapa === 'adicionar_material' && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <h2 className="text-lg font-bold text-foreground flex items-center justify-center gap-2">
+                <Plus className="h-5 w-5 text-primary" />
+                ADICIONAR MATERIAL
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Adicionar item à cautela de {policialNome}
+              </p>
+            </div>
+
+            {/* Materiais atuais */}
+            {materiaisAtuais.length > 0 && (
+              <div className="bg-muted/50 rounded-lg p-3 max-h-24 overflow-y-auto">
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  Materiais na cautela ({materiaisAtuais.length}):
+                </p>
+                <div className="space-y-1">
+                  {materiaisAtuais.map((m, idx) => (
+                    <div key={idx} className="text-xs text-foreground">
+                      • {m.nome} {m.quantidade > 1 && `(${m.quantidade})`}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {loadingMateriais ? (
+              <div className="text-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                <p className="text-xs text-muted-foreground mt-2">Carregando materiais...</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-sm">Selecione o Material:</Label>
+                  <Select value={materialSelecionado} onValueChange={setMaterialSelecionado}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Escolher material..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {materiaisDisponiveis.map((mat) => (
+                        <SelectItem key={mat.id} value={mat.id}>
+                          {mat.nome}
+                          {mat.numeroSerie && ` - ${mat.numeroSerie}`}
+                          {mat.quantidade && ` (Est: ${mat.quantidade})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Quantidade para munição */}
+                {materialSelecionado && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Quantidade:</Label>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setQuantidadeMaterial(Math.max(1, quantidadeMaterial - 1))}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Input
+                        type="number"
+                        value={quantidadeMaterial}
+                        onChange={(e) => setQuantidadeMaterial(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-20 text-center"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setQuantidadeMaterial(quantidadeMaterial + 1)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                onClick={handleAdicionarMaterial}
+                disabled={loading || !materialSelecionado || loadingMateriais}
+                className="flex-1 gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                ADICIONAR
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEtapa('senha');
+                  setMaterialSelecionado('');
+                  setQuantidadeMaterial(1);
+                }}
+                disabled={loading}
+                className="flex-1"
               >
                 VOLTAR
               </Button>

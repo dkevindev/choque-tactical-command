@@ -39,9 +39,10 @@ interface LivroInfo {
 interface PendenciasAnterioresSectionProps {
   livroAtualId: string;
   onRecebimentoRealizado: () => void;
+  armeiroLogadoId?: string;
 }
 
-const PendenciasAnterioresSection = ({ livroAtualId, onRecebimentoRealizado }: PendenciasAnterioresSectionProps) => {
+const PendenciasAnterioresSection = ({ livroAtualId, onRecebimentoRealizado, armeiroLogadoId }: PendenciasAnterioresSectionProps) => {
   const [pendencias, setPendencias] = useState<(CautelaPendente & { livroInfo?: LivroInfo })[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalRecebimento, setModalRecebimento] = useState(false);
@@ -221,6 +222,7 @@ const PendenciasAnterioresSection = ({ livroAtualId, onRecebimentoRealizado }: P
         }}
         cautela={cautelaSelecionada}
         onRecebimentoConcluido={handleRecebimentoConcluido}
+        armeiroLogadoId={armeiroLogadoId}
       />
     </>
   );

@@ -1,21 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon, Eye, Users, ChevronDown, ChevronRight } from 'lucide-react';
-import { format, isSameDay } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar as CalendarIcon, Eye, Users, ChevronDown, ChevronRight, Copy } from 'lucide-react';
+import { format, isSameDay, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AulaDetalhesCard } from '../instrutor/AulaDetalhesCard';
 import { RelatorioMensalGestor } from './RelatorioMensalGestor';
 import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
+import { toast } from 'sonner';
 
 interface RelatoriosGestorTabProps {
   projeto: any;
@@ -52,6 +54,9 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
   const [instrutorSelecionado, setInstrutorSelecionado] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [aulasInstrutor, setAulasInstrutor] = useState<any[]>([]);
+  
+  // Estado para seletor de mês no relatório de instrutores
+  const [mesRelatorioInstrutores, setMesRelatorioInstrutores] = useState<Date>(new Date());
 
   useEffect(() => {
     carregarDados();
@@ -101,23 +106,14 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
           const policial = await buscarPolicialPorId(data.policialId);
 
           if (policial) {
-            // Contar aulas do instrutor
+            // Contar todas as aulas do instrutor
             const aulasInstrutor = aulas.filter(a => 
               a.instrutores?.includes(data.policialId)
             );
 
-            const hoje = new Date();
-            const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-            const aulasMes = aulasInstrutor.filter(a => {
-              const dataAula = a.data?.toDate ? a.data.toDate() : new Date(a.data);
-              return dataAula >= primeiroDiaMes;
-            });
-
             return {
               id: data.policialId,
               nome: formatarNomePolicial(policial),
-              aulasMes: aulasMes.length,
-              horasMes: aulasMes.length * 3,
               horasTotal: aulasInstrutor.length * 3
             };
           }
@@ -185,11 +181,43 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
     return alunosFrequencia.filter(aluno => !aluno.turmaId);
   };
 
+  // Calcular dados de instrutores com base no mês selecionado
+  const instrutoresRelatorioMes = useMemo(() => {
+    const primeiroDiaMes = new Date(mesRelatorioInstrutores.getFullYear(), mesRelatorioInstrutores.getMonth(), 1);
+    const ultimoDiaMes = new Date(mesRelatorioInstrutores.getFullYear(), mesRelatorioInstrutores.getMonth() + 1, 0, 23, 59, 59);
+    
+    return instrutoresRelatorio.map(instrutor => {
+      const aulasInstrutorMes = todasAulas.filter(a => {
+        if (!a.instrutores?.includes(instrutor.id)) return false;
+        const dataAula = a.data?.toDate ? a.data.toDate() : new Date(a.data);
+        return dataAula >= primeiroDiaMes && dataAula <= ultimoDiaMes;
+      });
+      
+      return {
+        ...instrutor,
+        aulasMes: aulasInstrutorMes.length,
+        horasMes: aulasInstrutorMes.length * 3
+      };
+    });
+  }, [instrutoresRelatorio, todasAulas, mesRelatorioInstrutores]);
+
+  // Gerar opções de meses (últimos 12 meses)
+  const opcoesDesMes = useMemo(() => {
+    const meses = [];
+    for (let i = 0; i < 12; i++) {
+      const data = subMonths(new Date(), i);
+      meses.push({
+        value: format(data, 'yyyy-MM'),
+        label: format(data, 'MMMM/yyyy', { locale: ptBR })
+      });
+    }
+    return meses;
+  }, []);
+
   const verDetalhesInstrutor = (instrutor: any) => {
-    // Buscar aulas do instrutor apenas do mês atual
-    const hoje = new Date();
-    const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59);
+    // Buscar aulas do instrutor no mês selecionado
+    const primeiroDiaMes = new Date(mesRelatorioInstrutores.getFullYear(), mesRelatorioInstrutores.getMonth(), 1);
+    const ultimoDiaMes = new Date(mesRelatorioInstrutores.getFullYear(), mesRelatorioInstrutores.getMonth() + 1, 0, 23, 59, 59);
     
     const aulasDoInstrutor = todasAulas.filter(a => {
       if (!a.instrutores?.includes(instrutor.id)) return false;
@@ -207,6 +235,44 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
     setInstrutorSelecionado(instrutor);
     setAulasInstrutor(aulasDoInstrutor);
     setDialogOpen(true);
+  };
+
+  // Função para copiar resumo de todos os instrutores
+  const copiarResumoInstrutores = () => {
+    const mesNome = format(mesRelatorioInstrutores, 'MMMM/yyyy', { locale: ptBR });
+    let texto = `📊 *RELATÓRIO DE HORAS - ${mesNome.toUpperCase()}*\n\n`;
+    
+    instrutoresRelatorioMes.forEach(inst => {
+      texto += `👤 ${inst.nome}\n`;
+      texto += `   📚 Aulas: ${inst.aulasMes}\n`;
+      texto += `   ⏱️ Horas: ${inst.horasMes}h\n\n`;
+    });
+    
+    const totalAulas = instrutoresRelatorioMes.reduce((sum, i) => sum + i.aulasMes, 0);
+    const totalHoras = instrutoresRelatorioMes.reduce((sum, i) => sum + i.horasMes, 0);
+    texto += `\n*TOTAL: ${totalAulas} aulas • ${totalHoras}h ministradas*`;
+    
+    navigator.clipboard.writeText(texto);
+    toast.success('Resumo copiado para a área de transferência!');
+  };
+
+  // Função para copiar detalhes de um instrutor específico
+  const copiarDetalhesInstrutor = () => {
+    if (!instrutorSelecionado) return;
+    
+    const mesNome = format(mesRelatorioInstrutores, 'MMMM/yyyy', { locale: ptBR });
+    let texto = `📊 *AULAS DE ${instrutorSelecionado.nome.toUpperCase()}*\n`;
+    texto += `📅 Referência: ${mesNome}\n\n`;
+    
+    aulasInstrutor.forEach(aula => {
+      const data = formatarDataAula(aula.data);
+      texto += `• ${data} - ${aula.turnoNome || `Turno ${aula.turno}`}\n`;
+    });
+    
+    texto += `\n*Total: ${aulasInstrutor.length} aulas • ${aulasInstrutor.length * 3}h*`;
+    
+    navigator.clipboard.writeText(texto);
+    toast.success('Detalhes copiados!');
   };
 
   const formatarDataAula = (data: any) => {
@@ -257,6 +323,35 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
 
       <TabsContent value="instrutores">
         <div className="space-y-6">
+          {/* Seletor de mês e botão copiar */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Mês de Referência:</span>
+              <Select 
+                value={format(mesRelatorioInstrutores, 'yyyy-MM')}
+                onValueChange={(value) => {
+                  const [ano, mes] = value.split('-').map(Number);
+                  setMesRelatorioInstrutores(new Date(ano, mes - 1, 1));
+                }}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {opcoesDesMes.map(opcao => (
+                    <SelectItem key={opcao.value} value={opcao.value}>
+                      {opcao.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="sm" onClick={copiarResumoInstrutores} className="gap-2">
+              <Copy className="h-4 w-4" />
+              Copiar Resumo
+            </Button>
+          </div>
+
           <div className="grid grid-cols-3 gap-6">
             <Card>
               <CardHeader className="pb-3">
@@ -272,12 +367,12 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Horas Ministradas (Mês)
+                  Horas Ministradas ({format(mesRelatorioInstrutores, 'MMM/yy', { locale: ptBR })})
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold">
-                  {instrutoresRelatorio.reduce((sum, i) => sum + i.horasMes, 0)}h
+                  {instrutoresRelatorioMes.reduce((sum, i) => sum + i.horasMes, 0)}h
                 </p>
               </CardContent>
             </Card>
@@ -285,12 +380,12 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Aulas Realizadas (Mês)
+                  Aulas Realizadas ({format(mesRelatorioInstrutores, 'MMM/yy', { locale: ptBR })})
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold">
-                  {instrutoresRelatorio.reduce((sum, i) => sum + i.aulasMes, 0)}
+                  {instrutoresRelatorioMes.reduce((sum, i) => sum + i.aulasMes, 0)}
                 </p>
               </CardContent>
             </Card>
@@ -298,7 +393,7 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Horas por Instrutor</CardTitle>
+              <CardTitle>Horas por Instrutor - {format(mesRelatorioInstrutores, 'MMMM/yyyy', { locale: ptBR })}</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -311,7 +406,7 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {instrutoresRelatorio.map((instrutor) => (
+                  {instrutoresRelatorioMes.map((instrutor) => (
                     <TableRow 
                       key={instrutor.id} 
                       className="cursor-pointer hover:bg-muted/50"
@@ -584,12 +679,12 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Aulas de {instrutorSelecionado?.nome}</DialogTitle>
+            <DialogTitle>Aulas de {instrutorSelecionado?.nome} - {format(mesRelatorioInstrutores, 'MMMM/yyyy', { locale: ptBR })}</DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             {aulasInstrutor.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">
-                Nenhuma aula registrada
+                Nenhuma aula registrada neste mês
               </p>
             ) : (
               <Table>
@@ -614,11 +709,15 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
               </Table>
             )}
           </ScrollArea>
-          <div className="border-t pt-4 mt-2">
-            <p className="text-sm text-muted-foreground">
+          <DialogFooter className="flex-col sm:flex-row gap-2 border-t pt-4">
+            <div className="flex-1 text-sm text-muted-foreground">
               Total: {aulasInstrutor.length} aulas • {aulasInstrutor.length * 3}h
-            </p>
-          </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={copiarDetalhesInstrutor} className="gap-2">
+              <Copy className="h-4 w-4" />
+              Copiar Detalhes
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Tabs>
