@@ -1507,59 +1507,6 @@ const ArmeiroInterface = () => {
                   }));
                   setModalComplementar(true);
                 }}
-                onTransferirMaterial={async (cautelaId, policialId, policialNome, materiais) => {
-                  // Buscar dados completos da cautela
-                  const cautelaDoc = await getDoc(doc(db, 'cautelas_provisorias', cautelaId));
-                  if (cautelaDoc.exists()) {
-                    const cautelaData = cautelaDoc.data();
-                    
-                    // Mapear materiais limpando undefined
-                    const materiaisLimpos = materiais.map(m => {
-                      const mat: any = {
-                        materialId: m.materialId || m.id,
-                        nome: m.nome,
-                        quantidade: m.quantidade
-                      };
-                      if (m.categoria) mat.categoria = m.categoria;
-                      if (m.numeroSerie) mat.numeroSerie = m.numeroSerie;
-                      if (m.carregadores !== undefined) mat.carregadores = m.carregadores;
-                      return mat;
-                    });
-                    
-                    setTransferenciaCautela({
-                      id: cautelaId,
-                      livroId: cautelaData.livroId,
-                      policialId: cautelaData.policialId,
-                      policialNome: cautelaData.policialNome,
-                      policialMatricula: cautelaData.policialMatricula,
-                      policialNomeGuerra: cautelaData.policialNomeGuerra,
-                      policialNumeral: cautelaData.policialNumeral,
-                      postoGrad: cautelaData.postoGrad,
-                      armeiroId: cautelaData.armeiroId,
-                      materiais: materiaisLimpos,
-                      dataCautela: cautelaData.dataCautela?.toDate?.() || new Date(),
-                      horaCautela: cautelaData.horaCautela,
-                      status: cautelaData.status
-                    });
-                    
-                    // Buscar policial de origem
-                    const policialDoc = await getDoc(doc(db, 'policiais', cautelaData.policialId));
-                    if (policialDoc.exists()) {
-                      const policialData = policialDoc.data();
-                      setTransferenciaPolicialOrigem({
-                        id: policialDoc.id,
-                        NOME: policialData.NOME,
-                        'Matrícula': policialData['Matrícula'],
-                        'Post/Grad': policialData['Post/Grad'],
-                        'NOME DE GUERRA': policialData['NOME DE GUERRA'],
-                        'NOME DE GUERRA1': policialData['NOME DE GUERRA1'],
-                        NUMERAL: policialData.NUMERAL
-                      });
-                    }
-                    
-                    setModalTransferencia(true);
-                  }
-                }}
               />
             </TabsContent>
 
