@@ -77,6 +77,7 @@ interface LivroAtivo {
 interface MovimentacaoDia {
   id: string;
   cautelaId?: string;
+  policialId?: string;
   policialNome: string;
   policialNomeGuerra?: string;
   policialMatricula?: string;
@@ -270,6 +271,7 @@ const ArmeiroInterface = () => {
           gruposMap.set(groupKey, {
             id: docSnap.id,
             cautelaId: docSnap.id,
+            policialId: data.policialId,
             policialNome: data.policialNome || '',
             policialNomeGuerra: nomeGuerra,
             policialMatricula: data.policialMatricula,
