@@ -372,8 +372,10 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
         transferidoDe: {
           policialId: policialOrigem.id,
           policialNome: policialOrigem.NOME,
-          policialNomeGuerra: policialOrigem['NOME DE GUERRA1'] || policialOrigem['NOME DE GUERRA'],
-          cautelaId: cautela.id
+          cautelaId: cautela.id,
+          ...((policialOrigem['NOME DE GUERRA1'] || policialOrigem['NOME DE GUERRA']) && {
+            policialNomeGuerra: policialOrigem['NOME DE GUERRA1'] || policialOrigem['NOME DE GUERRA']
+          })
         }
       });
 
