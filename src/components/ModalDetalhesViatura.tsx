@@ -83,6 +83,13 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   const [bandeiraCartao, setBandeiraCartao] = useState('');
   const [nomeCondutor, setNomeCondutor] = useState('');
   const [matriculaCondutor, setMatriculaCondutor] = useState('');
+  
+  // Estados para edição de KM
+  const [editandoKm, setEditandoKm] = useState(false);
+  const [novoKm, setNovoKm] = useState('');
+  const [novoKmOleo, setNovoKmOleo] = useState('');
+  const [salvandoKm, setSalvandoKm] = useState(false);
+  
   const { toast } = useToast();
 
   // Novo hook para dados FIPE
@@ -213,6 +220,80 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     setDataInicio(undefined);
     setDataFim(undefined);
     setDataEspecifica(undefined);
+  };
+
+  const handleAtualizarKm = async () => {
+    if (!viatura) return;
+    
+    const km = parseInt(novoKm);
+    const kmOleo = parseInt(novoKmOleo);
+    
+    if (isNaN(km) || km < 0) {
+      toast({
+        title: "Erro",
+        description: "O KM atual deve ser um número válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isNaN(kmOleo) || kmOleo < 0) {
+      toast({
+        title: "Erro",
+        description: "O KM próximo óleo deve ser um número válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (kmOleo <= km) {
+      toast({
+        title: "Atenção",
+        description: "O KM próximo óleo deve ser maior que o KM atual.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSalvandoKm(true);
+    
+    try {
+      const viaturaRef = doc(db, 'frota', viatura.id);
+      await updateDoc(viaturaRef, {
+        KM: km,
+        KMOLEO: kmOleo
+      });
+      
+      toast({
+        title: "KM atualizado",
+        description: `KM atual: ${km.toLocaleString()} | KM próximo óleo: ${kmOleo.toLocaleString()}`,
+      });
+      
+      setEditandoKm(false);
+      
+      // Atualizar os dados locais
+      if (viatura) {
+        viatura.KM = km;
+        viatura.KMOLEO = kmOleo;
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar KM:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar KM. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSalvandoKm(false);
+    }
+  };
+
+  const iniciarEdicaoKm = () => {
+    if (viatura) {
+      setNovoKm(viatura.KM?.toString() || '0');
+      setNovoKmOleo(viatura.KMOLEO?.toString() || '0');
+      setEditandoKm(true);
+    }
   };
 
   const getOrdensComFiltro = (filtro: string) => {
@@ -561,14 +642,58 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <p className="text-sm font-medium text-muted-foreground">Renavam</p>
                   <p className="text-sm font-semibold">{viatura.RENAVAM || 'N/A'}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">KM Atual</p>
-                  <p className="text-sm font-semibold">{viatura.KM?.toLocaleString() || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">KM Próximo Óleo</p>
-                  <p className="text-sm font-semibold">{viatura.KMOLEO?.toLocaleString() || 'N/A'}</p>
-                </div>
+                {/* KM Atual e Próximo Óleo - Editáveis */}
+                {editandoKm ? (
+                  <>
+                    <div className="space-y-1">
+                      <Label htmlFor="novoKm" className="text-sm font-medium text-muted-foreground">KM Atual</Label>
+                      <Input
+                        id="novoKm"
+                        type="number"
+                        value={novoKm}
+                        onChange={(e) => setNovoKm(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="novoKmOleo" className="text-sm font-medium text-muted-foreground">KM Próximo Óleo</Label>
+                      <Input
+                        id="novoKmOleo"
+                        type="number"
+                        value={novoKmOleo}
+                        onChange={(e) => setNovoKmOleo(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div className="flex items-end gap-2 md:col-span-2">
+                      <Button size="sm" onClick={handleAtualizarKm} disabled={salvandoKm}>
+                        <Save className="h-4 w-4 mr-1" />
+                        {salvandoKm ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditandoKm(false)} disabled={salvandoKm}>
+                        <X className="h-4 w-4 mr-1" />
+                        Cancelar
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-muted-foreground">KM Atual</p>
+                      <p className="text-sm font-semibold">{viatura.KM?.toLocaleString() || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-muted-foreground">KM Próximo Óleo</p>
+                      <p className="text-sm font-semibold">{viatura.KMOLEO?.toLocaleString() || 'N/A'}</p>
+                    </div>
+                    <div className="flex items-end">
+                      <Button size="sm" variant="outline" onClick={iniciarEdicaoKm}>
+                        <Edit className="h-4 w-4 mr-1" />
+                        Atualizar KM
+                      </Button>
+                    </div>
+                  </>
+                )}
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Saldo</p>
                   <p className="text-sm font-semibold">
