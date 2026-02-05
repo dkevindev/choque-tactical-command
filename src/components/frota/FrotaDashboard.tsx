@@ -26,6 +26,8 @@ import GestaoSaldos from './GestaoSaldos';
 import { Viatura } from '@/bot/types';
 import { isFroteLeve, isFrotePesada, buscarViaturasLeves, buscarViaturasPesadas, limparCacheViaturas } from '@/lib/viaturaUtils';
 import AtualizarKmOleoDialog from '../gestao-pessoas/AtualizarKmOleoDialog';
+import ModalCadastroViatura from './ModalCadastroViatura';
+import { Plus } from 'lucide-react';
 
 interface OrdemServico {
   id: string;
@@ -59,6 +61,7 @@ const FrotaDashboard = () => {
   const [gastoFrotePesadaMes, setGastoFrotePesadaMes] = useState(0);
   const [totalOSMes, setTotalOSMes] = useState(0);
   const [kmDialogOpen, setKmDialogOpen] = useState(false);
+  const [cadastroViaturaOpen, setCadastroViaturaOpen] = useState(false);
   const [avariasNaoVisualizadas, setAvariasNaoVisualizadas] = useState<any[]>([]);
   const { toast } = useToast();
 
@@ -636,28 +639,19 @@ const FrotaDashboard = () => {
         <div className="flex gap-2">
           <Button
             variant="default"
+            onClick={() => setCadastroViaturaOpen(true)}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Cadastrar Viatura
+          </Button>
+          <Button
+            variant="secondary"
             onClick={() => setKmDialogOpen(true)}
             className="gap-2"
           >
             <RefreshCw className="h-4 w-4" />
             Atualizar KM e Óleo
-          </Button>
-          <Button
-            onClick={handleAtualizarSaldos}
-            disabled={isUpdatingSaldos}
-            variant="secondary"
-            size="sm"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isUpdatingSaldos ? 'animate-spin' : ''}`} />
-            {isUpdatingSaldos ? 'Atualizando...' : 'Atualizar Saldos'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setGestaoSaldosAberto(true)}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Configurar Saldos
           </Button>
         </div>
       </div>
@@ -942,6 +936,15 @@ const FrotaDashboard = () => {
       <AtualizarKmOleoDialog 
         open={kmDialogOpen} 
         onOpenChange={setKmDialogOpen}
+      />
+
+      {/* Modal de Cadastrar Viatura */}
+      <ModalCadastroViatura
+        open={cadastroViaturaOpen}
+        onOpenChange={setCadastroViaturaOpen}
+        onSuccess={() => {
+          fetchViaturas();
+        }}
       />
     </div>
   );
