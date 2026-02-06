@@ -246,11 +246,19 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
         const dataAula = a.data?.toDate ? a.data.toDate() : new Date(a.data);
         return dataAula >= primeiroDiaMes && dataAula <= ultimoDiaMes;
       });
+
+      // Ordenar aulas por data crescente
+      const aulasOrdenadas = [...aulasInstrutorMes].sort((a, b) => {
+        const d1 = a.data?.toDate ? a.data.toDate() : new Date(a.data);
+        const d2 = b.data?.toDate ? b.data.toDate() : new Date(b.data);
+        return d1.getTime() - d2.getTime();
+      });
       
       return {
         ...instrutor,
         aulasMes: aulasInstrutorMes.length,
-        horasMes: aulasInstrutorMes.length * 3
+        horasMes: aulasInstrutorMes.length * 3,
+        aulasDetalhes: aulasOrdenadas
       };
     });
   }, [instrutoresRelatorio, todasAulas, mesRelatorioInstrutores]);
@@ -299,7 +307,17 @@ const RelatoriosGestorTab = ({ projeto }: RelatoriosGestorTabProps) => {
     instrutoresRelatorioMes.forEach(inst => {
       texto += `👤 ${inst.nome}\n`;
       texto += `   📚 Aulas: ${inst.aulasMes}\n`;
-      texto += `   ⏱️ Horas: ${inst.horasMes}h\n\n`;
+      texto += `   ⏱️ Horas: ${inst.horasMes}h\n`;
+      if (inst.aulasDetalhes && inst.aulasDetalhes.length > 0) {
+        texto += `   📅 Dias:\n`;
+        inst.aulasDetalhes.forEach((aula: any) => {
+          const dataAula = aula.data?.toDate ? aula.data.toDate() : new Date(aula.data);
+          const dataFormatada = format(dataAula, 'dd/MM/yyyy');
+          const turno = aula.turnoNome || aula.turno || '';
+          texto += `      • ${dataFormatada}${turno ? ` - ${turno}` : ''}\n`;
+        });
+      }
+      texto += `\n`;
     });
     
     const totalAulas = instrutoresRelatorioMes.reduce((sum, i) => sum + i.aulasMes, 0);
