@@ -601,7 +601,27 @@ const CadastroMateriais = () => {
         where('materialId', '==', materialId),
         orderBy('data', 'desc')
       );
-      const snapshot = await getDocs(q);
+      let snapshot = await getDocs(q);
+
+      // Registro retroativo: se não há histórico e o material está cautelado, cria registro atual
+      if (snapshot.empty) {
+        const material = materiais.find(m => m.id === materialId);
+        if (material?.policialAssociadoId && material?.policialAssociadoNome) {
+          await addDoc(collection(db, 'historico_material'), {
+            materialId: materialId,
+            materialNome: material.nome || material.categoria,
+            numeroSerie: material.numeroSerie || '',
+            policialNome: material.policialAssociadoNome,
+            policialId: material.policialAssociadoId,
+            tipo: 'cautelado',
+            data: new Date(),
+            observacoes: 'Registro retroativo - cautela vigente'
+          });
+          // Recarregar após inserção
+          snapshot = await getDocs(q);
+        }
+      }
+
       const data = snapshot.docs.map(d => ({
         id: d.id,
         ...d.data(),
