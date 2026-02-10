@@ -336,6 +336,142 @@ const CadastroMateriais = () => {
       if (editingMaterial) {
         await updateDoc(doc(db, 'materiais_belicos', editingMaterial.id), materialData);
         materialId = editingMaterial.id;
+
+        // Verificar se o policial mudou para atualizar cautelas
+        const policialAntigoId = editingMaterial.policialAssociadoId || '';
+        const policialNovoId = formData.policialAssociadoId || '';
+
+        if (policialAntigoId !== policialNovoId) {
+          // 1. Remover da cautela do policial antigo
+          if (policialAntigoId) {
+            const cautelasAntigoSnapshot = await getDocs(
+              query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
+            );
+            for (const cautelaDoc of cautelasAntigoSnapshot.docs) {
+              const cautela = cautelaDoc.data();
+              if (cautela.policialId !== policialAntigoId) continue;
+              const materiaisFiltrados = (cautela.materiais || []).filter(
+                (m: any) => m.materialId !== editingMaterial.id && 
+                            m.materialId !== `${editingMaterial.id}_carregadores` &&
+                            m.materialId !== `${editingMaterial.id}_municoes`
+              );
+              if (materiaisFiltrados.length !== (cautela.materiais || []).length) {
+                await updateDoc(doc(db, 'cautelas_permanentes', cautelaDoc.id), {
+                  materiais: materiaisFiltrados
+                });
+              }
+            }
+            // Registrar devolução no histórico
+            await addDoc(collection(db, 'historico_material'), {
+              materialId: editingMaterial.id,
+              materialNome: materialData.nome || materialData.categoria,
+              numeroSerie: materialData.numeroSerie || '',
+              policialNome: editingMaterial.policialAssociadoNome || '',
+              policialId: policialAntigoId,
+              tipo: 'devolvido',
+              data: new Date(),
+              observacoes: policialNovoId ? 'Transferido para outro policial via edição' : 'Devolvido à reserva via edição'
+            });
+          }
+
+          // 2. Adicionar na cautela do novo policial
+          if (policialNovoId) {
+            const policial = policiais.find(p => p.id === policialNovoId);
+
+            // Registrar cautela no histórico
+            await addDoc(collection(db, 'historico_material'), {
+              materialId: editingMaterial.id,
+              materialNome: materialData.nome || materialData.categoria,
+              numeroSerie: materialData.numeroSerie || '',
+              policialNome: formData.policialAssociadoNome,
+              policialId: policialNovoId,
+              tipo: 'cautelado',
+              data: new Date(),
+              observacoes: policialAntigoId ? 'Transferido de outro policial via edição' : 'Cautelado via edição'
+            });
+
+            // Montar item para cautela
+            const itemPrincipal: any = {
+              materialId: editingMaterial.id,
+              nome: materialData.nome,
+              categoria: materialData.categoria,
+              quantidade: 1
+            };
+            if (materialData.numeroSerie) itemPrincipal.numeroSerie = materialData.numeroSerie;
+            if (materialData.tamanhoColete) itemPrincipal.tamanhoColete = materialData.tamanhoColete;
+            if (materialData.sexo) itemPrincipal.sexo = materialData.sexo;
+            if (materialData.fabricante) itemPrincipal.fabricante = materialData.fabricante;
+            if (materialData.modelo) itemPrincipal.modelo = materialData.modelo;
+            if (materialData.numeroSIARM) itemPrincipal.numeroSIARM = materialData.numeroSIARM;
+            if (materialData.categoria === 'Armamento') {
+              itemPrincipal.calibre = materialData.calibre;
+              itemPrincipal.quantidadeCarregadores = parseInt(materialData.quantidadeCarregadores) || 0;
+              itemPrincipal.quantidadeMunicoes = parseInt(materialData.quantidadeMunicoes) || 0;
+            }
+
+            const materiaisParaCautela: any[] = [itemPrincipal];
+            if (materialData.categoria === 'Armamento') {
+              if (materialData.quantidadeCarregadores && parseInt(materialData.quantidadeCarregadores) > 0) {
+                materiaisParaCautela.push({
+                  materialId: `${editingMaterial.id}_carregadores`,
+                  nome: `Carregadores - ${materialData.nome}`,
+                  categoria: 'Acessório',
+                  quantidade: parseInt(materialData.quantidadeCarregadores),
+                  fabricante: materialData.fabricante || 'N/D',
+                  modelo: materialData.modelo || 'N/D',
+                  calibre: materialData.calibre,
+                  numeroSerie: 'N/D'
+                });
+              }
+              if (materialData.quantidadeMunicoes && parseInt(materialData.quantidadeMunicoes) > 0) {
+                materiaisParaCautela.push({
+                  materialId: `${editingMaterial.id}_municoes`,
+                  nome: `Munição ${materialData.calibre}`,
+                  categoria: 'Munição',
+                  subcategoria: 'Letal',
+                  quantidade: parseInt(materialData.quantidadeMunicoes),
+                  calibre: materialData.calibre,
+                  numeroSerie: 'N/D',
+                  fabricante: 'N/D'
+                });
+              }
+            }
+
+            // Buscar cautela ativa do novo policial
+            const cautelasNovoSnapshot = await getDocs(
+              query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
+            );
+            const cautelaNovoPolicial = cautelasNovoSnapshot.docs.find(d => d.data().policialId === policialNovoId);
+
+            if (cautelaNovoPolicial) {
+              const materiaisAtualizados = [...(cautelaNovoPolicial.data().materiais || []), ...materiaisParaCautela];
+              await updateDoc(doc(db, 'cautelas_permanentes', cautelaNovoPolicial.id), {
+                materiais: materiaisAtualizados
+              });
+            } else {
+              const querySnapshot = await getDocs(collection(db, 'cautelas_permanentes'));
+              const proximoNumero = querySnapshot.size + 1;
+              const numeroCautela = String(proximoNumero).padStart(3, '0');
+              await addDoc(collection(db, 'cautelas_permanentes'), {
+                numeroCautela,
+                numeroSequencial: proximoNumero,
+                policialId: policialNovoId,
+                policialNome: policial?.nome,
+                policialMatricula: policial?.matricula,
+                policialPatente: policial?.patente,
+                numeral: policial?.numeral,
+                materiais: materiaisParaCautela,
+                observacoes: formData.observacoes || '',
+                status: 'ativa',
+                tipoDocumento: 'permanente',
+                dataInicio: new Date(),
+                createdAt: new Date(),
+                createdBy: 'admin'
+              });
+            }
+          }
+        }
+
         toast.success('Material atualizado com sucesso');
       } else {
         const docRef = await addDoc(collection(db, 'materiais_belicos'), materialData);
