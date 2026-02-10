@@ -159,7 +159,19 @@ const BaixaMaterialCargaModal = ({ open, onClose, onSuccess }: Props) => {
       );
 
       for (const material of materiaisSelecionados) {
-        // 1. Criar registro de baixa
+        // 1. Registrar histórico
+        await addDoc(collection(db, 'historico_material'), {
+          materialId: material.id,
+          materialNome: material.nome || material.categoria,
+          numeroSerie: material.numeroSerie || '',
+          policialNome: material.policialAssociadoNome || '',
+          policialId: material.policialAssociadoId || '',
+          tipo: 'baixa',
+          data: new Date(),
+          observacoes: `Baixa: ${motivoBaixa} - Destino: ${destino}`
+        });
+
+        // 2. Criar registro de baixa
         await addDoc(collection(db, 'baixas_materiais'), {
           materialId: material.id,
           nome: material.nome || material.categoria,
@@ -180,7 +192,7 @@ const BaixaMaterialCargaModal = ({ open, onClose, onSuccess }: Props) => {
           criadoPor: ''
         });
 
-        // 2. Atualizar material
+        // 3. Atualizar material
         await updateDoc(doc(db, 'materiais_belicos', material.id), {
           baixado: true,
           disponivel: false,
@@ -189,7 +201,7 @@ const BaixaMaterialCargaModal = ({ open, onClose, onSuccess }: Props) => {
           motivoBaixa
         });
 
-        // 3. Remover de cautelas permanentes
+        // 4. Remover de cautelas permanentes
         for (const cautelaDoc of cautelasSnapshot.docs) {
           const cautela = cautelaDoc.data();
           const materiaisAtuais = cautela.materiais || [];

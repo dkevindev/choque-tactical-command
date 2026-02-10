@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Plus, 
   Edit, 
@@ -15,7 +17,12 @@ import {
   Save,
   X,
   Search,
-  User
+  User,
+  History,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  ArrowRightCircle,
+  XCircle
 } from 'lucide-react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -59,6 +66,10 @@ const CadastroMateriais = () => {
   const [tipoArmaFiltro, setTipoArmaFiltro] = useState('todos');
   const [cauteladoFiltro, setCauteladoFiltro] = useState('todos');
   const [modeloFiltro, setModeloFiltro] = useState('todos');
+  const [historicoMaterial, setHistoricoMaterial] = useState<any[]>([]);
+  const [showHistorico, setShowHistorico] = useState(false);
+  const [historicoLoading, setHistoricoLoading] = useState(false);
+  const [historicoNomeMaterial, setHistoricoNomeMaterial] = useState('');
   const [formData, setFormData] = useState({
     nome: '',
     categoria: '',
@@ -370,6 +381,18 @@ const CadastroMateriais = () => {
       if (formData.policialAssociadoId && !editingMaterial) {
         const policial = policiais.find(p => p.id === formData.policialAssociadoId);
         
+        // Registrar no histórico
+        await addDoc(collection(db, 'historico_material'), {
+          materialId: materialId,
+          materialNome: materialData.nome || materialData.categoria,
+          numeroSerie: materialData.numeroSerie || '',
+          policialNome: formData.policialAssociadoNome,
+          policialId: formData.policialAssociadoId,
+          tipo: 'cautelado',
+          data: new Date(),
+          observacoes: 'Cautela inicial no cadastro'
+        });
+        
         // Verificar se já existe uma cautela ativa para este policial
         const cautelasQuery = query(
           collection(db, 'cautelas_permanentes'),
@@ -528,6 +551,8 @@ const CadastroMateriais = () => {
     if (!confirm('Tem certeza que deseja excluir este material?')) return;
 
     try {
+      const material = materiais.find(m => m.id === id);
+      
       // Verificar se está em alguma cautela ativa e remover
       const cautelasSnapshot = await getDocs(
         query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
@@ -538,6 +563,19 @@ const CadastroMateriais = () => {
           (m: any) => m.materialId !== id
         );
         if (materiaisAtualizados?.length !== cautela.materiais?.length) {
+          // Registrar no histórico antes de remover
+          if (material) {
+            await addDoc(collection(db, 'historico_material'), {
+              materialId: id,
+              materialNome: material.nome || material.categoria,
+              numeroSerie: material.numeroSerie || '',
+              policialNome: material.policialAssociadoNome || '',
+              policialId: material.policialAssociadoId || '',
+              tipo: 'removido',
+              data: new Date(),
+              observacoes: 'Material excluído do sistema'
+            });
+          }
           await updateDoc(doc(db, 'cautelas_permanentes', cautelaDoc.id), {
             materiais: materiaisAtualizados
           });
@@ -550,6 +588,53 @@ const CadastroMateriais = () => {
     } catch (error) {
       console.error('Erro ao excluir material:', error);
       toast.error('Erro ao excluir material');
+    }
+  };
+
+  const loadHistorico = async (materialId: string, materialNome: string) => {
+    setHistoricoLoading(true);
+    setHistoricoNomeMaterial(materialNome);
+    setShowHistorico(true);
+    try {
+      const q = query(
+        collection(db, 'historico_material'),
+        where('materialId', '==', materialId),
+        orderBy('data', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        data: d.data().data?.toDate?.() || new Date()
+      }));
+      setHistoricoMaterial(data);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+      setHistoricoMaterial([]);
+    } finally {
+      setHistoricoLoading(false);
+    }
+  };
+
+  const getHistoricoIcon = (tipo: string) => {
+    switch (tipo) {
+      case 'cautelado': return <ArrowUpCircle className="h-5 w-5 text-green-500" />;
+      case 'devolvido': return <ArrowDownCircle className="h-5 w-5 text-red-500" />;
+      case 'transferido': return <ArrowRightCircle className="h-5 w-5 text-blue-500" />;
+      case 'baixa': return <XCircle className="h-5 w-5 text-muted-foreground" />;
+      case 'removido': return <XCircle className="h-5 w-5 text-destructive" />;
+      default: return <History className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const getHistoricoLabel = (tipo: string) => {
+    switch (tipo) {
+      case 'cautelado': return 'Cautelado';
+      case 'devolvido': return 'Devolvido';
+      case 'transferido': return 'Transferido';
+      case 'baixa': return 'Baixa';
+      case 'removido': return 'Removido';
+      default: return tipo;
     }
   };
 
@@ -1135,13 +1220,21 @@ const CadastroMateriais = () => {
                       {material.policialAssociadoNome || '-'}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(material)}
                         >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => loadHistorico(material.id, material.nome || material.categoria)}
+                          title="Histórico"
+                        >
+                          <History className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -1160,6 +1253,47 @@ const CadastroMateriais = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de Histórico */}
+      <Dialog open={showHistorico} onOpenChange={setShowHistorico}>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Histórico — {historicoNomeMaterial}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="flex-1 min-h-0">
+            {historicoLoading ? (
+              <p className="text-center py-8 text-muted-foreground">Carregando histórico...</p>
+            ) : historicoMaterial.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">Nenhum registro de histórico encontrado</p>
+            ) : (
+              <div className="space-y-3 p-1">
+                {historicoMaterial.map((h, i) => (
+                  <div key={h.id || i} className="flex gap-3 items-start p-3 rounded-lg border bg-muted/30">
+                    <div className="mt-0.5">{getHistoricoIcon(h.tipo)}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="text-xs">{getHistoricoLabel(h.tipo)}</Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {h.data instanceof Date ? h.data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </span>
+                      </div>
+                      {h.policialNome && (
+                        <p className="text-sm font-medium mt-1">{h.policialNome}</p>
+                      )}
+                      {h.observacoes && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{h.observacoes}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

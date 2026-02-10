@@ -48,7 +48,6 @@ const MateriaisTransferidos = () => {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('');
   const [filtroLocal, setFiltroLocal] = useState('todos');
-  const [filtroStatus, setFiltroStatus] = useState('todos');
   const [detalhes, setDetalhes] = useState<Transferencia | null>(null);
 
   useEffect(() => {
@@ -82,20 +81,8 @@ const MateriaisTransferidos = () => {
       t.policialMatricula?.toLowerCase().includes(filtro.toLowerCase()) ||
       t.publicacao?.toLowerCase().includes(filtro.toLowerCase());
     const matchLocal = filtroLocal === 'todos' || t.localDestino === filtroLocal;
-    const matchStatus = filtroStatus === 'todos' || t.status === filtroStatus;
-    return matchTexto && matchLocal && matchStatus;
+    return matchTexto && matchLocal;
   });
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pendente':
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">Pendente</Badge>;
-      case 'concluida':
-        return <Badge className="bg-green-600 hover:bg-green-700 text-white">Concluída</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -109,7 +96,7 @@ const MateriaisTransferidos = () => {
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -128,16 +115,6 @@ const MateriaisTransferidos = () => {
                 {locaisUnicos.map((local) => (
                   <SelectItem key={local} value={local}>{local}</SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os Status</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="concluida">Concluída</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -163,20 +140,19 @@ const MateriaisTransferidos = () => {
                   <TableHead>Publicação</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead>Materiais</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                     <TableCell colSpan={7} className="text-center py-8">
                       Carregando...
                     </TableCell>
                   </TableRow>
                 ) : transferenciasFiltradas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       Nenhuma transferência encontrada
                     </TableCell>
                   </TableRow>
@@ -202,7 +178,6 @@ const MateriaisTransferidos = () => {
                           </Badge>
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(t.status)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" onClick={() => setDetalhes(t)}>
                           <Eye className="h-4 w-4" />
@@ -248,12 +223,7 @@ const MateriaisTransferidos = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Status</p>
-                  {getStatusBadge(detalhes.status)}
-                </div>
-              </div>
+
 
               {detalhes.materiaisLevados?.length > 0 && (
                 <div>
