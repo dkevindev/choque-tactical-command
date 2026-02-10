@@ -1,35 +1,56 @@
 
 
-# Registrar Cautela Atual no Historico
+# Corrigir Erro de Index no Historico de Material
 
-## O que sera feito
+## Problema
 
-Ao clicar no botao de historico de um material, se ele estiver atualmente cautelado a um policial mas nao tiver nenhum registro na colecao `historico_material`, o sistema criara automaticamente um registro retroativo com os dados da associacao atual. Isso garante que pelo menos a cautela vigente fique registrada, alem de todas as futuras.
+O Firebase Firestore exige um indice composto (composite index) para consultas que combinam `where` com `orderBy` em campos diferentes. A query atual usa `where('materialId', '==', id)` + `orderBy('data', 'desc')`, e esse indice nao existe no projeto.
+
+A mensagem de erro no console confirma:
+> "The query requires an index."
+
+## Solucao
+
+Remover o `orderBy('data', 'desc')` da query do Firestore e ordenar os resultados em memoria (no JavaScript) apos buscar os documentos. Isso elimina a necessidade de criar um indice composto no Firebase Console.
 
 ## Detalhes Tecnicos
 
 ### Arquivo: `src/components/admin-belico/CadastroMateriais.tsx`
 
-Alterar a funcao `loadHistorico` para:
+Na funcao `loadHistorico`, alterar a query de:
 
-1. Buscar os registros existentes em `historico_material`
-2. Se nao houver nenhum registro E o material estiver cautelado (tiver `policialAssociadoNome` e `policialAssociadoId`), criar automaticamente um registro do tipo `cautelado` com os dados atuais
-3. Recarregar a lista apos a insercao
-
-Para isso, a funcao precisa receber tambem os dados do material (ou busca-lo da lista `materiais` em memoria). Como `materiais` ja esta no estado do componente, basta encontrar o material pelo ID.
-
+```typescript
+const q = query(
+  collection(db, 'historico_material'),
+  where('materialId', '==', materialId),
+  orderBy('data', 'desc')
+);
 ```
-Logica:
-1. Buscar historico do Firebase
-2. Se snapshot vazio E material.policialAssociadoId existir:
-   - addDoc em historico_material com tipo 'cautelado' e observacao 'Registro retroativo - cautela vigente'
-   - Recarregar snapshot
-3. Exibir resultados
+
+Para:
+
+```typescript
+const q = query(
+  collection(db, 'historico_material'),
+  where('materialId', '==', materialId)
+);
+```
+
+E apos mapear os documentos, ordenar em memoria:
+
+```typescript
+const data = snapshot.docs.map(d => ({
+  id: d.id,
+  ...d.data(),
+  data: d.data().data?.toDate?.() || new Date()
+}));
+data.sort((a, b) => b.data.getTime() - a.data.getTime());
+setHistoricoMaterial(data);
 ```
 
 ### Resumo
 
 | Arquivo | Acao |
 |---------|------|
-| `CadastroMateriais.tsx` | Alterar funcao `loadHistorico` para registrar cautela atual se historico vazio |
+| `CadastroMateriais.tsx` | Remover `orderBy` da query e ordenar em memoria |
 
