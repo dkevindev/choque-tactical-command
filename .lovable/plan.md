@@ -1,97 +1,71 @@
 
 
-# Refatorar Historico de Materiais: Botao Global "Consultar Historico"
+# Corrigir Historico de Transferidos: Verificar materiaisDevolvidos
 
-## Problema Atual
+## Problema
 
-Ao clicar no icone de relogio (History) de cada material individual, o sistema verifica se existe historico e, caso nao exista, cria um registro retroativo para aquele material especifico. Isso significa que o usuario precisa clicar em cada material um por um para gerar o historico.
+O codigo atual so verifica `materiaisLevados` das transferencias. Porem, quando um policial e transferido e **devolve** materiais, esses itens ficam em `materiaisDevolvidos`. A arma nserie 58J051042 esta nessa lista, por isso o historico nao foi criado.
+
+Dados reais do Firebase confirmam:
+- `materiaisDevolvidos`: PISTOLA .40, nserie 58J051042 (materialId: ituHAW6jGpWHCEdzor1V)
+- `materiaisLevados`: Colete Balistico (outro material)
 
 ## O que sera feito
 
-1. Remover a logica de registro retroativo do `loadHistorico` (o clique individual apenas consulta, sem criar nada)
-2. Adicionar um botao "Consultar Historico" no header da pagina que processa TODOS os materiais de uma vez
-3. Para cada material cautelado sem historico, cria o registro retroativo
-4. Tambem consulta a colecao `transferencias_policiais` para verificar se algum material passou por policiais transferidos e cria registros de historico tipo "transferido"
+Alterar a funcao `gerarHistoricoGlobal` para verificar **ambas** as listas: `materiaisLevados` e `materiaisDevolvidos`.
 
 ## Detalhes Tecnicos
 
 ### Arquivo: `src/components/admin-belico/CadastroMateriais.tsx`
 
-**1. Remover registro retroativo do `loadHistorico` (linhas 560-602)**
-
-A funcao `loadHistorico` passara a ser apenas consulta simples:
+**Linhas 621-644** - Expandir o bloco de transferencias para iterar tambem sobre `materiaisDevolvidos`:
 
 ```typescript
-const loadHistorico = async (materialId: string, materialNome: string) => {
-  setHistoricoLoading(true);
-  setHistoricoNomeMaterial(materialNome);
-  setShowHistorico(true);
-  try {
-    const q = query(collection(db, 'historico_material'), where('materialId', '==', materialId));
-    const snapshot = await getDocs(q);
-    const data = snapshot.docs.map(d => ({
-      id: d.id, ...d.data(),
-      data: d.data().data?.toDate?.() || new Date()
-    }));
-    data.sort((a, b) => b.data.getTime() - a.data.getTime());
-    setHistoricoMaterial(data);
-  } catch (error) {
-    console.error('Erro ao carregar histórico:', error);
-    setHistoricoMaterial([]);
-  } finally {
-    setHistoricoLoading(false);
+// 3. Consultar transferências de policiais
+const transferenciasSnap = await getDocs(collection(db, 'transferencias_policiais'));
+for (const transDoc of transferenciasSnap.docs) {
+  const transData = transDoc.data();
+  
+  // Verificar AMBAS as listas: levados E devolvidos
+  const materiaisLevados = transData.materiaisLevados || [];
+  const materiaisDevolvidos = transData.materiaisDevolvidos || [];
+  const todosMateriaisTransferencia = [
+    ...materiaisLevados.map((m: any) => ({ ...m, subTipo: 'levado' })),
+    ...materiaisDevolvidos.map((m: any) => ({ ...m, subTipo: 'devolvido' }))
+  ];
+
+  for (const matTrans of todosMateriaisTransferencia) {
+    const matId = matTrans.id || matTrans.materialId;
+    if (!matId) continue;
+    
+    const chaveUnica = `${matId}_${transData.policialId || transData.policialNome}`;
+    if (historicoTransferidos.has(chaveUnica)) continue;
+
+    const obs = matTrans.subTipo === 'levado'
+      ? `Levado para: ${transData.localDestino || 'Destino não informado'}`
+      : `Devolvido pelo policial transferido para: ${transData.localDestino || 'Destino não informado'}`;
+
+    await addDoc(collection(db, 'historico_material'), {
+      materialId: matId,
+      materialNome: matTrans.nome || matTrans.materialNome || 'Material',
+      numeroSerie: matTrans.numeroSerie || '',
+      policialNome: transData.policialNome || 'Desconhecido',
+      policialId: transData.policialId || '',
+      tipo: 'transferido',
+      data: transData.dataTransferencia?.toDate?.() || transData.createdAt?.toDate?.() || new Date(),
+      observacoes: obs
+    });
+    transferenciasEncontradas++;
+    historicoTransferidos.add(chaveUnica);
   }
-};
+}
 ```
 
-**2. Nova funcao `gerarHistoricoGlobal`**
+### Resumo
 
-Adicionar funcao que:
-- Carrega todos os registros de `historico_material` de uma vez
-- Para cada material cautelado sem historico, cria registro retroativo tipo `cautelado`
-- Carrega `transferencias_policiais` e verifica se algum materialId dos materiais aparece nos `materiaisLevados`
-- Para cada match em transferencias sem registro de historico tipo `transferido`, cria o registro com dados do policial transferido e destino
-- Exibe toast com resumo (ex: "12 registros criados, 3 transferencias encontradas")
-
-**3. Adicionar botao no header (linha 685-698)**
-
-Adicionar botao "Consultar Historico" ao lado dos botoes existentes:
-
-```typescript
-<Button 
-  variant="outline" 
-  onClick={gerarHistoricoGlobal}
-  disabled={gerandoHistorico}
-  className="flex items-center gap-2"
->
-  <History className="h-4 w-4" />
-  {gerandoHistorico ? 'Gerando...' : 'Gerar Histórico'}
-</Button>
-```
-
-**4. Novo estado para controle de loading**
-
-```typescript
-const [gerandoHistorico, setGerandoHistorico] = useState(false);
-```
-
-### Logica da verificacao de transferidos
-
-```
-Para cada material em materiais_belicos:
-  1. Buscar se existe historico em historico_material
-  2. Se nao existe e material esta cautelado -> criar registro "cautelado"
-  3. Buscar em transferencias_policiais se o materialId aparece em materiaisLevados
-  4. Para cada transferencia encontrada sem historico correspondente -> criar registro "transferido"
-     com policialNome, localDestino e data da transferencia
-```
-
-### Resumo de alteracoes
-
-| Local | Acao |
-|-------|------|
-| `loadHistorico` | Remover bloco de registro retroativo (linhas 571-587) |
-| Header | Adicionar botao "Gerar Historico" |
-| Nova funcao | `gerarHistoricoGlobal` que processa todos os materiais + transferidos |
-| Novo estado | `gerandoHistorico` para loading do botao |
+| O que muda | Detalhe |
+|------------|---------|
+| `materiaisDevolvidos` | Agora tambem e verificado, alem de `materiaisLevados` |
+| Observacao no historico | Diferencia se o material foi "levado" ou "devolvido" pelo policial transferido |
+| Resultado esperado | A PISTOLA .40 nserie 58J051042 aparecera no historico com o nome do policial transferido |
 
