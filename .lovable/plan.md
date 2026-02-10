@@ -1,89 +1,161 @@
 
 
-# Corrigir Delay no Carregamento da Aba "Baixa"
+# Criar Menu "Saiu da Carga" e Corrigir Problemas de Materiais
 
-## Problema
+## Contexto
 
-Quando o usuario clica na aba "Baixa", a mensagem "Nenhum policial com material cautelado" aparece imediatamente e so depois os policiais carregam. Isso acontece por dois motivos:
+Atualmente, ao transferir policiais ou dar baixa em coletes vencidos, os materiais nao sao corretamente removidos da carga e continuam aparecendo nas listagens (Coletes, Reserva de Armamento). Alem disso, ao excluir um material no Cadastro, o sistema nao verifica se ele esta cautelado a algum policial.
 
-1. **Sem indicador de carregamento**: O estado `policiaisComCautela` comeca como array vazio e nao existe um estado `loading` para o carregamento inicial, entao a mensagem "Nenhum policial" aparece enquanto os dados ainda estao sendo buscados.
+## O que sera feito
 
-2. **Consultas sequenciais lentas**: A funcao `recarregarPoliciaisComCautela` busca os dados de cada policial um por um em um loop `for`, fazendo 16+ chamadas sequenciais ao Firebase. Cada chamada espera a anterior terminar.
+### 1. Nova aba "Saiu da Carga" no menu Belico
 
-## Solucao
+A grade de 6 abas passara para 7, adicionando "Saiu da Carga" entre "Transferencias" e "Materiais". Esta aba tera duas sub-abas internas:
 
-### 1. Adicionar estado de carregamento inicial
+**Sub-aba "Transferidos"**
+- Reaproveitamento do componente `MateriaisTransferidos` ja existente, que mostra policiais transferidos e seus materiais levados/devolvidos
+- Ja contem todas as informacoes: policial, destino, materiais, documentos
 
-Criar um estado `loadingInicial` que mostra um skeleton/spinner enquanto os dados carregam, em vez da mensagem enganosa "Nenhum policial".
+**Sub-aba "Baixa de Materiais"**
+- Tabela com historico de materiais que receberam baixa (coletes vencidos, materiais inservíveis, etc.)
+- Informacoes: nome do material, numero de serie, categoria, motivo da baixa, destino, policial cautelado antes, data da baixa
+- Botao "Dar Baixa em Materiais" que abre modal para:
+  - Selecionar materiais (com busca e filtros por categoria)
+  - Selecao em lote (checkboxes)
+  - Informar motivo da baixa (Vencimento, Inservível, Avaria, Extravio, Outro)
+  - Informar destino (ex: "Enviado para destruicao", "Devolvido ao almoxarifado")
+  - Ao confirmar: salvar registro na colecao `baixas_materiais` no Firebase, atualizar o material como `baixado: true` e `disponivel: false`, e remover da cautela permanente do policial se estiver cautelado
 
-### 2. Paralelizar consultas Firebase
+### 2. Filtrar materiais transferidos/baixados nas listagens
 
-Substituir o loop `for` sequencial por `Promise.all` para buscar todos os policiais simultaneamente, reduzindo o tempo de ~1.5s para ~0.2s.
+**ColetesTab.tsx**: Adicionar filtro na query para excluir coletes com `transferido: true` ou `baixado: true`
+
+**Reserva de Armamento**: Materiais devolvidos por policiais transferidos devem ter o campo `policialAssociadoNome` limpo quando marcados como `disponivel: true` (correcao no `TransferenciaPolicialModal.tsx`)
+
+### 3. Excluir material verifica cautela permanente
+
+**CadastroMateriais.tsx**: Antes de deletar, consultar `cautelas_permanentes` para verificar se o material consta em alguma cautela ativa. Se sim, remover o material do array `materiais` da cautela antes de excluir.
+
+---
 
 ## Detalhes Tecnicos
 
-### Arquivo: `src/components/reserva-armamento/BaixaMaterialSection.tsx`
+### Novo arquivo: `src/components/admin-belico/SaiuDaCarga.tsx`
 
-**Adicionar estado de loading inicial (linha 59):**
+Componente principal com Tabs internas:
+- Tab "Transferidos": renderiza `<MateriaisTransferidos />`
+- Tab "Baixa de Materiais": renderiza a listagem de materiais baixados + botao de acao
+
+### Novo arquivo: `src/components/admin-belico/BaixaMaterialCargaModal.tsx`
+
+Modal para dar baixa em lote:
+- Carrega materiais de `materiais_belicos` (filtrando opcionalente por categoria, ex: "Colete Balistico")
+- Busca por nome ou numero de serie
+- Checkboxes para selecao em lote
+- Campos: motivo da baixa (Select), destino (Input), observacoes (Textarea)
+- Ao confirmar, para cada material selecionado:
+  1. Criar doc em `baixas_materiais` com: materialId, nome, numeroSerie, categoria, fabricante, modelo, vencimento, motivoBaixa, destino, policialCauteladoNome, policialCauteladoMatricula, dataBaixa, observacoes
+  2. Atualizar `materiais_belicos/{id}` com `baixado: true, disponivel: false, cautelado: false, dataBaixa: Timestamp.now(), motivoBaixa`
+  3. Se material estava cautelado: buscar cautela em `cautelas_permanentes` onde `materiais` contem o materialId, remover do array `materiais` via `updateDoc`
+
+### Alteracao: `src/components/AdminDashboard.tsx`
+
+- Import `SaiuDaCarga`
+- Alterar grid de 6 para 7 colunas nas tabs do Belico
+- Adicionar `<TabsTrigger value="saiu-carga">Saiu da Carga</TabsTrigger>`
+- Adicionar `<TabsContent value="saiu-carga"><SaiuDaCarga /></TabsContent>`
+
+### Alteracao: `src/components/admin-belico/ColetesTab.tsx`
+
+Na funcao `buscarColetes`, filtrar resultados que tenham `transferido: true` ou `baixado: true`:
+
 ```typescript
-const [loadingInicial, setLoadingInicial] = useState(true);
+const dados = snapshot.docs
+  .map(doc => ({ id: doc.id, ...doc.data() }))
+  .filter((d: any) => !d.transferido && !d.baixado) as Colete[];
 ```
 
-**Paralelizar consultas na funcao `recarregarPoliciaisComCautela` (linhas 114-123):**
+### Alteracao: `src/components/admin-belico/TransferenciaPolicialModal.tsx`
 
-Antes (sequencial):
+Ao marcar material como devolvido, limpar o campo `policialAssociadoNome`:
+
 ```typescript
-for (const policialId of policialIds) {
-  const policialDoc = await getDoc(doc(db, 'policiais', policialId));
-  if (policialDoc.exists()) {
-    policiaisData.push({ id: policialDoc.id, ...policialDoc.data() });
+await updateDoc(doc(db, 'materiais_belicos', material.materialId), {
+  disponivel: true,
+  cautelado: false,
+  policialAssociadoNome: '',
+  policialAssociadoId: '',
+  // ...resto dos campos
+});
+```
+
+### Alteracao: `src/components/admin-belico/CadastroMateriais.tsx`
+
+Na funcao `handleDelete`, antes de deletar, verificar cautelas:
+
+```typescript
+const handleDelete = async (id: string) => {
+  if (!confirm('Tem certeza que deseja excluir este material?')) return;
+  try {
+    // Verificar se esta em alguma cautela ativa
+    const cautelasSnapshot = await getDocs(
+      query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
+    );
+    for (const cautelaDoc of cautelasSnapshot.docs) {
+      const cautela = cautelaDoc.data();
+      const materiaisAtualizados = cautela.materiais?.filter(
+        (m: any) => m.materialId !== id
+      );
+      if (materiaisAtualizados?.length !== cautela.materiais?.length) {
+        await updateDoc(doc(db, 'cautelas_permanentes', cautelaDoc.id), {
+          materiais: materiaisAtualizados
+        });
+      }
+    }
+    await deleteDoc(doc(db, 'materiais_belicos', id));
+    toast.success('Material excluído com sucesso');
+    loadMateriais();
+  } catch (error) {
+    console.error('Erro ao excluir material:', error);
+    toast.error('Erro ao excluir material');
   }
+};
+```
+
+### Colecao Firebase: `baixas_materiais`
+
+Estrutura de cada documento:
+
+```text
+{
+  materialId: string
+  nome: string
+  numeroSerie: string
+  categoria: string
+  fabricante: string
+  modelo: string
+  vencimento: string
+  sexo: string (para coletes)
+  tamanhoColete: string (para coletes)
+  motivoBaixa: string (Vencimento | Inservível | Avaria | Extravio | Outro)
+  destino: string
+  observacoes: string
+  policialCauteladoNome: string
+  policialCauteladoMatricula: string
+  policialCauteladoId: string
+  dataBaixa: Timestamp
+  criadoPor: string
 }
 ```
 
-Depois (paralelo):
-```typescript
-const policiaisData = (await Promise.all(
-  policialIds.map(async (policialId) => {
-    const policialDoc = await getDoc(doc(db, 'policiais', policialId));
-    return policialDoc.exists()
-      ? { id: policialDoc.id, ...policialDoc.data() } as Policial
-      : null;
-  })
-)).filter((p): p is Policial => p !== null);
-```
+## Resumo dos arquivos
 
-**Atualizar `setLoadingInicial(false)` no finally da funcao.**
-
-**Mostrar skeleton durante carregamento (linha 683):**
-
-Substituir a verificacao `policiaisComCautela.length === 0` por uma que considera o loading:
-
-```typescript
-{loadingInicial ? (
-  <div className="space-y-2">
-    {[1, 2, 3].map(i => (
-      <div key={i} className="p-3 border rounded-lg">
-        <Skeleton className="h-5 w-48 mb-1" />
-        <Skeleton className="h-4 w-32" />
-      </div>
-    ))}
-  </div>
-) : policiaisComCautela.length === 0 ? (
-  <div className="text-center py-8 text-muted-foreground">
-    <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-    <p>Nenhum policial com material cautelado</p>
-  </div>
-) : (
-  // lista existente...
-)}
-```
-
-### Resumo das mudancas
-
-| Mudanca | Efeito |
-|---------|--------|
-| Estado `loadingInicial` | Mostra skeleton em vez de "Nenhum policial" durante carregamento |
-| `Promise.all` nas consultas | Reduz tempo de carregamento de ~1.5s para ~0.2s |
-| Import `Skeleton` | Componente visual durante loading |
+| Arquivo | Acao |
+|---------|------|
+| `SaiuDaCarga.tsx` | Novo - componente principal da aba |
+| `BaixaMaterialCargaModal.tsx` | Novo - modal de baixa em lote |
+| `AdminDashboard.tsx` | Alterar - adicionar 7a aba no Belico |
+| `ColetesTab.tsx` | Alterar - filtrar transferidos/baixados |
+| `TransferenciaPolicialModal.tsx` | Alterar - limpar nome policial ao devolver |
+| `CadastroMateriais.tsx` | Alterar - verificar cautela antes de excluir |
 
