@@ -11,7 +11,7 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import MateriaisTransferidos from './MateriaisTransferidos';
+import MateriaisTransferidosCarga from './MateriaisTransferidosCarga';
 import BaixaMaterialCargaModal from './BaixaMaterialCargaModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -92,7 +92,7 @@ const SaiuDaCarga = () => {
         </TabsList>
 
         <TabsContent value="transferidos">
-          <MateriaisTransferidos />
+          <MateriaisTransferidosCarga />
         </TabsContent>
 
         <TabsContent value="baixas">

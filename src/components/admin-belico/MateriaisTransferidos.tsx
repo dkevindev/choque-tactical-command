@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Eye } from 'lucide-react';
+import { Search, Eye, FileText } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
@@ -34,17 +35,20 @@ interface Transferencia {
   numeroCautelaOriginal: string;
   materiaisLevados: Material[];
   materiaisDevolvidos: Material[];
+  documentosGerados?: {
+    baixaCautela?: { gerado: boolean };
+    transferenciaCautela?: { gerado: boolean };
+    termoEntrega?: { gerado: boolean };
+  };
   status: string;
-}
-
-interface MaterialTransferido {
-  material: Material;
-  transferencia: Transferencia;
 }
 
 const MateriaisTransferidos = () => {
   const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('');
+  const [filtroLocal, setFiltroLocal] = useState('todos');
+  const [filtroStatus, setFiltroStatus] = useState('todos');
   const [detalhes, setDetalhes] = useState<Transferencia | null>(null);
 
   useEffect(() => {
@@ -52,6 +56,7 @@ const MateriaisTransferidos = () => {
   }, []);
 
   const loadTransferencias = async () => {
+    setLoading(true);
     try {
       const q = query(collection(db, 'transferencias_policiais'), orderBy('dataTransferencia', 'desc'));
       const querySnapshot = await getDocs(q);
@@ -64,96 +69,142 @@ const MateriaisTransferidos = () => {
     } catch (error) {
       console.error('Erro ao carregar transferências:', error);
       toast.error('Erro ao carregar transferências');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const materiaisFlat: MaterialTransferido[] = transferencias.flatMap((t) =>
-    t.materiaisLevados.map((m) => ({ material: m, transferencia: t }))
-  );
+  const locaisUnicos = [...new Set(transferencias.map(t => t.localDestino).filter(Boolean))];
 
-  const materiaisFiltrados = materiaisFlat.filter((item) => {
-    const termo = filtro.toLowerCase();
-    return (
-      item.material.nome?.toLowerCase().includes(termo) ||
-      item.material.numeroSerie?.toLowerCase().includes(termo) ||
-      item.transferencia.policialNome?.toLowerCase().includes(termo)
-    );
+  const transferenciasFiltradas = transferencias.filter((t) => {
+    const matchTexto =
+      t.policialNome?.toLowerCase().includes(filtro.toLowerCase()) ||
+      t.policialMatricula?.toLowerCase().includes(filtro.toLowerCase()) ||
+      t.publicacao?.toLowerCase().includes(filtro.toLowerCase());
+    const matchLocal = filtroLocal === 'todos' || t.localDestino === filtroLocal;
+    const matchStatus = filtroStatus === 'todos' || t.status === filtroStatus;
+    return matchTexto && matchLocal && matchStatus;
   });
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pendente':
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">Pendente</Badge>;
+      case 'concluida':
+        return <Badge className="bg-green-600 hover:bg-green-700 text-white">Concluída</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Materiais Transferidos</h3>
+        <h3 className="text-lg font-semibold text-foreground">Transferências de Policiais</h3>
         <p className="text-sm text-muted-foreground">
-          Materiais que saíram da carga por transferência de policiais
+          Histórico de policiais transferidos e seus materiais
         </p>
       </div>
 
+      {/* Filtros */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-md">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por material, nº série ou policial..."
+                placeholder="Buscar por policial, matrícula ou publicação..."
                 value={filtro}
                 onChange={(e) => setFiltro(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Badge variant="outline">
-              {materiaisFiltrados.length} materiais
-            </Badge>
+            <Select value={filtroLocal} onValueChange={setFiltroLocal}>
+              <SelectTrigger>
+                <SelectValue placeholder="Local de destino" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os Destinos</SelectItem>
+                {locaisUnicos.map((local) => (
+                  <SelectItem key={local} value={local}>{local}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os Status</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="concluida">Concluída</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
+      {/* Tabela */}
       <Card>
         <CardHeader>
-          <CardTitle>Materiais que Saíram da Carga</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Policiais Transferidos</span>
+            <Badge variant="outline">{transferenciasFiltradas.length} registros</Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Material</TableHead>
-                  <TableHead>N/S</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Fabricante/Modelo</TableHead>
-                  <TableHead>Cautelado a</TableHead>
+                  <TableHead>Policial</TableHead>
+                  <TableHead>Matrícula</TableHead>
+                  <TableHead>Destino</TableHead>
+                  <TableHead>Publicação</TableHead>
                   <TableHead>Data</TableHead>
+                  <TableHead>Materiais</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {materiaisFiltrados.length === 0 ? (
+                {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      Nenhum material transferido encontrado
+                    <TableCell colSpan={8} className="text-center py-8">
+                      Carregando...
+                    </TableCell>
+                  </TableRow>
+                ) : transferenciasFiltradas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      Nenhuma transferência encontrada
                     </TableCell>
                   </TableRow>
                 ) : (
-                  materiaisFiltrados.map((item, index) => (
-                    <TableRow key={`${item.transferencia.id}-${item.material.materialId}-${index}`}>
-                      <TableCell className="font-medium">{item.material.nome}</TableCell>
-                      <TableCell className="text-sm">{item.material.numeroSerie || '—'}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{item.material.categoria}</Badge>
+                  transferenciasFiltradas.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium">
+                        {t.policialPatente} {t.policialNome}
                       </TableCell>
+                      <TableCell className="text-sm">{t.policialMatricula}</TableCell>
+                      <TableCell className="text-sm">{t.localDestino}</TableCell>
+                      <TableCell className="text-sm">{t.publicacao}</TableCell>
                       <TableCell className="text-sm">
-                        {[item.material.fabricante, item.material.modelo].filter(Boolean).join(' / ') || '—'}
+                        {t.dataTransferencia.toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell>
-                        <p className="text-sm font-medium">
-                          {item.transferencia.policialPatente} {item.transferencia.policialNome}
-                        </p>
+                        <div className="flex gap-1">
+                          <Badge variant="outline" className="text-xs">
+                            {t.materiaisLevados?.length || 0} levados
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            {t.materiaisDevolvidos?.length || 0} devolvidos
+                          </Badge>
+                        </div>
                       </TableCell>
-                      <TableCell className="text-sm">
-                        {item.transferencia.dataTransferencia.toLocaleDateString()}
-                      </TableCell>
+                      <TableCell>{getStatusBadge(t.status)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => setDetalhes(item.transferencia)}>
+                        <Button variant="ghost" size="icon" onClick={() => setDetalhes(t)}>
                           <Eye className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -166,6 +217,7 @@ const MateriaisTransferidos = () => {
         </CardContent>
       </Card>
 
+      {/* Modal de Detalhes */}
       {detalhes && (
         <Dialog open={!!detalhes} onOpenChange={() => setDetalhes(null)}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -192,11 +244,18 @@ const MateriaisTransferidos = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium">Data</p>
-                  <p className="text-sm text-muted-foreground">{detalhes.dataTransferencia.toLocaleDateString()}</p>
+                  <p className="text-sm text-muted-foreground">{detalhes.dataTransferencia.toLocaleDateString('pt-BR')}</p>
                 </div>
               </div>
 
-              {detalhes.materiaisLevados.length > 0 && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium">Status</p>
+                  {getStatusBadge(detalhes.status)}
+                </div>
+              </div>
+
+              {detalhes.materiaisLevados?.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-2">Materiais Levados</h4>
                   <div className="space-y-2">
@@ -213,7 +272,7 @@ const MateriaisTransferidos = () => {
                 </div>
               )}
 
-              {detalhes.materiaisDevolvidos.length > 0 && (
+              {detalhes.materiaisDevolvidos?.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-2">Materiais Devolvidos ao Batalhão</h4>
                   <div className="space-y-2">
@@ -226,6 +285,26 @@ const MateriaisTransferidos = () => {
                         </p>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {detalhes.documentosGerados && (
+                <div>
+                  <h4 className="font-semibold mb-2">Documentos</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant={detalhes.documentosGerados.baixaCautela?.gerado ? 'default' : 'outline'}>
+                      <FileText className="h-3 w-3 mr-1" />
+                      Baixa Cautela {detalhes.documentosGerados.baixaCautela?.gerado ? '✓' : '—'}
+                    </Badge>
+                    <Badge variant={detalhes.documentosGerados.transferenciaCautela?.gerado ? 'default' : 'outline'}>
+                      <FileText className="h-3 w-3 mr-1" />
+                      Transferência {detalhes.documentosGerados.transferenciaCautela?.gerado ? '✓' : '—'}
+                    </Badge>
+                    <Badge variant={detalhes.documentosGerados.termoEntrega?.gerado ? 'default' : 'outline'}>
+                      <FileText className="h-3 w-3 mr-1" />
+                      Termo Entrega {detalhes.documentosGerados.termoEntrega?.gerado ? '✓' : '—'}
+                    </Badge>
                   </div>
                 </div>
               )}
