@@ -99,45 +99,8 @@ const GerenciarCautelas = () => {
       setCautelas(cautelasData);
     } catch (error) {
       console.error('Erro ao carregar cautelas:', error);
-      // Mock data for development
-      setCautelas([
-        {
-          id: '1',
-          policialId: '1',
-          policialNome: 'João Silva Santos',
-          policialMatricula: '123456',
-          materiais: [
-            { materialId: '1', nome: 'Pistola .40', categoria: 'Armamento', numeroSerie: 'BR001', quantidade: 1 },
-            { materialId: '2', nome: 'Colete Balístico', categoria: 'EPI', quantidade: 1 }
-          ],
-          dataInicio: new Date('2024-01-15'),
-          status: 'ativa',
-          tipoDocumento: 'permanente',
-          assinatura: {
-            matricula: '123456',
-            timestamp: new Date('2024-01-15')
-          },
-          documentoGerado: true
-        },
-        {
-          id: '2',
-          policialId: '2',
-          policialNome: 'Maria Oliveira Costa',
-          policialMatricula: '123457',
-          materiais: [
-            { materialId: '3', nome: 'Espingarda 12', categoria: 'Armamento', numeroSerie: 'ES001', quantidade: 1 }
-          ],
-          dataInicio: new Date('2024-02-01'),
-          dataFim: new Date('2024-02-15'),
-          status: 'finalizada',
-          tipoDocumento: 'temporaria',
-          assinatura: {
-            matricula: '123457',
-            timestamp: new Date('2024-02-01')
-          },
-          documentoGerado: true
-        }
-      ]);
+      toast.error('Erro ao carregar cautelas. Verifique sua conexão.');
+      setCautelas([]);
     }
   };
 
