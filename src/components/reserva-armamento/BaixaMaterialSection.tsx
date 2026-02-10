@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, User, Package, CheckCircle, RotateCcw, ArrowRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, getDocs, updateDoc, doc, addDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -57,6 +58,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
   const [cautelasAtivas, setCautelasAtivas] = useState<CautelaProvisoria[]>([]);
   const [materiaisSelecionados, setMateriaisSelecionados] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingInicial, setLoadingInicial] = useState(true);
   
   // Modal de devolução de munição
   const [modalMunicao, setModalMunicao] = useState(false);
@@ -110,22 +112,22 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       const policialIds = [...new Set(cautelasData.map(c => c.policialId))];
       console.log('[BaixaMaterial] IDs de policiais com cautela:', policialIds);
       
-      // Carregar dados dos policiais
-      const policiaisData: Policial[] = [];
-      for (const policialId of policialIds) {
-        const policialDoc = await getDoc(doc(db, 'policiais', policialId));
-        if (policialDoc.exists()) {
-          policiaisData.push({
-            id: policialDoc.id,
-            ...policialDoc.data()
-          } as Policial);
-        }
-      }
+      // Carregar dados dos policiais (em paralelo)
+      const policiaisData = (await Promise.all(
+        policialIds.map(async (policialId) => {
+          const policialDoc = await getDoc(doc(db, 'policiais', policialId));
+          return policialDoc.exists()
+            ? { id: policialDoc.id, ...policialDoc.data() } as Policial
+            : null;
+        })
+      )).filter((p): p is Policial => p !== null);
       
       console.log('[BaixaMaterial] Lista atualizada:', policiaisData.length, 'policiais');
       setPoliciaisComCautela(policiaisData);
     } catch (error) {
       console.error('[BaixaMaterial] Erro ao recarregar:', error);
+    } finally {
+      setLoadingInicial(false);
     }
   };
 
@@ -680,7 +682,16 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                 />
               </div>
 
-              {policiaisComCautela.length === 0 ? (
+              {loadingInicial ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="p-3 border rounded-lg">
+                      <Skeleton className="h-5 w-48 mb-1" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                  ))}
+                </div>
+              ) : policiaisComCautela.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>Nenhum policial com material cautelado</p>
