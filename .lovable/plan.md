@@ -1,131 +1,35 @@
 
 
-# Remover Status de Transferencias e Adicionar Historico de Material
+# Registrar Cautela Atual no Historico
 
 ## O que sera feito
 
-### 1. Remover coluna "Status" da aba Transferencias
-
-Em `MateriaisTransferidos.tsx`, remover:
-- O filtro de Status (Select)
-- A coluna "Status" da tabela (TableHead + TableCell)
-- A funcao `getStatusBadge`
-- O filtro `filtroStatus` do estado e da logica de filtragem
-- A secao de status no modal de detalhes
-
-### 2. Adicionar botao de Historico na aba Materiais
-
-Em `CadastroMateriais.tsx`, adicionar na coluna "Acoes" um botao com icone de historico (History) que ao clicar abre um modal mostrando todo o historico de cautelas daquele material -- por quais policiais ele passou, datas de entrada e saida.
-
-### 3. Registrar historico de cautelas do material
-
-Criar uma nova colecao Firebase `historico_material` que sera alimentada sempre que:
-- Um material for cautelado a um policial (entrada)
-- Um material for devolvido/removido de uma cautela (saida)
-- Um material for transferido com um policial
-
-Cada registro tera: materialId, materialNome, policialNome, policialMatricula, policialId, tipo (cautelado/devolvido/transferido), data, observacoes.
-
-Para materiais ja existentes, o historico sera construido a partir das cautelas ativas atuais (registro retroativo ao abrir o historico pela primeira vez nao sera feito -- apenas a partir de agora).
-
----
+Ao clicar no botao de historico de um material, se ele estiver atualmente cautelado a um policial mas nao tiver nenhum registro na colecao `historico_material`, o sistema criara automaticamente um registro retroativo com os dados da associacao atual. Isso garante que pelo menos a cautela vigente fique registrada, alem de todas as futuras.
 
 ## Detalhes Tecnicos
 
-### Arquivo: `src/components/admin-belico/MateriaisTransferidos.tsx`
-
-Remover:
-- Estado `filtroStatus` e `setFiltroStatus`
-- O Select de filtro de status no grid de filtros (alterar grid de 4 para 3 colunas)
-- A coluna `<TableHead>Status</TableHead>` e `<TableCell>{getStatusBadge(t.status)}</TableCell>`
-- A funcao `getStatusBadge`
-- `matchStatus` da logica de filtragem
-- Secao de status no modal de detalhes
-- Ajustar colSpan de 8 para 7
-
 ### Arquivo: `src/components/admin-belico/CadastroMateriais.tsx`
 
-Alteracoes:
-1. Importar `History` do lucide-react
-2. Adicionar estados: `historicoMaterial` (array), `showHistorico` (boolean), `historicoLoading` (boolean)
-3. Criar funcao `loadHistorico(materialId)` que busca docs em `historico_material` onde `materialId == id`, ordenados por data desc
-4. Na coluna Acoes, adicionar botao com icone History entre Edit e Trash
-5. Adicionar modal/Dialog de historico com timeline mostrando cada evento
+Alterar a funcao `loadHistorico` para:
 
-### Novo registro de historico
+1. Buscar os registros existentes em `historico_material`
+2. Se nao houver nenhum registro E o material estiver cautelado (tiver `policialAssociadoNome` e `policialAssociadoId`), criar automaticamente um registro do tipo `cautelado` com os dados atuais
+3. Recarregar a lista apos a insercao
 
-Nos pontos do codigo que ja existem onde um material e cautelado ou devolvido, adicionar chamada para salvar em `historico_material`:
+Para isso, a funcao precisa receber tambem os dados do material (ou busca-lo da lista `materiais` em memoria). Como `materiais` ja esta no estado do componente, basta encontrar o material pelo ID.
 
-**Em `CadastroMateriais.tsx` (ao cadastrar material com policial associado):**
-```typescript
-await addDoc(collection(db, 'historico_material'), {
-  materialId: materialId,
-  materialNome: materialData.nome,
-  numeroSerie: materialData.numeroSerie || '',
-  policialNome: formData.policialAssociadoNome,
-  policialId: formData.policialAssociadoId,
-  tipo: 'cautelado',
-  data: new Date(),
-  observacoes: 'Cautela inicial no cadastro'
-});
+```
+Logica:
+1. Buscar historico do Firebase
+2. Se snapshot vazio E material.policialAssociadoId existir:
+   - addDoc em historico_material com tipo 'cautelado' e observacao 'Registro retroativo - cautela vigente'
+   - Recarregar snapshot
+3. Exibir resultados
 ```
 
-**Em `CadastroMateriais.tsx` (ao excluir material que esta cautelado):**
-```typescript
-await addDoc(collection(db, 'historico_material'), {
-  materialId: id,
-  materialNome: material.nome,
-  numeroSerie: material.numeroSerie || '',
-  policialNome: cautelaInfo.policialNome,
-  policialId: cautelaInfo.policialId,
-  tipo: 'removido',
-  data: new Date(),
-  observacoes: 'Material excluido do sistema'
-});
-```
-
-**Em `BaixaMaterialCargaModal.tsx` (ao dar baixa):**
-```typescript
-await addDoc(collection(db, 'historico_material'), {
-  materialId: mat.id,
-  materialNome: mat.nome,
-  numeroSerie: mat.numeroSerie || '',
-  policialNome: mat.policialAssociadoNome || '',
-  policialId: mat.policialAssociadoId || '',
-  tipo: 'baixa',
-  data: new Date(),
-  observacoes: `Baixa: ${motivoBaixa} - Destino: ${destino}`
-});
-```
-
-### Modal de Historico (dentro de CadastroMateriais.tsx)
-
-O modal mostrara uma timeline vertical com cada evento:
-- Icone colorido por tipo (verde = cautelado, vermelho = devolvido, azul = transferido, cinza = baixa)
-- Nome do policial
-- Data formatada
-- Tipo do evento
-- Observacoes
-
-### Colecao Firebase: `historico_material`
-
-```text
-{
-  materialId: string
-  materialNome: string
-  numeroSerie: string
-  policialNome: string
-  policialId: string
-  tipo: string (cautelado | devolvido | transferido | baixa | removido)
-  data: Timestamp
-  observacoes: string
-}
-```
-
-### Resumo dos arquivos
+### Resumo
 
 | Arquivo | Acao |
 |---------|------|
-| `MateriaisTransferidos.tsx` | Alterar - remover coluna e filtro de Status |
-| `CadastroMateriais.tsx` | Alterar - adicionar botao Historico + modal + registro de historico |
-| `BaixaMaterialCargaModal.tsx` | Alterar - registrar historico ao dar baixa |
+| `CadastroMateriais.tsx` | Alterar funcao `loadHistorico` para registrar cautela atual se historico vazio |
+
