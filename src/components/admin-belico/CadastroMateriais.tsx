@@ -620,24 +620,35 @@ const CadastroMateriais = () => {
       const transferenciasSnap = await getDocs(collection(db, 'transferencias_policiais'));
       for (const transDoc of transferenciasSnap.docs) {
         const transData = transDoc.data();
-        const materiaisLevados = transData.materiaisLevados || [];
         
-        for (const matLevado of materiaisLevados) {
-          const matId = matLevado.id || matLevado.materialId;
+        // Verificar AMBAS as listas: levados E devolvidos
+        const materiaisLevados = transData.materiaisLevados || [];
+        const materiaisDevolvidos = transData.materiaisDevolvidos || [];
+        const todosMateriaisTransferencia = [
+          ...materiaisLevados.map((m: any) => ({ ...m, subTipo: 'levado' })),
+          ...materiaisDevolvidos.map((m: any) => ({ ...m, subTipo: 'devolvido' }))
+        ];
+
+        for (const matTrans of todosMateriaisTransferencia) {
+          const matId = matTrans.id || matTrans.materialId;
           if (!matId) continue;
           
           const chaveUnica = `${matId}_${transData.policialId || transData.policialNome}`;
           if (historicoTransferidos.has(chaveUnica)) continue;
 
+          const obs = matTrans.subTipo === 'levado'
+            ? `Levado para: ${transData.localDestino || transData.destino || 'Destino não informado'}`
+            : `Devolvido pelo policial transferido para: ${transData.localDestino || transData.destino || 'Destino não informado'}`;
+
           await addDoc(collection(db, 'historico_material'), {
             materialId: matId,
-            materialNome: matLevado.nome || matLevado.materialNome || 'Material',
-            numeroSerie: matLevado.numeroSerie || '',
+            materialNome: matTrans.nome || matTrans.materialNome || 'Material',
+            numeroSerie: matTrans.numeroSerie || '',
             policialNome: transData.policialNome || 'Desconhecido',
             policialId: transData.policialId || '',
             tipo: 'transferido',
             data: transData.dataTransferencia?.toDate?.() || transData.createdAt?.toDate?.() || new Date(),
-            observacoes: `Transferido para: ${transData.localDestino || transData.destino || 'Destino não informado'}`
+            observacoes: obs
           });
           transferenciasEncontradas++;
           historicoTransferidos.add(chaveUnica);
