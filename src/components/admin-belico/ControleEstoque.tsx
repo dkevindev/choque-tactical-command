@@ -126,48 +126,8 @@ const ControleEstoque = () => {
       calcularEstatisticas(materiaisData);
     } catch (error) {
       console.error('Erro ao carregar dados do estoque:', error);
-      // Mock data for development
-      const mockMateriais: MaterialEstoque[] = [
-        {
-          id: '1',
-          nome: 'Pistola .40 - BR001',
-          categoria: 'Armamento',
-          numeroSerie: 'BR001',
-          disponivel: true,
-          cautelado: false,
-          statusManutencao: 'ok'
-        },
-        {
-          id: '2',
-          nome: 'Pistola .40 - BR002',
-          categoria: 'Armamento',
-          numeroSerie: 'BR002',
-          disponivel: false,
-          cautelado: true,
-          cauteladoPara: 'Cb. Silva',
-          statusManutencao: 'ok'
-        },
-        {
-          id: '3',
-          nome: 'Colete Balístico - CB001',
-          categoria: 'EPI',
-          numeroSerie: 'CB001',
-          disponivel: true,
-          cautelado: false,
-          statusManutencao: 'ok'
-        },
-        {
-          id: '4',
-          nome: 'Espingarda 12 - ES001',
-          categoria: 'Armamento',
-          numeroSerie: 'ES001',
-          disponivel: false,
-          cautelado: false,
-          statusManutencao: 'manutencao'
-        }
-      ];
-      setMateriais(mockMateriais);
-      calcularEstatisticas(mockMateriais);
+      setMateriais([]);
+      calcularEstatisticas([]);
     }
   };
 

@@ -4,22 +4,72 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, Lock, IdCard } from 'lucide-react';
+import { Shield, Lock, IdCard, Loader2 } from 'lucide-react';
 import logoRegimento from '@/assets/logo-regimento.jpg';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/firebase';
+import { toast } from 'sonner';
 
 const LoginGestao = () => {
   const [matricula, setMatricula] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Mock authentication logic
-    if (matricula.includes('admin') || matricula === '001') {
-      navigate('/admin-dashboard');
-    } else {
-      navigate('/user-dashboard');
+    if (!matricula || !password) {
+      toast.error('Preencha matrícula e senha');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Buscar policial pela matrícula
+      const q = query(collection(db, 'policiais'), where('Matrícula', '==', matricula));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        toast.error('Matrícula não encontrada');
+        setLoading(false);
+        return;
+      }
+
+      const policialDoc = snapshot.docs[0];
+      const policialData = policialDoc.data();
+
+      // Verificar senha (campo 'senha' no Firestore)
+      if (policialData.senha && policialData.senha !== password) {
+        toast.error('Senha incorreta');
+        setLoading(false);
+        return;
+      }
+
+      // Salvar dados do policial logado no localStorage
+      const dadosLogado = {
+        id: policialDoc.id,
+        NOME: policialData.NOME,
+        matricula: policialData['Matrícula'],
+        postGrad: policialData['Post/Grad'],
+        numeral: policialData.NUMERAL,
+        perfil: policialData.perfil || 'usuario'
+      };
+      localStorage.setItem('policialLogado', JSON.stringify(dadosLogado));
+
+      toast.success(`Bem-vindo, ${policialData['Post/Grad'] || ''} ${policialData.NOME || ''}!`);
+
+      // Redirecionar baseado no perfil
+      if (policialData.perfil === 'admin' || policialData.perfil === 'gestor') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/user-dashboard');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer login:', error);
+      toast.error('Erro ao acessar o sistema. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,6 +111,7 @@ const LoginGestao = () => {
                 placeholder="Digite sua matrícula"
                 className="bg-input border-border text-foreground placeholder:text-muted-foreground"
                 required
+                disabled={loading}
               />
             </div>
             
@@ -77,14 +128,23 @@ const LoginGestao = () => {
                 placeholder="Digite sua senha"
                 className="bg-input border-border text-foreground placeholder:text-muted-foreground"
                 required
+                disabled={loading}
               />
             </div>
             
             <Button 
               type="submit" 
               className="w-full bg-primary hover:bg-tactical-light text-primary-foreground font-bold py-3 shadow-tactical-glow transition-all duration-200"
+              disabled={loading}
             >
-              ACESSAR SISTEMA
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  VERIFICANDO...
+                </>
+              ) : (
+                'ACESSAR SISTEMA'
+              )}
             </Button>
           </form>
           

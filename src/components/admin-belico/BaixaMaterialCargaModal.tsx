@@ -158,7 +158,7 @@ const BaixaMaterialCargaModal = ({ open, onClose, onSuccess }: Props) => {
         query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
       );
 
-      for (const material of materiaisSelecionados) {
+      await Promise.all(materiaisSelecionados.map(async (material) => {
         // 1. Registrar histórico
         await addDoc(collection(db, 'historico_material'), {
           materialId: material.id,
@@ -214,7 +214,7 @@ const BaixaMaterialCargaModal = ({ open, onClose, onSuccess }: Props) => {
             });
           }
         }
-      }
+      }));
 
       toast.success(`${materiaisSelecionados.length} material(is) baixado(s) com sucesso!`);
       onSuccess();

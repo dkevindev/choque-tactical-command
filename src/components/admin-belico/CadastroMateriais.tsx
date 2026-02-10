@@ -188,42 +188,8 @@ const CadastroMateriais = () => {
       setMateriais(materiaisData);
     } catch (error) {
       console.error('Erro ao carregar materiais:', error);
-      // Mock data for development
-      setMateriais([
-        {
-          id: '1',
-          nome: 'Pistola .40',
-          categoria: 'Armamento',
-          calibre: '.40',
-          numeroSerie: 'BR001',
-          disponivel: true,
-          fabricante: 'Taurus',
-          local: 'Fortaleza',
-          createdAt: new Date()
-        },
-        {
-          id: '2',
-          nome: 'Munição .40',
-          categoria: 'Munição',
-          subcategoria: 'Letal',
-          calibre: '.40',
-          quantidade: 500,
-          disponivel: true,
-          fabricante: 'CBC',
-          local: 'Fortaleza',
-          createdAt: new Date()
-        },
-        {
-          id: '3',
-          nome: 'Escudo Balístico',
-          categoria: 'EPI',
-          quantidade: 10,
-          disponivel: true,
-          fabricante: 'Proteção',
-          local: 'Fortaleza',
-          createdAt: new Date()
-        }
-      ]);
+      toast.error('Erro ao carregar materiais. Verifique sua conexão.');
+      setMateriais([]);
     }
   };
 
