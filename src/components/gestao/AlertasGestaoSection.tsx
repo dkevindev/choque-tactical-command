@@ -46,11 +46,11 @@ const AlertasGestaoSection = () => {
         where('lido', '==', false)
       ),
       (snapshot) => {
-        const alertasData = snapshot.docs.map(doc => ({
+        const alertasData = (snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
           dataHora: doc.data().dataHora?.toDate?.() || new Date()
-        })) as AlertaGestao[];
+        })) as AlertaGestao[]).filter(alerta => alerta.tipo !== 'material_pendente');
         
         // Ordenar em memória para evitar necessidade de índice composto
         alertasData.sort((a, b) => b.dataHora.getTime() - a.dataHora.getTime());
