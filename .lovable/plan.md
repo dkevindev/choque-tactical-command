@@ -1,52 +1,66 @@
 
 
-# Corrigir Limpeza de Material Devolvido
+# Atualizar Cautelas ao Editar Material
 
-## Problema
+## Problema Encontrado
 
-A limpeza dos campos `policialAssociadoNome` e `policialAssociadoId` esta dentro do bloco que so executa quando o historico ainda nao existe. Como o historico ja foi criado na primeira vez que o botao foi clicado, na segunda vez o `continue` na linha 637 pula todo o bloco, incluindo o `updateDoc`.
+Ao editar um material e mudar o policial associado (ou remover o policial colocando como disponivel), o sistema **nao atualiza as cautelas permanentes**. A logica de cautela so executa para materiais novos (cadastro), nunca para edicao.
 
-## Solucao
+Cenarios que nao funcionam hoje:
+1. **Trocar policial**: Material fica na cautela do antigo E nao entra na cautela do novo
+2. **Remover policial** (deixar disponivel): Material continua na cautela do antigo
 
-Mover a logica de limpeza para **fora** da verificacao de historico duplicado. A limpeza deve acontecer **sempre** que encontrar um material devolvido, independente de ja ter historico criado ou nao.
+## O que sera feito
+
+Adicionar logica no fluxo de edicao (`editingMaterial`) para:
+- Detectar se o policial mudou
+- Remover o material da cautela do policial anterior
+- Adicionar na cautela do novo policial (ou criar cautela nova)
+- Registrar no historico de material
 
 ## Detalhes Tecnicos
 
 ### Arquivo: `src/components/admin-belico/CadastroMateriais.tsx`
 
-**Reestruturar o loop de transferencias (linhas 632-669)**:
+Dentro do bloco `if (editingMaterial)` (apos a linha 339), adicionar logica para verificar mudanca de policial:
 
-```typescript
-for (const matTrans of todosMateriaisTransferencia) {
-  const matId = matTrans.id || matTrans.materialId;
-  if (!matId) continue;
+```
+if (editingMaterial) {
+  await updateDoc(doc(db, 'materiais_belicos', editingMaterial.id), materialData);
+  materialId = editingMaterial.id;
 
-  // SEMPRE limpar campos se o material foi devolvido
-  if (matTrans.subTipo === 'devolvido') {
-    try {
-      await updateDoc(doc(db, 'materiais_belicos', matId), {
-        policialAssociadoNome: '',
-        policialAssociadoId: '',
-        cautelado: false,
-        disponivel: true
-      });
-    } catch (e) {
-      console.error('Erro ao limpar associação:', matId, e);
+  // NOVO: Verificar se policial mudou
+  const policialAntigoId = editingMaterial.policialAssociadoId || '';
+  const policialNovoId = formData.policialAssociadoId || '';
+
+  if (policialAntigoId !== policialNovoId) {
+    // 1. Remover da cautela do policial antigo (se existia)
+    if (policialAntigoId) {
+      // Buscar cautelas ativas do policial antigo
+      // Filtrar o material da lista de materiais da cautela
+      // Registrar no historico como "devolvido"
+    }
+
+    // 2. Adicionar na cautela do policial novo (se definido)
+    if (policialNovoId) {
+      // Buscar cautela ativa do novo policial
+      // Se existe: adicionar material na lista
+      // Se nao existe: criar nova cautela
+      // Registrar no historico como "cautelado"
     }
   }
 
-  // Criar historico apenas se ainda nao existe
-  const chaveUnica = `${matId}_${transData.policialId || transData.policialNome}`;
-  if (historicoTransferidos.has(chaveUnica)) continue;
-
-  // ... resto do codigo de criacao de historico ...
+  toast.success('Material atualizado com sucesso');
 }
 ```
 
-A mudanca e simples: o bloco de limpeza (`updateDoc`) vem **antes** do `continue`, garantindo que sempre execute para materiais devolvidos.
+### Resumo das acoes
 
-| O que muda | Detalhe |
-|------------|---------|
-| Ordem de execucao | Limpeza executa ANTES da verificacao de duplicidade de historico |
-| Resultado | Ao clicar "Gerar Historico", a pistola 58H245020 tera os campos limpos mesmo que o historico ja tenha sido criado |
+| Cenario | O que acontece |
+|---------|---------------|
+| Trocar policial A por B | Remove da cautela de A, adiciona na cautela de B |
+| Remover policial (disponivel) | Remove da cautela do policial anterior |
+| Manter mesmo policial | Nenhuma alteracao nas cautelas |
+| Associar policial onde nao tinha | Cria/atualiza cautela do novo policial |
 
+A logica reutiliza o mesmo padrao ja existente no cadastro (linhas 362-471) para criar/atualizar cautelas, e o padrao do delete (linhas 522-548) para remover de cautelas.
