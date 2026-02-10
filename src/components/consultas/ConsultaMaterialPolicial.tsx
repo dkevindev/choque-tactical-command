@@ -157,8 +157,8 @@ const ConsultaMaterialPolicial = () => {
   const cautelasFiltradas = cautelas.filter(c => {
     if (searchCautela === '') return true;
     return c.policialNome?.toLowerCase().includes(searchCautela.toLowerCase()) ||
-           c.policialMatricula?.includes(searchCautela) ||
-           c.numeroCautela?.includes(searchCautela);
+           String(c.policialMatricula ?? '').includes(searchCautela) ||
+           String(c.numeroCautela ?? '').includes(searchCautela);
   });
 
   // Filtrar viaturas
