@@ -1,71 +1,44 @@
 
 
-# Corrigir Historico de Transferidos: Verificar materiaisDevolvidos
+# Corrigir Material Devolvido que Ainda Mostra Policial Transferido
 
 ## Problema
 
-O codigo atual so verifica `materiaisLevados` das transferencias. Porem, quando um policial e transferido e **devolve** materiais, esses itens ficam em `materiaisDevolvidos`. A arma nserie 58J051042 esta nessa lista, por isso o historico nao foi criado.
+A PISTOLA serie 58H245020 esta com status "Reserva" (corretamente `cautelado: false`) mas ainda exibe o nome do policial transferido (SD FAGNER) na coluna "Cautelado Para". Isso acontece porque o campo `policialAssociadoNome` nao foi limpo quando o policial foi transferido e devolveu o material.
 
-Dados reais do Firebase confirmam:
-- `materiaisDevolvidos`: PISTOLA .40, nserie 58J051042 (materialId: ituHAW6jGpWHCEdzor1V)
-- `materiaisLevados`: Colete Balistico (outro material)
+O `TransferenciaPolicialModal` deveria limpar esse campo (linhas 128-132), mas provavelmente essa transferencia foi feita antes dessa logica existir, ou houve falha silenciosa.
 
 ## O que sera feito
 
-Alterar a funcao `gerarHistoricoGlobal` para verificar **ambas** as listas: `materiaisLevados` e `materiaisDevolvidos`.
+Adicionar uma etapa de limpeza no `gerarHistoricoGlobal` que, ao encontrar materiais devolvidos por policiais transferidos, tambem limpa os campos `policialAssociadoNome` e `policialAssociadoId` no Firebase se o material nao esta mais cautelado.
 
 ## Detalhes Tecnicos
 
 ### Arquivo: `src/components/admin-belico/CadastroMateriais.tsx`
 
-**Linhas 621-644** - Expandir o bloco de transferencias para iterar tambem sobre `materiaisDevolvidos`:
+**Dentro do loop de `todosMateriaisTransferencia`** (apos criar o registro de historico), adicionar logica para materiais devolvidos:
 
 ```typescript
-// 3. Consultar transferências de policiais
-const transferenciasSnap = await getDocs(collection(db, 'transferencias_policiais'));
-for (const transDoc of transferenciasSnap.docs) {
-  const transData = transDoc.data();
-  
-  // Verificar AMBAS as listas: levados E devolvidos
-  const materiaisLevados = transData.materiaisLevados || [];
-  const materiaisDevolvidos = transData.materiaisDevolvidos || [];
-  const todosMateriaisTransferencia = [
-    ...materiaisLevados.map((m: any) => ({ ...m, subTipo: 'levado' })),
-    ...materiaisDevolvidos.map((m: any) => ({ ...m, subTipo: 'devolvido' }))
-  ];
-
-  for (const matTrans of todosMateriaisTransferencia) {
-    const matId = matTrans.id || matTrans.materialId;
-    if (!matId) continue;
-    
-    const chaveUnica = `${matId}_${transData.policialId || transData.policialNome}`;
-    if (historicoTransferidos.has(chaveUnica)) continue;
-
-    const obs = matTrans.subTipo === 'levado'
-      ? `Levado para: ${transData.localDestino || 'Destino não informado'}`
-      : `Devolvido pelo policial transferido para: ${transData.localDestino || 'Destino não informado'}`;
-
-    await addDoc(collection(db, 'historico_material'), {
-      materialId: matId,
-      materialNome: matTrans.nome || matTrans.materialNome || 'Material',
-      numeroSerie: matTrans.numeroSerie || '',
-      policialNome: transData.policialNome || 'Desconhecido',
-      policialId: transData.policialId || '',
-      tipo: 'transferido',
-      data: transData.dataTransferencia?.toDate?.() || transData.createdAt?.toDate?.() || new Date(),
-      observacoes: obs
+// Se o material foi devolvido, garantir que os campos de associacao estejam limpos
+if (matTrans.subTipo === 'devolvido') {
+  try {
+    await updateDoc(doc(db, 'materiais_belicos', matId), {
+      policialAssociadoNome: '',
+      policialAssociadoId: '',
+      cautelado: false,
+      disponivel: true
     });
-    transferenciasEncontradas++;
-    historicoTransferidos.add(chaveUnica);
+  } catch (e) {
+    console.error('Erro ao limpar associacao do material devolvido:', matId, e);
   }
 }
 ```
 
-### Resumo
+Isso resolve tanto o caso atual (pistola 58H245020) quanto qualquer outro material que tenha ficado com dados inconsistentes apos transferencia.
 
 | O que muda | Detalhe |
 |------------|---------|
-| `materiaisDevolvidos` | Agora tambem e verificado, alem de `materiaisLevados` |
-| Observacao no historico | Diferencia se o material foi "levado" ou "devolvido" pelo policial transferido |
-| Resultado esperado | A PISTOLA .40 nserie 58J051042 aparecera no historico com o nome do policial transferido |
+| Limpeza de campos | `policialAssociadoNome` e `policialAssociadoId` sao zerados para materiais devolvidos |
+| Quando executa | Durante o "Gerar Historico", junto com a criacao do registro de transferencia |
+| Resultado | A pistola 58H245020 deixara de mostrar o nome do policial na coluna "Cautelado Para" |
 
