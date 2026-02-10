@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -97,6 +97,7 @@ const ModalFechamentoLivro = ({
             <BookOpen className="h-5 w-5 text-primary" />
             Fechar Livro Diário
           </DialogTitle>
+          <DialogDescription className="sr-only">Registre alterações e feche o livro diário</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -192,7 +193,7 @@ const ModalFechamentoLivro = ({
               placeholder="Digite sua senha para fechar o livro"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleFechar()}
+              onKeyDown={(e) => e.key === 'Enter' && handleFechar()}
             />
           </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -514,6 +514,7 @@ const ModalComplementarCautela: React.FC<ModalComplementarCautelaProps> = ({
             <Plus className="h-5 w-5" />
             Complementar Cautela
           </DialogTitle>
+          <DialogDescription className="sr-only">Adicione materiais à cautela existente</DialogDescription>
         </DialogHeader>
 
         {etapa === 'selecao' && (

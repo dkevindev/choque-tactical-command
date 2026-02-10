@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Lock, CheckCircle, AlertCircle, User, Package } from "lucide-react";
@@ -116,6 +116,7 @@ const ModalConfirmacaoPolicial = ({
             <CheckCircle className="h-5 w-5 text-primary" />
             Confirmação de Recebimento
           </DialogTitle>
+          <DialogDescription className="sr-only">Confirme o recebimento dos materiais com sua senha</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -170,7 +171,7 @@ const ModalConfirmacaoPolicial = ({
               placeholder="Digite sua senha para confirmar"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleConfirmar()}
+              onKeyDown={(e) => e.key === 'Enter' && handleConfirmar()}
             />
           </div>
 

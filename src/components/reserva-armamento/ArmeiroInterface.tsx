@@ -956,7 +956,7 @@ const ArmeiroInterface = () => {
         policialId: policialSelecionado.id,
         policialNome: policialSelecionado.NOME,
         policialNomeGuerra: nomeGuerra,
-        policialNumeral: numeral,
+        ...(numeral !== undefined && { policialNumeral: numeral }),
         policialMatricula: String(policialSelecionado['Matrícula'] || ''),
         postoGrad: policialSelecionado['Post/Grad'],
         armeiroId: policialLogado?.id || livroAtivo?.armeiroId,
