@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -399,11 +399,6 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
         });
       }
 
-      // Atualizar sessão para confirmado
-      await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
-        'sessaoDigitacao.etapa': 'confirmado'
-      });
-
       toast({
         title: "Transferência Realizada",
         description: `${materiaisParaTransferir.length} material(is) transferido(s) para ${nomeGuerraDestino}.`
@@ -513,6 +508,7 @@ const ModalTransferenciaMaterial: React.FC<ModalTransferenciaMaterialProps> = ({
             <ArrowRight className="h-5 w-5" />
             Transferir Material
           </DialogTitle>
+          <DialogDescription className="sr-only">Transfira materiais entre policiais</DialogDescription>
         </DialogHeader>
 
         {/* Etapa 1: Selecionar Policial Destino */}

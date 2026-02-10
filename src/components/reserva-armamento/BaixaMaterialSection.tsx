@@ -217,6 +217,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       let armeiroNome = 'Armeiro';
       if (userStorage) {
         const userData = JSON.parse(userStorage);
+        if (!userData?.id) { toast({ title: "Erro", description: "ID do armeiro não encontrado." }); return; }
         const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
         if (armeiroDoc.exists()) {
           const armeiroData = armeiroDoc.data();
@@ -225,6 +226,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       }
 
       // Devolver munição ao estoque
+      if (!materialMunicao.materialId) { toast({ title: "Erro", description: "ID do material não encontrado." }); return; }
       const materialRef = doc(db, 'materiais_belicos', materialMunicao.materialId);
       const materialDoc = await getDoc(materialRef);
       
@@ -318,6 +320,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
         let armeiroIdLocal = '';
         if (userStorage) {
           const userData = JSON.parse(userStorage);
+          if (!userData?.id) { console.warn('userData.id não encontrado'); return; }
           armeiroIdLocal = userData.id;
           const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
           if (armeiroDoc.exists()) {
@@ -442,10 +445,12 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       let armeiroNomeBaixa = 'Armeiro';
       if (userStorage) {
         const userData = JSON.parse(userStorage);
-        const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
-        if (armeiroDoc.exists()) {
-          const armeiroData = armeiroDoc.data();
-          armeiroNomeBaixa = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+        if (userData?.id) {
+          const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
+          if (armeiroDoc.exists()) {
+            const armeiroData = armeiroDoc.data();
+            armeiroNomeBaixa = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+          }
         }
       }
 
@@ -487,6 +492,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
 
           // Devolver materiais ao estoque
           for (const material of materiaisParaBaixa) {
+            if (!material.materialId) continue;
             const materialRef = doc(db, 'materiais_belicos', material.materialId);
             const materialDoc = await getDoc(materialRef);
             

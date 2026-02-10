@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -552,6 +552,7 @@ const ModalAguardandoConfirmacao: React.FC<ModalAguardandoConfirmacaoProps> = ({
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-lg" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogDescription className="sr-only">Confirmação de recebimento de materiais pelo policial</DialogDescription>
         {/* ETAPA: AGUARDANDO SENHA */}
         {etapa === 'senha' && (
           <div className="space-y-4">

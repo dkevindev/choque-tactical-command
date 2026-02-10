@@ -259,29 +259,30 @@ const MaterialNaRuaSection = () => {
         } as CautelaAtiva;
       });
       
-      // Detectar cautelas removidas para animação
+      // Detectar cautelas removidas para animação usando ref
       const novosIds = new Set(novasCautelas.map(c => c.id));
-      const idsAtuais = new Set(cautelasAtivas.map(c => c.id));
       
-      idsAtuais.forEach(id => {
-        if (!novosIds.has(id)) {
-          setExitingIds(prev => new Set([...prev, id]));
-          setTimeout(() => {
-            setExitingIds(prev => {
-              const next = new Set(prev);
-              next.delete(id);
-              return next;
-            });
-          }, 500);
-        }
+      setCautelasAtivas(prev => {
+        const idsAtuais = new Set(prev.map(c => c.id));
+        idsAtuais.forEach(id => {
+          if (!novosIds.has(id)) {
+            setExitingIds(exitPrev => new Set([...exitPrev, id]));
+            setTimeout(() => {
+              setExitingIds(exitPrev => {
+                const next = new Set(exitPrev);
+                next.delete(id);
+                return next;
+              });
+            }, 500);
+          }
+        });
+        return novasCautelas;
       });
-      
-      setCautelasAtivas(novasCautelas);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [cautelasAtivas]);
+  }, []);
 
   // Agrupar cautelas por policial (evitar múltiplos avatares)
   const cautelasAgrupadas = useMemo(() => {

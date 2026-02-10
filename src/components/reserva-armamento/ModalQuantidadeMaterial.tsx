@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,6 +71,7 @@ const ModalQuantidadeMaterial = ({
             <Package className="h-5 w-5 text-primary" />
             {tipo === 'municao' ? 'Quantidade de Munição' : 'Configurar Armamento'}
           </DialogTitle>
+          <DialogDescription className="sr-only">Configure a quantidade do material selecionado</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
