@@ -557,35 +557,15 @@ const CadastroMateriais = () => {
     }
   };
 
+  const [gerandoHistorico, setGerandoHistorico] = useState(false);
+
   const loadHistorico = async (materialId: string, materialNome: string) => {
     setHistoricoLoading(true);
     setHistoricoNomeMaterial(materialNome);
     setShowHistorico(true);
     try {
-      const q = query(
-        collection(db, 'historico_material'),
-        where('materialId', '==', materialId)
-      );
-      let snapshot = await getDocs(q);
-
-      // Registro retroativo: se não há histórico e o material está cautelado, cria registro atual
-      if (snapshot.empty) {
-        const material = materiais.find(m => m.id === materialId);
-        if (material?.policialAssociadoId && material?.policialAssociadoNome) {
-          await addDoc(collection(db, 'historico_material'), {
-            materialId: materialId,
-            materialNome: material.nome || material.categoria,
-            numeroSerie: material.numeroSerie || '',
-            policialNome: material.policialAssociadoNome,
-            policialId: material.policialAssociadoId,
-            tipo: 'cautelado',
-            data: new Date(),
-            observacoes: 'Registro retroativo - cautela vigente'
-          });
-          snapshot = await getDocs(q);
-        }
-      }
-
+      const q = query(collection(db, 'historico_material'), where('materialId', '==', materialId));
+      const snapshot = await getDocs(q);
       const data = snapshot.docs.map(d => ({
         id: d.id,
         ...d.data(),
@@ -598,6 +578,78 @@ const CadastroMateriais = () => {
       setHistoricoMaterial([]);
     } finally {
       setHistoricoLoading(false);
+    }
+  };
+
+  const gerarHistoricoGlobal = async () => {
+    setGerandoHistorico(true);
+    try {
+      // 1. Carregar todo o histórico existente
+      const historicoSnap = await getDocs(collection(db, 'historico_material'));
+      const historicoExistente = new Set<string>();
+      const historicoTransferidos = new Set<string>();
+      historicoSnap.docs.forEach(d => {
+        const data = d.data();
+        historicoExistente.add(data.materialId);
+        if (data.tipo === 'transferido') {
+          historicoTransferidos.add(`${data.materialId}_${data.policialId || data.policialNome}`);
+        }
+      });
+
+      let registrosCriados = 0;
+      let transferenciasEncontradas = 0;
+
+      // 2. Para cada material cautelado sem histórico, criar registro retroativo
+      for (const material of materiais) {
+        if (material.cautelado && material.policialAssociadoId && material.policialAssociadoNome && !historicoExistente.has(material.id)) {
+          await addDoc(collection(db, 'historico_material'), {
+            materialId: material.id,
+            materialNome: material.nome || material.categoria,
+            numeroSerie: material.numeroSerie || '',
+            policialNome: material.policialAssociadoNome,
+            policialId: material.policialAssociadoId,
+            tipo: 'cautelado',
+            data: new Date(),
+            observacoes: 'Registro retroativo - cautela vigente'
+          });
+          registrosCriados++;
+        }
+      }
+
+      // 3. Consultar transferências de policiais
+      const transferenciasSnap = await getDocs(collection(db, 'transferencias_policiais'));
+      for (const transDoc of transferenciasSnap.docs) {
+        const transData = transDoc.data();
+        const materiaisLevados = transData.materiaisLevados || [];
+        
+        for (const matLevado of materiaisLevados) {
+          const matId = matLevado.id || matLevado.materialId;
+          if (!matId) continue;
+          
+          const chaveUnica = `${matId}_${transData.policialId || transData.policialNome}`;
+          if (historicoTransferidos.has(chaveUnica)) continue;
+
+          await addDoc(collection(db, 'historico_material'), {
+            materialId: matId,
+            materialNome: matLevado.nome || matLevado.materialNome || 'Material',
+            numeroSerie: matLevado.numeroSerie || '',
+            policialNome: transData.policialNome || 'Desconhecido',
+            policialId: transData.policialId || '',
+            tipo: 'transferido',
+            data: transData.dataTransferencia?.toDate?.() || transData.createdAt?.toDate?.() || new Date(),
+            observacoes: `Transferido para: ${transData.localDestino || transData.destino || 'Destino não informado'}`
+          });
+          transferenciasEncontradas++;
+          historicoTransferidos.add(chaveUnica);
+        }
+      }
+
+      toast.success(`Histórico gerado: ${registrosCriados} registros criados, ${transferenciasEncontradas} transferências encontradas`);
+    } catch (error) {
+      console.error('Erro ao gerar histórico global:', error);
+      toast.error('Erro ao gerar histórico global');
+    } finally {
+      setGerandoHistorico(false);
     }
   };
 
@@ -683,6 +735,15 @@ const CadastroMateriais = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={gerarHistoricoGlobal}
+            disabled={gerandoHistorico}
+            className="flex items-center gap-2"
+          >
+            <History className="h-4 w-4" />
+            {gerandoHistorico ? 'Gerando...' : 'Gerar Histórico'}
+          </Button>
           <Button 
             variant="outline" 
             onClick={() => setShowForm(true)} 
