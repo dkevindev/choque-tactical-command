@@ -1,65 +1,39 @@
 
 
-# Refatorar sub-aba "Transferidos" - Foco no Material
+# Separar Componentes: Transferências vs Saiu da Carga
 
-## O que muda
+## Problema
 
-A sub-aba "Transferidos" dentro de "Saiu da Carga" sera completamente reescrita. Em vez de uma tabela centrada no policial (com colunas de publicacao, destino, documentos), passara a ser uma **tabela focada nos materiais** que sairam da carga por transferencia.
+O componente `MateriaisTransferidos.tsx` e usado em dois locais:
+1. **Belico > Transferencias** (aba principal) - deveria manter o formato original focado no policial
+2. **Belico > Saiu da Carga > Transferidos** - deveria ter o novo formato focado no material
 
-## Nova estrutura da tabela principal
+Ao reescrever o componente, ambos os locais foram alterados. Precisamos restaurar o original e criar um componente separado para "Saiu da Carga".
 
-Cada linha sera um **material individual** (extraido dos arrays `materiaisLevados` de todas as transferencias).
+## Solucao
 
-| Coluna | Conteudo |
-|--------|----------|
-| Material | Nome do material |
-| N/S | Numero de serie |
-| Categoria | Categoria do material |
-| Fabricante/Modelo | Fabricante e modelo |
-| Cautelado a | Nome do policial que levou |
-| Data | Data da transferencia |
-| Acoes | Botao olho para ver detalhes |
-
-### Filtro/Busca
-
-Campo de busca que filtra por nome do material, numero de serie ou nome do policial.
-
-### Modal ao clicar no olho
-
-Ao clicar no icone de olho, abre um modal com todas as informacoes da transferencia:
-
-- **Dados do Policial**: patente, nome, matricula
-- **Transferencia**: destino, publicacao, data
-- **Materiais Levados**: lista completa do que o policial levou
-- **Materiais Devolvidos**: lista do que ficou no batalhao
+1. **Restaurar `MateriaisTransferidos.tsx`** ao formato original (focado no policial, com publicacao, destino, etc.)
+2. **Criar novo componente `MateriaisTransferidosCarga.tsx`** com o formato focado no material (tabela material-centrica com modal de detalhes do policial)
+3. **Atualizar `SaiuDaCarga.tsx`** para importar o novo `MateriaisTransferidosCarga` em vez de `MateriaisTransferidos`
 
 ## Detalhes Tecnicos
 
 ### Arquivo: `src/components/admin-belico/MateriaisTransferidos.tsx`
+- Restaurar ao conteudo original que ja foi fornecido no contexto do projeto (tabela centrada no policial, com colunas de publicacao, destino, status, modal com dados completos)
 
-Reescrever o componente para:
+### Novo arquivo: `src/components/admin-belico/MateriaisTransferidosCarga.tsx`
+- Contera o codigo atual de `MateriaisTransferidos.tsx` (versao material-centrica)
+- Tabela com colunas: Material, N/S, Categoria, Fabricante/Modelo, Cautelado a, Data, Acoes
+- Modal com detalhes do policial, destino, publicacao, materiais levados e devolvidos
 
-1. Ao carregar as transferencias de `transferencias_policiais`, fazer um "flat map" para criar uma lista de materiais:
-
-```typescript
-interface MaterialTransferido {
-  material: Material;
-  transferencia: Transferencia;
-}
-
-const materiaisFlat = transferencias.flatMap(t =>
-  t.materiaisLevados.map(m => ({ material: m, transferencia: t }))
-);
-```
-
-2. Tabela renderiza `materiaisFlat` - cada linha e um material
-3. Busca filtra por `material.nome`, `material.numeroSerie`, `transferencia.policialNome`
-4. Remover filtros de local e status (nao mais necessarios)
-5. Modal de detalhes continua mostrando os dados completos da transferencia (policial, destino, publicacao, materiais levados, materiais devolvidos) - sem a secao de documentos
+### Arquivo: `src/components/admin-belico/SaiuDaCarga.tsx`
+- Trocar o import de `MateriaisTransferidos` para `MateriaisTransferidosCarga`
 
 ### Resumo
 
 | Arquivo | Acao |
 |---------|------|
-| `MateriaisTransferidos.tsx` | Reescrever - tabela focada em materiais com modal de detalhes do policial |
+| `MateriaisTransferidos.tsx` | Restaurar ao formato original (foco no policial) |
+| `MateriaisTransferidosCarga.tsx` | Novo - formato material-centrico (codigo atual do MateriaisTransferidos) |
+| `SaiuDaCarga.tsx` | Alterar import para usar MateriaisTransferidosCarga |
 
