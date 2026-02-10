@@ -1,105 +1,89 @@
 
 
-# Teste do Sistema de Reserva de Armamento - Falhas Encontradas
+# Corrigir Delay no Carregamento da Aba "Baixa"
 
-## Resumo
+## Problema
 
-Foram analisados todos os 18 arquivos do modulo de reserva de armamento. Abaixo estao listadas as falhas encontradas, classificadas por gravidade.
+Quando o usuario clica na aba "Baixa", a mensagem "Nenhum policial com material cautelado" aparece imediatamente e so depois os policiais carregam. Isso acontece por dois motivos:
 
----
+1. **Sem indicador de carregamento**: O estado `policiaisComCautela` comeca como array vazio e nao existe um estado `loading` para o carregamento inicial, entao a mensagem "Nenhum policial" aparece enquanto os dados ainda estao sendo buscados.
 
-## CRITICO - Loop Infinito
+2. **Consultas sequenciais lentas**: A funcao `recarregarPoliciaisComCautela` busca os dados de cada policial um por um em um loop `for`, fazendo 16+ chamadas sequenciais ao Firebase. Cada chamada espera a anterior terminar.
 
-### 1. MaterialNaRuaSection.tsx - useEffect com dependencia ciclica (Linha 284)
+## Solucao
 
-O `useEffect` que configura o listener `onSnapshot` inclui `cautelasAtivas` na lista de dependencias. Porem, o proprio callback do `onSnapshot` chama `setCautelasAtivas`, o que altera `cautelasAtivas`, disparando o `useEffect` novamente. Isso cria um **loop infinito de listeners** que degrada a performance e consome recursos do Firebase.
+### 1. Adicionar estado de carregamento inicial
 
-**Correcao:** Remover `cautelasAtivas` da lista de dependencias do useEffect. Mover a logica de deteccao de cautelas removidas para dentro do callback usando uma ref.
+Criar um estado `loadingInicial` que mostra um skeleton/spinner enquanto os dados carregam, em vez da mensagem enganosa "Nenhum policial".
 
----
+### 2. Paralelizar consultas Firebase
 
-## ALTO - Erros de Runtime Potenciais
+Substituir o loop `for` sequencial por `Promise.all` para buscar todos os policiais simultaneamente, reduzindo o tempo de ~1.5s para ~0.2s.
 
-### 2. BaixaMaterialSection.tsx - materialId undefined (Linha 228 e 490)
+## Detalhes Tecnicos
 
-Nas funcoes `handleConfirmarMunicao` e `realizarBaixa`, o codigo chama `doc(db, 'materiais_belicos', material.materialId)` sem verificar se `materialId` existe. Cautelas antigas podem nao ter esse campo.
+### Arquivo: `src/components/reserva-armamento/BaixaMaterialSection.tsx`
 
-**Correcao:** Adicionar verificacao `if (material.materialId)` antes de acessar o documento, igual ao que ja foi feito no `ModalRecebimentoPendente.tsx`.
+**Adicionar estado de loading inicial (linha 59):**
+```typescript
+const [loadingInicial, setLoadingInicial] = useState(true);
+```
 
-### 3. BaixaMaterialSection.tsx - userData.id undefined (Linhas 220, 322, 444)
+**Paralelizar consultas na funcao `recarregarPoliciaisComCautela` (linhas 114-123):**
 
-Chamadas a `doc(db, 'policiais', userData.id)` sem verificar se `userData.id` existe. Se o localStorage estiver corrompido ou sem o campo `id`, ocorrera TypeError.
+Antes (sequencial):
+```typescript
+for (const policialId of policialIds) {
+  const policialDoc = await getDoc(doc(db, 'policiais', policialId));
+  if (policialDoc.exists()) {
+    policiaisData.push({ id: policialDoc.id, ...policialDoc.data() });
+  }
+}
+```
 
-**Correcao:** Adicionar verificacao `if (userData?.id)` antes de cada chamada.
+Depois (paralelo):
+```typescript
+const policiaisData = (await Promise.all(
+  policialIds.map(async (policialId) => {
+    const policialDoc = await getDoc(doc(db, 'policiais', policialId));
+    return policialDoc.exists()
+      ? { id: policialDoc.id, ...policialDoc.data() } as Policial
+      : null;
+  })
+)).filter((p): p is Policial => p !== null);
+```
 
-### 4. ModalTransferenciaMaterial.tsx - Conflito de operacoes no Firebase (Linhas 383-405)
+**Atualizar `setLoadingInicial(false)` no finally da funcao.**
 
-Ao processar transferencia total, o codigo primeiro deleta os campos `sessaoDigitacao` (linha 390) e logo em seguida tenta atualizar `sessaoDigitacao.etapa` (linha 403-404). Isso pode causar erro pois o campo acabou de ser deletado.
+**Mostrar skeleton durante carregamento (linha 683):**
 
-**Correcao:** Remover a segunda chamada de updateDoc que tenta setar `sessaoDigitacao.etapa` apos o campo ja ter sido deletado.
+Substituir a verificacao `policiaisComCautela.length === 0` por uma que considera o loading:
 
-### 5. ArmeiroInterface.tsx - policialNumeral undefined no Firebase (Linha 959)
+```typescript
+{loadingInicial ? (
+  <div className="space-y-2">
+    {[1, 2, 3].map(i => (
+      <div key={i} className="p-3 border rounded-lg">
+        <Skeleton className="h-5 w-48 mb-1" />
+        <Skeleton className="h-4 w-32" />
+      </div>
+    ))}
+  </div>
+) : policiaisComCautela.length === 0 ? (
+  <div className="text-center py-8 text-muted-foreground">
+    <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+    <p>Nenhum policial com material cautelado</p>
+  </div>
+) : (
+  // lista existente...
+)}
+```
 
-O campo `policialNumeral: numeral` e salvo no Firebase mesmo quando `numeral` e `undefined`, o que pode causar problemas de dados inconsistentes.
+### Resumo das mudancas
 
-**Correcao:** Usar spread condicional: `...(numeral !== undefined && { policialNumeral: numeral })`, igual ao padrao ja usado na linha 824.
-
----
-
-## MEDIO - Acessibilidade (Warnings no Console)
-
-### 6. DialogDescription ausente em 8 modais
-
-Todos os modais abaixo geram o warning "Missing Description or aria-describedby" no console. Apenas o `ModalRecebimentoPendente.tsx` foi corrigido anteriormente.
-
-Modais afetados:
-- ModalConfirmacaoPolicial.tsx
-- ModalAguardandoConfirmacao.tsx
-- ModalComplementarCautela.tsx
-- ModalTransferenciaMaterial.tsx
-- ModalFechamentoLivro.tsx
-- ModalDevolucaoMunicao.tsx
-- ModalQuantidadeMaterial.tsx
-- ModalDetalhesLivro.tsx
-
-**Correcao:** Adicionar `<DialogDescription className="sr-only">` em cada DialogHeader, importando o componente de `@/components/ui/dialog`.
-
----
-
-## BAIXO - Boas Praticas
-
-### 7. onKeyPress depreciado (2 arquivos)
-
-`onKeyPress` esta depreciado em favor de `onKeyDown`:
-- ModalConfirmacaoPolicial.tsx (linha 173)
-- ModalFechamentoLivro.tsx (linha 195)
-
-**Correcao:** Substituir `onKeyPress` por `onKeyDown`.
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Falhas | Gravidade |
-|---------|--------|-----------|
-| MaterialNaRuaSection.tsx | Loop infinito no useEffect + DialogDescription | Critico |
-| BaixaMaterialSection.tsx | materialId e userData.id undefined (5 locais) | Alto |
-| ModalTransferenciaMaterial.tsx | Conflito Firebase + DialogDescription | Alto |
-| ArmeiroInterface.tsx | policialNumeral undefined | Alto |
-| ModalConfirmacaoPolicial.tsx | DialogDescription + onKeyPress | Medio |
-| ModalAguardandoConfirmacao.tsx | DialogDescription | Medio |
-| ModalComplementarCautela.tsx | DialogDescription | Medio |
-| ModalFechamentoLivro.tsx | DialogDescription + onKeyPress | Medio |
-| ModalDevolucaoMunicao.tsx | DialogDescription | Medio |
-| ModalQuantidadeMaterial.tsx | DialogDescription | Medio |
-| ModalDetalhesLivro.tsx | DialogDescription | Medio |
-
-## Ordem de Implementacao
-
-1. Corrigir loop infinito em MaterialNaRuaSection.tsx (critico - afeta performance)
-2. Proteger chamadas Firebase contra undefined em BaixaMaterialSection.tsx
-3. Corrigir conflito de operacoes em ModalTransferenciaMaterial.tsx
-4. Corrigir campo undefined em ArmeiroInterface.tsx
-5. Adicionar DialogDescription em todos os 8 modais restantes
-6. Substituir onKeyPress por onKeyDown nos 2 arquivos
+| Mudanca | Efeito |
+|---------|--------|
+| Estado `loadingInicial` | Mostra skeleton em vez de "Nenhum policial" durante carregamento |
+| `Promise.all` nas consultas | Reduz tempo de carregamento de ~1.5s para ~0.2s |
+| Import `Skeleton` | Componente visual durante loading |
 
