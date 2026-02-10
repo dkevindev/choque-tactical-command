@@ -652,6 +652,20 @@ const CadastroMateriais = () => {
           });
           transferenciasEncontradas++;
           historicoTransferidos.add(chaveUnica);
+
+          // Se o material foi devolvido, garantir que os campos de associação estejam limpos
+          if (matTrans.subTipo === 'devolvido') {
+            try {
+              await updateDoc(doc(db, 'materiais_belicos', matId), {
+                policialAssociadoNome: '',
+                policialAssociadoId: '',
+                cautelado: false,
+                disponivel: true
+              });
+            } catch (e) {
+              console.error('Erro ao limpar associação do material devolvido:', matId, e);
+            }
+          }
         }
       }
 
