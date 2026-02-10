@@ -32,6 +32,7 @@ import GerenciarCautelas from '@/components/admin-belico/GerenciarCautelas';
 import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferidos';
 import ColetesTab from '@/components/admin-belico/ColetesTab';
+import SaiuDaCarga from '@/components/admin-belico/SaiuDaCarga';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import ReservaAdminPage from '@/components/admin/ReservaAdminPage';
 import PatrimonioPage from '@/components/patrimonio/PatrimonioPage';
@@ -748,13 +749,14 @@ const BelicoContent = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="cautelas" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="cautelas">Cautelas</TabsTrigger>
               <TabsTrigger value="coletes">Coletes</TabsTrigger>
-              <TabsTrigger value="transferencias">Transferências</TabsTrigger>
+              <TabsTrigger value="saiu-carga">Saiu da Carga</TabsTrigger>
               <TabsTrigger value="materiais">Materiais</TabsTrigger>
               <TabsTrigger value="estoque">Carga</TabsTrigger>
               <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+              <TabsTrigger value="transferencias">Transferências</TabsTrigger>
             </TabsList>
 
             <TabsContent value="cautelas">
@@ -765,8 +767,8 @@ const BelicoContent = () => {
               <ColetesTab />
             </TabsContent>
 
-            <TabsContent value="transferencias">
-              <MateriaisTransferidos />
+            <TabsContent value="saiu-carga">
+              <SaiuDaCarga />
             </TabsContent>
 
             <TabsContent value="materiais">
@@ -779,6 +781,10 @@ const BelicoContent = () => {
 
             <TabsContent value="relatorios">
               <RelatoriosBelico />
+            </TabsContent>
+
+            <TabsContent value="transferencias">
+              <MateriaisTransferidos />
             </TabsContent>
           </Tabs>
         </CardContent>

@@ -17,7 +17,7 @@ import {
   Search,
   User
 } from 'lucide-react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 
@@ -528,6 +528,22 @@ const CadastroMateriais = () => {
     if (!confirm('Tem certeza que deseja excluir este material?')) return;
 
     try {
+      // Verificar se está em alguma cautela ativa e remover
+      const cautelasSnapshot = await getDocs(
+        query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
+      );
+      for (const cautelaDoc of cautelasSnapshot.docs) {
+        const cautela = cautelaDoc.data();
+        const materiaisAtualizados = cautela.materiais?.filter(
+          (m: any) => m.materialId !== id
+        );
+        if (materiaisAtualizados?.length !== cautela.materiais?.length) {
+          await updateDoc(doc(db, 'cautelas_permanentes', cautelaDoc.id), {
+            materiais: materiaisAtualizados
+          });
+        }
+      }
+
       await deleteDoc(doc(db, 'materiais_belicos', id));
       toast.success('Material excluído com sucesso');
       loadMateriais();

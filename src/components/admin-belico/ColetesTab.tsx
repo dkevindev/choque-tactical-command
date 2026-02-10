@@ -49,10 +49,9 @@ const ColetesTab = () => {
         where('categoria', '==', 'Colete Balístico')
       );
       const snapshot = await getDocs(q);
-      const dados = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Colete[];
+      const dados = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((d: any) => !d.transferido && !d.baixado) as Colete[];
       setColetes(dados);
     } catch (error) {
       console.error('Erro ao buscar coletes:', error);

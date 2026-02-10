@@ -128,6 +128,8 @@ const TransferenciaPolicialModal = ({ cautela, open, onClose, onSuccess }: Props
           await updateDoc(doc(db, 'materiais_belicos', material.materialId), {
             disponivel: true,
             cautelado: false,
+            policialAssociadoNome: '',
+            policialAssociadoId: '',
             historicoTransferencias: [
               {
                 transferidoEm: Timestamp.fromDate(new Date(dataTransferencia)),
