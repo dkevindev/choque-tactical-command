@@ -598,8 +598,7 @@ const CadastroMateriais = () => {
     try {
       const q = query(
         collection(db, 'historico_material'),
-        where('materialId', '==', materialId),
-        orderBy('data', 'desc')
+        where('materialId', '==', materialId)
       );
       let snapshot = await getDocs(q);
 
@@ -617,7 +616,6 @@ const CadastroMateriais = () => {
             data: new Date(),
             observacoes: 'Registro retroativo - cautela vigente'
           });
-          // Recarregar após inserção
           snapshot = await getDocs(q);
         }
       }
@@ -627,6 +625,7 @@ const CadastroMateriais = () => {
         ...d.data(),
         data: d.data().data?.toDate?.() || new Date()
       }));
+      data.sort((a: any, b: any) => b.data.getTime() - a.data.getTime());
       setHistoricoMaterial(data);
     } catch (error) {
       console.error('Erro ao carregar histórico:', error);
