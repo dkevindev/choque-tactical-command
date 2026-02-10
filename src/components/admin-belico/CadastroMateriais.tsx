@@ -632,7 +632,22 @@ const CadastroMateriais = () => {
         for (const matTrans of todosMateriaisTransferencia) {
           const matId = matTrans.id || matTrans.materialId;
           if (!matId) continue;
+
+          // SEMPRE limpar campos se o material foi devolvido (antes da verificação de duplicidade)
+          if (matTrans.subTipo === 'devolvido') {
+            try {
+              await updateDoc(doc(db, 'materiais_belicos', matId), {
+                policialAssociadoNome: '',
+                policialAssociadoId: '',
+                cautelado: false,
+                disponivel: true
+              });
+            } catch (e) {
+              console.error('Erro ao limpar associação do material devolvido:', matId, e);
+            }
+          }
           
+          // Criar historico apenas se ainda nao existe
           const chaveUnica = `${matId}_${transData.policialId || transData.policialNome}`;
           if (historicoTransferidos.has(chaveUnica)) continue;
 
@@ -652,20 +667,6 @@ const CadastroMateriais = () => {
           });
           transferenciasEncontradas++;
           historicoTransferidos.add(chaveUnica);
-
-          // Se o material foi devolvido, garantir que os campos de associação estejam limpos
-          if (matTrans.subTipo === 'devolvido') {
-            try {
-              await updateDoc(doc(db, 'materiais_belicos', matId), {
-                policialAssociadoNome: '',
-                policialAssociadoId: '',
-                cautelado: false,
-                disponivel: true
-              });
-            } catch (e) {
-              console.error('Erro ao limpar associação do material devolvido:', matId, e);
-            }
-          }
         }
       }
 
