@@ -1,66 +1,73 @@
 
 
-# Atualizar Cautelas ao Editar Material
-
-## Problema Encontrado
-
-Ao editar um material e mudar o policial associado (ou remover o policial colocando como disponivel), o sistema **nao atualiza as cautelas permanentes**. A logica de cautela so executa para materiais novos (cadastro), nunca para edicao.
-
-Cenarios que nao funcionam hoje:
-1. **Trocar policial**: Material fica na cautela do antigo E nao entra na cautela do novo
-2. **Remover policial** (deixar disponivel): Material continua na cautela do antigo
+# Cadastro em Lote de Materiais
 
 ## O que sera feito
 
-Adicionar logica no fluxo de edicao (`editingMaterial`) para:
-- Detectar se o policial mudou
-- Remover o material da cautela do policial anterior
-- Adicionar na cautela do novo policial (ou criar cautela nova)
-- Registrar no historico de material
+Adicionar um toggle "Cadastro em Lote" no formulario de novo material. Quando ativado, o campo "Numero de Serie" sera substituido por uma area onde voce pode adicionar multiplos numeros de serie (um por item). Ao salvar, o sistema cria um registro separado para cada numero de serie, todos com as mesmas informacoes preenchidas no formulario.
+
+## Como vai funcionar
+
+1. Ao clicar em "Novo Material", aparece o formulario normal com um switch "Cadastro em Lote" no topo
+2. Ao ativar o lote, o campo "Numero de Serie" vira uma lista onde voce digita um numero e clica em "Adicionar"
+3. Os numeros adicionados aparecem como badges que podem ser removidos individualmente
+4. Ao clicar "Cadastrar", o sistema cria N materiais identicos, cada um com seu numero de serie
+5. Uma barra de progresso mostra o andamento do cadastro
+
+## Exemplo visual
+
+```text
++------------------------------------------+
+|  [x] Cadastro em Lote                    |
++------------------------------------------+
+|  Nome: Colete Balistico Nivel IIIA       |
+|  Categoria: Colete Balistico             |
+|  Fabricante: Armour                      |
+|  ...demais campos iguais...              |
+|                                          |
+|  Numeros de Serie do Lote:               |
+|  [_______________] [+ Adicionar]         |
+|                                          |
+|  [CB-001 x] [CB-002 x] [CB-003 x]       |
+|  [CB-004 x] ... (40 itens)              |
+|                                          |
+|  Total: 40 materiais serao cadastrados   |
+|                                          |
+|  [Cadastrar Lote]  [Cancelar]            |
++------------------------------------------+
+```
 
 ## Detalhes Tecnicos
 
 ### Arquivo: `src/components/admin-belico/CadastroMateriais.tsx`
 
-Dentro do bloco `if (editingMaterial)` (apos a linha 339), adicionar logica para verificar mudanca de policial:
+**1. Novos estados:**
+- `modoLote: boolean` - controla se o modo lote esta ativo
+- `seriesLote: string[]` - lista de numeros de serie adicionados
+- `serieAtual: string` - campo de input para digitar o proximo numero
+- `cadastrandoLote: boolean` - indica que o cadastro em lote esta em andamento
+- `progressoLote: number` - progresso do cadastro (0 a N)
 
-```
-if (editingMaterial) {
-  await updateDoc(doc(db, 'materiais_belicos', editingMaterial.id), materialData);
-  materialId = editingMaterial.id;
+**2. No formulario (JSX):**
+- Adicionar switch "Cadastro em Lote" logo apos o titulo do card (aparece apenas quando NAO esta editando)
+- Quando `modoLote` esta ativo: substituir o campo "Numero de Serie" por um campo de input + botao "Adicionar" + lista de badges com os numeros adicionados
+- Mostrar contador "Total: X materiais serao cadastrados"
+- Botao muda de "Cadastrar" para "Cadastrar Lote (X itens)"
 
-  // NOVO: Verificar se policial mudou
-  const policialAntigoId = editingMaterial.policialAssociadoId || '';
-  const policialNovoId = formData.policialAssociadoId || '';
+**3. Na logica de submit (`handleSubmit`):**
+- Se `modoLote` esta ativo e `seriesLote.length > 0`:
+  - Loop por cada numero de serie
+  - Criar material identico para cada um (mesmo `materialDataBase` mas com `numeroSerie` diferente)
+  - Atualizar progresso a cada item
+  - Ao final, exibir toast de sucesso com quantidade cadastrada
+  - Se houver policial associado, a cautela tambem e criada para cada material
 
-  if (policialAntigoId !== policialNovoId) {
-    // 1. Remover da cautela do policial antigo (se existia)
-    if (policialAntigoId) {
-      // Buscar cautelas ativas do policial antigo
-      // Filtrar o material da lista de materiais da cautela
-      // Registrar no historico como "devolvido"
-    }
+**4. Funcoes auxiliares:**
+- `adicionarSerie()` - adiciona o numero digitado na lista (impede duplicatas)
+- `removerSerie(index)` - remove um numero da lista
+- Suporte a colar lista separada por virgula, ponto-e-virgula ou quebra de linha (para agilizar entrada de muitos numeros)
 
-    // 2. Adicionar na cautela do policial novo (se definido)
-    if (policialNovoId) {
-      // Buscar cautela ativa do novo policial
-      // Se existe: adicionar material na lista
-      // Se nao existe: criar nova cautela
-      // Registrar no historico como "cautelado"
-    }
-  }
-
-  toast.success('Material atualizado com sucesso');
-}
-```
-
-### Resumo das acoes
-
-| Cenario | O que acontece |
-|---------|---------------|
-| Trocar policial A por B | Remove da cautela de A, adiciona na cautela de B |
-| Remover policial (disponivel) | Remove da cautela do policial anterior |
-| Manter mesmo policial | Nenhuma alteracao nas cautelas |
-| Associar policial onde nao tinha | Cria/atualiza cautela do novo policial |
-
-A logica reutiliza o mesmo padrao ja existente no cadastro (linhas 362-471) para criar/atualizar cautelas, e o padrao do delete (linhas 522-548) para remover de cautelas.
+### O que NAO muda
+- Todo o formulario de campos (nome, categoria, fabricante, etc.) permanece identico
+- A logica de edicao nao e afetada (lote so aparece no cadastro novo)
+- A logica de cautela existente e reutilizada para cada item do lote
