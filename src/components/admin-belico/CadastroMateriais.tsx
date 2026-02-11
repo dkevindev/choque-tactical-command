@@ -78,6 +78,7 @@ const CadastroMateriais = () => {
   const [serieAtual, setSerieAtual] = useState('');
   const [cadastrandoLote, setCadastrandoLote] = useState(false);
   const [progressoLote, setProgressoLote] = useState(0);
+  const [gerandoHistorico, setGerandoHistorico] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
     categoria: '',
@@ -950,6 +951,61 @@ const CadastroMateriais = () => {
     setModeloFiltro('todos');
   };
 
+  const gerarHistoricoGlobal = async () => {
+    setGerandoHistorico(true);
+    try {
+      const transferenciasSnapshot = await getDocs(collection(db, 'materiais_transferidos'));
+      const chavesRegistradas = new Set<string>();
+      let registros = 0;
+
+      for (const transDoc of transferenciasSnapshot.docs) {
+        const transData = transDoc.data();
+        const materiais = transData.materiais || [];
+
+        for (const mat of materiais) {
+          const chaveUnica = `${mat.materialId}_${transData.data?.seconds || transDoc.id}_${mat.subTipo || 'transferido'}`;
+          if (chavesRegistradas.has(chaveUnica)) continue;
+          chavesRegistradas.add(chaveUnica);
+
+          // Se devolvido, limpar campos no material
+          if (mat.subTipo === 'devolvido' && mat.materialId) {
+            try {
+              await updateDoc(doc(db, 'materiais_belicos', mat.materialId), {
+                policialAssociadoNome: '',
+                policialAssociadoId: '',
+                cautelado: false,
+                disponivel: true
+              });
+            } catch (e) {
+              // Material pode não existir mais
+            }
+          }
+
+          // Criar registro no histórico
+          await addDoc(collection(db, 'historico_material'), {
+            materialId: mat.materialId || '',
+            materialNome: mat.nome || mat.materialNome || '',
+            numeroSerie: mat.numeroSerie || '',
+            policialNome: transData.policialNome || mat.policialNome || '',
+            policialId: transData.policialId || mat.policialId || '',
+            tipo: mat.subTipo || 'transferido',
+            data: transData.data?.toDate ? transData.data.toDate() : new Date(),
+            observacoes: `Gerado automaticamente a partir de transferência ${transDoc.id}`
+          });
+          registros++;
+        }
+      }
+
+      toast.success(`Histórico gerado com sucesso! ${registros} registros criados.`);
+      loadMateriais();
+    } catch (error) {
+      console.error('Erro ao gerar histórico:', error);
+      toast.error('Erro ao gerar histórico global');
+    } finally {
+      setGerandoHistorico(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -961,6 +1017,19 @@ const CadastroMateriais = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={gerarHistoricoGlobal}
+            disabled={gerandoHistorico}
+            className="flex items-center gap-2"
+          >
+            {gerandoHistorico ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <History className="h-4 w-4" />
+            )}
+            {gerandoHistorico ? 'Gerando...' : 'Gerar Histórico'}
+          </Button>
           <Button 
             variant="outline" 
             onClick={() => setShowForm(true)} 
