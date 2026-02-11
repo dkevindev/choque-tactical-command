@@ -954,8 +954,64 @@ const CadastroMateriais = () => {
   const gerarHistoricoGlobal = async () => {
     setGerandoHistorico(true);
     try {
+      // 1. Buscar histórico existente para evitar duplicatas
+      const historicoExistenteSnapshot = await getDocs(collection(db, 'historico_material'));
+      const chavesExistentes = new Set<string>();
+      const idsHistoricoParaRemover: string[] = [];
+      const historicosPorMaterial = new Map<string, any[]>();
+
+      historicoExistenteSnapshot.docs.forEach(docSnap => {
+        const d = docSnap.data();
+        const chave = `${d.materialId}_${d.data?.seconds || ''}_${d.tipo || ''}`;
+        chavesExistentes.add(chave);
+        // Agrupar por materialId para detectar duplicatas
+        if (d.materialId) {
+          const lista = historicosPorMaterial.get(d.materialId) || [];
+          lista.push({ id: docSnap.id, ...d });
+          historicosPorMaterial.set(d.materialId, lista);
+        }
+      });
+
+      // 2. Remover registros duplicados no histórico (manter apenas o mais recente de cada tipo)
+      let removidos = 0;
+      for (const [materialId, registros] of historicosPorMaterial.entries()) {
+        const porChave = new Map<string, any[]>();
+        registros.forEach(r => {
+          const chave = `${r.materialId}_${r.data?.seconds || ''}_${r.tipo || ''}`;
+          const lista = porChave.get(chave) || [];
+          lista.push(r);
+          porChave.set(chave, lista);
+        });
+        for (const [chave, duplicados] of porChave.entries()) {
+          if (duplicados.length > 1) {
+            // Manter o primeiro, remover os demais
+            for (let i = 1; i < duplicados.length; i++) {
+              await deleteDoc(doc(db, 'historico_material', duplicados[i].id));
+              removidos++;
+            }
+          }
+        }
+      }
+
+      // 3. Limpar nome do policial de materiais na reserva que ainda têm nome
+      const materiaisSnapshot = await getDocs(collection(db, 'materiais_belicos'));
+      let limpos = 0;
+      for (const matDoc of materiaisSnapshot.docs) {
+        const matData = matDoc.data();
+        const naReserva = matData.disponivel === true && !matData.cautelado;
+        const temNome = matData.policialAssociadoNome && matData.policialAssociadoNome.trim() !== '';
+        if (naReserva && temNome) {
+          await updateDoc(doc(db, 'materiais_belicos', matDoc.id), {
+            policialAssociadoNome: '',
+            policialAssociadoId: '',
+            cautelado: false
+          });
+          limpos++;
+        }
+      }
+
+      // 4. Processar transferências e criar histórico faltante
       const transferenciasSnapshot = await getDocs(collection(db, 'materiais_transferidos'));
-      const chavesRegistradas = new Set<string>();
       let registros = 0;
 
       for (const transDoc of transferenciasSnapshot.docs) {
@@ -964,8 +1020,8 @@ const CadastroMateriais = () => {
 
         for (const mat of materiais) {
           const chaveUnica = `${mat.materialId}_${transData.data?.seconds || transDoc.id}_${mat.subTipo || 'transferido'}`;
-          if (chavesRegistradas.has(chaveUnica)) continue;
-          chavesRegistradas.add(chaveUnica);
+          if (chavesExistentes.has(chaveUnica)) continue;
+          chavesExistentes.add(chaveUnica);
 
           // Se devolvido, limpar campos no material
           if (mat.subTipo === 'devolvido' && mat.materialId) {
@@ -981,7 +1037,6 @@ const CadastroMateriais = () => {
             }
           }
 
-          // Criar registro no histórico
           await addDoc(collection(db, 'historico_material'), {
             materialId: mat.materialId || '',
             materialNome: mat.nome || mat.materialNome || '',
@@ -996,7 +1051,11 @@ const CadastroMateriais = () => {
         }
       }
 
-      toast.success(`Histórico gerado com sucesso! ${registros} registros criados.`);
+      const msgs: string[] = [];
+      if (registros > 0) msgs.push(`${registros} registros criados`);
+      if (removidos > 0) msgs.push(`${removidos} duplicatas removidas`);
+      if (limpos > 0) msgs.push(`${limpos} materiais na reserva corrigidos`);
+      toast.success(msgs.length > 0 ? `Concluído: ${msgs.join(', ')}.` : 'Tudo já está correto, nenhuma alteração necessária.');
       loadMateriais();
     } catch (error) {
       console.error('Erro ao gerar histórico:', error);
