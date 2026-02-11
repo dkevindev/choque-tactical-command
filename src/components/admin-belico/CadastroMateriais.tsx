@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -22,7 +23,8 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   ArrowRightCircle,
-  XCircle
+  XCircle,
+  Package
 } from 'lucide-react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -70,6 +72,12 @@ const CadastroMateriais = () => {
   const [showHistorico, setShowHistorico] = useState(false);
   const [historicoLoading, setHistoricoLoading] = useState(false);
   const [historicoNomeMaterial, setHistoricoNomeMaterial] = useState('');
+  // Batch mode states
+  const [modoLote, setModoLote] = useState(false);
+  const [seriesLote, setSeriesLote] = useState<string[]>([]);
+  const [serieAtual, setSerieAtual] = useState('');
+  const [cadastrandoLote, setCadastrandoLote] = useState(false);
+  const [progressoLote, setProgressoLote] = useState(0);
   const [formData, setFormData] = useState({
     nome: '',
     categoria: '',
@@ -223,10 +231,39 @@ const CadastroMateriais = () => {
     setBuscaPolicial('');
     setEditingMaterial(null);
     setShowForm(false);
+    setModoLote(false);
+    setSeriesLote([]);
+    setSerieAtual('');
+    setCadastrandoLote(false);
+    setProgressoLote(0);
+  };
+
+  const adicionarSerie = () => {
+    const input = serieAtual.trim();
+    if (!input) return;
+    // Suporte a colar múltiplos separados por vírgula, ponto-e-vírgula ou quebra de linha
+    const novos = input.split(/[,;\n]+/).map(s => s.trim()).filter(s => s.length > 0);
+    const unicos = novos.filter(n => !seriesLote.includes(n));
+    if (unicos.length === 0) {
+      toast.error('Número(s) de série já adicionado(s)');
+      return;
+    }
+    setSeriesLote(prev => [...prev, ...unicos]);
+    setSerieAtual('');
+  };
+
+  const removerSerie = (index: number) => {
+    setSeriesLote(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validação do modo lote
+    if (modoLote && !editingMaterial && seriesLote.length === 0) {
+      toast.error('Adicione pelo menos um número de série para o cadastro em lote');
+      return;
+    }
     
     // Validação condicional: nome não é obrigatório para Colete Balístico
     if (formData.categoria !== 'Colete Balístico' && !formData.nome) {
@@ -473,6 +510,130 @@ const CadastroMateriais = () => {
         }
 
         toast.success('Material atualizado com sucesso');
+      } else if (modoLote && seriesLote.length > 0) {
+        // === CADASTRO EM LOTE ===
+        setCadastrandoLote(true);
+        setProgressoLote(0);
+        const total = seriesLote.length;
+        const materiaisIds: string[] = [];
+
+        for (let i = 0; i < total; i++) {
+          const loteData = { ...materialData, numeroSerie: seriesLote[i] };
+          const docRef = await addDoc(collection(db, 'materiais_belicos'), loteData);
+          materiaisIds.push(docRef.id);
+          setProgressoLote(i + 1);
+
+          // Se associado a policial, criar cautela para cada item
+          if (formData.policialAssociadoId) {
+            const policial = policiais.find(p => p.id === formData.policialAssociadoId);
+            
+            await addDoc(collection(db, 'historico_material'), {
+              materialId: docRef.id,
+              materialNome: loteData.nome || loteData.categoria,
+              numeroSerie: seriesLote[i],
+              policialNome: formData.policialAssociadoNome,
+              policialId: formData.policialAssociadoId,
+              tipo: 'cautelado',
+              data: new Date(),
+              observacoes: `Cautela inicial no cadastro em lote (${i + 1}/${total})`
+            });
+
+            // Montar item para cautela
+            const itemCautela: any = {
+              materialId: docRef.id,
+              nome: loteData.nome,
+              categoria: loteData.categoria,
+              quantidade: 1,
+              numeroSerie: seriesLote[i]
+            };
+            if (loteData.tamanhoColete) itemCautela.tamanhoColete = loteData.tamanhoColete;
+            if (loteData.sexo) itemCautela.sexo = loteData.sexo;
+            if (loteData.fabricante) itemCautela.fabricante = loteData.fabricante;
+            if (loteData.modelo) itemCautela.modelo = loteData.modelo;
+            if (loteData.numeroSIARM) itemCautela.numeroSIARM = loteData.numeroSIARM;
+            if (loteData.categoria === 'Armamento') {
+              itemCautela.calibre = loteData.calibre;
+              itemCautela.quantidadeCarregadores = parseInt(loteData.quantidadeCarregadores) || 0;
+              itemCautela.quantidadeMunicoes = parseInt(loteData.quantidadeMunicoes) || 0;
+            }
+
+            // Buscar/criar cautela ativa (fazemos apenas na primeira iteração, depois reutilizamos)
+            if (i === 0) {
+              const cautelasQuery = query(collection(db, 'cautelas_permanentes'), orderBy('createdAt', 'desc'));
+              const cautelasSnapshot = await getDocs(cautelasQuery);
+              const cautelaExistente = cautelasSnapshot.docs.find(d => {
+                const data = d.data();
+                return data.policialId === formData.policialAssociadoId && data.status === 'ativa';
+              });
+
+              if (cautelaExistente) {
+                // Adicionar todos os itens do lote na cautela existente de uma vez ao final
+              } else {
+                // Criar nova cautela - será preenchida ao final
+              }
+            }
+          }
+        }
+
+        // Após criar todos, se tem policial, adicionar todos de uma vez na cautela
+        if (formData.policialAssociadoId) {
+          const policial = policiais.find(p => p.id === formData.policialAssociadoId);
+          const todosItensCautela: any[] = materiaisIds.map((mid, idx) => {
+            const item: any = {
+              materialId: mid,
+              nome: materialData.nome,
+              categoria: materialData.categoria,
+              quantidade: 1,
+              numeroSerie: seriesLote[idx]
+            };
+            if (materialData.tamanhoColete) item.tamanhoColete = materialData.tamanhoColete;
+            if (materialData.sexo) item.sexo = materialData.sexo;
+            if (materialData.fabricante) item.fabricante = materialData.fabricante;
+            if (materialData.modelo) item.modelo = materialData.modelo;
+            if (materialData.numeroSIARM) item.numeroSIARM = materialData.numeroSIARM;
+            if (materialData.categoria === 'Armamento') {
+              item.calibre = materialData.calibre;
+            }
+            return item;
+          });
+
+          const cautelasQ = query(collection(db, 'cautelas_permanentes'), orderBy('createdAt', 'desc'));
+          const cautelasSnap = await getDocs(cautelasQ);
+          const cautelaExist = cautelasSnap.docs.find(d => {
+            const data = d.data();
+            return data.policialId === formData.policialAssociadoId && data.status === 'ativa';
+          });
+
+          if (cautelaExist) {
+            const materiaisAtualizados = [...(cautelaExist.data().materiais || []), ...todosItensCautela];
+            await updateDoc(doc(db, 'cautelas_permanentes', cautelaExist.id), {
+              materiais: materiaisAtualizados
+            });
+          } else {
+            const allCautelas = await getDocs(collection(db, 'cautelas_permanentes'));
+            const proximoNumero = allCautelas.size + 1;
+            const numeroCautela = String(proximoNumero).padStart(3, '0');
+            await addDoc(collection(db, 'cautelas_permanentes'), {
+              numeroCautela,
+              numeroSequencial: proximoNumero,
+              policialId: formData.policialAssociadoId,
+              policialNome: policial?.nome,
+              policialMatricula: policial?.matricula,
+              policialPatente: policial?.patente,
+              numeral: policial?.numeral,
+              materiais: todosItensCautela,
+              observacoes: formData.observacoes || '',
+              status: 'ativa',
+              tipoDocumento: 'permanente',
+              dataInicio: new Date(),
+              createdAt: new Date(),
+              createdBy: 'admin'
+            });
+          }
+        }
+
+        setCadastrandoLote(false);
+        toast.success(`${total} materiais cadastrados com sucesso!`);
       } else {
         const docRef = await addDoc(collection(db, 'materiais_belicos'), materialData);
         materialId = docRef.id;
@@ -905,10 +1066,32 @@ const CadastroMateriais = () => {
           <CardHeader>
             <CardTitle className="text-foreground flex items-center gap-2">
               <Target className="h-5 w-5" />
-              {editingMaterial ? 'Editar Material' : 'Novo Material'}
+              {editingMaterial ? 'Editar Material' : modoLote ? 'Cadastro em Lote' : 'Novo Material'}
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {!editingMaterial && (
+              <div className="flex items-center gap-3 mb-4 p-3 rounded-lg border bg-muted/30">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <Label htmlFor="modoLote" className="cursor-pointer font-medium">Cadastro em Lote</Label>
+                <Switch
+                  id="modoLote"
+                  checked={modoLote}
+                  onCheckedChange={(checked) => {
+                    setModoLote(checked);
+                    if (!checked) {
+                      setSeriesLote([]);
+                      setSerieAtual('');
+                    }
+                  }}
+                />
+                {modoLote && (
+                  <span className="text-xs text-muted-foreground">
+                    Cadastre vários materiais com mesmo dados, apenas mudando o nº de série
+                  </span>
+                )}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {formData.categoria !== 'Colete Balístico' && (
@@ -963,15 +1146,66 @@ const CadastroMateriais = () => {
                   </div>
                 )}
 
-                <div>
-                  <Label htmlFor="numeroSerie">Número de Série</Label>
-                  <Input
-                    id="numeroSerie"
-                    value={formData.numeroSerie}
-                    onChange={(e) => setFormData(prev => ({ ...prev, numeroSerie: e.target.value }))}
-                    placeholder="Ex: BR001234"
-                  />
-                </div>
+                {modoLote && !editingMaterial ? (
+                  <div className="md:col-span-2 space-y-3">
+                    <Label>Números de Série do Lote *</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={serieAtual}
+                        onChange={(e) => setSerieAtual(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            adicionarSerie();
+                          }
+                        }}
+                        placeholder="Digite o nº de série e pressione Enter (ou cole vários separados por vírgula)"
+                      />
+                      <Button type="button" variant="outline" onClick={adicionarSerie} className="shrink-0">
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar
+                      </Button>
+                    </div>
+                    {seriesLote.length > 0 && (
+                      <>
+                        <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-2 rounded-lg border bg-muted/20">
+                          {seriesLote.map((serie, idx) => (
+                            <Badge key={idx} variant="secondary" className="gap-1 pr-1">
+                              {serie}
+                              <button
+                                type="button"
+                                onClick={() => removerSerie(idx)}
+                                className="ml-1 rounded-full hover:bg-destructive/20 p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Total: {seriesLote.length} materiais serão cadastrados
+                        </p>
+                      </>
+                    )}
+                    {cadastrandoLote && (
+                      <div className="space-y-2">
+                        <Progress value={(progressoLote / seriesLote.length) * 100} />
+                        <p className="text-xs text-muted-foreground text-center">
+                          Cadastrando {progressoLote} de {seriesLote.length}...
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="numeroSerie">Número de Série</Label>
+                    <Input
+                      id="numeroSerie"
+                      value={formData.numeroSerie}
+                      onChange={(e) => setFormData(prev => ({ ...prev, numeroSerie: e.target.value }))}
+                      placeholder="Ex: BR001234"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="fabricante">Fabricante</Label>
@@ -1271,11 +1505,11 @@ const CadastroMateriais = () => {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex items-center gap-2">
+                <Button type="submit" className="flex items-center gap-2" disabled={cadastrandoLote}>
                   <Save className="h-4 w-4" />
-                  {editingMaterial ? 'Atualizar' : 'Cadastrar'}
+                  {editingMaterial ? 'Atualizar' : modoLote && seriesLote.length > 0 ? `Cadastrar Lote (${seriesLote.length} itens)` : 'Cadastrar'}
                 </Button>
-                <Button type="button" variant="outline" onClick={resetForm} className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={resetForm} className="flex items-center gap-2" disabled={cadastrandoLote}>
                   <X className="h-4 w-4" />
                   Cancelar
                 </Button>
