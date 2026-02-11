@@ -350,8 +350,8 @@ const CadastroMateriais = () => {
       if (formData.calibre) materialDataBase.calibre = formData.calibre;
       if (formData.numeroSerie) materialDataBase.numeroSerie = formData.numeroSerie;
       if (formData.quantidade !== '') materialDataBase.quantidade = parseInt(formData.quantidade);
-      if (formData.policialAssociadoId) materialDataBase.policialAssociadoId = formData.policialAssociadoId;
-      if (formData.policialAssociadoNome) materialDataBase.policialAssociadoNome = formData.policialAssociadoNome;
+      materialDataBase.policialAssociadoId = formData.policialAssociadoId || '';
+      materialDataBase.policialAssociadoNome = formData.policialAssociadoNome || '';
       if (formData.fabricante) materialDataBase.fabricante = formData.fabricante;
       if (formData.modelo) materialDataBase.modelo = formData.modelo;
       if (formData.observacoes) materialDataBase.observacoes = formData.observacoes;
