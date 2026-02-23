@@ -16,6 +16,7 @@ import MovimentacoesTab from './gestao-pessoas/MovimentacoesTab';
 import SituacaoTab from './gestao-pessoas/SituacaoTab';
 import FuncaoTab from './gestao-pessoas/FuncaoTab';
 import TransferidosTab from './gestao-pessoas/TransferidosTab';
+import AtestadosMedicosTab from './gestao-pessoas/AtestadosMedicosTab';
 
 interface Policial {
   id: string;
@@ -182,7 +183,7 @@ const GestãoPessoas: React.FC = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="ferias">Férias</TabsTrigger>
           <TabsTrigger value="efetivo">Efetivo</TabsTrigger>
@@ -190,6 +191,7 @@ const GestãoPessoas: React.FC = () => {
           <TabsTrigger value="situacao">Situação</TabsTrigger>
           <TabsTrigger value="funcao">Função</TabsTrigger>
           <TabsTrigger value="transferidos">Transferidos</TabsTrigger>
+          <TabsTrigger value="atestados">Atestados</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
@@ -375,6 +377,10 @@ const GestãoPessoas: React.FC = () => {
 
         <TabsContent value="transferidos">
           <TransferidosTab policiais={policiais} onUpdate={fetchPoliciais} />
+        </TabsContent>
+
+        <TabsContent value="atestados">
+          <AtestadosMedicosTab policiais={policiais} onUpdate={fetchPoliciais} />
         </TabsContent>
       </Tabs>
     </div>
