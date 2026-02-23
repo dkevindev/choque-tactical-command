@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle } from 'lucide-react';
-import { collection, getDocs, addDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2 } from 'lucide-react';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 import { addDays, format, parseISO } from 'date-fns';
@@ -130,7 +130,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   const dataFimCalculada = useMemo(() => {
     if (!dataInicio || !dias || isNaN(Number(dias))) return '';
     try {
-      const result = addDays(parseISO(dataInicio), Number(dias));
+      const result = addDays(parseISO(dataInicio), Number(dias) - 1);
       return format(result, 'yyyy-MM-dd');
     } catch {
       return '';
@@ -233,6 +233,18 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
       fetchAtestados();
     } catch (error) {
       toast({ title: "Erro", description: "Erro ao homologar", variant: "destructive" });
+    }
+  };
+
+  const handleExcluir = async (atestado: Atestado) => {
+    if (!confirm(`Excluir atestado de ${atestado.policialNome} (CID: ${atestado.cid})?`)) return;
+    try {
+      await deleteDoc(doc(db, 'atestados_medicos', atestado.id));
+      toast({ title: "Sucesso", description: "Atestado excluído com sucesso" });
+      fetchAtestados();
+    } catch (error) {
+      console.error('Erro ao excluir atestado:', error);
+      toast({ title: "Erro", description: "Erro ao excluir atestado", variant: "destructive" });
     }
   };
 
@@ -441,12 +453,13 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                           <TableHead>Médico</TableHead>
                           <TableHead>Hospital</TableHead>
                           <TableHead>Status Perícia</TableHead>
+                          <TableHead>Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredAtestados.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={9} className="text-center text-muted-foreground">
+                            <TableCell colSpan={10} className="text-center text-muted-foreground">
                               Nenhum atestado encontrado
                             </TableCell>
                           </TableRow>
@@ -464,6 +477,11 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                             <TableCell>{a.medico || 'N/A'}</TableCell>
                             <TableCell>{a.hospital || 'N/A'}</TableCell>
                             <TableCell>{statusBadge(a.statusPericia)}</TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => handleExcluir(a)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
