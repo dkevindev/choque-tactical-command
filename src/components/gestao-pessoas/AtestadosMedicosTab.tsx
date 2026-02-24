@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2, Download } from 'lucide-react';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
-import { addDays, format, parseISO } from 'date-fns';
+import { addDays, format, parseISO, getMonth, getYear } from 'date-fns';
 import { buscarCid, CidItem } from '@/lib/cidData';
 
 interface Policial {
@@ -57,6 +58,21 @@ interface AtestadosMedicosTabProps {
   onUpdate: () => void;
 }
 
+const MESES = [
+  { value: '0', label: 'Janeiro' },
+  { value: '1', label: 'Fevereiro' },
+  { value: '2', label: 'Março' },
+  { value: '3', label: 'Abril' },
+  { value: '4', label: 'Maio' },
+  { value: '5', label: 'Junho' },
+  { value: '6', label: 'Julho' },
+  { value: '7', label: 'Agosto' },
+  { value: '8', label: 'Setembro' },
+  { value: '9', label: 'Outubro' },
+  { value: '10', label: 'Novembro' },
+  { value: '11', label: 'Dezembro' },
+];
+
 const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, onUpdate }) => {
   const [atestados, setAtestados] = useState<Atestado[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +98,13 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   const [periciaAtestado, setPericiaAtestado] = useState<Atestado | null>(null);
   const [dataPericia, setDataPericia] = useState('');
   const [horaPericia, setHoraPericia] = useState('');
+
+  // Filtros
+  const [filtroPolicial, setFiltroPolicial] = useState('todos');
+  const [filtroMes, setFiltroMes] = useState('todos');
+  const [filtroAno, setFiltroAno] = useState('todos');
+  const [filtroDe, setFiltroDe] = useState('');
+  const [filtroAte, setFiltroAte] = useState('');
 
   const { toast } = useToast();
 
@@ -159,14 +182,16 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   };
 
   const handleSalvar = async () => {
-    if (!selectedPolicial || !dataInicio || !dias || !selectedCid) {
-      toast({ title: "Erro", description: "Preencha todos os campos obrigatórios", variant: "destructive" });
+    if (!selectedPolicial || !dataInicio || !dias) {
+      toast({ title: "Erro", description: "Preencha policial, data início e quantidade de dias", variant: "destructive" });
       return;
     }
 
     setSaving(true);
     try {
       const numDias = Number(dias);
+      const cidCodigo = selectedCid ? selectedCid.codigo : cidSearch.trim();
+      const cidDesc = selectedCid ? selectedCid.descricao : '';
       const atestado = {
         policialId: selectedPolicial.id,
         policialNome: selectedPolicial.NOME || '',
@@ -177,8 +202,8 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
         dataInicio,
         dias: numDias,
         dataFim: dataFimCalculada,
-        cid: selectedCid.codigo,
-        cidDescricao: selectedCid.descricao,
+        cid: cidCodigo,
+        cidDescricao: cidDesc,
         medico,
         crm,
         hospital,
@@ -237,7 +262,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   };
 
   const handleExcluir = async (atestado: Atestado) => {
-    if (!confirm(`Excluir atestado de ${atestado.policialNome} (CID: ${atestado.cid})?`)) return;
+    if (!confirm(`Excluir atestado de ${atestado.policialNome}${atestado.cid ? ` (CID: ${atestado.cid})` : ''}?`)) return;
     try {
       await deleteDoc(doc(db, 'atestados_medicos', atestado.id));
       toast({ title: "Sucesso", description: "Atestado excluído com sucesso" });
@@ -255,11 +280,88 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
 
   const pendentesPericia = atestados.filter(a => a.dias > 3 && (a.statusPericia === 'PENDENTE' || a.statusPericia === 'AGENDADO'));
 
-  const filteredAtestados = atestados.filter(a =>
-    a.policialNome?.toLowerCase().includes(searchAtestado.toLowerCase()) ||
-    a.policialPostGrad?.toLowerCase().includes(searchAtestado.toLowerCase()) ||
-    a.cid?.toLowerCase().includes(searchAtestado.toLowerCase())
-  );
+  // Anos disponíveis nos atestados
+  const anosDisponiveis = useMemo(() => {
+    const anos = new Set<number>();
+    atestados.forEach(a => {
+      if (a.dataInicio) {
+        try { anos.add(getYear(parseISO(a.dataInicio))); } catch {}
+      }
+    });
+    return Array.from(anos).sort((a, b) => b - a);
+  }, [atestados]);
+
+  // Policiais únicos nos atestados
+  const policiaisUnicos = useMemo(() => {
+    const nomes = new Map<string, string>();
+    atestados.forEach(a => {
+      if (a.policialNome && !nomes.has(a.policialId)) {
+        nomes.set(a.policialId, `${a.policialPostGrad} ${a.policialNome}`);
+      }
+    });
+    return Array.from(nomes.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [atestados]);
+
+  // Filtrar atestados
+  const filteredAtestados = useMemo(() => {
+    return atestados.filter(a => {
+      // Busca texto
+      if (searchAtestado) {
+        const term = searchAtestado.toLowerCase();
+        const match = a.policialNome?.toLowerCase().includes(term) ||
+          a.policialPostGrad?.toLowerCase().includes(term) ||
+          a.cid?.toLowerCase().includes(term);
+        if (!match) return false;
+      }
+      // Filtro policial
+      if (filtroPolicial !== 'todos' && a.policialId !== filtroPolicial) return false;
+      // Filtro mês
+      if (filtroMes !== 'todos' && a.dataInicio) {
+        try {
+          if (getMonth(parseISO(a.dataInicio)) !== Number(filtroMes)) return false;
+        } catch { return false; }
+      }
+      // Filtro ano
+      if (filtroAno !== 'todos' && a.dataInicio) {
+        try {
+          if (getYear(parseISO(a.dataInicio)) !== Number(filtroAno)) return false;
+        } catch { return false; }
+      }
+      // Filtro período
+      if (filtroDe && a.dataInicio && a.dataInicio < filtroDe) return false;
+      if (filtroAte && a.dataInicio && a.dataInicio > filtroAte) return false;
+      return true;
+    });
+  }, [atestados, searchAtestado, filtroPolicial, filtroMes, filtroAno, filtroDe, filtroAte]);
+
+  // Exportar CSV
+  const handleExportarCSV = () => {
+    const headers = ['Policial', 'Post/Grad', 'Matrícula', 'Data Início', 'Dias', 'Data Fim', 'CID', 'Descrição CID', 'Médico', 'CRM', 'Hospital', 'Status Perícia'];
+    const rows = filteredAtestados.map(a => [
+      a.policialNome,
+      a.policialPostGrad,
+      a.policialMatricula,
+      formatDate(a.dataInicio),
+      a.dias,
+      formatDate(a.dataFim),
+      a.cid || '',
+      a.cidDescricao || '',
+      a.medico || '',
+      a.crm || '',
+      a.hospital || '',
+      a.statusPericia === 'NAO_PRECISA' ? 'Não precisa' : a.statusPericia === 'PENDENTE' ? 'Pendente' : a.statusPericia === 'AGENDADO' ? 'Agendado' : 'Homologado',
+    ]);
+
+    const csvContent = '\uFEFF' + [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `atestados_medicos_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exportado!", description: `${filteredAtestados.length} atestados exportados` });
+  };
 
   const statusBadge = (status: string) => {
     switch (status) {
@@ -304,7 +406,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                 <CardContent className="space-y-4">
                   {/* Busca de policial */}
                   <div className="relative">
-                    <Label>Localizar Policial (numeral, nome ou nome de guerra)</Label>
+                    <Label>Localizar Policial (numeral, nome ou nome de guerra) *</Label>
                     <div className="relative">
                       <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -371,9 +473,9 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
 
                   {/* CID */}
                   <div className="relative">
-                    <Label>CID *</Label>
+                    <Label>CID</Label>
                     <Input
-                      placeholder="Digite o código ou descrição do CID..."
+                      placeholder="Digite o código ou descrição do CID (opcional)..."
                       value={selectedCid ? `${selectedCid.codigo} - ${selectedCid.descricao}` : cidSearch}
                       onChange={e => {
                         setCidSearch(e.target.value);
@@ -397,20 +499,25 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                         ))}
                       </div>
                     )}
+                    {cidSearch && !selectedCid && cidResults.length === 0 && cidSearch.length >= 2 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        CID "{cidSearch}" não encontrado na lista, mas será salvo como digitado
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label>Médico</Label>
-                      <Input value={medico} onChange={e => setMedico(e.target.value)} placeholder="Nome do médico" />
+                      <Input value={medico} onChange={e => setMedico(e.target.value)} placeholder="Nome do médico (opcional)" />
                     </div>
                     <div>
                       <Label>CRM</Label>
-                      <Input value={crm} onChange={e => setCrm(e.target.value)} placeholder="CRM" />
+                      <Input value={crm} onChange={e => setCrm(e.target.value)} placeholder="CRM (opcional)" />
                     </div>
                     <div>
                       <Label>Hospital</Label>
-                      <Input value={hospital} onChange={e => setHospital(e.target.value)} placeholder="Hospital/Clínica" />
+                      <Input value={hospital} onChange={e => setHospital(e.target.value)} placeholder="Hospital/Clínica (opcional)" />
                     </div>
                   </div>
 
@@ -425,15 +532,83 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
 
               {/* Lista de atestados */}
               <div className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar atestados por nome, graduação ou CID..."
-                    value={searchAtestado}
-                    onChange={e => setSearchAtestado(e.target.value)}
-                    className="pl-8"
-                  />
+                {/* Filtros */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+                  <div className="relative lg:col-span-2">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por nome, graduação ou CID..."
+                      value={searchAtestado}
+                      onChange={e => setSearchAtestado(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                  <Select value={filtroPolicial} onValueChange={setFiltroPolicial}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Policial" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os policiais</SelectItem>
+                      {policiaisUnicos.map(([id, nome]) => (
+                        <SelectItem key={id} value={id}>{nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filtroMes} onValueChange={setFiltroMes}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Mês" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os meses</SelectItem>
+                      {MESES.map(m => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filtroAno} onValueChange={setFiltroAno}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os anos</SelectItem>
+                      {anosDisponiveis.map(a => (
+                        <SelectItem key={a} value={String(a)}>{a}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" onClick={handleExportarCSV} className="flex items-center gap-2">
+                    <Download className="h-4 w-4" />
+                    Exportar CSV
+                  </Button>
                 </div>
+
+                {/* Filtro por período */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm whitespace-nowrap">De:</Label>
+                    <Input type="date" value={filtroDe} onChange={e => setFiltroDe(e.target.value)} className="w-40" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm whitespace-nowrap">Até:</Label>
+                    <Input type="date" value={filtroAte} onChange={e => setFiltroAte(e.target.value)} className="w-40" />
+                  </div>
+                  {(filtroDe || filtroAte || filtroPolicial !== 'todos' || filtroMes !== 'todos' || filtroAno !== 'todos') && (
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setFiltroDe('');
+                      setFiltroAte('');
+                      setFiltroPolicial('todos');
+                      setFiltroMes('todos');
+                      setFiltroAno('todos');
+                      setSearchAtestado('');
+                    }}>
+                      Limpar filtros
+                    </Button>
+                  )}
+                  <span className="text-sm text-muted-foreground ml-auto">
+                    {filteredAtestados.length} atestado(s)
+                  </span>
+                </div>
+
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin mr-2" />
@@ -471,8 +646,14 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                             <TableCell>{a.dias}</TableCell>
                             <TableCell>{formatDate(a.dataFim)}</TableCell>
                             <TableCell>
-                              <span className="font-mono text-xs">{a.cid}</span>
-                              <p className="text-xs text-muted-foreground">{a.cidDescricao}</p>
+                              {a.cid ? (
+                                <>
+                                  <span className="font-mono text-xs">{a.cid}</span>
+                                  {a.cidDescricao && <p className="text-xs text-muted-foreground">{a.cidDescricao}</p>}
+                                </>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">N/A</span>
+                              )}
                             </TableCell>
                             <TableCell>{a.medico || 'N/A'}</TableCell>
                             <TableCell>{a.hospital || 'N/A'}</TableCell>
@@ -537,7 +718,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                               <TableCell>{formatDate(a.dataInicio)}</TableCell>
                               <TableCell>{a.dias}</TableCell>
                               <TableCell>
-                                <span className="font-mono text-xs">{a.cid}</span>
+                                <span className="font-mono text-xs">{a.cid || 'N/A'}</span>
                               </TableCell>
                               <TableCell>{statusBadge(a.statusPericia)}</TableCell>
                               <TableCell>
