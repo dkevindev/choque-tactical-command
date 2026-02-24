@@ -1,88 +1,54 @@
 
 
-# Plano: Correcoes e Novas Funcionalidades em Gestao de Pessoas
-
-Este plano cobre 3 grandes itens solicitados. Devido a complexidade, vou dividir em partes para implementar de forma organizada.
+# Plano: CID Completo, Campos Opcionais, Filtros e Exportacao Excel
 
 ---
 
-## 1. Corrigir aba "Transferidos" (nao mostra os ultimos)
+## 1. Tornar campos nao obrigatorios
 
-**Problema:** A aba Transferidos filtra policiais da colecao `policiais` buscando `SITUACAO === 'transferido'`. Porem, ao transferir, o policial e removido da colecao `policiais` e movido para `policiais_transferidos`. Por isso nada aparece.
+**Arquivo:** `src/components/gestao-pessoas/AtestadosMedicosTab.tsx`
 
-**Solucao:** Alterar o componente `TransferidosTab` para buscar dados diretamente da colecao `policiais_transferidos` no Firebase, em vez de filtrar da lista de policiais ativos.
-
-### Arquivo: `src/components/gestao-pessoas/TransferidosTab.tsx`
-- Adicionar `useEffect` para carregar documentos da colecao `policiais_transferidos` via `getDocs`
-- Exibir colunas: Nome, Post/Grad, Matricula, Destino, Data da Transferencia, Publicacao
-- Manter busca por nome/posto/destino
-- Ordenar por data de transferencia (mais recente primeiro)
+- Remover a validacao de `selectedCid` no `handleSalvar` (linha 162)
+- Apenas `selectedPolicial`, `dataInicio` e `dias` serao obrigatorios
+- Quando nao houver CID selecionado, salvar `cid: ''` e `cidDescricao: ''`
+- Permitir tambem digitacao livre no campo CID (caso o usuario digite um codigo que nao esta no autocomplete, salvar o texto digitado)
+- Remover os asteriscos (*) dos labels de CID, Medico, CRM e Hospital no formulario
 
 ---
 
-## 2. Nova aba "Atestados Medicos"
+## 2. Substituir cidData.ts com a tabela completa de CIDs
 
-Criar um sistema completo de cadastro de atestados medicos, inspirado no modelo VBA da imagem de referencia.
+**Arquivo:** `src/lib/cidData.ts`
 
-### Novo arquivo: `src/components/gestao-pessoas/AtestadosMedicosTab.tsx`
-
-**Funcionalidades:**
-- Sub-abas: "Cadastro/Lista" e "Pendentes de Pericia"
-- Busca de policial por numeral, nome ou nome de guerra (consultando colecao `policiais`)
-- Ao localizar, preenche automaticamente: Numeral, Nome, Matricula, Post/Grad, CPF, OPM/Unidade
-
-**Campos do atestado:**
-- Data inicio
-- Quantidade de dias
-- CID (com autocomplete usando dicionario local de CIDs - os codigos mais comuns da CID-10 serao incluidos em um arquivo JSON embarcado no sistema, sem necessidade de API externa)
-- Tipo/descricao do CID (preenchido automaticamente ao digitar o codigo)
-- Medico
-- CRM
-- Hospital
-- CPF (pre-preenchido do policial)
-- Data fim (calculada automaticamente: data inicio + dias)
-
-**Regra de pericia:**
-- Se quantidade de dias > 3, o atestado e marcado como "Pendente de Pericia"
-- Status possíveis: NAO PRECISA, PENDENTE, AGENDADO, HOMOLOGADO
-
-**Aba "Pendentes de Pericia":**
-- Lista apenas atestados com dias > 3 e status pendente
-- Botao "Copiar CPF" em cada linha (para agilizar marcacao de pericia)
-- Botao "Confirmar Marcacao" que abre dialog para inserir data e hora da pericia
-- Ao confirmar, status muda para "AGENDADO"
-
-**Armazenamento:** Colecao Firebase `atestados_medicos` com campos: policialId, policialNome, policialPostGrad, policialMatricula, policialCpf, policialNumeral, dataInicio, dias, dataFim, cid, cidDescricao, medico, crm, hospital, statusPericia, dataPericia, horaPericia
-
-### Novo arquivo: `src/lib/cidData.ts`
-- Dicionario com os CIDs mais comuns (aproximadamente 200 codigos) incluindo categorias como: lesoes, doencas osteomusculares, transtornos mentais, doencas respiratorias, etc.
-- Formato: `{ codigo: string, descricao: string }`
+- Substituir os ~160 codigos atuais pela tabela completa do Excel enviado (~14.400 codigos CID-10)
+- Manter o mesmo formato `{ codigo: string, descricao: string }`
+- Inclui todos os codigos como S462, M501, A059 que nao estavam sendo encontrados
+- A funcao `buscarCid` continuara funcionando igual, retornando no maximo 15 resultados por busca
 
 ---
 
-## 3. Ficha de Assentamentos do Policial (ao clicar no Efetivo)
+## 3. Adicionar filtros na lista de atestados
 
-Ao clicar no botao "Visualizar" (olho) de um policial na aba Efetivo, alem dos dados atuais, exibir uma secao de "Assentamentos" que consolida todos os registros do policial.
+**Arquivo:** `src/components/gestao-pessoas/AtestadosMedicosTab.tsx`
 
-### Arquivo: `src/components/gestao-pessoas/EfetivoTab.tsx`
+Novos filtros acima da tabela de atestados:
+- **Filtro por policial**: Select/combobox para filtrar por nome do policial
+- **Filtro por mes**: Select com meses (Janeiro a Dezembro)
+- **Filtro por ano**: Select com anos disponiveis
+- **Filtro por periodo**: Campos "Data De" e "Data Ate" para filtrar por intervalo
 
-**Alteracoes no Dialog de visualizacao:**
-- Adicionar abas dentro do dialog: "Dados Pessoais" (atual) e "Assentamentos"
-- Na aba Assentamentos, buscar e exibir:
-  - Atestados medicos (colecao `atestados_medicos` filtrado por policialId)
-  - Ferias (dados do proprio policial)
-  - Licencas (historico de situacoes)
-  - Movimentacoes/transferencias
-- Cada registro com data, tipo, descricao e status
-- Timeline visual organizada cronologicamente
+Todos os filtros serao combinados (AND) e aplicados sobre a lista de atestados.
 
 ---
 
-## Alteracao na pagina principal
+## 4. Exportar tabela em Excel
 
-### Arquivo: `src/components/GestãoPessoas.tsx`
-- Adicionar a aba "Atestados" no TabsList (passar de 7 para 8 colunas)
-- Importar e renderizar o novo componente `AtestadosMedicosTab`
+**Arquivo:** `src/components/gestao-pessoas/AtestadosMedicosTab.tsx`
+
+- Adicionar botao "Exportar Excel" ao lado dos filtros
+- Gerar arquivo .xlsx ou .csv com os atestados filtrados
+- Colunas: Policial, Post/Grad, Matricula, Data Inicio, Dias, Data Fim, CID, Descricao CID, Medico, CRM, Hospital, Status Pericia
+- Usar geracao de CSV nativo (sem dependencia extra) com download automatico
 
 ---
 
@@ -90,9 +56,6 @@ Ao clicar no botao "Visualizar" (olho) de um policial na aba Efetivo, alem dos d
 
 | Arquivo | Acao |
 |---------|------|
-| `src/components/gestao-pessoas/TransferidosTab.tsx` | Reescrever para buscar de `policiais_transferidos` |
-| `src/components/gestao-pessoas/AtestadosMedicosTab.tsx` | Novo - sistema completo de atestados |
-| `src/lib/cidData.ts` | Novo - dicionario de CIDs |
-| `src/components/gestao-pessoas/EfetivoTab.tsx` | Adicionar aba Assentamentos no dialog de visualizacao |
-| `src/components/GestãoPessoas.tsx` | Adicionar aba Atestados |
+| `src/lib/cidData.ts` | Reescrever com tabela completa (~14.400 CIDs) |
+| `src/components/gestao-pessoas/AtestadosMedicosTab.tsx` | Campos opcionais + filtros + exportacao Excel |
 
