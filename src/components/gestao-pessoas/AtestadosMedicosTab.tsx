@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2, Download } from 'lucide-react';
+import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2, Download, BookOpen } from 'lucide-react';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +51,8 @@ interface Atestado {
   dataPericia?: string;
   horaPericia?: string;
   criadoEm: string;
+  boletimInterno?: string;
+  bcgHomologacao?: string;
 }
 
 interface AtestadosMedicosTabProps {
@@ -98,6 +100,16 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   const [periciaAtestado, setPericiaAtestado] = useState<Atestado | null>(null);
   const [dataPericia, setDataPericia] = useState('');
   const [horaPericia, setHoraPericia] = useState('');
+
+  // Dialog BI
+  const [showBIDialog, setShowBIDialog] = useState(false);
+  const [biAtestado, setBiAtestado] = useState<Atestado | null>(null);
+  const [boletimInternoInput, setBoletimInternoInput] = useState('');
+
+  // Dialog BCG
+  const [showBCGDialog, setShowBCGDialog] = useState(false);
+  const [bcgAtestado, setBcgAtestado] = useState<Atestado | null>(null);
+  const [bcgInput, setBcgInput] = useState('');
 
   // Filtros
   const [filtroPolicial, setFiltroPolicial] = useState('todos');
@@ -261,6 +273,40 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
     }
   };
 
+  const handleSalvarBI = async () => {
+    if (!biAtestado || !boletimInternoInput.trim()) {
+      toast({ title: "Erro", description: "Preencha o número do Boletim Interno", variant: "destructive" });
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'atestados_medicos', biAtestado.id), { boletimInterno: boletimInternoInput.trim() });
+      toast({ title: "Sucesso", description: "Boletim Interno registrado" });
+      setShowBIDialog(false);
+      setBiAtestado(null);
+      setBoletimInternoInput('');
+      fetchAtestados();
+    } catch (error) {
+      toast({ title: "Erro", description: "Erro ao salvar BI", variant: "destructive" });
+    }
+  };
+
+  const handleSalvarBCG = async () => {
+    if (!bcgAtestado || !bcgInput.trim()) {
+      toast({ title: "Erro", description: "Preencha o número do BCG", variant: "destructive" });
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'atestados_medicos', bcgAtestado.id), { bcgHomologacao: bcgInput.trim() });
+      toast({ title: "Sucesso", description: "BCG de homologação registrado" });
+      setShowBCGDialog(false);
+      setBcgAtestado(null);
+      setBcgInput('');
+      fetchAtestados();
+    } catch (error) {
+      toast({ title: "Erro", description: "Erro ao salvar BCG", variant: "destructive" });
+    }
+  };
+
   const handleExcluir = async (atestado: Atestado) => {
     if (!confirm(`Excluir atestado de ${atestado.policialNome}${atestado.cid ? ` (CID: ${atestado.cid})` : ''}?`)) return;
     try {
@@ -278,7 +324,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
     try { return format(parseISO(d), 'dd/MM/yyyy'); } catch { return d; }
   };
 
-  const pendentesPericia = atestados.filter(a => a.dias > 3 && (a.statusPericia === 'PENDENTE' || a.statusPericia === 'AGENDADO'));
+  const pendentesPericia = atestados.filter(a => a.dias > 3 && (a.statusPericia === 'PENDENTE' || a.statusPericia === 'AGENDADO' || a.statusPericia === 'HOMOLOGADO'));
 
   // Anos disponíveis nos atestados
   const anosDisponiveis = useMemo(() => {
@@ -305,7 +351,6 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   // Filtrar atestados
   const filteredAtestados = useMemo(() => {
     return atestados.filter(a => {
-      // Busca texto
       if (searchAtestado) {
         const term = searchAtestado.toLowerCase();
         const match = a.policialNome?.toLowerCase().includes(term) ||
@@ -313,30 +358,29 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
           a.cid?.toLowerCase().includes(term);
         if (!match) return false;
       }
-      // Filtro policial
       if (filtroPolicial !== 'todos' && a.policialId !== filtroPolicial) return false;
-      // Filtro mês
       if (filtroMes !== 'todos' && a.dataInicio) {
         try {
           if (getMonth(parseISO(a.dataInicio)) !== Number(filtroMes)) return false;
         } catch { return false; }
       }
-      // Filtro ano
       if (filtroAno !== 'todos' && a.dataInicio) {
         try {
           if (getYear(parseISO(a.dataInicio)) !== Number(filtroAno)) return false;
         } catch { return false; }
       }
-      // Filtro período
       if (filtroDe && a.dataInicio && a.dataInicio < filtroDe) return false;
       if (filtroAte && a.dataInicio && a.dataInicio > filtroAte) return false;
       return true;
+    }).sort((a, b) => {
+      if (!a.dataInicio || !b.dataInicio) return 0;
+      return b.dataInicio.localeCompare(a.dataInicio);
     });
   }, [atestados, searchAtestado, filtroPolicial, filtroMes, filtroAno, filtroDe, filtroAte]);
 
   // Exportar CSV
   const handleExportarCSV = () => {
-    const headers = ['Policial', 'Post/Grad', 'Matrícula', 'Data Início', 'Dias', 'Data Fim', 'CID', 'Descrição CID', 'Médico', 'CRM', 'Hospital', 'Status Perícia'];
+    const headers = ['Policial', 'Post/Grad', 'Matrícula', 'Data Início', 'Dias', 'Data Fim', 'CID', 'Descrição CID', 'Médico', 'CRM', 'Hospital', 'Status Perícia', 'Boletim Interno'];
     const rows = filteredAtestados.map(a => [
       a.policialNome,
       a.policialPostGrad,
@@ -350,6 +394,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
       a.crm || '',
       a.hospital || '',
       a.statusPericia === 'NAO_PRECISA' ? 'Não precisa' : a.statusPericia === 'PENDENTE' ? 'Pendente' : a.statusPericia === 'AGENDADO' ? 'Agendado' : 'Homologado',
+      a.boletimInterno || '',
     ]);
 
     const csvContent = '\uFEFF' + [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n');
@@ -628,13 +673,14 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                           <TableHead>Médico</TableHead>
                           <TableHead>Hospital</TableHead>
                           <TableHead>Status Perícia</TableHead>
+                          <TableHead>BI</TableHead>
                           <TableHead>Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredAtestados.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={10} className="text-center text-muted-foreground">
+                            <TableCell colSpan={11} className="text-center text-muted-foreground">
                               Nenhum atestado encontrado
                             </TableCell>
                           </TableRow>
@@ -659,9 +705,25 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                             <TableCell>{a.hospital || 'N/A'}</TableCell>
                             <TableCell>{statusBadge(a.statusPericia)}</TableCell>
                             <TableCell>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => handleExcluir(a)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {a.boletimInterno ? (
+                                <span className="text-xs font-mono">{a.boletimInterno}</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Registrar Boletim Interno" onClick={() => {
+                                  setBiAtestado(a);
+                                  setBoletimInternoInput(a.boletimInterno || '');
+                                  setShowBIDialog(true);
+                                }}>
+                                  <BookOpen className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => handleExcluir(a)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -688,7 +750,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                     <div className="border rounded-lg">
                       <Table>
                         <TableHeader>
-                          <TableRow>
+                         <TableRow>
                             <TableHead>Policial</TableHead>
                             <TableHead>Post/Grad</TableHead>
                             <TableHead>CPF</TableHead>
@@ -697,6 +759,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                             <TableHead>CID</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Perícia</TableHead>
+                            <TableHead>BCG</TableHead>
                             <TableHead>Ações</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -727,6 +790,13 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                                 )}
                               </TableCell>
                               <TableCell>
+                                {a.bcgHomologacao ? (
+                                  <span className="text-xs font-mono">{a.bcgHomologacao}</span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
                                 <div className="flex gap-1">
                                   {a.statusPericia === 'PENDENTE' && (
                                     <Button
@@ -745,6 +815,16 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                                     <Button size="sm" variant="outline" onClick={() => handleHomologar(a)}>
                                       <CheckCircle className="h-4 w-4 mr-1" />
                                       Homologar
+                                    </Button>
+                                  )}
+                                  {(a.statusPericia === 'HOMOLOGADO' || a.statusPericia === 'AGENDADO') && (
+                                    <Button size="sm" variant="outline" title="Registrar BCG" onClick={() => {
+                                      setBcgAtestado(a);
+                                      setBcgInput(a.bcgHomologacao || '');
+                                      setShowBCGDialog(true);
+                                    }}>
+                                      <BookOpen className="h-4 w-4 mr-1" />
+                                      BCG
                                     </Button>
                                   )}
                                 </div>
@@ -784,6 +864,46 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPericiaDialog(false)}>Cancelar</Button>
             <Button onClick={handleConfirmarPericia}>Confirmar Agendamento</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Boletim Interno */}
+      <Dialog open={showBIDialog} onOpenChange={setShowBIDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Boletim Interno</DialogTitle>
+            <DialogDescription>
+              {biAtestado && `${biAtestado.policialPostGrad} ${biAtestado.policialNome} — ${formatDate(biAtestado.dataInicio)}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Número do Boletim Interno</Label>
+            <Input value={boletimInternoInput} onChange={e => setBoletimInternoInput(e.target.value)} placeholder="Ex: BI nº 045/2026" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBIDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSalvarBI}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog BCG Homologação */}
+      <Dialog open={showBCGDialog} onOpenChange={setShowBCGDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar BCG de Homologação</DialogTitle>
+            <DialogDescription>
+              {bcgAtestado && `${bcgAtestado.policialPostGrad} ${bcgAtestado.policialNome} — ${formatDate(bcgAtestado.dataInicio)}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Número do BCG</Label>
+            <Input value={bcgInput} onChange={e => setBcgInput(e.target.value)} placeholder="Ex: BCG nº 123/2026" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBCGDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSalvarBCG}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
