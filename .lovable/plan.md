@@ -1,61 +1,55 @@
 
+# Plano: Ordenacao, Boletim Interno e BCG de Homologacao
 
-# Plano: CID Completo, Campos Opcionais, Filtros e Exportacao Excel
-
----
-
-## 1. Tornar campos nao obrigatorios
+## 1. Ordenar tabela por data do atestado (mais novos primeiro)
 
 **Arquivo:** `src/components/gestao-pessoas/AtestadosMedicosTab.tsx`
 
-- Remover a validacao de `selectedCid` no `handleSalvar` (linha 162)
-- Apenas `selectedPolicial`, `dataInicio` e `dias` serao obrigatorios
-- Quando nao houver CID selecionado, salvar `cid: ''` e `cidDescricao: ''`
-- Permitir tambem digitacao livre no campo CID (caso o usuario digite um codigo que nao esta no autocomplete, salvar o texto digitado)
-- Remover os asteriscos (*) dos labels de CID, Medico, CRM e Hospital no formulario
+- No `filteredAtestados`, adicionar `.sort()` por `dataInicio` decrescente apos o filtro
+- Isso garante que os atestados mais recentes aparecem no topo da tabela
 
 ---
 
-## 2. Substituir cidData.ts com a tabela completa de CIDs
-
-**Arquivo:** `src/lib/cidData.ts`
-
-- Substituir os ~160 codigos atuais pela tabela completa do Excel enviado (~14.400 codigos CID-10)
-- Manter o mesmo formato `{ codigo: string, descricao: string }`
-- Inclui todos os codigos como S462, M501, A059 que nao estavam sendo encontrados
-- A funcao `buscarCid` continuara funcionando igual, retornando no maximo 15 resultados por busca
-
----
-
-## 3. Adicionar filtros na lista de atestados
+## 2. Coluna "Boletim Interno" na tabela de atestados + acao para registrar
 
 **Arquivo:** `src/components/gestao-pessoas/AtestadosMedicosTab.tsx`
 
-Novos filtros acima da tabela de atestados:
-- **Filtro por policial**: Select/combobox para filtrar por nome do policial
-- **Filtro por mes**: Select com meses (Janeiro a Dezembro)
-- **Filtro por ano**: Select com anos disponiveis
-- **Filtro por periodo**: Campos "Data De" e "Data Ate" para filtrar por intervalo
-
-Todos os filtros serao combinados (AND) e aplicados sobre a lista de atestados.
+- Adicionar campo `boletimInterno` na interface `Atestado`
+- Adicionar coluna "BI" na tabela de atestados (entre Status Pericia e Acoes)
+- Na coluna Acoes, adicionar botao (icone de documento) para registrar o numero do Boletim Interno
+- Ao clicar, abre um Dialog simples pedindo o numero do BI
+- Ao confirmar, salva no Firestore via `updateDoc` o campo `boletimInterno`
+- Exibir o BI na coluna quando preenchido
+- Incluir coluna "Boletim Interno" tambem no export CSV
 
 ---
 
-## 4. Exportar tabela em Excel
+## 3. Coluna "Publicacao BCG" na tabela de Pendentes de Pericia + acao para registrar
 
 **Arquivo:** `src/components/gestao-pessoas/AtestadosMedicosTab.tsx`
 
-- Adicionar botao "Exportar Excel" ao lado dos filtros
-- Gerar arquivo .xlsx ou .csv com os atestados filtrados
-- Colunas: Policial, Post/Grad, Matricula, Data Inicio, Dias, Data Fim, CID, Descricao CID, Medico, CRM, Hospital, Status Pericia
-- Usar geracao de CSV nativo (sem dependencia extra) com download automatico
+- Adicionar campo `bcgHomologacao` na interface `Atestado`
+- Na tabela de Pendentes, adicionar coluna "BCG" (entre Pericia e Acoes)
+- Nos atestados com status HOMOLOGADO ou AGENDADO, adicionar botao na coluna Acoes para registrar o BCG da homologacao
+- Ao clicar, abre Dialog pedindo o numero do BCG
+- Ao confirmar, salva via `updateDoc` o campo `bcgHomologacao`
+- Exibir o BCG na coluna quando preenchido
 
 ---
 
-## Resumo dos arquivos
+## 4. Novos estados de dialog
 
-| Arquivo | Acao |
-|---------|------|
-| `src/lib/cidData.ts` | Reescrever com tabela completa (~14.400 CIDs) |
-| `src/components/gestao-pessoas/AtestadosMedicosTab.tsx` | Campos opcionais + filtros + exportacao Excel |
+- Novo state `showBIDialog` + `biAtestado` + `boletimInternoInput` para o dialog de BI
+- Novo state `showBCGDialog` + `bcgAtestado` + `bcgInput` para o dialog de BCG
+- Duas funcoes: `handleSalvarBI` e `handleSalvarBCG` que fazem `updateDoc` no Firestore
 
+---
+
+## Resumo
+
+| Alteracao | Descricao |
+|-----------|-----------|
+| Ordenacao | `filteredAtestados` ordenado por `dataInicio` desc |
+| Coluna BI | Nova coluna + botao + dialog na tabela principal |
+| Coluna BCG | Nova coluna + botao + dialog na tabela de pendentes |
+| CSV | Incluir BI na exportacao |
