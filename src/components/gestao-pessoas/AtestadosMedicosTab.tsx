@@ -8,11 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2, Download, BookOpen } from 'lucide-react';
+import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2, Download, BookOpen, Trophy } from 'lucide-react';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
-import { addDays, format, parseISO, getMonth, getYear } from 'date-fns';
+import { addDays, format, parseISO, getMonth, getYear, subMonths, startOfMonth } from 'date-fns';
 import { buscarCid, CidItem } from '@/lib/cidData';
 
 interface Policial {
@@ -117,6 +117,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   const [filtroAno, setFiltroAno] = useState('todos');
   const [filtroDe, setFiltroDe] = useState('');
   const [filtroAte, setFiltroAte] = useState('');
+  const [rankingPeriodo, setRankingPeriodo] = useState('geral');
 
   const { toast } = useToast();
 
@@ -408,6 +409,31 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
     toast({ title: "Exportado!", description: `${filteredAtestados.length} atestados exportados` });
   };
 
+  // Ranking computation
+  const rankingData = useMemo(() => {
+    const now = new Date();
+    let dataLimite: Date | null = null;
+    if (rankingPeriodo === 'mes') dataLimite = startOfMonth(now);
+    else if (rankingPeriodo === '3meses') dataLimite = subMonths(now, 3);
+    else if (rankingPeriodo === '6meses') dataLimite = subMonths(now, 6);
+    else if (rankingPeriodo === '1ano') dataLimite = subMonths(now, 12);
+
+    const filtrados = dataLimite
+      ? atestados.filter(a => a.dataInicio && a.dataInicio >= format(dataLimite!, 'yyyy-MM-dd'))
+      : atestados;
+
+    const mapa = new Map<string, { nome: string, postGrad: string, qtd: number, dias: number }>();
+    filtrados.forEach(a => {
+      const key = a.policialId;
+      const cur = mapa.get(key) || { nome: a.policialNome, postGrad: a.policialPostGrad, qtd: 0, dias: 0 };
+      cur.qtd += 1;
+      cur.dias += a.dias || 0;
+      mapa.set(key, cur);
+    });
+
+    return Array.from(mapa.values()).sort((a, b) => b.dias - a.dias || b.qtd - a.qtd);
+  }, [atestados, rankingPeriodo]);
+
   const statusBadge = (status: string) => {
     switch (status) {
       case 'NAO_PRECISA': return <Badge variant="secondary">Não precisa</Badge>;
@@ -430,11 +456,15 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
         </CardHeader>
         <CardContent>
           <Tabs value={subTab} onValueChange={setSubTab}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="cadastro">Cadastro / Lista</TabsTrigger>
               <TabsTrigger value="pendentes" className="flex items-center gap-1">
                 <AlertTriangle className="h-4 w-4" />
-                Pendentes de Perícia ({pendentesPericia.length})
+                Pendentes ({pendentesPericia.length})
+              </TabsTrigger>
+              <TabsTrigger value="ranking" className="flex items-center gap-1">
+                <Trophy className="h-4 w-4" />
+                Ranking
               </TabsTrigger>
             </TabsList>
 
@@ -829,6 +859,76 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                                   )}
                                 </div>
                               </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* RANKING */}
+            <TabsContent value="ranking" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Trophy className="h-4 w-4" />
+                    Ranking de Atestados
+                  </CardTitle>
+                  <CardDescription>Policiais com mais atestados e dias de licença</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { value: 'mes', label: 'Mês Atual' },
+                      { value: '3meses', label: 'Últimos 3 Meses' },
+                      { value: '6meses', label: 'Últimos 6 Meses' },
+                      { value: '1ano', label: 'Último Ano' },
+                      { value: 'geral', label: 'Geral' },
+                    ].map(p => (
+                      <Button
+                        key={p.value}
+                        variant={rankingPeriodo === p.value ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setRankingPeriodo(p.value)}
+                      >
+                        {p.label}
+                      </Button>
+                    ))}
+                  </div>
+
+                  {rankingData.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">Nenhum atestado encontrado para o período selecionado.</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">#</TableHead>
+                            <TableHead>Post/Grad</TableHead>
+                            <TableHead>Policial</TableHead>
+                            <TableHead className="text-center">Atestados</TableHead>
+                            <TableHead className="text-center">Total de Dias</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rankingData.map((r, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-bold">
+                                {idx < 3 ? (
+                                  <Badge variant={idx === 0 ? 'destructive' : 'secondary'}>
+                                    {idx + 1}º
+                                  </Badge>
+                                ) : (
+                                  `${idx + 1}º`
+                                )}
+                              </TableCell>
+                              <TableCell>{r.postGrad}</TableCell>
+                              <TableCell className="font-medium">{r.nome}</TableCell>
+                              <TableCell className="text-center font-semibold">{r.qtd}</TableCell>
+                              <TableCell className="text-center font-semibold">{r.dias}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
