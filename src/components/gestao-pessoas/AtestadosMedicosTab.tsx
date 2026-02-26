@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2, Download, BookOpen, Trophy } from 'lucide-react';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -53,6 +54,7 @@ interface Atestado {
   criadoEm: string;
   boletimInterno?: string;
   bcgHomologacao?: string;
+  periciaDocumental?: boolean;
 }
 
 interface AtestadosMedicosTabProps {
@@ -243,21 +245,30 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   };
 
   const handleConfirmarPericia = async () => {
-    if (!periciaAtestado || !dataPericia || !horaPericia) {
+    if (!periciaAtestado) return;
+    if (!periciaDocumental && (!dataPericia || !horaPericia)) {
       toast({ title: "Erro", description: "Preencha data e hora da perícia", variant: "destructive" });
       return;
     }
     try {
-      await updateDoc(doc(db, 'atestados_medicos', periciaAtestado.id), {
+      const updateData: any = {
         statusPericia: 'AGENDADO',
-        dataPericia,
-        horaPericia,
-      });
-      toast({ title: "Sucesso", description: "Perícia agendada com sucesso" });
+        periciaDocumental,
+      };
+      if (periciaDocumental) {
+        updateData.dataPericia = '';
+        updateData.horaPericia = '';
+      } else {
+        updateData.dataPericia = dataPericia;
+        updateData.horaPericia = horaPericia;
+      }
+      await updateDoc(doc(db, 'atestados_medicos', periciaAtestado.id), updateData);
+      toast({ title: "Sucesso", description: periciaDocumental ? "Perícia documental registrada" : "Perícia agendada com sucesso" });
       setShowPericiaDialog(false);
       setPericiaAtestado(null);
       setDataPericia('');
       setHoraPericia('');
+      setPericiaDocumental(false);
       fetchAtestados();
     } catch (error) {
       console.error('Erro ao agendar perícia:', error);
@@ -816,7 +827,10 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                               </TableCell>
                               <TableCell>{statusBadge(a.statusPericia)}</TableCell>
                               <TableCell>
-                                {a.statusPericia === 'AGENDADO' && a.dataPericia && (
+                                {a.statusPericia === 'AGENDADO' && a.periciaDocumental && (
+                                  <span className="text-xs font-medium text-muted-foreground">Documental</span>
+                                )}
+                                {a.statusPericia === 'AGENDADO' && !a.periciaDocumental && a.dataPericia && (
                                   <span className="text-xs">{formatDate(a.dataPericia)} às {a.horaPericia}</span>
                                 )}
                               </TableCell>
@@ -953,13 +967,24 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="periciaDocumental"
+                checked={periciaDocumental}
+                onCheckedChange={(checked) => {
+                  setPericiaDocumental(!!checked);
+                  if (checked) { setDataPericia(''); setHoraPericia(''); }
+                }}
+              />
+              <Label htmlFor="periciaDocumental">Perícia Documental (online, sem agendamento)</Label>
+            </div>
             <div>
               <Label>Data da Perícia</Label>
-              <Input type="date" value={dataPericia} onChange={e => setDataPericia(e.target.value)} />
+              <Input type="date" value={dataPericia} onChange={e => setDataPericia(e.target.value)} disabled={periciaDocumental} />
             </div>
             <div>
               <Label>Hora da Perícia</Label>
-              <Input type="time" value={horaPericia} onChange={e => setHoraPericia(e.target.value)} />
+              <Input type="time" value={horaPericia} onChange={e => setHoraPericia(e.target.value)} disabled={periciaDocumental} />
             </div>
           </div>
           <DialogFooter>
