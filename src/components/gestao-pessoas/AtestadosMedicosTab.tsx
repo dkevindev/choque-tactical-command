@@ -100,6 +100,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   const [periciaAtestado, setPericiaAtestado] = useState<Atestado | null>(null);
   const [dataPericia, setDataPericia] = useState('');
   const [horaPericia, setHoraPericia] = useState('');
+  const [periciaDocumental, setPericiaDocumental] = useState(false);
 
   // Dialog BI
   const [showBIDialog, setShowBIDialog] = useState(false);
