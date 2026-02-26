@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2, Download, BookOpen, Trophy } from 'lucide-react';
+import { Search, FileText, AlertTriangle, Copy, CalendarCheck, Plus, Loader2, Clock, CheckCircle, Trash2, Download, BookOpen, Trophy, ArrowUpDown } from 'lucide-react';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
@@ -121,6 +121,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
   const [filtroDe, setFiltroDe] = useState('');
   const [filtroAte, setFiltroAte] = useState('');
   const [rankingPeriodo, setRankingPeriodo] = useState('geral');
+  const [rankingOrdem, setRankingOrdem] = useState<'dias' | 'qtd'>('dias');
 
   const { toast } = useToast();
 
@@ -443,8 +444,10 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
       mapa.set(key, cur);
     });
 
-    return Array.from(mapa.values()).sort((a, b) => b.dias - a.dias || b.qtd - a.qtd);
-  }, [atestados, rankingPeriodo]);
+    return Array.from(mapa.values()).sort((a, b) => 
+      rankingOrdem === 'dias' ? (b.dias - a.dias || b.qtd - a.qtd) : (b.qtd - a.qtd || b.dias - a.dias)
+    );
+  }, [atestados, rankingPeriodo, rankingOrdem]);
 
   const statusBadge = (status: string) => {
     switch (status) {
@@ -914,6 +917,23 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                     ))}
                   </div>
 
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const periodoLabel = { mes: 'Mes_Atual', '3meses': '3_Meses', '6meses': '6_Meses', '1ano': '1_Ano', geral: 'Geral' }[rankingPeriodo] || 'Geral';
+                      const bom = '\uFEFF';
+                      const headers = ['#', 'Post/Grad', 'Policial', 'Atestados', 'Total de Dias'];
+                      const rows = rankingData.map((r, idx) => [idx + 1, r.postGrad, r.nome, r.qtd, r.dias].join(';'));
+                      const csv = bom + [headers.join(';'), ...rows].join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url; a.download = `ranking_atestados_${periodoLabel}.csv`; a.click();
+                      URL.revokeObjectURL(url);
+                    }}>
+                      <Download className="h-4 w-4 mr-1" /> Exportar
+                    </Button>
+                  </div>
+
                   {rankingData.length === 0 ? (
                     <p className="text-muted-foreground text-center py-8">Nenhum atestado encontrado para o período selecionado.</p>
                   ) : (
@@ -924,8 +944,18 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                             <TableHead className="w-12">#</TableHead>
                             <TableHead>Post/Grad</TableHead>
                             <TableHead>Policial</TableHead>
-                            <TableHead className="text-center">Atestados</TableHead>
-                            <TableHead className="text-center">Total de Dias</TableHead>
+                            <TableHead className="text-center cursor-pointer select-none" onClick={() => setRankingOrdem('qtd')}>
+                              <span className="inline-flex items-center gap-1">
+                                Atestados <ArrowUpDown className="h-3 w-3" />
+                                {rankingOrdem === 'qtd' && <span className="text-primary">●</span>}
+                              </span>
+                            </TableHead>
+                            <TableHead className="text-center cursor-pointer select-none" onClick={() => setRankingOrdem('dias')}>
+                              <span className="inline-flex items-center gap-1">
+                                Total de Dias <ArrowUpDown className="h-3 w-3" />
+                                {rankingOrdem === 'dias' && <span className="text-primary">●</span>}
+                              </span>
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
