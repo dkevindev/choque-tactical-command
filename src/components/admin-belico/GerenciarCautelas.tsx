@@ -152,7 +152,7 @@ const GerenciarCautelas = () => {
       
       // Resolver dados atuais do policial
       const dadosAtuais = policiaisMap.get(cautela.policialId);
-      const nomeAtual = dadosAtuais?.nomeGuerra || cautela.policialNome;
+      const nomeAtual = dadosAtuais?.nome || cautela.policialNome;
       const gradAtual = dadosAtuais?.postGrad || cautela.policialPatente || '';
 
       const response = await fetch('https://gerarcauteladocx-owvlmrnsjq-uc.a.run.app', {
