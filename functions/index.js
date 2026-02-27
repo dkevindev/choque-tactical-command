@@ -529,9 +529,184 @@ exports.gerarListaFrequenciaDocx = gerarListaFrequenciaDocx;
 const { gerarFrequenciaMensalDocx } = require('./gerar-frequencia-mensal');
 exports.gerarFrequenciaMensalDocx = gerarFrequenciaMensalDocx;
 
-// ----------------- FUNÇÃO RESUMO DE EFETIVO -----------------
-const { gerarResumoEfetivoDocx } = require('./gerar-resumo-efetivo');
-exports.gerarResumoEfetivoDocx = gerarResumoEfetivoDocx;
+// ----------------- FUNÇÃO RESUMO DE EFETIVO (DOCXTEMPLATER) -----------------
+const appResumoEfetivo = express();
+appResumoEfetivo.use(cors({ origin: true }));
+appResumoEfetivo.use(express.json());
+
+appResumoEfetivo.post('/', async (req, res) => {
+    let tempFilePath;
+    try {
+        const { mes, ano } = req.body;
+        const mesAtual = mes !== undefined ? mes : new Date().getMonth();
+        const anoAtual = ano || new Date().getFullYear();
+
+        const MESES_NOMES = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+
+        const UNIDADE_MAP = {
+            'SEDE': 'RPMONT – SEDE',
+            '1º ESQD': '1º Esquadrão/RPMONT',
+            '2º ESQD': '2º Esquadrão/RPMONT',
+            '3º PEL': '3º Pel./2º ESQD/RPMONT (Crato)',
+            'BSP': 'BSP'
+        };
+        const ORDEM_UNIDADES = ['SEDE', '1º ESQD', '2º ESQD', '3º PEL', 'BSP'];
+        const SITUACOES_OPERACIONAIS = ['MONTADO - POLICIAMENTO OSTENSIVO', 'VIATURA'];
+
+        console.log(`[ResumoEfetivo] Gerando para ${MESES_NOMES[mesAtual]}/${anoAtual}`);
+
+        // 1. Baixar template
+        const bucket = admin.storage().bucket();
+        const filePath = 'templates/template-resumo-efetivo.docx';
+        tempFilePath = path.join('/tmp', `template-resumo-efetivo-${Date.now()}.docx`);
+        await bucket.file(filePath).download({ destination: tempFilePath });
+        console.log('[ResumoEfetivo] Template baixado:', tempFilePath);
+
+        const content = fs.readFileSync(tempFilePath, 'binary');
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+        // 2. Buscar policiais do Firestore
+        const policiaisSnap = await admin.firestore().collection('policiais').get();
+        const policiais = policiaisSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        console.log(`[ResumoEfetivo] Total de policiais encontrados: ${policiais.length}`);
+
+        // DEBUG: Mostrar valores únicos do campo Unidade
+        const unidadesUnicas = [...new Set(policiais.map(p => p.Unidade || 'SEM_UNIDADE'))];
+        console.log('[ResumoEfetivo] Valores únicos de Unidade:', JSON.stringify(unidadesUnicas));
+
+        // 3. Agrupar por unidade
+        const porUnidade = {};
+        ORDEM_UNIDADES.forEach(u => { porUnidade[u] = { todos: [], indisponiveis: [], operacionais: [] }; });
+        porUnidade['OUTROS'] = { todos: [], indisponiveis: [], operacionais: [] };
+
+        policiais.forEach(p => {
+            const unidade = p.Unidade || 'OUTROS';
+            const grupo = porUnidade[unidade] || porUnidade['OUTROS'];
+            grupo.todos.push(p);
+
+            const situacao = p['SITUAÇÃO'] || p.SITUAÇÃO || '';
+            if (!situacao || SITUACOES_OPERACIONAIS.includes(situacao)) {
+                grupo.operacionais.push(p);
+            } else {
+                grupo.indisponiveis.push(p);
+            }
+        });
+
+        // 4. Montar dados para o template
+        let totalGeral = 0, totalIndisponivel = 0, totalOperacional = 0;
+
+        const unidades = ORDEM_UNIDADES.map(key => {
+            const g = porUnidade[key];
+            totalGeral += g.todos.length;
+            totalIndisponivel += g.indisponiveis.length;
+            totalOperacional += g.operacionais.length;
+            return {
+                nome: UNIDADE_MAP[key],
+                total: String(g.todos.length),
+                indisponivel: String(g.indisponiveis.length),
+                operacional: String(g.operacionais.length)
+            };
+        });
+
+        // 5. Montar indisponibilidades por unidade
+        const indisponibilidades = [];
+        ORDEM_UNIDADES.forEach(key => {
+            const g = porUnidade[key];
+            if (g.indisponiveis.length === 0) return;
+
+            const porSituacao = {};
+            g.indisponiveis.forEach(p => {
+                const sit = p['SITUAÇÃO'] || p.SITUAÇÃO || 'NÃO INFORMADO';
+                const sitUpper = sit.toUpperCase();
+                // Pular férias (vai para observação separada)
+                if (sitUpper.includes('FÉRIAS') || sitUpper.includes('FERIAS')) return;
+                if (!porSituacao[sit]) porSituacao[sit] = [];
+                porSituacao[sit].push(p);
+            });
+
+            const situacoes = Object.entries(porSituacao).map(([situacao, pols]) => ({
+                situacao: situacao,
+                quantidade: String(pols.length),
+                policiais: pols.map(p => {
+                    const pg = p['Post/Grad'] || '';
+                    const mat = p['Matrícula'] || p.Matricula || '';
+                    const nome = p['NOME DE GUERRA'] || p.nomeGuerra || p.NOME || '';
+                    return `${pg} ${mat} ${nome}`.trim();
+                }).join(', ')
+            }));
+
+            if (situacoes.length > 0) {
+                // Contar total sem férias
+                const totalSemFerias = situacoes.reduce((acc, s) => acc + parseInt(s.quantidade), 0);
+                indisponibilidades.push({
+                    nomeUnidade: `${UNIDADE_MAP[key]} - TOTAL: ${totalSemFerias}`,
+                    situacoes: situacoes
+                });
+            }
+        });
+
+        // 6. Montar observação de férias
+        const ferias = [];
+        ORDEM_UNIDADES.forEach(key => {
+            const g = porUnidade[key];
+            const deFerias = g.indisponiveis.filter(p => {
+                const sit = (p['SITUAÇÃO'] || p.SITUAÇÃO || '').toUpperCase();
+                return sit.includes('FÉRIAS') || sit.includes('FERIAS');
+            });
+            if (deFerias.length > 0) {
+                ferias.push({
+                    texto: `${String(deFerias.length).padStart(2, '0')} PPMM do ${UNIDADE_MAP[key]}`
+                });
+            }
+        });
+
+        // 7. Data do documento
+        const dataHoje = new Date();
+        const dia = String(dataHoje.getDate()).padStart(2, '0');
+        const dataDocumento = `Quartel do RPMONT, ${dia} de ${MESES_NOMES[mesAtual]} de ${anoAtual}.`;
+
+        const templateData = {
+            unidades: unidades,
+            totalGeral: String(totalGeral),
+            totalIndisponivel: String(totalIndisponivel),
+            totalOperacional: String(totalOperacional),
+            indisponibilidades: indisponibilidades,
+            temFerias: ferias.length > 0,
+            ferias: ferias,
+            dataDocumento: dataDocumento
+        };
+
+        console.log('[ResumoEfetivo] Dados do template:', JSON.stringify(templateData, null, 2));
+
+        // 8. Renderizar
+        doc.render(templateData);
+
+        const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+        const nomeArquivo = `RESUMO_DE_EFETIVO_${MESES_NOMES[mesAtual].toUpperCase()}_${anoAtual}.docx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
+        res.send(buffer);
+        console.log('[ResumoEfetivo] Documento gerado com sucesso:', nomeArquivo);
+
+    } catch (error) {
+        console.error('[ResumoEfetivo] Erro:', error);
+        if (error.properties) {
+            console.error('[ResumoEfetivo] Erro detalhado:', JSON.stringify(error.properties, null, 2));
+            return res.status(500).send(`Erro ao preencher template: ${error.message}`);
+        }
+        res.status(500).send(`Erro interno: ${error.message}`);
+    } finally {
+        try { if (tempFilePath) fs.unlinkSync(tempFilePath); }
+        catch (e) { console.warn('Não foi possível excluir arquivo temporário:', e); }
+    }
+});
+
+exports.gerarResumoEfetivoDocx = functions.https.onRequest(appResumoEfetivo);
 
 // ----------------- FUNÇÃO LIVRO RESERVA DE ARMAMENTO -----------------
 const appLivroReservaArmamento = express();
