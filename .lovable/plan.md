@@ -1,19 +1,34 @@
 
-# Corrigir Select de Nova Situacao e Adicionar Retirada em Lote
+# Filtrar Lista de Policiais em Situacao por Indisponibilidade
 
-## Alteracoes no arquivo `src/components/gestao-pessoas/SituacaoTab.tsx`
+## Resumo
+Na lista "Policiais em Situacao", mostrar apenas policiais cuja situacao esteja marcada como `indisponivel: true` na colecao `config_situacoes`. Situacoes que nao geram indisponibilidade serao excluidas da lista.
 
-### 1. Nova Situacao - Mostrar apenas situacoes cadastradas
-No dialog "Retirar da Situacao", o select de "Nova Situacao" atualmente tem opcoes hardcoded ("MONTADO - POLICIAMENTO OSTENSIVO", "VIATURA") alem das cadastradas. Sera alterado para mostrar **somente** as situacoes vindas do Firestore (`config_situacoes`), mais a opcao fixa "MONTADO - POLICIAMENTO OSTENSIVO" (que e o estado padrao/disponivel, nao uma situacao especial).
+## Detalhes Tecnicos
 
-### 2. Retirada em Lote
-Adicionar checkboxes na lista de "Policiais em Situacao" para selecionar multiplos policiais e um botao "Retirar Selecionados" que abre o mesmo dialog de retirada, aplicando nova situacao, nova funcao e publicacao para todos os selecionados de uma vez. Cada policial tera seu assentamento registrado individualmente.
+### Arquivo: `src/components/gestao-pessoas/SituacaoTab.tsx`
 
-### Detalhes tecnicos
+Alterar o `useMemo` de `policiaisEmSituacao` (linha ~135) para cruzar com a lista de situacoes cadastradas e filtrar apenas aquelas com `indisponivel === true`:
 
-- Novo estado `selectedRetirada: string[]` para controlar policiais selecionados para retirada em lote
-- Checkbox em cada linha da lista "Policiais em Situacao"
-- Botao "Selecionar Todos" / "Retirar Selecionados (N)" no header do card
-- Ao clicar "Retirar Selecionados", abrir o dialog de retirada (sem nome do policial especifico, mostrando "N policiais selecionados")
-- `handleConfirmarRetirada` sera adaptado para funcionar tanto para 1 policial quanto para lote, usando `writeBatch` para performance
-- O select de "Nova Situacao" no dialog sera: "MONTADO - POLICIAMENTO OSTENSIVO" (fixo) + todas as situacoes de `situacoesNomes`
+**De:**
+```typescript
+const policiaisEmSituacao = useMemo(() => {
+  return policiais
+    .filter(p => p.SITUAÇÃO !== 'MONTADO - POLICIAMENTO OSTENSIVO' && p.SITUAÇÃO !== 'VIATURA' && p.SITUAÇÃO)
+    .sort(sortByHierarquia);
+}, [policiais]);
+```
+
+**Para:**
+```typescript
+const policiaisEmSituacao = useMemo(() => {
+  const situacoesIndisponiveis = situacoes
+    .filter(s => s.indisponivel)
+    .map(s => s.nome);
+  return policiais
+    .filter(p => p.SITUAÇÃO && situacoesIndisponiveis.includes(p.SITUAÇÃO))
+    .sort(sortByHierarquia);
+}, [policiais, situacoes]);
+```
+
+Isso garante que apenas situacoes marcadas como indisponibilidade aparecam na lista "Policiais em Situacao".
