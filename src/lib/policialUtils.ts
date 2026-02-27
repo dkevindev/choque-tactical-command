@@ -36,6 +36,22 @@ export const buscarPolicialPorId = async (policialId: string): Promise<any | nul
   }
 };
 
+export const getPostGradOrder = (postGrad: string): number => {
+  const ordem: Record<string, number> = {
+    'TEN CEL': 1, 'MAJ': 2, 'CAP': 3, '1º TEN': 4, '2º TEN': 5,
+    '1º SGT': 6, '2º SGT': 7, '3º SGT': 8, 'CB': 9, 'SD': 10
+  };
+  return ordem[postGrad] || 999;
+};
+
+export const sortByHierarquia = (a: any, b: any): number => {
+  const aIsCmt = a['FUNÇÃO']?.includes('CMT RPMONT');
+  const bIsCmt = b['FUNÇÃO']?.includes('CMT RPMONT');
+  if (aIsCmt && !bIsCmt) return -1;
+  if (!aIsCmt && bIsCmt) return 1;
+  return getPostGradOrder(a['Post/Grad'] || '') - getPostGradOrder(b['Post/Grad'] || '');
+};
+
 export const formatarNomePolicial = (policial: any): string => {
   if (!policial) return 'Desconhecido';
   const postGrad = policial['Post/Grad'] || policial.postGrad || policial.patente || '';

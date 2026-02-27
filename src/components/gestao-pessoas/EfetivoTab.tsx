@@ -394,6 +394,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
 // Componente de Assentamentos
 const AssentamentosSection: React.FC<{ policialId: string; policial: Policial }> = ({ policialId, policial }) => {
   const [atestados, setAtestados] = React.useState<any[]>([]);
+  const [assentamentos, setAssentamentos] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -406,6 +407,12 @@ const AssentamentosSection: React.FC<{ policialId: string; policial: Policial }>
         const snap = await getDocs(q);
         const atestadosData = snap.docs.map(d => ({ id: d.id, tipo: 'Atestado Médico', ...d.data() }));
         setAtestados(atestadosData);
+
+        // Buscar assentamentos (mudanças de situação/função)
+        const assentRef = collection(db, 'assentamentos');
+        const qAssent = query(assentRef, where('policialId', '==', policialId));
+        const snapAssent = await getDocs(qAssent);
+        setAssentamentos(snapAssent.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (error) {
         console.error('Erro ao buscar assentamentos:', error);
       } finally {
@@ -420,9 +427,8 @@ const AssentamentosSection: React.FC<{ policialId: string; policial: Policial }>
     try { return format(parseISO(d), 'dd/MM/yyyy'); } catch { return d; }
   };
 
-  // Montar timeline com atestados + dados do policial (férias, situação)
   const timeline = React.useMemo(() => {
-    const items: { data: string; tipo: string; descricao: string; status?: string }[] = [];
+    const items: { data: string; tipo: string; descricao: string; status?: string; publicacao?: string }[] = [];
 
     // Atestados
     atestados.forEach(a => {
@@ -433,6 +439,17 @@ const AssentamentosSection: React.FC<{ policialId: string; policial: Policial }>
         status: a.statusPericia === 'PENDENTE' ? 'Pendente Perícia' :
                 a.statusPericia === 'AGENDADO' ? 'Perícia Agendada' :
                 a.statusPericia === 'HOMOLOGADO' ? 'Homologado' : 'OK',
+      });
+    });
+
+    // Assentamentos (mudanças de situação)
+    assentamentos.forEach(a => {
+      items.push({
+        data: a.data || a.criadoEm || '',
+        tipo: a.tipo || 'Mudança de Situação',
+        descricao: a.descricao || `${a.situacaoAnterior} → ${a.novaSituacao}`,
+        status: a.novaSituacao || '',
+        publicacao: a.publicacao || '',
       });
     });
 
@@ -456,7 +473,6 @@ const AssentamentosSection: React.FC<{ policialId: string; policial: Policial }>
       });
     }
 
-    // Ordenar por data (mais recente primeiro)
     items.sort((a, b) => {
       const dateA = a.data ? new Date(a.data).getTime() : 0;
       const dateB = b.data ? new Date(b.data).getTime() : 0;
@@ -464,7 +480,7 @@ const AssentamentosSection: React.FC<{ policialId: string; policial: Policial }>
     });
 
     return items;
-  }, [atestados, policial]);
+  }, [atestados, assentamentos, policial]);
 
   if (loading) {
     return (
@@ -491,7 +507,8 @@ const AssentamentosSection: React.FC<{ policialId: string; policial: Policial }>
               <div className="flex flex-col items-center">
                 <div className={`w-3 h-3 rounded-full ${
                   item.tipo === 'Atestado Médico' ? 'bg-red-500' :
-                  item.tipo === 'Férias' ? 'bg-blue-500' : 'bg-muted-foreground'
+                  item.tipo === 'Férias' ? 'bg-blue-500' :
+                  item.tipo === 'Mudança de Situação' ? 'bg-amber-500' : 'bg-muted-foreground'
                 }`} />
                 {idx < timeline.length - 1 && <div className="w-px h-full bg-border mt-1" />}
               </div>
@@ -504,6 +521,9 @@ const AssentamentosSection: React.FC<{ policialId: string; policial: Policial }>
                   </span>
                 </div>
                 <p className="text-sm mt-1">{item.descricao}</p>
+                {item.publicacao && (
+                  <p className="text-xs text-muted-foreground mt-1">📄 Publicação: {item.publicacao}</p>
+                )}
                 {item.status && (
                   <Badge variant="secondary" className="mt-1 text-xs">{item.status}</Badge>
                 )}
