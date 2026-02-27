@@ -11,6 +11,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { doc, updateDoc, collection, writeBatch } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
+import { format, parseISO } from 'date-fns';
+
+const formatDateBR = (d: string | undefined) => {
+  if (!d) return '-';
+  try { return format(parseISO(d), 'dd/MM/yy'); } catch { return d; }
+};
 
 interface Policial {
   id: string;
@@ -345,7 +351,7 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
                         {policial.inicioFerias && (
                           <Badge variant="outline" className="text-xs">
                             <CalendarDays className="h-3 w-3 mr-1" />
-                            {new Date(policial.inicioFerias).toLocaleDateString()} - {policial.fimFerias ? new Date(policial.fimFerias).toLocaleDateString() : ''}
+                            {formatDateBR(policial.inicioFerias)} - {formatDateBR(policial.fimFerias)}
                           </Badge>
                         )}
                         {policial.publicacaoFerias && (
