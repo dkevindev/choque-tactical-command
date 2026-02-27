@@ -16,6 +16,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval, parseISO, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import GerarResumoEfetivoForm from './GerarResumoEfetivoForm';
 
 interface Policial {
   id: string;
@@ -389,6 +390,9 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
           Exportar Efetivo Completo
         </Button>
       </div>
+
+      {/* Gerador de Resumo de Efetivo DOCX */}
+      <GerarResumoEfetivoForm />
 
       {/* Sub-abas */}
       <Tabs value={subTab} onValueChange={setSubTab}>

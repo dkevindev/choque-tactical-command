@@ -13,6 +13,7 @@ import GerarTransferenciaCautelaForm from './admin-belico/documentos/GerarTransf
 import GerarTermoEntregaForm from './admin-belico/documentos/GerarTermoEntregaForm';
 import GerarNadaConstaForm from './admin-belico/documentos/GerarNadaConstaForm';
 import GerarCorpoEmailOS from './motorizado/GerarCorpoEmailOS';
+import GerarResumoEfetivoForm from './gestao-pessoas/GerarResumoEfetivoForm';
 
 interface DocumentosPageProps {
   locationState?: any;
@@ -132,7 +133,10 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
           </TabsContent>
 
           <TabsContent value="expediente">
-            <p className="text-muted-foreground">Documentos administrativos e de expediente interno.</p>
+            <div className="space-y-4">
+              <p className="text-muted-foreground mb-2">Documentos administrativos e de expediente interno:</p>
+              <GerarResumoEfetivoForm />
+            </div>
           </TabsContent>
         </Tabs>
       </CardContent>
