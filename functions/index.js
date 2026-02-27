@@ -575,7 +575,7 @@ appResumoEfetivo.post('/', async (req, res) => {
         console.log(`[ResumoEfetivo] Total de policiais encontrados: ${policiais.length}`);
 
         // DEBUG: Mostrar valores únicos do campo Unidade
-        const unidadesUnicas = [...new Set(policiais.map(p => p.Unidade || 'SEM_UNIDADE'))];
+        const unidadesUnicas = [...new Set(policiais.map(p => p.UNIDADE || p.Unidade || 'SEM_UNIDADE'))];
         console.log('[ResumoEfetivo] Valores únicos de Unidade:', JSON.stringify(unidadesUnicas));
 
         // 3. Agrupar por unidade
@@ -584,7 +584,7 @@ appResumoEfetivo.post('/', async (req, res) => {
         porUnidade['OUTROS'] = { todos: [], indisponiveis: [], operacionais: [] };
 
         policiais.forEach(p => {
-            const unidade = p.Unidade || 'OUTROS';
+            const unidade = p.UNIDADE || p.Unidade || 'OUTROS';
             const grupo = porUnidade[unidade] || porUnidade['OUTROS'];
             grupo.todos.push(p);
 
