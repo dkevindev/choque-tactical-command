@@ -1,57 +1,83 @@
 
+# Padronizar Ordenacao e Resolver Dados Estaticos de Policiais
 
-# Adicionar QOPM/QOAPM e prioridade SUBCMT RPMONT na ordenacao
+## Problema 1: Ordenacao inconsistente
+Varios locais do sistema listam policiais mas usam logica de ordenacao diferente ou nenhuma. O `sortByHierarquia` de `policialUtils.ts` e a versao canonica, mas nao e usado em todos os lugares.
 
-## Contexto
-Oficiais podem ser de dois quadros: **QOPM** (mais antigo) ou **QOAPM** (menos antigo). Alem disso, quem exerce a funcao de **SUBCMT DO RPMONT** deve aparecer antes dos oficiais de mesmo posto. Atualmente o sistema nao diferencia esses quadros nem prioriza o SUBCMT.
+### Locais que precisam adotar `sortByHierarquia`:
 
-## Alteracoes
+1. **PolicialTable.tsx** (linhas 115-192) - Tem sua propria logica de ordenacao com `getPostGradOrder` local, `hasCmtRpmont`, `shouldCapComeFirst`. Substituir por `sortByHierarquia` importado de `policialUtils.ts`.
 
-### 1. Formulario de edicao - checkboxes QOPM/QOAPM (EfetivoTab.tsx)
+2. **PolicialSearchCombobox.tsx** (linha 88-98) - Lista filtrada sem nenhuma ordenacao hierarquica. Adicionar `.sort(sortByHierarquia)` apos o filtro, mapeando os campos (`posto` -> `Post/Grad`, etc.) ou adaptando antes de ordenar.
 
-No `EditPolicialForm`, na secao "Dados Profissionais", adicionar um campo **"Quadro"** que aparece apenas para oficiais (TEN CEL, MAJ, CAP, 1 TEN, 2 TEN). O campo sera um Select com opcoes: "Nenhum", "QOPM", "QOAPM". O valor sera salvo no Firebase no campo `quadro`.
+3. **ArmeiroInterface.tsx** (linhas 1069-1076) - `policiaisFiltrados` sem ordenacao. Adicionar `.sort(sortByHierarquia)`.
 
-Tambem adicionar o campo `quadro` ao estado inicial do formulario, lendo de `policial.quadro`.
+4. **NovaCautelaForm.tsx** - Lista de policiais para selecao de cautela. Verificar e adicionar ordenacao.
 
-### 2. Logica de ordenacao (policialUtils.ts)
+5. **EfetivoTab.tsx** (linhas 102-108) - Tem `getPostGradOrder` local duplicado. Remover e usar apenas o `sortByHierarquia` importado (que ja e usado na linha 133).
 
-Atualizar `sortByHierarquia` para incluir duas novas regras apos o CMT RPMONT:
+---
+
+## Problema 2: Dados estaticos de graduacao nas cautelas permanentes
+
+Quando uma cautela e criada, os campos `policialNome`, `policialPatente` e `policialAssociadoNome` sao gravados como texto fixo. Se o policial e promovido, os dados ficam desatualizados.
+
+### Solucao: Resolucao dinamica na hora de EXIBIR
+
+Nao alterar como os dados sao gravados (manter `policialId` como referencia principal). Criar uma funcao utilitaria que, dado um `policialId`, busca os dados atuais do policial na colecao `policiais` e retorna posto/graduacao e nome atualizados.
+
+### Arquivos afetados para exibicao dinamica:
+
+1. **CadastroMateriais.tsx** (linha 174) - Onde monta `policialAssociadoNome` a partir da cautela: em vez de usar `cautela.policialPatente + cautela.policialNome`, buscar dados atuais pelo `policialId`.
+
+2. **GerenciarCautelas.tsx** (linha 327) - Exibe `cautela.policialNome` estatico na tabela. Resolver dinamicamente usando `policialId`.
+
+3. **BaixaMaterialCargaModal.tsx** (linha 82) - Monta nome a partir de `policialPatente + policialNome` da cautela. Resolver pelo ID.
+
+4. **MateriaisTransferidos.tsx** (linha 163) - Exibe `policialPatente + policialNome`. Resolver pelo ID.
+
+5. **MateriaisTransferidosCarga.tsx** (linhas 149, 179) - Mesmo padrao.
+
+6. **TransferenciaPolicialModal.tsx** (linha 196) - Exibe dados estaticos.
+
+7. **ConsultaMaterialPolicial.tsx** - Exibe dados de cautelas com nomes estaticos.
+
+### Implementacao tecnica:
+
+Criar um hook `usePolicialResolver` ou uma funcao de cache que:
+- Recebe uma lista de `policialId`s
+- Faz uma unica query ao Firebase para buscar todos os policiais
+- Retorna um Map de `policialId -> { nome, postGrad, nomeGuerra, matricula }`
+- Usado nos componentes de listagem para exibir dados atualizados
 
 ```text
-Ordem de prioridade:
-1. CMT RPMONT sempre primeiro (ja existe)
-2. SUBCMT DO RPMONT antes dos demais de mesmo posto
-3. Mesmo posto: QOPM antes de QOAPM
-4. Mesmo quadro: data de promocao mais antiga primeiro
-5. Mesmo tudo: numeral menor primeiro
+// Novo hook: src/hooks/usePolicialResolver.ts
+// Input: policialIds: string[]
+// Output: Map<string, { nome, postGrad, nomeGuerra, matricula }>
+// Faz getDocs(collection('policiais')) uma vez e cacheia
 ```
 
-A logica especifica:
-- Apos verificar CMT RPMONT, verificar se a funcao inclui "SUBCMT" (para SUBCMT DO RPMONT)
-- Apos verificar posto/graduacao, se o posto for de oficial e ambos tiverem o mesmo posto, comparar quadro: QOPM (valor 1) antes de QOAPM (valor 2), sem quadro definido fica no meio
-
-### 3. Exibir quadro na tabela (EfetivoTab.tsx)
-
-Na coluna Post/Grad da tabela, se o policial tiver `quadro` definido, exibir um badge pequeno ao lado: "QOPM" (verde) ou "QOAPM" (amarelo).
-
-## Arquivos modificados
-
-1. **src/lib/policialUtils.ts** -- atualizar `sortByHierarquia` com regras de SUBCMT e QOPM/QOAPM
-2. **src/components/gestao-pessoas/EfetivoTab.tsx** -- adicionar campo `quadro` no formulario de edicao + badge na tabela
-
-## Detalhes tecnicos
-
-### sortByHierarquia atualizado
+Nos componentes de listagem, em vez de exibir `cautela.policialPatente + cautela.policialNome`, exibir:
 ```text
-1. CMT RPMONT primeiro
-2. SUBCMT RPMONT segundo (novo)
-3. Comparar posto/graduacao
-4. Se mesmo posto E for oficial: QOPM < QOAPM (novo)
-5. Data ultima promocao
-6. Numeral
+const dadosAtuais = policiaisMap.get(cautela.policialId);
+const nomeExibicao = dadosAtuais 
+  ? `${dadosAtuais.postGrad} ${dadosAtuais.nomeGuerra}`
+  : `${cautela.policialPatente} ${cautela.policialNome}`; // fallback
 ```
 
-### Campo Firebase
-- Nome: `quadro`
-- Valores: `'QOPM'` | `'QOAPM'` | `undefined`
-- Apenas relevante para oficiais (TEN CEL ate 2 TEN)
+---
+
+## Arquivos a modificar
+
+1. **src/hooks/usePolicialResolver.ts** (NOVO) - Hook para resolver dados atuais de policiais por ID
+2. **src/components/PolicialTable.tsx** - Remover logica de ordenacao local, usar `sortByHierarquia`
+3. **src/components/guarda-quartel/PolicialSearchCombobox.tsx** - Adicionar ordenacao hierarquica na lista
+4. **src/components/reserva-armamento/ArmeiroInterface.tsx** - Adicionar `.sort(sortByHierarquia)` nos policiais filtrados
+5. **src/components/gestao-pessoas/EfetivoTab.tsx** - Remover `getPostGradOrder` duplicado
+6. **src/components/admin-belico/CadastroMateriais.tsx** - Usar resolver para exibir dados atuais do policial cautelado
+7. **src/components/admin-belico/GerenciarCautelas.tsx** - Usar resolver para exibir dados atuais
+8. **src/components/admin-belico/BaixaMaterialCargaModal.tsx** - Usar resolver para exibir dados atuais
+9. **src/components/admin-belico/MateriaisTransferidos.tsx** - Usar resolver para exibir dados atuais
+10. **src/components/admin-belico/MateriaisTransferidosCarga.tsx** - Usar resolver para exibir dados atuais
+11. **src/components/admin-belico/TransferenciaPolicialModal.tsx** - Usar resolver para exibir dados atuais
+12. **src/components/admin-belico/NovaCautelaForm.tsx** - Adicionar ordenacao na lista de policiais
