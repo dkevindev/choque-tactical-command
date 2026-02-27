@@ -529,6 +529,10 @@ exports.gerarListaFrequenciaDocx = gerarListaFrequenciaDocx;
 const { gerarFrequenciaMensalDocx } = require('./gerar-frequencia-mensal');
 exports.gerarFrequenciaMensalDocx = gerarFrequenciaMensalDocx;
 
+// ----------------- FUNÇÃO RESUMO DE EFETIVO -----------------
+const { gerarResumoEfetivoDocx } = require('./gerar-resumo-efetivo');
+exports.gerarResumoEfetivoDocx = gerarResumoEfetivoDocx;
+
 // ----------------- FUNÇÃO LIVRO RESERVA DE ARMAMENTO -----------------
 const appLivroReservaArmamento = express();
 appLivroReservaArmamento.use(cors({ origin: true }));
