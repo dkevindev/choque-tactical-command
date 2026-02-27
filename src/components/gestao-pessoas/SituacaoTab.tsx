@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, Users, Search, Filter, Settings, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, Users, Search, Filter, Settings, Plus, Pencil, Trash2, ArrowRightLeft } from 'lucide-react';
 import { doc, updateDoc, writeBatch, collection, addDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
@@ -357,6 +358,33 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
     }
   };
 
+  // Migrar policiais para EM ATIVIDADE
+  const policiaisParaMigrar = useMemo(() => {
+    return policiais.filter(p =>
+      p.SITUAÇÃO === 'MONTADO - POLICIAMENTO OSTENSIVO' || p.SITUAÇÃO === 'VIATURA' || !p.SITUAÇÃO
+    );
+  }, [policiais]);
+
+  const handleMigrarParaEmAtividade = async () => {
+    if (policiaisParaMigrar.length === 0) return;
+    setLoading(true);
+    try {
+      const batch = writeBatch(db);
+      for (const policial of policiaisParaMigrar) {
+        const ref = doc(db, 'policiais', policial.id);
+        batch.update(ref, { SITUAÇÃO: 'EM ATIVIDADE' });
+      }
+      await batch.commit();
+      toast({ title: "Sucesso", description: `${policiaisParaMigrar.length} policial(is) migrado(s) para EM ATIVIDADE` });
+      onUpdate();
+    } catch (error) {
+      console.error('Erro ao migrar:', error);
+      toast({ title: "Erro", description: "Erro ao migrar policiais", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleToggleIndisponivel = async (sit: ConfigSituacao) => {
     try {
       await updateDoc(doc(db, 'config_situacoes', sit.id), { indisponivel: !sit.indisponivel });
@@ -630,11 +658,37 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
         {/* Policiais Disponíveis (situação sem indisponibilidade) */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Policiais Disponíveis ({policiaisDisponivelComSituacao.length})
-            </CardTitle>
-            <CardDescription>Policiais com situação que não gera indisponibilidade</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Policiais Disponíveis ({policiaisDisponivelComSituacao.length})
+                </CardTitle>
+                <CardDescription className="mt-1">Policiais com situação que não gera indisponibilidade</CardDescription>
+              </div>
+              {policiaisParaMigrar.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="outline" disabled={loading}>
+                      <ArrowRightLeft className="h-4 w-4 mr-1" />
+                      Migrar para EM ATIVIDADE ({policiaisParaMigrar.length})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Confirmar migração em massa</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {policiaisParaMigrar.length} policial(is) com situação "MONTADO - POLICIAMENTO OSTENSIVO", "VIATURA" ou sem situação serão migrados para "EM ATIVIDADE". Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleMigrarParaEmAtividade}>Confirmar</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-96 overflow-y-auto">
