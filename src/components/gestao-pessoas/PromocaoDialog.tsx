@@ -142,12 +142,13 @@ const PromocaoDialog: React.FC<PromocaoDialogProps> = ({ policiais, onClose, onU
     try {
       const historicoSnap = await getDocs(collection(db, 'historico_promocoes'));
       
-      // Agrupar por policialId, pegando a data mais recente
+      // Agrupar por policialId, pegando a data mais recente + todos os registros
       const mapaPromocoes: Record<string, string> = {};
-      historicoSnap.docs.forEach(d => {
-        const data = d.data();
-        const pid = data.policialId;
-        const dataPromo = data.dataPromocao;
+      const todosRegistros = historicoSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      todosRegistros.forEach((reg: any) => {
+        const pid = reg.policialId;
+        const dataPromo = reg.dataPromocao;
         if (!pid || !dataPromo) return;
         
         if (!mapaPromocoes[pid] || new Date(dataPromo) > new Date(mapaPromocoes[pid])) {
@@ -155,7 +156,20 @@ const PromocaoDialog: React.FC<PromocaoDialogProps> = ({ policiais, onClose, onU
         }
       });
 
+      // Buscar assentamentos de promoção existentes para evitar duplicatas
+      const assentamentosSnap = await getDocs(
+        query(collection(db, 'assentamentos'), where('tipo', '==', 'Promocao'))
+      );
+      const assentamentosExistentes = new Set(
+        assentamentosSnap.docs.map(d => {
+          const data = d.data();
+          return `${data.policialId}_${data.data}_${data.graduacaoAnterior}_${data.graduacaoNova}`;
+        })
+      );
+
       let atualizados = 0;
+      let assentamentosCriados = 0;
+
       for (const [policialId, dataPromo] of Object.entries(mapaPromocoes)) {
         try {
           const policialRef = doc(db, 'policiais', policialId);
@@ -169,9 +183,39 @@ const PromocaoDialog: React.FC<PromocaoDialogProps> = ({ policiais, onClose, onU
         }
       }
 
+      // Criar assentamentos retroativos para cada promoção do histórico
+      for (const reg of todosRegistros) {
+        const r = reg as any;
+        if (!r.policialId || !r.dataPromocao) continue;
+        
+        const dataFormatada = r.dataPromocao.includes('T') 
+          ? r.dataPromocao.split('T')[0] 
+          : r.dataPromocao;
+        const chave = `${r.policialId}_${dataFormatada}_${r.graduacaoAnterior}_${r.graduacaoNova}`;
+        
+        if (assentamentosExistentes.has(chave)) continue;
+        
+        try {
+          await addDoc(collection(db, 'assentamentos'), {
+            policialId: r.policialId,
+            tipo: "Promocao",
+            data: dataFormatada,
+            descricao: `Promovido de ${r.graduacaoAnterior} para ${r.graduacaoNova}. Publicação: ${r.publicacao || 'N/I'}`,
+            graduacaoAnterior: r.graduacaoAnterior,
+            graduacaoNova: r.graduacaoNova,
+            publicacao: r.publicacao || 'N/I',
+            criadoEm: new Date().toISOString()
+          });
+          assentamentosCriados++;
+          assentamentosExistentes.add(chave);
+        } catch (err) {
+          console.warn(`Erro ao criar assentamento para ${r.policialId}:`, err);
+        }
+      }
+
       toast({
         title: "Sincronização concluída",
-        description: `${atualizados} policial(is) atualizado(s) com a data da última promoção.`
+        description: `${atualizados} data(s) atualizada(s), ${assentamentosCriados} assentamento(s) criado(s).`
       });
       onUpdate();
     } catch (error: any) {
@@ -269,6 +313,18 @@ const PromocaoDialog: React.FC<PromocaoDialogProps> = ({ policiais, onClose, onU
           graduacaoAnterior: tipoPromocao.de,
           graduacaoNova: tipoPromocao.para,
           dataPromocao: dataPromocaoDate.toISOString(),
+          publicacao,
+          criadoEm: new Date().toISOString()
+        });
+
+        // Registrar assentamento de promoção
+        await addDoc(collection(db, 'assentamentos'), {
+          policialId: novoId,
+          tipo: "Promocao",
+          data: dataPromocao,
+          descricao: `Promovido de ${tipoPromocao.de} para ${tipoPromocao.para}. Publicação: ${publicacao}`,
+          graduacaoAnterior: tipoPromocao.de,
+          graduacaoNova: tipoPromocao.para,
           publicacao,
           criadoEm: new Date().toISOString()
         });
