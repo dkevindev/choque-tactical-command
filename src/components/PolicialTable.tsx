@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, Eye, User, Phone, MapPin, Calendar, CreditCard, Mail, Building, FileText } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { sortByHierarquia } from '@/lib/policialUtils';
 
 interface Policial {
   id: string;
@@ -112,33 +113,6 @@ const PolicialTable = () => {
     loadData();
   }, []);
 
-  const getPostGradOrder = (postGrad: string) => {
-    const hierarchy = {
-      'CEL': 1,
-      'TEN CEL': 2,
-      'CAP': 3,
-      '1º TEN': 4,
-      '2º TEN': 5,
-      'SUBTEN': 6,
-      '1º SGT': 7,
-      '2º SGT': 8,
-      '3º SGT': 9,
-      'CB': 10,
-      'SD': 11
-    };
-    return hierarchy[postGrad as keyof typeof hierarchy] || 999;
-  };
-
-  const hasCmtRpmont = (policial: Policial) => {
-    const funcao = policial.FUNÇÃO || '';
-    return funcao.includes('CMT RPMONT');
-  };
-
-  const shouldCapComeFirst = (policial: Policial) => {
-    const funcao = policial.FUNÇÃO || '';
-    return funcao.includes('RESP SUBCOMANDO RPMONT') || funcao.includes('CMT');
-  };
-
   const filteredPoliciais = policiais.filter(policial => {
     const cautelaData = cautelasMap.get(policial.id);
     const armamentoSerie = cautelaData?.armamento || '';
@@ -152,44 +126,7 @@ const PolicialTable = () => {
       armamentoSerie.toLowerCase().includes(searchTerm.toLowerCase()) ||
       coleteSerie.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }).sort((a, b) => {
-    // Primeiro: quem tem CMT RPMONT sempre no topo
-    const aHasCmtRpmont = hasCmtRpmont(a);
-    const bHasCmtRpmont = hasCmtRpmont(b);
-    
-    if (aHasCmtRpmont && !bHasCmtRpmont) return -1;
-    if (!aHasCmtRpmont && bHasCmtRpmont) return 1;
-    
-    const aPost = a['Post/Grad'] || '';
-    const bPost = b['Post/Grad'] || '';
-    
-    const aOrder = getPostGradOrder(aPost);
-    const bOrder = getPostGradOrder(bPost);
-    
-    // Se ambos são CAP, aplicar critério especial
-    if (aOrder === 3 && bOrder === 3) {
-      const aIsPriority = shouldCapComeFirst(a);
-      const bIsPriority = shouldCapComeFirst(b);
-      
-      if (aIsPriority && !bIsPriority) return -1;
-      if (!aIsPriority && bIsPriority) return 1;
-      
-      // Se ambos são prioritários ou ambos não são, usar numeral como desempate
-      return (a.NUMERAL || 0) - (b.NUMERAL || 0);
-    }
-    
-    // Se posts diferentes, usar hierarquia
-    if (aOrder !== bOrder) {
-      return aOrder - bOrder;
-    }
-    
-    // Se mesmo post e a partir de 1º SGT, usar numeral como desempate
-    if (aOrder >= 7) {
-      return (a.NUMERAL || 0) - (b.NUMERAL || 0);
-    }
-    
-    return 0;
-  });
+  }).sort(sortByHierarquia);
 
   const getStatusBadge = (situacao: string) => {
     const status = situacao?.toLowerCase() || '';

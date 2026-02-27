@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { sortByHierarquia } from '@/lib/policialUtils';
 
 export interface PolicialData {
   id: string;
@@ -95,6 +96,11 @@ const PolicialSearchCombobox = ({
       (p.numeral && String(p.numeral).includes(termo)) ||
       (p.posto || '').toLowerCase().includes(termo)
     );
+  }).sort((a, b) => {
+    // Mapear campos do combobox para o formato esperado por sortByHierarquia
+    const mapA = { 'Post/Grad': a.posto, NUMERAL: a.numeral, NOME: a.nome, 'FUNÇÃO': '' } as any;
+    const mapB = { 'Post/Grad': b.posto, NUMERAL: b.numeral, NOME: b.nome, 'FUNÇÃO': '' } as any;
+    return sortByHierarquia(mapA, mapB);
   });
 
   const selectedPolicial = policiais.find((p) => p.id === value);

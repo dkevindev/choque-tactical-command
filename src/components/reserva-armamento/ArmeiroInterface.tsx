@@ -16,6 +16,7 @@ import {
   doc, getDocs, orderBy, getDoc, deleteDoc 
 } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { sortByHierarquia } from '@/lib/policialUtils';
 import ModalConfirmacaoPolicial from './ModalConfirmacaoPolicial';
 import ModalQuantidadeMaterial from './ModalQuantidadeMaterial';
 import ModalFechamentoLivro from './ModalFechamentoLivro';
@@ -1073,7 +1074,7 @@ const ArmeiroInterface = () => {
     const matriculaMatch = String(p['Matrícula'] || '').includes(searchPolicial);
     const numeralMatch = String(p.NUMERAL || '').includes(searchPolicial);
     return nomeMatch || nomeGuerraMatch || matriculaMatch || numeralMatch;
-  });
+  }).sort(sortByHierarquia);
 
   // Mapear categoria para o filtro usando tipoArma do Firebase
   const mapearCategoria = (material: Material) => {

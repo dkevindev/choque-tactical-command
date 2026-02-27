@@ -25,6 +25,7 @@ import { db } from '@/firebase';
 import { toast } from 'sonner';
 import NovaCautelaForm from './NovaCautelaForm';
 import TransferenciaPolicialModal from './TransferenciaPolicialModal';
+import { usePolicialResolver } from '@/hooks/usePolicialResolver';
 
 interface Cautela {
   id: string;
@@ -75,7 +76,7 @@ const GerenciarCautelas = () => {
   const [cautelaDetalhes, setCautelaDetalhes] = useState<Cautela | null>(null);
   const [showNovaForm, setShowNovaForm] = useState(false);
   const [cautelaTransferencia, setCautelaTransferencia] = useState<Cautela | null>(null);
-
+  const { resolverNome } = usePolicialResolver();
   useEffect(() => {
     loadCautelas();
   }, []);
@@ -324,7 +325,7 @@ const GerenciarCautelas = () => {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-foreground">{cautela.policialNome}</p>
+                        <p className="font-medium text-foreground">{resolverNome(cautela.policialId, cautela.policialPatente, cautela.policialNome)}</p>
                         <p className="text-sm text-muted-foreground">Mat: {cautela.policialMatricula}</p>
                       </div>
                     </TableCell>
@@ -413,7 +414,7 @@ const GerenciarCautelas = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Dados do Policial</h4>
-                  <p><strong>Nome:</strong> {cautelaDetalhes?.policialNome}</p>
+                  <p><strong>Nome:</strong> {resolverNome(cautelaDetalhes?.policialId, cautelaDetalhes?.policialPatente, cautelaDetalhes?.policialNome)}</p>
                   <p><strong>Matrícula:</strong> {cautelaDetalhes?.policialMatricula}</p>
                 </div>
                 

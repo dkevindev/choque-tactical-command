@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { usePolicialResolver } from '@/hooks/usePolicialResolver';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,6 +111,7 @@ const CadastroMateriais = () => {
 
   const [policiais, setPoliciais] = useState<any[]>([]);
   const [buscaPolicial, setBuscaPolicial] = useState('');
+  const { policiaisMap, resolverNome } = usePolicialResolver();
 
   const categorias = [
     'Armamento',
@@ -171,7 +173,7 @@ const CadastroMateriais = () => {
           cautela.materiais.forEach((mat: any) => {
             if (mat.materialId) {
               materiaisCautelados.set(mat.materialId, {
-                policialNome: `${cautela.policialPatente} ${cautela.policialNome}`,
+                policialNome: resolverNome(cautela.policialId, cautela.policialPatente, cautela.policialNome),
                 policialId: cautela.policialId
               });
             }

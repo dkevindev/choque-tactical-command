@@ -12,6 +12,7 @@ import { Search, PackageMinus, AlertTriangle } from 'lucide-react';
 import { collection, getDocs, query, where, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
+import { usePolicialResolver } from '@/hooks/usePolicialResolver';
 
 interface MaterialBelico {
   id: string;
@@ -48,6 +49,7 @@ const BaixaMaterialCargaModal = ({ open, onClose, onSuccess }: Props) => {
   const [motivoBaixa, setMotivoBaixa] = useState('');
   const [destino, setDestino] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const { resolverNome } = usePolicialResolver();
 
   useEffect(() => {
     if (open) {
@@ -79,7 +81,7 @@ const BaixaMaterialCargaModal = ({ open, onClose, onSuccess }: Props) => {
         c.materiais?.forEach((m: any) => {
           if (m.materialId) {
             cautelaMap.set(m.materialId, {
-              nome: `${c.policialPatente || ''} ${c.policialNome || ''}`.trim(),
+              nome: resolverNome(c.policialId, c.policialPatente, c.policialNome),
               matricula: c.policialMatricula || '',
               id: c.policialId || ''
             });

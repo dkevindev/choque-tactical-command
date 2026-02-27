@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { sortByHierarquia } from '@/lib/policialUtils';
 import { toast } from 'sonner';
 
 // Interface original do Firestore
@@ -244,6 +245,10 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
         ? String(p.numeral).toLowerCase().includes(busca)
         : false)
     );
+  }).sort((a, b) => {
+    const mapA = { 'Post/Grad': a.patente, NUMERAL: a.numeral, NOME: a.nome, 'FUNÇÃO': a.funcao || '' } as any;
+    const mapB = { 'Post/Grad': b.patente, NUMERAL: b.numeral, NOME: b.nome, 'FUNÇÃO': b.funcao || '' } as any;
+    return sortByHierarquia(mapA, mapB);
   });
 
   // Filtra materiais pela busca
