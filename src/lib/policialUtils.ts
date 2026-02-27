@@ -38,8 +38,8 @@ export const buscarPolicialPorId = async (policialId: string): Promise<any | nul
 
 export const getPostGradOrder = (postGrad: string): number => {
   const ordem: Record<string, number> = {
-    'TEN CEL': 1, 'MAJ': 2, 'CAP': 3, '1º TEN': 4, '2º TEN': 5,
-    '1º SGT': 6, '2º SGT': 7, '3º SGT': 8, 'CB': 9, 'SD': 10
+    'TEN CEL': 1, 'TENCEL': 1, 'MAJ': 2, 'CAP': 3, '1º TEN': 4, '2º TEN': 5,
+    'SUBTEN': 6, '1º SGT': 7, '2º SGT': 8, '3º SGT': 9, 'CB': 10, 'SD': 11
   };
   return ordem[postGrad] || 999;
 };
@@ -49,7 +49,19 @@ export const sortByHierarquia = (a: any, b: any): number => {
   const bIsCmt = b['FUNÇÃO']?.includes('CMT RPMONT');
   if (aIsCmt && !bIsCmt) return -1;
   if (!aIsCmt && bIsCmt) return 1;
-  return getPostGradOrder(a['Post/Grad'] || '') - getPostGradOrder(b['Post/Grad'] || '');
+
+  const orderDiff = getPostGradOrder(a['Post/Grad'] || '') - getPostGradOrder(b['Post/Grad'] || '');
+  if (orderDiff !== 0) return orderDiff;
+
+  // Mesma graduação: quem foi promovido primeiro é mais antigo
+  const dateA = a.dataUltimaPromocao ? new Date(a.dataUltimaPromocao).getTime() : Infinity;
+  const dateB = b.dataUltimaPromocao ? new Date(b.dataUltimaPromocao).getTime() : Infinity;
+  if (dateA !== dateB) return dateA - dateB;
+
+  // Mesmo posto e data: ordenar por numeral
+  const numA = Number(a.NUMERAL || a.numeral || 9999);
+  const numB = Number(b.NUMERAL || b.numeral || 9999);
+  return numA - numB;
 };
 
 export const formatarNomePolicial = (policial: any): string => {

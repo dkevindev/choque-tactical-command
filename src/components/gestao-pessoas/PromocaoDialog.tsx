@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Search, ChevronLeft, CheckCircle } from 'lucide-react';
+import { ArrowRight, Search, ChevronLeft, CheckCircle, RefreshCw } from 'lucide-react';
 import { collection, addDoc, doc, getDocs, query, where, getDoc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 import HistoricoPromocoesTable from './HistoricoPromocoesTable';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Policial {
   id: string;
@@ -132,7 +133,58 @@ const PromocaoDialog: React.FC<PromocaoDialogProps> = ({ policiais, onClose, onU
   const [publicacao, setPublicacao] = useState('');
   const [loading, setLoading] = useState(false);
   const [viewingHistorico, setViewingHistorico] = useState<Policial | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
   const { toast } = useToast();
+
+  // Função para sincronizar retroativamente as datas de promoção
+  const handleSincronizarDatasPromocao = async () => {
+    setSyncLoading(true);
+    try {
+      const historicoSnap = await getDocs(collection(db, 'historico_promocoes'));
+      
+      // Agrupar por policialId, pegando a data mais recente
+      const mapaPromocoes: Record<string, string> = {};
+      historicoSnap.docs.forEach(d => {
+        const data = d.data();
+        const pid = data.policialId;
+        const dataPromo = data.dataPromocao;
+        if (!pid || !dataPromo) return;
+        
+        if (!mapaPromocoes[pid] || new Date(dataPromo) > new Date(mapaPromocoes[pid])) {
+          mapaPromocoes[pid] = dataPromo;
+        }
+      });
+
+      let atualizados = 0;
+      for (const [policialId, dataPromo] of Object.entries(mapaPromocoes)) {
+        try {
+          const policialRef = doc(db, 'policiais', policialId);
+          const policialSnap = await getDoc(policialRef);
+          if (policialSnap.exists()) {
+            await updateDoc(policialRef, { dataUltimaPromocao: dataPromo });
+            atualizados++;
+          }
+        } catch (err) {
+          console.warn(`Erro ao atualizar policial ${policialId}:`, err);
+        }
+      }
+
+      toast({
+        title: "Sincronização concluída",
+        description: `${atualizados} policial(is) atualizado(s) com a data da última promoção.`
+      });
+      onUpdate();
+    } catch (error: any) {
+      console.error('Erro ao sincronizar:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao sincronizar datas: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setSyncLoading(false);
+    }
+  };
 
   // Filtrar policiais elegíveis para promoção
   const policiaisElegiveis = tipoPromocao
@@ -304,6 +356,35 @@ const PromocaoDialog: React.FC<PromocaoDialogProps> = ({ policiais, onClose, onU
                     </Button>
                   );
                 })}
+              </div>
+
+              {/* Botão Sincronizar Datas */}
+              <div className="border-t pt-4 mt-4">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full" disabled={syncLoading}>
+                      <RefreshCw className={`h-4 w-4 mr-2 ${syncLoading ? 'animate-spin' : ''}`} />
+                      {syncLoading ? 'Sincronizando...' : 'Sincronizar Datas de Promoção'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sincronizar Datas de Promoção</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação irá consultar o histórico de promoções e atualizar o campo "dataUltimaPromocao" de cada policial com a data da promoção mais recente. Deseja continuar?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleSincronizarDatasPromocao}>
+                        Sincronizar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <p className="text-xs text-muted-foreground mt-1 text-center">
+                  Atualiza retroativamente as datas de promoção baseado no histórico
+                </p>
               </div>
             </div>
           )}
