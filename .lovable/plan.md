@@ -1,35 +1,51 @@
 
-# Corrigir Nome nos Documentos e Ordenacao do SUBCMT
 
-## Duas correcoes necessarias
+# Filtrar Top Assiduidade: remover quem teve indisponibilidade nos ultimos 12 meses
 
-### 1. Documentos DOCX: usar `Post/Grad` + `NOME` (nome completo)
+## Contexto
 
-Atualmente os 4 arquivos de geracao de documentos usam `dadosAtuais?.nomeGuerra` que retorna o nome de guerra (ex: "K RIBEIRO"). O correto para documentos oficiais e usar `dadosAtuais?.nome` que corresponde ao campo `NOME` do Firebase (ex: "KEVIN RIBEIRO DOS SANTOS").
+O ranking "Top Assiduidade" conta atestados medicos nos ultimos 12 meses. Porem, policiais que ficaram afastados por qualquer situacao de indisponibilidade (licenca maternidade, LTS, etc.) nao devem aparecer no ranking, pois a ausencia deles nao e comparavel.
 
-O campo `postGrad` ja corresponde a `Post/Grad` do Firebase, entao esta correto.
+As mudancas de situacao ja sao salvas na colecao `assentamentos` com tipo `'Mudanca de Situacao'` ou `'mudanca_situacao'`, contendo os campos `novaSituacao` ou `situacaoNova`. A colecao `config_situacoes` indica quais situacoes geram indisponibilidade (flag `indisponivel`).
 
-**Arquivos afetados** (trocar `nomeGuerra` por `nome` apenas no payload do documento):
+## Solucao
 
-- `src/components/admin-belico/GerenciarCautelas.tsx` (linha 155): `dadosAtuais?.nomeGuerra` -> `dadosAtuais?.nome`
-- `src/components/admin-belico/documentos/GerarNadaConstaForm.tsx` (linha 73): idem
-- `src/components/admin-belico/documentos/GerarTermoEntregaForm.tsx` (linha 236): idem
-- `src/components/admin-belico/documentos/GerarTransferenciaCautelaForm.tsx` (linha 88): idem
+Carregar os assentamentos de mudanca de situacao dos ultimos 12 meses, cruzar com `config_situacoes` para identificar quais policiais entraram em alguma situacao indisponivel, e remove-los do ranking.
 
-Nas telas/UI continua usando `nomeGuerra` normalmente.
+## Arquivo a modificar
 
-### 2. Ordenacao: SUBCMT e desempate de mesmo posto, nao sobrepoe graduacao
+**src/components/gestao-pessoas/EstatisticasTab.tsx**
 
-No `src/lib/policialUtils.ts`, a verificacao do SUBCMT (etapa 2, linhas 65-68) esta ANTES da comparacao de posto (etapa 3, linhas 71-72). Isso faz um MAJ SUBCMT aparecer antes de um TEN CEL, o que esta errado.
+### Alteracoes:
 
-**Correcao**: mover a verificacao do SUBCMT para DEPOIS da comparacao de posto, tornando-a o primeiro criterio de desempate quando os postos sao iguais.
+1. No `useEffect` de carregamento (linha 88-123), adicionar fetch da colecao `assentamentos` em paralelo com as demais
+2. Armazenar os assentamentos em novo estado `allAssentamentos`
+3. No `useMemo` do `rankingAssiduidade` (linhas 133-152):
+   - Identificar nomes de situacoes indisponiveis (ja existe em `situacoesIndisponiveis`)
+   - Varrer assentamentos dos ultimos 12 meses com tipo de mudanca de situacao
+   - Coletar IDs de policiais cuja `novaSituacao` ou `situacaoNova` esteja na lista de situacoes indisponiveis
+   - Filtrar esses policiais fora do ranking
+   - Manter a contagem de atestados (quantidade, independente de dias) para os restantes
 
-Nova ordem:
-1. CMT RPMONT sempre primeiro
-2. Comparar posto/graduacao
-3. Mesmo posto: SUBCMT primeiro (desempate)
-4. Mesmo posto e oficial: QOPM antes de QOAPM
-5. Data ultima promocao
-6. Numeral
+### Logica principal:
 
-**Arquivo**: `src/lib/policialUtils.ts` -- reordenar blocos dentro de `sortByHierarquia`
+```text
+// Dentro do rankingAssiduidade useMemo:
+const idsComIndisponibilidade = new Set();
+allAssentamentos.forEach(a => {
+  if (a.data < limite) return;
+  const tipo = (a.tipo || '').toLowerCase();
+  if (!tipo.includes('mudanca') && !tipo.includes('mudança')) return;
+  const sitNova = a.novaSituacao || a.situacaoNova || '';
+  if (situacoesIndisponiveis.includes(sitNova)) {
+    idsComIndisponibilidade.add(a.policialId);
+  }
+});
+
+return policiaisFiltrados
+  .filter(p => !idsComIndisponibilidade.has(p.id))
+  .map(...)
+  .sort(...);
+```
+
+Nenhuma alteracao estrutural necessaria -- os dados ja existem no Firebase, apenas precisam ser carregados e cruzados.
