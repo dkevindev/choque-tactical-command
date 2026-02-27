@@ -21,7 +21,7 @@ const GerarResumoEfetivoForm: React.FC = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        'https://us-central1-finkevin-fbd9a.cloudfunctions.net/gerarResumoEfetivoDocx',
+        'https://gerarresumoefetivodocx-owvlmrnsjq-uc.a.run.app',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
