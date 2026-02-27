@@ -148,8 +148,14 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
       .sort(sortByHierarquia);
   }, [policiais, situacoes]);
 
+  const policiaisParaColocarSituacao = useMemo(() => {
+    const situacoesIndisponiveis = situacoes.filter(s => s.indisponivel).map(s => s.nome);
+    // Mostrar todos os policiais que NÃO estão em situação de indisponibilidade
+    return policiais.filter(p => !p.SITUAÇÃO || !situacoesIndisponiveis.includes(p.SITUAÇÃO)).sort(sortByHierarquia);
+  }, [policiais, situacoes]);
+
   const policiaisDisponiveisFiltrados = useMemo(() => {
-    return policiaisDisponiveis.filter(policial => {
+    return policiaisParaColocarSituacao.filter(policial => {
       const matchesSearch = !searchTerm ||
         policial.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -157,7 +163,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
       const matchesSituacao = filterSituacao === 'all' || !filterSituacao || policial.SITUAÇÃO === filterSituacao;
       return matchesSearch && matchesSituacao;
     });
-  }, [policiaisDisponiveis, searchTerm, filterSituacao]);
+  }, [policiaisParaColocarSituacao, searchTerm, filterSituacao]);
 
   const policiaisEmSituacaoFiltrados = useMemo(() => {
     return policiaisEmSituacao.filter(policial => {
