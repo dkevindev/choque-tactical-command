@@ -197,9 +197,10 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
 
           {/* Tabela */}
           <div className="border rounded-lg">
-            <Table>
+             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>NUM</TableHead>
                   <TableHead>Post/Grad</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Matrícula</TableHead>
@@ -212,6 +213,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
               <TableBody>
                 {filteredPoliciais.map((policial) => (
                   <TableRow key={policial.id}>
+                    <TableCell>{policial.NUMERAL || policial.numeral || '-'}</TableCell>
                     <TableCell className="font-medium">
                       {policial['Post/Grad']}
                     </TableCell>
