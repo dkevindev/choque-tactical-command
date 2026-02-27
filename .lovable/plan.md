@@ -1,42 +1,58 @@
 
 
-# Corrigir cedilha e cadastrar policiais BSP (cedidos)
+# Melhorias em Estatisticas, Funcao e Performance
 
-## Parte 1: Botao para corrigir cedilha nos dados existentes
+## 1. Top Policiais Assiduidade (EstatisticasTab.tsx)
 
-Na aba **Efetivo** (EfetivoTab.tsx), adicionar um botao "Corrigir Acentuacao" que:
-- Busca todos os policiais no Firebase cuja SITUACAO contenha "LICENCA" (sem cedilha)
-- Atualiza automaticamente para "LICENÇA TRATAMENTO DE SAUDE" (com cedilha)
-- Exibe um toast informando quantos registros foram corrigidos (ou "Nenhum registro para corrigir")
+No grid onde aparece o card "Disponibilidade" e "Resumo por Posto/Graduacao", transformar em grid de 3 colunas e adicionar um terceiro card **"Top Assiduidade"** que:
+- Busca atestados dos ultimos 12 meses da colecao `atestados_medicos`
+- Conta quantos atestados cada policial teve
+- Lista TODOS os policiais em ordem crescente (quem tem MENOS atestados primeiro)
+- Formato de cada item: posicao + NOME DE GUERRA1 (maiusculo, campo do Firebase)
+- Policiais com 0 atestados aparecem primeiro (mais assíduos)
+- Card com scroll interno (max-height) para nao estourar o layout
+- Usa os dados de `atestados_medicos` ja carregados no useEffect existente, apenas expandindo o calculo
 
-O botao ficara ao lado do botao "Gerenciar Promocoes" no header do card de Efetivo.
+## 2. Resumo por Funcao mais bonito (EstatisticasTab.tsx)
 
-## Parte 2: Cadastro de policiais BSP (cedidos)
+Substituir a tabela simples de "Resumo por Posto/Graduacao" no grid inferior por um layout visual melhor:
+- Usar cards pequenos ou badges coloridos em grid ao inves de tabela crua
+- Adicionar tambem um resumo por funcao (agrupando policiais por FUNCAO)
+- Cada item com icone, nome da funcao e quantidade em destaque
+- Layout em grid responsivo (3-4 colunas)
 
-### Conceito
-Policiais cedidos de outras unidades (ex: BSP) serao armazenados na mesma colecao `policiais` no Firebase, porem com um campo `origemExterna: 'BSP'` (ou outra unidade) e `UNIDADE: 'BSP'`. Isso permite que:
-- Aparecam na tabela de efetivo, diferenciados visualmente
-- Sejam contados nas estatisticas
-- Aparecam no documento de Resumo de Efetivo (a cloud function ja trata BSP como unidade)
+## 3. Correcoes de Performance no modulo Gestao de Pessoas
 
-### Implementacao
+### 3.1 Remover carregamento duplicado de policiais (GestãoPessoas.tsx)
+- Linha 120: `if (retornos.length > 0 || true)` -- o `|| true` forca SEMPRE um segundo `getDocs` desnecessario. Remover o `|| true` para so recarregar quando houve mudancas reais
 
-**EfetivoTab.tsx:**
-- Adicionar botao "Cadastrar Policial Cedido (BSP)" no header
-- Abrir um Dialog com formulario simplificado: Nome, Nome de Guerra, Post/Grad, Matricula, Funcao, Situacao (padrao "EM ATIVIDADE"), Telefone
-- Ao salvar, gravar no Firebase com `origemExterna: 'BSP'`, `UNIDADE: 'BSP'`
-- Na tabela de efetivo, policiais com `origemExterna` terao um Badge "BSP" ou "CEDIDO" ao lado do nome, com cor diferenciada (ex: azul)
-- Filtro de situacao continuara funcionando normalmente
+### 3.2 Evitar re-fetch de atestados no EstatisticasTab
+- O componente pai (`GestãoPessoas`) ja carrega atestados no `iniciarSistema`. Passar esses dados via props para `EstatisticasTab` ao inves de fazer outra query ao Firebase
+- Isso elimina uma chamada duplicada ao Firestore
 
-**EstatisticasTab.tsx:**
-- Os policiais BSP ja serao incluidos nos dados pois vem da mesma colecao `policiais`
-- O agrupamento por unidade ja funciona (a cloud function ja mapeia BSP)
+### 3.3 Otimizar FuncaoTab
+- A tab de Funcao faz seed de `config_funcoes` toda vez que a lista esta vazia -- isso e correto mas o `useEffect` nao tem dependencias que mudem, entao roda so 1x. OK.
 
-### Diferenciacao visual na tabela
-Na linha da tabela, se o policial tiver `origemExterna`, exibir:
-- Badge azul "BSP" na coluna Unidade
-- Linha com fundo levemente diferente (bg-blue-50)
+## Arquivos a modificar
 
-## Arquivos modificados
-- `src/components/gestao-pessoas/EfetivoTab.tsx` -- botao corrigir cedilha + cadastro BSP + visual diferenciado na tabela
+1. **src/components/gestao-pessoas/EstatisticasTab.tsx** -- adicionar card Top Assiduidade no grid, melhorar visual do resumo por funcao, receber atestados via props
+2. **src/components/GestãoPessoas.tsx** -- remover `|| true` no carregamento duplicado, passar atestados como prop para EstatisticasTab
 
+## Detalhes tecnicos
+
+### Top Assiduidade (calculo)
+```text
+1. Filtrar atestados com dataInicio nos ultimos 12 meses
+2. Agrupar por policialId -> contar quantidade
+3. Para cada policial do efetivo filtrado, buscar contagem (0 se nao tem)
+4. Ordenar crescente (menos atestados = mais assiduo)
+5. Exibir: #1 - NOME DE GUERRA1
+```
+
+### Grid Estatisticas (layout)
+```text
+Antes:  grid 1x2 -> [Disponibilidade] [Posto/Grad]
+Depois: grid 1x3 -> [Disponibilidade] [Top Assiduidade] [Resumo Funcao]
+```
+
+O resumo por Posto/Graduacao sera mantido mas com visual de badges/chips ao inves de tabela.
