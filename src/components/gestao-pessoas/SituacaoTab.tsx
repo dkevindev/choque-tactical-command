@@ -141,6 +141,15 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
       .sort(sortByHierarquia);
   }, [policiais, situacoes]);
 
+  const policiaisDisponivelComSituacao = useMemo(() => {
+    const situacoesDisponiveis = situacoes
+      .filter(s => !s.indisponivel)
+      .map(s => s.nome);
+    return policiais
+      .filter(p => p.SITUAÇÃO && situacoesDisponiveis.includes(p.SITUAÇÃO))
+      .sort(sortByHierarquia);
+  }, [policiais, situacoes]);
+
   const policiaisDisponiveisFiltrados = useMemo(() => {
     return policiaisDisponiveis.filter(policial => {
       const matchesSearch = !searchTerm ||
@@ -607,6 +616,51 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
                           <p className="text-xs text-muted-foreground mt-1">Função original: {policial.funcaoOrigem}</p>
                         )}
                       </div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => openRetiradaDialog(policial)} disabled={loading}>
+                      Retirar
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Policiais Disponíveis (situação sem indisponibilidade) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Policiais Disponíveis ({policiaisDisponivelComSituacao.length})
+            </CardTitle>
+            <CardDescription>Policiais com situação que não gera indisponibilidade</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {policiaisDisponivelComSituacao.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">Nenhum policial nesta categoria</p>
+              ) : (
+                policiaisDisponivelComSituacao.map(policial => (
+                  <div key={policial.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium">{policial['Post/Grad']} {policial.NOME}</p>
+                      <Badge variant="secondary" className="mt-1">{policial.SITUAÇÃO}</Badge>
+                      <div className="flex gap-2 mt-2">
+                        {policial.inicioSituacao && (
+                          <Badge variant="outline" className="text-xs">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(policial.inicioSituacao).toLocaleDateString()}
+                            {policial.fimSituacao && ` - ${new Date(policial.fimSituacao).toLocaleDateString()}`}
+                          </Badge>
+                        )}
+                        {policial.publicacaoSituacao && (
+                          <Badge variant="secondary" className="text-xs">{policial.publicacaoSituacao}</Badge>
+                        )}
+                      </div>
+                      {policial.observacaoSituacao && (
+                        <p className="text-xs text-muted-foreground mt-1">{policial.observacaoSituacao}</p>
+                      )}
                     </div>
                     <Button variant="outline" size="sm" onClick={() => openRetiradaDialog(policial)} disabled={loading}>
                       Retirar
