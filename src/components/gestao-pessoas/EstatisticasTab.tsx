@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Users, UserCheck, UserX, CalendarDays, Download, Heart, AlertTriangle, Eye, EyeOff, Percent
+  Users, UserCheck, UserX, CalendarDays, Download, Heart, AlertTriangle, Eye, EyeOff, Percent, Trophy, Briefcase, Shield
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, subMonths } from 'date-fns';
 
 const formatDateBR = (d: string | undefined) => {
   if (!d) return '-';
@@ -61,9 +62,23 @@ const UNIDADES: { key: UnidadeKey; label: string; filter: (p: Policial) => boole
   { key: '3pel', label: '3º PEL/2º ESQD', filter: (p) => { const u = (p.UNIDADE || p.Unidade || '').toUpperCase(); return u.includes('3') && (u.includes('PEL') || u.includes('3')); } },
 ];
 
+const FUNCAO_COLORS = [
+  'bg-blue-100 text-blue-800 border-blue-200',
+  'bg-green-100 text-green-800 border-green-200',
+  'bg-purple-100 text-purple-800 border-purple-200',
+  'bg-orange-100 text-orange-800 border-orange-200',
+  'bg-pink-100 text-pink-800 border-pink-200',
+  'bg-teal-100 text-teal-800 border-teal-200',
+  'bg-indigo-100 text-indigo-800 border-indigo-200',
+  'bg-yellow-100 text-yellow-800 border-yellow-200',
+  'bg-red-100 text-red-800 border-red-200',
+  'bg-cyan-100 text-cyan-800 border-cyan-200',
+];
+
 const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
   const [situacoes, setSituacoes] = useState<ConfigSituacao[]>([]);
   const [atestadosMap, setAtestadosMap] = useState<Map<string, AtestadoMapa>>(new Map());
+  const [allAtestados, setAllAtestados] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [abaUnidade, setAbaUnidade] = useState<UnidadeKey>('regimento');
   const [showFerias, setShowFerias] = useState(false);
@@ -79,13 +94,13 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
         ]);
         setSituacoes(situacoesSnap.docs.map(d => ({ id: d.id, nome: d.data().nome, indisponivel: d.data().indisponivel ?? true })));
 
+        const allAtestadosData = atestadosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllAtestados(allAtestadosData);
+
         // Criar mapa policialId -> atestado vigente mais recente
-        const hoje = format(new Date(), 'yyyy-MM-dd');
         const mapa = new Map<string, AtestadoMapa>();
-        atestadosSnap.docs.forEach(d => {
-          const data = d.data();
+        allAtestadosData.forEach((data: any) => {
           if (!data.policialId || !data.dataInicio || !data.dataFim) return;
-          // Pegar o mais recente por policial (vigente ou não, para exibir info)
           const existing = mapa.get(data.policialId);
           if (!existing || data.dataFim > existing.dataFim) {
             mapa.set(data.policialId, {
@@ -115,6 +130,27 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
     return policiais.filter(unidade.filter);
   }, [policiais, abaUnidade]);
 
+  // Top Assiduidade - últimos 12 meses
+  const rankingAssiduidade = useMemo(() => {
+    const limite = format(subMonths(new Date(), 12), 'yyyy-MM-dd');
+    const contagem: Record<string, number> = {};
+    
+    allAtestados.forEach((a: any) => {
+      if (!a.policialId || !a.dataInicio) return;
+      if (a.dataInicio >= limite) {
+        contagem[a.policialId] = (contagem[a.policialId] || 0) + 1;
+      }
+    });
+
+    return policiaisFiltrados
+      .map(p => ({
+        id: p.id,
+        nome: (p['NOME DE GUERRA1'] || p.NOME || '-').toUpperCase(),
+        atestados: contagem[p.id] || 0,
+      }))
+      .sort((a, b) => a.atestados - b.atestados);
+  }, [policiaisFiltrados, allAtestados]);
+
   const stats = useMemo(() => {
     const total = policiaisFiltrados.length;
     const indisponiveis = policiaisFiltrados.filter(p => p.SITUAÇÃO && situacoesIndisponiveis.includes(p.SITUAÇÃO));
@@ -133,7 +169,16 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
       postGradMap[pg] = (postGradMap[pg] || 0) + 1;
     });
     const postGradResumo = Object.entries(postGradMap).sort((a, b) => b[1] - a[1]);
-    return { total, disponiveis, indisponiveis, ferias, lts, outrosAfastamentos, postGradResumo };
+
+    // Resumo por Função
+    const funcaoMap: Record<string, number> = {};
+    policiaisFiltrados.forEach(p => {
+      const funcao = p['FUNÇÃO'] || 'N/I';
+      funcaoMap[funcao] = (funcaoMap[funcao] || 0) + 1;
+    });
+    const funcaoResumo = Object.entries(funcaoMap).sort((a, b) => b[1] - a[1]);
+
+    return { total, disponiveis, indisponiveis, ferias, lts, outrosAfastamentos, postGradResumo, funcaoResumo };
   }, [policiaisFiltrados, situacoesIndisponiveis]);
 
   const getNomeGuerra = (p: Policial) => p['NOME DE GUERRA1'] || p.NOME || '-';
@@ -360,8 +405,9 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
               </CardContent>
             </Card>
 
-            {/* Estatísticas adicionais */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Grid 3 colunas: Disponibilidade + Top Assiduidade + Resumo Função */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Disponibilidade */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-base">Disponibilidade</CardTitle>
@@ -375,28 +421,88 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Top Assiduidade */}
               <Card>
-                <CardHeader><CardTitle className="text-base">Resumo por Posto/Graduação</CardTitle></CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Posto/Graduação</TableHead>
-                        <TableHead className="text-right">Qtd</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {stats.postGradResumo.map(([pg, qtd]) => (
-                        <TableRow key={pg}>
-                          <TableCell>{pg}</TableCell>
-                          <TableCell className="text-right font-medium">{qtd}</TableCell>
-                        </TableRow>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-yellow-500" />
+                    Top Assiduidade
+                  </CardTitle>
+                  <Badge variant="secondary" className="text-xs">12 meses</Badge>
+                </CardHeader>
+                <CardContent className="p-0 px-6 pb-4">
+                  <ScrollArea className="h-[300px]">
+                    <div className="space-y-1">
+                      {rankingAssiduidade.map((item, idx) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-center justify-between py-1.5 px-2 rounded text-sm ${
+                            idx < 3 ? 'bg-yellow-50 border border-yellow-200' : 
+                            idx % 2 === 0 ? 'bg-muted/50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`font-bold w-7 text-right shrink-0 ${
+                              idx === 0 ? 'text-yellow-600' : idx === 1 ? 'text-gray-500' : idx === 2 ? 'text-amber-700' : 'text-muted-foreground'
+                            }`}>
+                              {idx + 1}º
+                            </span>
+                            <span className="truncate font-medium">{item.nome}</span>
+                          </div>
+                          <Badge variant={item.atestados === 0 ? 'default' : 'outline'} className="shrink-0 ml-2">
+                            {item.atestados}
+                          </Badge>
+                        </div>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              {/* Resumo por Posto/Graduação - visual melhorado */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    Posto/Graduação
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-2">
+                    {stats.postGradResumo.map(([pg, qtd]) => (
+                      <div key={pg} className="flex items-center justify-between p-2 rounded-lg bg-muted/60 border">
+                        <span className="text-sm font-medium truncate">{pg}</span>
+                        <Badge variant="secondary" className="font-bold ml-1">{qtd}</Badge>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Resumo por Função */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                  Resumo por Função
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {stats.funcaoResumo.map(([funcao, qtd], idx) => (
+                    <div
+                      key={funcao}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${FUNCAO_COLORS[idx % FUNCAO_COLORS.length]}`}
+                    >
+                      <span className="text-sm font-medium truncate">{funcao}</span>
+                      <span className="text-lg font-bold ml-2 shrink-0">{qtd}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="flex flex-wrap gap-3">
               <Button onClick={exportarRelatorioCompleto} variant="outline">
