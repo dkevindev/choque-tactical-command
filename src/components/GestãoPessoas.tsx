@@ -117,7 +117,7 @@ const GestãoPessoas: React.FC = () => {
       setProgressText('Finalizando...');
 
       // Recarregar policiais após atualizações
-      if (retornos.length > 0 || true) {
+      if (retornos.length > 0) {
         const snap2 = await getDocs(q);
         const updated = snap2.docs.map(d => ({ id: d.id, ...d.data() })) as Policial[];
         setPoliciais(updated);
