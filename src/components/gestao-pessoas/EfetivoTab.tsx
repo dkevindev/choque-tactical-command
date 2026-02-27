@@ -8,13 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Edit, Search, Filter, Eye, User, Phone, MapPin, CreditCard, Mail, Building, TrendingUp, FileText, Calendar, Clock } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { doc, setDoc } from 'firebase/firestore';
+import { Edit, Search, Filter, Eye, User, Phone, MapPin, CreditCard, Mail, Building, TrendingUp, FileText, Calendar, Clock, Wrench, UserPlus } from 'lucide-react';
+import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { format, parseISO } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
-import { sortByHierarquia } from '@/lib/policialUtils';
+import { sortByHierarquia, normalizarSituacao } from '@/lib/policialUtils';
 
 interface Policial {
   id: string;
@@ -39,8 +39,66 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
   const [editingPolicial, setEditingPolicial] = useState<Policial | null>(null);
   const [viewingPolicial, setViewingPolicial] = useState<Policial | null>(null);
   const [showPromocaoDialog, setShowPromocaoDialog] = useState(false);
+  const [showCadastroBSP, setShowCadastroBSP] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [corrigindoCedilha, setCorrigindoCedilha] = useState(false);
   const { toast } = useToast();
+
+  // BSP form state
+  const [bspForm, setBspForm] = useState({
+    NOME: '', 'NOME DE GUERRA': '', 'Post/Grad': '', Matrícula: '', 'FUNÇÃO': '', SITUAÇÃO: 'EM ATIVIDADE', telefone: ''
+  });
+
+  const handleCorrigirCedilha = async () => {
+    setCorrigindoCedilha(true);
+    try {
+      const snap = await getDocs(collection(db, 'policiais'));
+      let count = 0;
+      for (const d of snap.docs) {
+        const sit = d.data().SITUAÇÃO || '';
+        const norm = normalizarSituacao(sit);
+        if (norm.includes('LICEN') && norm.includes('TRATAMENTO') && sit !== 'LICENÇA TRATAMENTO DE SAUDE') {
+          await updateDoc(doc(db, 'policiais', d.id), { 'SITUAÇÃO': 'LICENÇA TRATAMENTO DE SAUDE' });
+          count++;
+        }
+      }
+      toast({
+        title: count > 0 ? "Correção concluída" : "Nenhum registro para corrigir",
+        description: count > 0 ? `${count} registro(s) corrigido(s) para "LICENÇA TRATAMENTO DE SAUDE"` : "Todos os registros já estão com a acentuação correta",
+      });
+      if (count > 0) onUpdate();
+    } catch (error) {
+      console.error('Erro ao corrigir cedilha:', error);
+      toast({ title: "Erro", description: "Erro ao corrigir acentuação", variant: "destructive" });
+    } finally {
+      setCorrigindoCedilha(false);
+    }
+  };
+
+  const handleCadastrarBSP = async () => {
+    if (!bspForm.NOME || !bspForm['NOME DE GUERRA'] || !bspForm['Post/Grad']) {
+      toast({ title: "Campos obrigatórios", description: "Preencha Nome, Nome de Guerra e Post/Grad", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'policiais'), {
+        ...bspForm,
+        UNIDADE: 'BSP',
+        origemExterna: 'BSP',
+        criadoEm: new Date().toISOString(),
+      });
+      toast({ title: "Sucesso", description: "Policial cedido (BSP) cadastrado com sucesso" });
+      setShowCadastroBSP(false);
+      setBspForm({ NOME: '', 'NOME DE GUERRA': '', 'Post/Grad': '', Matrícula: '', 'FUNÇÃO': '', SITUAÇÃO: 'EM ATIVIDADE', telefone: '' });
+      onUpdate();
+    } catch (error) {
+      console.error('Erro ao cadastrar BSP:', error);
+      toast({ title: "Erro", description: "Erro ao cadastrar policial cedido", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Função para ordenar por Post/Graduação (mesma lógica do PolicialTable)
   const getPostGradOrder = (postGrad: string): number => {
@@ -123,10 +181,20 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
               <Filter className="h-5 w-5" />
               Efetivo Total ({filteredPoliciais.length} de {policiais.length})
             </CardTitle>
-            <Button onClick={() => setShowPromocaoDialog(true)}>
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Gerenciar Promoções
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" size="sm" onClick={handleCorrigirCedilha} disabled={corrigindoCedilha}>
+                <Wrench className="h-4 w-4 mr-2" />
+                {corrigindoCedilha ? "Corrigindo..." : "Corrigir Acentuação"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowCadastroBSP(true)}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Cadastrar Cedido (BSP)
+              </Button>
+              <Button onClick={() => setShowPromocaoDialog(true)} size="sm">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Gerenciar Promoções
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -212,12 +280,17 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
               </TableHeader>
               <TableBody>
                 {filteredPoliciais.map((policial) => (
-                  <TableRow key={policial.id}>
+                  <TableRow key={policial.id} className={policial.origemExterna ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
                     <TableCell>{policial.NUMERAL || policial.numeral || '-'}</TableCell>
                     <TableCell className="font-medium">
                       {policial['Post/Grad']}
                     </TableCell>
-                    <TableCell>{policial.NOME}</TableCell>
+                    <TableCell>
+                      {policial.NOME}
+                      {policial.origemExterna && (
+                        <Badge className="ml-2 bg-blue-500 hover:bg-blue-600 text-white text-[10px] px-1.5 py-0">CEDIDO</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>{policial.Matrícula || 'N/A'}</TableCell>
                     <TableCell>
                       <Badge variant={
@@ -229,7 +302,13 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
                       </Badge>
                     </TableCell>
                     <TableCell>{policial['FUNÇÃO']}</TableCell>
-                    <TableCell>{policial.UNIDADE || policial['UNIDADE"RPMONT"'] || policial.Unidade || 'N/A'}</TableCell>
+                    <TableCell>
+                      {policial.origemExterna ? (
+                        <Badge className="bg-blue-500 hover:bg-blue-600 text-white">{policial.origemExterna}</Badge>
+                      ) : (
+                        policial.UNIDADE || policial['UNIDADE"RPMONT"'] || policial.Unidade || 'N/A'
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
@@ -384,6 +463,63 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
           onUpdate={onUpdate}
         />
       )}
+
+      {/* Dialog Cadastro BSP */}
+      <Dialog open={showCadastroBSP} onOpenChange={setShowCadastroBSP}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cadastrar Policial Cedido (BSP)</DialogTitle>
+            <DialogDescription>
+              Cadastre um policial cedido de outra unidade. Ele aparecerá no efetivo com identificação diferenciada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label>Nome Completo *</Label>
+                <Input value={bspForm.NOME} onChange={e => setBspForm(p => ({ ...p, NOME: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Nome de Guerra *</Label>
+                <Input value={bspForm['NOME DE GUERRA']} onChange={e => setBspForm(p => ({ ...p, 'NOME DE GUERRA': e.target.value }))} />
+              </div>
+              <div>
+                <Label>Post/Grad *</Label>
+                <Select value={bspForm['Post/Grad']} onValueChange={v => setBspForm(p => ({ ...p, 'Post/Grad': v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {['TEN CEL','MAJ','CAP','1º TEN','2º TEN','SUBTEN','1º SGT','2º SGT','3º SGT','CB','SD'].map(pg => (
+                      <SelectItem key={pg} value={pg}>{pg}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Matrícula</Label>
+                <Input value={bspForm.Matrícula} onChange={e => setBspForm(p => ({ ...p, Matrícula: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Função</Label>
+                <Input value={bspForm['FUNÇÃO']} onChange={e => setBspForm(p => ({ ...p, 'FUNÇÃO': e.target.value }))} />
+              </div>
+              <div>
+                <Label>Situação</Label>
+                <Input value={bspForm.SITUAÇÃO} onChange={e => setBspForm(p => ({ ...p, SITUAÇÃO: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Telefone</Label>
+                <Input value={bspForm.telefone} onChange={e => setBspForm(p => ({ ...p, telefone: e.target.value }))} placeholder="(00) 00000-0000" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCadastroBSP(false)}>Cancelar</Button>
+            <Button onClick={handleCadastrarBSP} disabled={loading}>
+              {loading ? "Salvando..." : "Cadastrar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
