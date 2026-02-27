@@ -251,7 +251,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
         try {
           const policialRef = doc(db, 'policiais', selectedPolicial.id);
           await updateDoc(policialRef, {
-            SITUAÇÃO: 'LICENCA TRATAMENTO DE SAUDE',
+            SITUAÇÃO: 'LICENÇA TRATAMENTO DE SAUDE',
             inicioSituacao: dataInicio,
             fimSituacao: dataFimCalculada,
             funcaoOrigem: selectedPolicial['FUNÇÃO'] || selectedPolicial['funcao'] || '',
@@ -261,7 +261,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
             tipo: 'mudanca_situacao',
             descricao: `Entrada automática em LTS - Atestado de ${numDias} dias (CID: ${cidCodigo || 'N/I'})`,
             situacaoAnterior: selectedPolicial.SITUAÇÃO || selectedPolicial['situacao'] || 'EM ATIVIDADE',
-            situacaoNova: 'LICENCA TRATAMENTO DE SAUDE',
+            situacaoNova: 'LICENÇA TRATAMENTO DE SAUDE',
             funcaoAnterior: selectedPolicial['FUNÇÃO'] || '',
             data: new Date().toISOString(),
             automatico: true,

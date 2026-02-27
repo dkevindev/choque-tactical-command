@@ -16,7 +16,7 @@ const formatDateBR = (d: string | undefined) => {
   try { return format(parseISO(d), 'dd/MM/yy'); } catch { return d; }
 };
 import GerarResumoEfetivoForm from './GerarResumoEfetivoForm';
-import { sortByHierarquia } from '@/lib/policialUtils';
+import { sortByHierarquia, isLTS } from '@/lib/policialUtils';
 
 interface Policial {
   id: string;
@@ -119,16 +119,12 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
     const total = policiaisFiltrados.length;
     const indisponiveis = policiaisFiltrados.filter(p => p.SITUAÇÃO && situacoesIndisponiveis.includes(p.SITUAÇÃO));
     const ferias = policiaisFiltrados.filter(p => p.SITUAÇÃO?.toUpperCase().includes('FÉRIAS') || p.SITUAÇÃO?.toUpperCase().includes('FERIAS'));
-    const lts = policiaisFiltrados.filter(p =>
-      p.SITUAÇÃO?.toUpperCase().includes('LICENÇA TRATAMENTO') || 
-      p.SITUAÇÃO?.toUpperCase().includes('LICENCA TRATAMENTO') ||
-      p.SITUAÇÃO?.toUpperCase() === 'LTS'
-    );
+    const lts = policiaisFiltrados.filter(p => isLTS(p.SITUAÇÃO));
     const outrosAfastamentos = indisponiveis.filter(p => {
       const sit = p.SITUAÇÃO?.toUpperCase() || '';
       const isFerias = sit.includes('FÉRIAS') || sit.includes('FERIAS');
-      const isLTS = sit.includes('LICENÇA TRATAMENTO') || sit.includes('LICENCA TRATAMENTO') || sit === 'LTS';
-      return !isFerias && !isLTS;
+      const ehLTS = isLTS(p.SITUAÇÃO);
+      return !isFerias && !ehLTS;
     });
     const disponiveis = total - indisponiveis.length;
     const postGradMap: Record<string, number> = {};
