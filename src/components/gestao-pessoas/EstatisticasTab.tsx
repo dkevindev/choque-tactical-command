@@ -9,7 +9,12 @@ import {
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+
+const formatDateBR = (d: string | undefined) => {
+  if (!d) return '-';
+  try { return format(parseISO(d), 'dd/MM/yy'); } catch { return d; }
+};
 import GerarResumoEfetivoForm from './GerarResumoEfetivoForm';
 import { sortByHierarquia } from '@/lib/policialUtils';
 
@@ -197,8 +202,8 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
               {options?.showSituacao && <TableCell><Badge variant="outline">{p.SITUAÇÃO}</Badge></TableCell>}
               {options?.showCid && <TableCell className="font-mono text-xs">{atestado?.cid || '-'}</TableCell>}
               {options?.showCid && <TableCell className="text-xs">{atestado?.cidDescricao || '-'}</TableCell>}
-              <TableCell>{p.inicioSituacao || '-'}</TableCell>
-              <TableCell>{p.fimSituacao || '-'}</TableCell>
+              <TableCell>{formatDateBR(p.inicioSituacao)}</TableCell>
+              <TableCell>{formatDateBR(p.fimSituacao)}</TableCell>
             </TableRow>
           );
         })}
@@ -346,8 +351,8 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
                           <TableCell><Badge variant="outline">{p.SITUAÇÃO}</Badge></TableCell>
                           <TableCell className="font-mono text-xs">{atestado?.cid || '-'}</TableCell>
                           <TableCell className="text-xs">{atestado?.cidDescricao || '-'}</TableCell>
-                          <TableCell>{p.inicioSituacao || '-'}</TableCell>
-                          <TableCell>{p.fimSituacao || '-'}</TableCell>
+                          <TableCell>{formatDateBR(p.inicioSituacao)}</TableCell>
+                          <TableCell>{formatDateBR(p.fimSituacao)}</TableCell>
                         </TableRow>
                       );
                     })}

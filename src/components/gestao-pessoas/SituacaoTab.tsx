@@ -17,6 +17,11 @@ import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from 'date-fns';
 import { sortByHierarquia } from '@/lib/policialUtils';
 
+const formatDateBR = (d: string | undefined) => {
+  if (!d) return '-';
+  try { return format(parseISO(d), 'dd/MM/yy'); } catch { return d; }
+};
+
 interface Policial {
   id: string;
   NOME: string;
@@ -633,8 +638,8 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
                           {policial.inicioSituacao && (
                             <Badge variant="outline" className="text-xs">
                               <Calendar className="h-3 w-3 mr-1" />
-                              {new Date(policial.inicioSituacao).toLocaleDateString()}
-                              {policial.fimSituacao && ` - ${new Date(policial.fimSituacao).toLocaleDateString()}`}
+                              {formatDateBR(policial.inicioSituacao)}
+                              {policial.fimSituacao && ` - ${formatDateBR(policial.fimSituacao)}`}
                             </Badge>
                           )}
                           {policial.publicacaoSituacao && (
@@ -708,8 +713,8 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
                         {policial.inicioSituacao && (
                           <Badge variant="outline" className="text-xs">
                             <Calendar className="h-3 w-3 mr-1" />
-                            {new Date(policial.inicioSituacao).toLocaleDateString()}
-                            {policial.fimSituacao && ` - ${new Date(policial.fimSituacao).toLocaleDateString()}`}
+                            {formatDateBR(policial.inicioSituacao)}
+                            {policial.fimSituacao && ` - ${formatDateBR(policial.fimSituacao)}`}
                           </Badge>
                         )}
                         {policial.publicacaoSituacao && (
