@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { GripVertical, Users, Search, Filter, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Users, Search, Filter, UserCog, CheckSquare } from 'lucide-react';
 import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Policial {
   id: string;
@@ -60,151 +62,124 @@ const FUNCOES_DISPONIVEIS = [
 const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFunction, setSelectedFunction] = useState('');
-  const [showEmptyFunctions, setShowEmptyFunctions] = useState(false);
-  const [collapsedFunctions, setCollapsedFunctions] = useState<Record<string, boolean>>({});
+  const [filterFuncao, setFilterFuncao] = useState('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
+  const [bulkFuncao, setBulkFuncao] = useState('');
   const { toast } = useToast();
 
-  // Filtrar policiais por busca
   const filteredPoliciais = useMemo(() => {
-    if (!searchTerm) return policiais;
-    return policiais.filter(policial => 
-      policial.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      policial['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(policial.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [policiais, searchTerm]);
+    return policiais.filter(p => {
+      const matchesSearch = !searchTerm ||
+        p.NOME?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p['Post/Grad']?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(p.Matrícula || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFuncao = filterFuncao === 'all' || p['FUNÇÃO'] === filterFuncao;
+      return matchesSearch && matchesFuncao;
+    });
+  }, [policiais, searchTerm, filterFuncao]);
 
-  // Organizar policiais por função (usando policiais filtrados)
-  const policiaisPorFuncao = FUNCOES_DISPONIVEIS.reduce((acc, funcao) => {
-    acc[funcao] = filteredPoliciais.filter(p => p['FUNÇÃO'] === funcao);
-    return acc;
-  }, {} as Record<string, Policial[]>);
+  // Resumo por função
+  const resumoFuncao = useMemo(() => {
+    const mapa: Record<string, number> = {};
+    policiais.forEach(p => {
+      const f = p['FUNÇÃO'] || 'SEM FUNÇÃO';
+      mapa[f] = (mapa[f] || 0) + 1;
+    });
+    return Object.entries(mapa).sort((a, b) => b[1] - a[1]);
+  }, [policiais]);
 
-  // Policiais sem função definida ou com função não listada (usando policiais filtrados)
-  const policiaisSemFuncao = filteredPoliciais.filter(p => 
-    !p['FUNÇÃO'] || !FUNCOES_DISPONIVEIS.includes(p['FUNÇÃO'])
-  );
-
-  // Funções para exibir (apenas com policiais ou se mostrar vazias estiver habilitado)
-  const funcoesParaExibir = FUNCOES_DISPONIVEIS.filter(funcao => {
-    const temPoliciais = policiaisPorFuncao[funcao]?.length > 0;
-    const matchesFilter = !selectedFunction || funcao.toLowerCase().includes(selectedFunction.toLowerCase());
-    return matchesFilter && (temPoliciais || showEmptyFunctions);
-  });
-
-  const toggleFunctionCollapse = (funcao: string) => {
-    setCollapsedFunctions(prev => ({
-      ...prev,
-      [funcao]: !prev[funcao]
-    }));
-  };
-
-  const handleDragEnd = async (result: any) => {
-    const { destination, source, draggableId } = result;
-
-    if (!destination) return;
-
-    // Se foi solto no mesmo lugar
-    if (destination.droppableId === source.droppableId && destination.index === source.index) {
-      return;
-    }
-
-    const novaFuncao = destination.droppableId;
-    const policialId = draggableId;
-
+  const handleChangeFuncao = async (policialId: string, novaFuncao: string) => {
+    const policial = policiais.find(p => p.id === policialId);
+    if (!policial) return;
     setLoading(true);
     try {
-      const policial = policiais.find(p => p.id === policialId);
-      if (!policial) return;
-
-      const policialRef = doc(db, 'policiais', policialId);
-      await updateDoc(policialRef, {
-        'FUNÇÃO': novaFuncao,
-        funcaoOrigem: novaFuncao // Atualizar função origem também
-      });
-
-      toast({
-        title: "Sucesso",
-        description: `${policial['Post/Grad']} ${policial.NOME} movido para ${novaFuncao}`
-      });
-
+      const ref = doc(db, 'policiais', policialId);
+      await updateDoc(ref, { 'FUNÇÃO': novaFuncao, funcaoOrigem: novaFuncao });
+      toast({ title: "Sucesso", description: `${policial['Post/Grad']} ${policial.NOME} → ${novaFuncao}` });
       onUpdate();
     } catch (error) {
       console.error('Erro ao atualizar função:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar função do policial",
-        variant: "destructive"
-      });
+      toast({ title: "Erro", description: "Erro ao atualizar função", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const PolicialCard = ({ policial, index }: { policial: Policial; index: number }) => (
-    <Draggable draggableId={policial.id} index={index}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          className={`p-3 border rounded-lg shadow-sm mb-2 flex items-center gap-2 transition-all duration-200 ${
-            snapshot.isDragging 
-              ? 'shadow-lg bg-blue-50 border-blue-300' 
-              : 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200'
-          }`}
-        >
-          <GripVertical className="h-4 w-4 text-blue-600" />
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <Badge variant="default" className="text-xs bg-blue-600 text-white">
-                {policial['Post/Grad']}
-              </Badge>
-              <span className="font-medium text-sm text-blue-900">{policial.NOME}</span>
-            </div>
-            <div className="text-xs text-blue-700 mt-1">
-              {policial.SITUAÇÃO}
-            </div>
-            {policial.Matrícula && (
-              <div className="text-xs text-blue-600 mt-1">
-                Mat: {policial.Matrícula}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </Draggable>
-  );
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? filteredPoliciais.map(p => p.id) : []);
+  };
+
+  const handleToggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id));
+  };
+
+  const handleBulkChange = async () => {
+    if (!bulkFuncao || selectedIds.length === 0) return;
+    setLoading(true);
+    try {
+      const batch = writeBatch(db);
+      selectedIds.forEach(id => {
+        batch.update(doc(db, 'policiais', id), { 'FUNÇÃO': bulkFuncao, funcaoOrigem: bulkFuncao });
+      });
+      await batch.commit();
+      toast({ title: "Sucesso", description: `${selectedIds.length} policial(is) alterado(s) para ${bulkFuncao}` });
+      setSelectedIds([]);
+      setBulkFuncao('');
+      setShowBulkDialog(false);
+      onUpdate();
+    } catch (error) {
+      console.error('Erro ao alterar em lote:', error);
+      toast({ title: "Erro", description: "Erro ao alterar funções em lote", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
+      {/* Resumo por Função */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Gestão de Funções - Drag & Drop
+            Resumo por Função
           </CardTitle>
-          <CardDescription>
-            Arraste os policiais entre as funções para reorganizar o efetivo
-          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>Como usar:</strong> Clique e arraste os policiais pelos cartões para movê-los entre as diferentes funções. 
-              A alteração será salva automaticamente no Firebase.
-            </p>
+          <div className="flex flex-wrap gap-2">
+            {resumoFuncao.map(([funcao, qtd]) => (
+              <Badge
+                key={funcao}
+                variant="outline"
+                className="cursor-pointer px-3 py-1.5 text-sm hover:bg-primary hover:text-primary-foreground transition-colors"
+                onClick={() => setFilterFuncao(funcao === filterFuncao ? 'all' : funcao)}
+              >
+                {funcao}: <span className="font-bold ml-1">{qtd}</span>
+              </Badge>
+            ))}
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Filtros de Busca */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {/* Filtros e Ações */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserCog className="h-5 w-5" />
+            Gestão de Funções
+          </CardTitle>
+          <CardDescription>
+            Altere a função individualmente pelo Select na tabela ou selecione vários para alterar em lote
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <Label htmlFor="search-policial">Buscar Policial</Label>
+              <Label>Buscar Policial</Label>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="search-policial"
                   placeholder="Nome, graduação ou matrícula..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -212,167 +187,141 @@ const FuncaoTab: React.FC<FuncaoTabProps> = ({ policiais, onUpdate }) => {
                 />
               </div>
             </div>
-            
             <div>
-              <Label htmlFor="filter-function">Filtrar por Função</Label>
-              <div className="relative">
-                <Filter className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="filter-function"
-                  placeholder="Ex: VIATURA, OFICIAL..."
-                  value={selectedFunction}
-                  onChange={(e) => setSelectedFunction(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
+              <Label>Filtrar por Função</Label>
+              <Select value={filterFuncao} onValueChange={setFilterFuncao}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as funções" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as funções</SelectItem>
+                  {FUNCOES_DISPONIVEIS.map(f => (
+                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-
-            <div>
-              <Label>Opções de Visualização</Label>
+            <div className="flex items-end gap-2">
               <Button
                 variant="outline"
-                size="sm"
-                onClick={() => setShowEmptyFunctions(!showEmptyFunctions)}
-                className="w-full"
+                onClick={() => { setSearchTerm(''); setFilterFuncao('all'); setSelectedIds([]); }}
               >
-                {showEmptyFunctions ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                {showEmptyFunctions ? 'Ocultar' : 'Mostrar'} Funções Vazias
+                Limpar
+              </Button>
+              <Button
+                disabled={selectedIds.length === 0}
+                onClick={() => setShowBulkDialog(true)}
+              >
+                <CheckSquare className="h-4 w-4 mr-2" />
+                Alterar em Lote ({selectedIds.length})
               </Button>
             </div>
           </div>
 
-          {searchTerm && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-800">
-                <strong>Resultado da busca:</strong> {filteredPoliciais.length} policial(is) encontrado(s)
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="space-y-4">
-          {/* Policiais sem função definida */}
-          {policiaisSemFuncao.length > 0 && (
-            <Card className="border-2 border-orange-300 bg-orange-50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm text-orange-800 font-bold">
-                  ⚠️ Sem Função Definida ({policiaisSemFuncao.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Droppable droppableId="SEM_FUNCAO">
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={`min-h-[120px] p-3 rounded-lg border-2 border-dashed transition-all duration-200 ${
-                        snapshot.isDraggingOver 
-                          ? 'bg-orange-200 border-orange-400' 
-                          : 'bg-orange-100 border-orange-300'
-                      }`}
-                    >
-                      {policiaisSemFuncao.map((policial, index) => (
-                        <PolicialCard key={policial.id} policial={policial} index={index} />
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Funções organizadas - Layout vertical compacto */}
-          <div className="space-y-3">
-            {funcoesParaExibir.map(funcao => (
-              <Collapsible
-                key={funcao}
-                open={!collapsedFunctions[funcao]}
-                onOpenChange={() => toggleFunctionCollapse(funcao)}
-              >
-                <Card className="border-2 border-blue-200 bg-blue-50">
-                  <CollapsibleTrigger asChild>
-                    <CardHeader className="pb-3 cursor-pointer hover:bg-blue-100 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm text-blue-800 font-bold">
-                          {funcao} ({policiaisPorFuncao[funcao]?.length || 0})
-                        </CardTitle>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {policiaisPorFuncao[funcao]?.length || 0} policiais
-                          </Badge>
-                          {collapsedFunctions[funcao] ? (
-                            <ChevronDown className="h-4 w-4 text-blue-600" />
-                          ) : (
-                            <ChevronUp className="h-4 w-4 text-blue-600" />
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </CollapsibleTrigger>
-                  
-                  <CollapsibleContent>
-                    <CardContent>
-                      <Droppable droppableId={funcao}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`min-h-[80px] p-3 rounded-lg border-2 border-dashed transition-all duration-200 ${
-                              snapshot.isDraggingOver 
-                                ? 'bg-blue-200 border-blue-400' 
-                                : 'bg-blue-100 border-blue-300'
-                            }`}
-                          >
-                            {policiaisPorFuncao[funcao]?.map((policial, index) => (
-                              <PolicialCard key={policial.id} policial={policial} index={index} />
+          {/* Tabela */}
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={selectedIds.length === filteredPoliciais.length && filteredPoliciais.length > 0}
+                      onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                    />
+                  </TableHead>
+                  <TableHead>Post/Grad</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Situação</TableHead>
+                  <TableHead>Função Atual</TableHead>
+                  <TableHead className="w-64">Alterar Função</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPoliciais.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      Nenhum policial encontrado
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredPoliciais.map(policial => (
+                    <TableRow key={policial.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.includes(policial.id)}
+                          onCheckedChange={(checked) => handleToggleSelect(policial.id, checked as boolean)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="text-xs">{policial['Post/Grad']}</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{policial.NOME}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{policial.SITUAÇÃO || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{policial['FUNÇÃO'] || 'SEM FUNÇÃO'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={policial['FUNÇÃO'] || ''}
+                          onValueChange={(val) => handleChangeFuncao(policial.id, val)}
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FUNCOES_DISPONIVEIS.map(f => (
+                              <SelectItem key={f} value={f} className="text-xs">{f}</SelectItem>
                             ))}
-                            {provided.placeholder}
-                            {(!policiaisPorFuncao[funcao] || policiaisPorFuncao[funcao].length === 0) && (
-                              <div className="text-center text-blue-600 text-sm py-4 font-medium">
-                                Arraste policiais aqui
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </Droppable>
-                    </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
-            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
-        </div>
-      </DragDropContext>
-
-      {/* Estatísticas */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumo por Funções</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {FUNCOES_DISPONIVEIS
-              .filter(funcao => policiaisPorFuncao[funcao]?.length > 0)
-              .map(funcao => (
-                <div key={funcao} className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {policiaisPorFuncao[funcao]?.length || 0}
-                  </div>
-                  <div className="text-xs text-blue-600 mt-1 font-medium">
-                    {funcao.length > 20 ? `${funcao.substring(0, 17)}...` : funcao}
-                  </div>
-                </div>
-              ))}
-          </div>
+          <p className="text-xs text-muted-foreground text-right">
+            Exibindo {filteredPoliciais.length} de {policiais.length} policiais
+          </p>
         </CardContent>
       </Card>
+
+      {/* Dialog de Alteração em Lote */}
+      <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Função em Lote</DialogTitle>
+            <DialogDescription>
+              Definir nova função para {selectedIds.length} policial(is) selecionado(s)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Nova Função</Label>
+            <Select value={bulkFuncao} onValueChange={setBulkFuncao}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a função" />
+              </SelectTrigger>
+              <SelectContent>
+                {FUNCOES_DISPONIVEIS.map(f => (
+                  <SelectItem key={f} value={f}>{f}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkDialog(false)}>Cancelar</Button>
+            <Button onClick={handleBulkChange} disabled={!bulkFuncao || loading}>
+              {loading ? 'Processando...' : `Alterar ${selectedIds.length} policial(is)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {loading && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg">
+          <div className="bg-background p-6 rounded-lg">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
             <p>Atualizando função...</p>
           </div>
