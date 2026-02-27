@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,7 +51,11 @@ const ModalDevolucaoMunicao = ({ open, onClose, material, onConfirmar }: ModalDe
   };
 
   const handleConfirmar = () => {
-    if (temFalta && !motivoFalta.trim()) {
+    // Verificar se é munição para exigir motivo
+    const ehMunicaoLocal = material.categoria?.toLowerCase().includes('munição') || 
+                          material.categoria?.toLowerCase().includes('municao');
+    
+    if (temFalta && ehMunicaoLocal && !motivoFalta.trim()) {
       return;
     }
     onConfirmar(quantidadeDevolvida, quantidadeFaltante, temFalta ? motivoFalta : undefined);
@@ -63,14 +67,21 @@ const ModalDevolucaoMunicao = ({ open, onClose, material, onConfirmar }: ModalDe
     onClose();
   };
 
+  // Título dinâmico baseado na categoria
+  const ehMunicao = material.categoria?.toLowerCase().includes('munição') || 
+                    material.categoria?.toLowerCase().includes('municao');
+  const titulo = ehMunicao ? 'Devolução de Munição' : 'Devolução de Material';
+  const exigirMotivo = ehMunicao; // Só exigir motivo para munição
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Devolução de Munição
+            {titulo}
           </DialogTitle>
+          <DialogDescription className="sr-only">Informe a quantidade devolvida do material</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -130,25 +141,34 @@ const ModalDevolucaoMunicao = ({ open, onClose, material, onConfirmar }: ModalDe
                   <p className="font-medium text-destructive">
                     Faltam {quantidadeFaltante} unidade(s)
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    É obrigatório informar o motivo da falta
-                  </p>
+                  {exigirMotivo && (
+                    <p className="text-xs text-muted-foreground">
+                      É obrigatório informar o motivo da falta
+                    </p>
+                  )}
+                  {!exigirMotivo && (
+                    <p className="text-xs text-muted-foreground">
+                      Material permanecerá pendente para próximo turno
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="motivo" className="flex items-center gap-1">
-                  Motivo da falta:
-                  <Badge variant="destructive" className="text-xs">Obrigatório</Badge>
-                </Label>
-                <Textarea
-                  id="motivo"
-                  placeholder="Ex: Disparo em ocorrência, perda durante operação..."
-                  value={motivoFalta}
-                  onChange={(e) => setMotivoFalta(e.target.value)}
-                  className="min-h-[100px]"
-                />
-              </div>
+              {exigirMotivo && (
+                <div className="space-y-2">
+                  <Label htmlFor="motivo" className="flex items-center gap-1">
+                    Motivo da falta:
+                    <Badge variant="destructive" className="text-xs">Obrigatório</Badge>
+                  </Label>
+                  <Textarea
+                    id="motivo"
+                    placeholder="Ex: Disparo em ocorrência, perda durante operação..."
+                    value={motivoFalta}
+                    onChange={(e) => setMotivoFalta(e.target.value)}
+                    className="min-h-[100px]"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -159,7 +179,7 @@ const ModalDevolucaoMunicao = ({ open, onClose, material, onConfirmar }: ModalDe
           </Button>
           <Button 
             onClick={handleConfirmar}
-            disabled={temFalta && !motivoFalta.trim()}
+            disabled={temFalta && exigirMotivo && !motivoFalta.trim()}
           >
             Confirmar Devolução
           </Button>

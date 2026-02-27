@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BookOpen, Clock, CheckCircle, User, Calendar, FileText, AlertCircle } from "lucide-react";
@@ -165,6 +165,7 @@ const ModalDetalhesLivro = ({ livro, open, onClose }: ModalDetalhesLivroProps) =
             <BookOpen className="h-6 w-6" />
             Detalhes do Livro - {formatarData(livro.dataAbertura)}
           </DialogTitle>
+          <DialogDescription className="sr-only">Movimentações e detalhes do livro diário</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4">

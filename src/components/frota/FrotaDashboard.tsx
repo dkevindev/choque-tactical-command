@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { collection, getDocs, getDoc, query, where, orderBy, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,8 +24,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import ModalDetalhesViatura from '@/components/ModalDetalhesViatura';
 import GestaoSaldos from './GestaoSaldos';
 import { Viatura } from '@/bot/types';
-import { isFroteLeve, isFrotePesada, buscarViaturasLeves, buscarViaturasPesadas, limparCacheViaturas } from '@/lib/viaturaUtils';
+import { isFroteLeve, isFrotePesada, limparCacheViaturas } from '@/lib/viaturaUtils';
 import AtualizarKmOleoDialog from '../gestao-pessoas/AtualizarKmOleoDialog';
+import ModalCadastroViatura from './ModalCadastroViatura';
+import { Plus } from 'lucide-react';
 
 interface OrdemServico {
   id: string;
@@ -59,6 +61,7 @@ const FrotaDashboard = () => {
   const [gastoFrotePesadaMes, setGastoFrotePesadaMes] = useState(0);
   const [totalOSMes, setTotalOSMes] = useState(0);
   const [kmDialogOpen, setKmDialogOpen] = useState(false);
+  const [cadastroViaturaOpen, setCadastroViaturaOpen] = useState(false);
   const [avariasNaoVisualizadas, setAvariasNaoVisualizadas] = useState<any[]>([]);
   const { toast } = useToast();
 
@@ -76,44 +79,25 @@ const FrotaDashboard = () => {
 
   const fetchViaturas = async () => {
     try {
-      console.log('Iniciando busca de viaturas...');
       const querySnapshot = await getDocs(collection(db, 'frota'));
       const viaturasData: Viatura[] = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Viatura[];
 
-      console.log('Dados das viaturas carregados:', viaturasData);
-
-      // Ordenar viaturas conforme solicitado
       const ordenCustomizada = ['CAV - 11', 'CAV - 12', 'CAV - 13', 'CAV - 05', 'CAV - 06', 'TA - 01', 'TA - 02', 'TA - 03', 'TP'];
 
       const viaturasOrdenadas = viaturasData.sort((a, b) => {
-        // Garantir que os valores sejam strings antes de comparar
         const cadastroA = String(a.CADASTRO || a.id || '');
         const cadastroB = String(b.CADASTRO || b.id || '');
-
-        console.log('Comparando cadastros:', { cadastroA, cadastroB });
-
         const indexA = ordenCustomizada.indexOf(cadastroA);
         const indexB = ordenCustomizada.indexOf(cadastroB);
-
-        // Se os dois estão na lista personalizada, usa a ordem dela
-        if (indexA !== -1 && indexB !== -1) {
-          return indexA - indexB;
-        }
-
-        // Se apenas A está na lista, ele vem primeiro
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
         if (indexA !== -1) return -1;
-
-        // Se apenas B está na lista, ele vem primeiro
         if (indexB !== -1) return 1;
-
-        // Se nenhum está na lista, ordena por nome
         return cadastroA.localeCompare(cadastroB);
       });
       
-      console.log('Viaturas ordenadas:', viaturasOrdenadas);
       setViaturas(viaturasOrdenadas);
     } catch (error) {
       console.error('Erro ao buscar viaturas:', error);
@@ -143,94 +127,36 @@ const FrotaDashboard = () => {
     const mesAtual = agora.getMonth();
     const anoAtual = agora.getFullYear();
 
-    console.log('=== INICIANDO CÁLCULO DAS MÉTRICAS DO DASHBOARD ===');
-    console.log('Mês atual:', mesAtual, 'Ano atual:', anoAtual);
-
     try {
-      // Buscar viaturas da frota leve e pesada dinamicamente
-      const viaturasLeves = await buscarViaturasLeves();
-      const viaturasPesadas = await buscarViaturasPesadas();
-      
-      console.log('Viaturas da frota leve encontradas:', viaturasLeves.map(v => ({
-        cadastro: v.CADASTRO,
-        placa: v.PLACA,
-        tipo: v.tipo
-      })));
-      
-      console.log('Viaturas da frota pesada encontradas:', viaturasPesadas.map(v => ({
-        cadastro: v.CADASTRO,
-        placa: v.PLACA,
-        tipo: v.tipo
-      })));
+      // Usar viaturas do estado em vez de buscar novamente
+      const viaturasLeves = viaturas.filter(v => v.tipo === 'leve');
+      const viaturasPesadas = viaturas.filter(v => v.tipo === 'pesada');
 
       const placasFroteLeve = viaturasLeves.map(v => v.PLACA);
       const cadastrosFroteLeve = viaturasLeves.map(v => v.CADASTRO);
       const placasFrotePesada = viaturasPesadas.map(v => v.PLACA);
       const cadastrosFrotePesada = viaturasPesadas.map(v => v.CADASTRO);
 
-      console.log('Placas frota leve:', placasFroteLeve);
-      console.log('Cadastros frota leve:', cadastrosFroteLeve);
-      console.log('Placas frota pesada:', placasFrotePesada);
-      console.log('Cadastros frota pesada:', cadastrosFrotePesada);
-
       // Filtrar OS do mês atual
       const osDoMes = ordensServico.filter(os => {
         const dataOS = new Date(os.dataOS);
-        const isMesAtual = dataOS.getMonth() === mesAtual && dataOS.getFullYear() === anoAtual;
-        if (isMesAtual) {
-          console.log('OS do mês encontrada:', {
-            placa: os.placaViatura,
-            cadastro: os.cadastroViatura,
-            valor: os.valorOS,
-            data: os.dataOS
-          });
-        }
-        return isMesAtual;
+        return dataOS.getMonth() === mesAtual && dataOS.getFullYear() === anoAtual;
       });
-
-      console.log('Total de OS do mês atual:', osDoMes.length);
 
       // Calcular gasto frota leve no mês
       const gastoLeve = osDoMes
-        .filter(os => {
-          const isPlacarLeve = placasFroteLeve.includes(os.placaViatura);
-          const isCadastroLeve = cadastrosFroteLeve.includes(os.cadastroViatura);
-          const isLeve = isPlacarLeve || isCadastroLeve;
-          
-          if (isLeve) {
-            console.log('OS da frota leve:', {
-              placa: os.placaViatura,
-              cadastro: os.cadastroViatura,
-              valor: os.valorOS,
-              valorNumerico: parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100
-            });
-          }
-          return isLeve;
-        })
+        .filter(os => placasFroteLeve.includes(os.placaViatura) || cadastrosFroteLeve.includes(os.cadastroViatura))
         .reduce((total, os) => {
           const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
           return total + valor;
         }, 0);
 
-      // Calcular gasto frota pesada no mês - CORREÇÃO AQUI
+      // Calcular gasto frota pesada no mês
       const gastoPesada = osDoMes
         .filter(os => {
-          const isPlacarPesada = placasFrotePesada.includes(os.placaViatura);
-          const isCadastroPesada = cadastrosFrotePesada.includes(os.cadastroViatura);
-          // Incluir casos especiais como placa "N/D" buscando por cadastro
-          const isEspecial = os.placaViatura === 'N/D' && cadastrosFrotePesada.includes(os.cadastroViatura);
-          const isPesada = isPlacarPesada || isCadastroPesada || isEspecial;
-          
-          if (isPesada) {
-            console.log('OS da frota pesada:', {
-              placa: os.placaViatura,
-              cadastro: os.cadastroViatura,
-              valor: os.valorOS,
-              valorNumerico: parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100,
-              motivo: isPlacarPesada ? 'placa' : isCadastroPesada ? 'cadastro' : 'especial N/D'
-            });
-          }
-          return isPesada;
+          return placasFrotePesada.includes(os.placaViatura) || 
+                 cadastrosFrotePesada.includes(os.cadastroViatura) ||
+                 (os.placaViatura === 'N/D' && cadastrosFrotePesada.includes(os.cadastroViatura));
         })
         .reduce((total, os) => {
           const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
@@ -245,13 +171,6 @@ const FrotaDashboard = () => {
       
       const saldoConfigurado = (saldoFroteLeve as any)?.saldoMensal || 45000;
       const saldoRestante = saldoConfigurado - gastoLeve;
-
-      console.log('=== RESULTADOS DOS CÁLCULOS ===');
-      console.log('Gasto frota leve:', gastoLeve);
-      console.log('Saldo configurado frota leve:', saldoConfigurado);
-      console.log('Saldo restante frota leve:', saldoRestante);
-      console.log('Gasto frota pesada:', gastoPesada);
-      console.log('Total OS no mês:', osDoMes.length);
 
       setGastoFroteLeveMes(gastoLeve);
       setSaldoFroteLeveMes(saldoRestante);
@@ -314,10 +233,9 @@ const FrotaDashboard = () => {
     setGastos12Meses(gastos12MesesData);
   };
 
-  const getStatusViatura = async (viatura: Viatura) => {
+  const getStatusViatura = (viatura: Viatura) => {
     const kmRestante = viatura.KMOLEO - viatura.KM;
     
-    // Verificar se é frota pesada usando função dinâmica
     const ehFrotePesada = isFrotePesada(viatura);
     const ehFroteLeve = isFroteLeve(viatura);
 
@@ -331,45 +249,12 @@ const FrotaDashboard = () => {
       return { status: 'OK', variant: 'default' as const, cor: 'border-green-500 bg-green-500/5' };
     }
 
-    // Para frota leve, verificar KM + saldo compartilhado
+    // Para frota leve, verificar KM + saldo já calculado no dashboard
     if (ehFroteLeve) {
-      const agora = new Date();
-      const mesAtual = agora.getMonth();
-      const anoAtual = agora.getFullYear();
-      
-      // Calcular gasto da frota leve no mês atual
-      const viaturasLeves = await buscarViaturasLeves();
-      const placasFroteLeve = viaturasLeves.map(v => v.PLACA);
-      
-      const gastoFroteLeveAtual = ordensServico
-        .filter(os => {
-          const dataOS = new Date(os.dataOS);
-          return placasFroteLeve.includes(os.placaViatura) &&
-                 dataOS.getMonth() === mesAtual && 
-                 dataOS.getFullYear() === anoAtual;
-        })
-        .reduce((total, os) => {
-          const valor = parseFloat(os.valorOS.replace(/[R$.,\s]/g, '')) / 100;
-          return total + valor;
-        }, 0);
-
-      // Buscar configuração de saldo da frota leve do Firebase
-      try {
-        const saldosSnapshot = await getDocs(collection(db, 'saldosViaturas'));
-        const saldoFroteLeve = saldosSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }) as any)
-          .find((s: any) => s.tipo === 'frota_leve' && s.anoReferencia === anoAtual);
-        
-        const saldoMensalFroteLeve = (saldoFroteLeve as any)?.saldoMensal || 30000; // Valor padrão
-        const saldoRestante = saldoMensalFroteLeve - gastoFroteLeveAtual;
-
-        if (kmRestante <= 1000 || saldoRestante < 1000) {
-          return { status: 'CRÍTICO', variant: 'destructive' as const, cor: 'border-destructive bg-destructive/5' };
-        } else if (kmRestante <= 3000 || saldoRestante < 2000) {
-          return { status: 'ATENÇÃO', variant: 'secondary' as const, cor: 'border-yellow-500 bg-yellow-500/5' };
-        }
-      } catch (error) {
-        console.error('Erro ao buscar saldo da frota leve:', error);
+      if (kmRestante <= 1000 || saldoFroteLeveMes < 1000) {
+        return { status: 'CRÍTICO', variant: 'destructive' as const, cor: 'border-destructive bg-destructive/5' };
+      } else if (kmRestante <= 3000 || saldoFroteLeveMes < 2000) {
+        return { status: 'ATENÇÃO', variant: 'secondary' as const, cor: 'border-yellow-500 bg-yellow-500/5' };
       }
     }
 
@@ -405,26 +290,25 @@ const FrotaDashboard = () => {
       const mesAtual = agora.getMonth() + 1;
       const anoAtual = agora.getFullYear();
 
-      // Buscar todas as OS do mês atual
-      const osSnapshot = await getDocs(collection(db, 'ordensDeServico'));
-      const ordensMesAtual = osSnapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          placa: doc.data().placaViatura,
-          valorTotal: parseFloat(doc.data().valorOS?.replace(/[R$.,\s]/g, '') || '0') / 100,
-          dataOS: doc.data().dataOS
+      // Usar ordensServico do estado em vez de buscar novamente
+      const ordensMesAtual = ordensServico
+        .map(os => ({
+          id: os.id,
+          placa: os.placaViatura,
+          valorTotal: parseFloat(os.valorOS?.replace(/[R$.,\s]/g, '') || '0') / 100,
+          dataOS: os.dataOS
         }))
         .filter(os => {
           const dataOS = new Date(os.dataOS);
           return dataOS.getMonth() + 1 === mesAtual && dataOS.getFullYear() === anoAtual;
         });
 
-      // Separar viaturas por tipo usando funções dinâmicas
-      const viaturasPesadas = await buscarViaturasPesadas();
-      const viaturasLeves = await buscarViaturasLeves();
+      // Usar viaturas do estado em vez de buscar novamente
+      const viaturasPesadasLocal = viaturas.filter(v => v.tipo === 'pesada');
+      const viaturasLevesLocal = viaturas.filter(v => v.tipo === 'leve');
 
-      // Calcular saldo usado da frota leve (soma de todas as OS das viaturas leves no mês)
-      const placasLeves = viaturasLeves.map(v => v.PLACA);
+      // Calcular saldo usado da frota leve
+      const placasLeves = viaturasLevesLocal.map(v => v.PLACA);
       const saldoUsadoFroteLeve = ordensMesAtual
         .filter(os => placasLeves.includes(os.placa))
         .reduce((total, os) => total + (os.valorTotal || 0), 0);
@@ -515,22 +399,14 @@ const FrotaDashboard = () => {
     }
   };
 
-  // Usar estado para o status das viaturas para evitar chamadas assíncronas no render
-  const [statusViaturas, setStatusViaturas] = useState<Record<string, any>>({});
-
-  useEffect(() => {
-    const calcularStatusTodasViaturas = async () => {
-      const statusMap: Record<string, any> = {};
-      for (const viatura of viaturas) {
-        statusMap[viatura.id] = await getStatusViatura(viatura);
-      }
-      setStatusViaturas(statusMap);
-    };
-
-    if (viaturas.length > 0) {
-      calcularStatusTodasViaturas();
+  // Calcular status de todas as viaturas de forma síncrona usando useMemo
+  const statusViaturas = useMemo(() => {
+    const statusMap: Record<string, any> = {};
+    for (const viatura of viaturas) {
+      statusMap[viatura.id] = getStatusViatura(viatura);
     }
-  }, [viaturas, ordensServico]);
+    return statusMap;
+  }, [viaturas, ordensServico, saldoFroteLeveMes]);
 
   // Buscar avarias pendentes sem ciência
   useEffect(() => {
@@ -636,28 +512,19 @@ const FrotaDashboard = () => {
         <div className="flex gap-2">
           <Button
             variant="default"
+            onClick={() => setCadastroViaturaOpen(true)}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Cadastrar Viatura
+          </Button>
+          <Button
+            variant="secondary"
             onClick={() => setKmDialogOpen(true)}
             className="gap-2"
           >
             <RefreshCw className="h-4 w-4" />
             Atualizar KM e Óleo
-          </Button>
-          <Button
-            onClick={handleAtualizarSaldos}
-            disabled={isUpdatingSaldos}
-            variant="secondary"
-            size="sm"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isUpdatingSaldos ? 'animate-spin' : ''}`} />
-            {isUpdatingSaldos ? 'Atualizando...' : 'Atualizar Saldos'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setGestaoSaldosAberto(true)}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Configurar Saldos
           </Button>
         </div>
       </div>
@@ -942,6 +809,15 @@ const FrotaDashboard = () => {
       <AtualizarKmOleoDialog 
         open={kmDialogOpen} 
         onOpenChange={setKmDialogOpen}
+      />
+
+      {/* Modal de Cadastrar Viatura */}
+      <ModalCadastroViatura
+        open={cadastroViaturaOpen}
+        onOpenChange={setCadastroViaturaOpen}
+        onSuccess={() => {
+          fetchViaturas();
+        }}
       />
     </div>
   );

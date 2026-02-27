@@ -8,22 +8,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Search, User, Clock, Package, BookOpen, Target, Plus, Minus, 
   CheckCircle, AlertCircle, Lock, Shield, Crosshair, MapPin, 
-  History, RotateCcw 
+  History, RotateCcw, Monitor 
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   collection, query, where, onSnapshot, addDoc, updateDoc, 
-  doc, getDocs, orderBy, getDoc 
+  doc, getDocs, orderBy, getDoc, deleteDoc 
 } from 'firebase/firestore';
 import { db } from '@/firebase';
 import ModalConfirmacaoPolicial from './ModalConfirmacaoPolicial';
 import ModalQuantidadeMaterial from './ModalQuantidadeMaterial';
 import ModalFechamentoLivro from './ModalFechamentoLivro';
+import ModalAguardandoConfirmacao from './ModalAguardandoConfirmacao';
 import BaixaMaterialSection from './BaixaMaterialSection';
 import HistoricoLivrosSection from './HistoricoLivrosSection';
 import MaterialNaRuaSection from './MaterialNaRuaSection';
 import PendenciasAnterioresSection from './PendenciasAnterioresSection';
 import LivroCautelaDia from './LivroCautelaDia';
+import ModalComplementarCautela from './ModalComplementarCautela';
+import ModalTransferenciaMaterial from './ModalTransferenciaMaterial';
 import ConsultaMaterialPolicial from '@/components/consultas/ConsultaMaterialPolicial';
 
 interface Policial {
@@ -75,6 +78,7 @@ interface LivroAtivo {
 interface MovimentacaoDia {
   id: string;
   cautelaId?: string;
+  policialId?: string;
   policialNome: string;
   policialNomeGuerra?: string;
   policialMatricula?: string;
@@ -119,6 +123,11 @@ const ArmeiroInterface = () => {
   const [modalConfirmacao, setModalConfirmacao] = useState(false);
   const [modalQuantidade, setModalQuantidade] = useState(false);
   const [modalFechamento, setModalFechamento] = useState(false);
+  const [modalAguardando, setModalAguardando] = useState(false);
+  const [cautelaAguardandoId, setCautelaAguardandoId] = useState<string | null>(null);
+  const [policialAguardandoId, setPolicialAguardandoId] = useState<string | null>(null);
+  const [policialAguardandoNome, setPolicialAguardandoNome] = useState("");
+  const [materiaisAguardando, setMateriaisAguardando] = useState<MaterialSelecionado[]>([]);
   const [materialParaQuantidade, setMaterialParaQuantidade] = useState<Material | null>(null);
   const [tipoQuantidade, setTipoQuantidade] = useState<'municao' | 'arma'>('municao');
   
@@ -131,6 +140,26 @@ const ArmeiroInterface = () => {
   
   // Tab ativa
   const [tabAtiva, setTabAtiva] = useState("livro");
+  
+  // Alterações automáticas para modal de fechamento
+  const [alteracoesAutomaticasModal, setAlteracoesAutomaticasModal] = useState<Array<{
+    id: string;
+    descricao: string;
+    dataHora: Date;
+    tipo?: string;
+  }>>([]);
+  
+  // Modal de complementar cautela
+  const [modalComplementar, setModalComplementar] = useState(false);
+  const [complementarCautelaId, setComplementarCautelaId] = useState('');
+  const [complementarPolicialId, setComplementarPolicialId] = useState('');
+  const [complementarPolicialNome, setComplementarPolicialNome] = useState('');
+  const [complementarMateriais, setComplementarMateriais] = useState<any[]>([]);
+  
+  // Modal de transferência de material
+  const [modalTransferencia, setModalTransferencia] = useState(false);
+  const [transferenciaCautela, setTransferenciaCautela] = useState<any>(null);
+  const [transferenciaPolicialOrigem, setTransferenciaPolicialOrigem] = useState<any>(null);
   
   const { toast } = useToast();
 
@@ -160,7 +189,8 @@ const ArmeiroInterface = () => {
         }
       });
       
-      const movimentacoes: MovimentacaoDia[] = [];
+      // Mapa para agrupar cautelas do mesmo policial, status e horário
+      const gruposMap = new Map<string, MovimentacaoDia>();
       
       // Processar cautelas
       for (const docSnap of cautelasSnapshot.docs) {
@@ -201,24 +231,77 @@ const ArmeiroInterface = () => {
           }
         }
         
-        movimentacoes.push({
-          id: docSnap.id,
-          cautelaId: docSnap.id,
-          policialNome: data.policialNome || '',
-          policialNomeGuerra: nomeGuerra,
-          policialMatricula: data.policialMatricula,
-          policialNumeral: numeral,
-          postoGrad: postoGrad,
-          materiais: data.materiais || [],
-          dataCautela,
-          horaCautela,
-          dataBaixa: status === 'entregue' ? (baixaInfo?.dataBaixa || data.dataBaixa?.toDate?.()) : undefined,
-          horaBaixa: status === 'entregue' ? (baixaInfo?.horaBaixa || data.horaBaixa) : undefined,
-          recebidoPorNome: status === 'entregue' ? data.recebidoPorNome : undefined,
-          status,
-          sequencial: 0
-        });
+        // Chave de agrupamento: policial + status + horário de cautela
+        // Isso agrupa itens do mesmo policial, mesmo status (pendente ou entregue) e mesmo horário
+        const groupKey = `${data.policialId}_${status}_${horaCautela}`;
+        
+        const existingGroup = gruposMap.get(groupKey);
+        
+        if (existingGroup) {
+          // Adicionar materiais ao grupo existente
+          const materiaisAtuais = data.materiais || [];
+          materiaisAtuais.forEach((mat: any) => {
+            // Verificar se o material já existe no grupo (por nome e série)
+            const existingMat = existingGroup.materiais.find(
+              m => m.nome === mat.nome && m.numeroSerie === mat.numeroSerie
+            );
+            if (existingMat) {
+              // Somar quantidade
+              existingMat.quantidade += mat.quantidade || 1;
+            } else {
+              existingGroup.materiais.push({
+                nome: mat.nome,
+                quantidade: mat.quantidade || 1,
+                numeroSerie: mat.numeroSerie,
+                categoria: mat.categoria
+              });
+            }
+          });
+          
+          // Atualizar data de baixa se for mais recente
+          if (status === 'entregue') {
+            const novaBaixa = baixaInfo?.dataBaixa || data.dataBaixa?.toDate?.();
+            if (novaBaixa && existingGroup.dataBaixa && novaBaixa > existingGroup.dataBaixa) {
+              existingGroup.dataBaixa = novaBaixa;
+              existingGroup.horaBaixa = baixaInfo?.horaBaixa || data.horaBaixa;
+            } else if (novaBaixa && !existingGroup.dataBaixa) {
+              existingGroup.dataBaixa = novaBaixa;
+              existingGroup.horaBaixa = baixaInfo?.horaBaixa || data.horaBaixa;
+            }
+            if (data.recebidoPorNome) {
+              existingGroup.recebidoPorNome = data.recebidoPorNome;
+            }
+          }
+        } else {
+          // Criar novo grupo
+          gruposMap.set(groupKey, {
+            id: docSnap.id,
+            cautelaId: docSnap.id,
+            policialId: data.policialId,
+            policialNome: data.policialNome || '',
+            policialNomeGuerra: nomeGuerra,
+            policialMatricula: data.policialMatricula,
+            policialNumeral: numeral,
+            postoGrad: postoGrad,
+            materiais: (data.materiais || []).map((mat: any) => ({
+              nome: mat.nome,
+              quantidade: mat.quantidade || 1,
+              numeroSerie: mat.numeroSerie,
+              categoria: mat.categoria
+            })),
+            dataCautela,
+            horaCautela,
+            dataBaixa: status === 'entregue' ? (baixaInfo?.dataBaixa || data.dataBaixa?.toDate?.()) : undefined,
+            horaBaixa: status === 'entregue' ? (baixaInfo?.horaBaixa || data.horaBaixa) : undefined,
+            recebidoPorNome: status === 'entregue' ? data.recebidoPorNome : undefined,
+            status,
+            sequencial: 0
+          });
+        }
       }
+      
+      // Converter mapa em array
+      const movimentacoes = Array.from(gruposMap.values());
       
       // Ordenar por data e atribuir sequencial
       movimentacoes.sort((a, b) => {
@@ -292,9 +375,88 @@ const ArmeiroInterface = () => {
         console.error('Erro ao verificar livro ativo:', error);
       }
     };
+
+    // Verificar cautelas aguardando confirmação (para recuperar modal ao reabrir página)
+    const verificarCautelasAguardando = async () => {
+      try {
+        // 1. Verificar cautelas novas aguardando confirmação
+        const cautelasAguardandoSnapshot = await getDocs(
+          query(
+            collection(db, 'cautelas_provisorias'),
+            where('status', '==', 'aguardando_confirmacao')
+          )
+        );
+
+        if (!cautelasAguardandoSnapshot.empty) {
+          const cautelaDoc = cautelasAguardandoSnapshot.docs[0];
+          const cautelaData = cautelaDoc.data();
+          
+          console.log('[Armeiro] Recuperando cautela aguardando confirmação:', cautelaDoc.id);
+          
+          const nomePolicial = `${cautelaData.postoGrad || ''} ${cautelaData.policialNomeGuerra || cautelaData.policialNome}`.trim();
+          
+          setCautelaAguardandoId(cautelaDoc.id);
+          setPolicialAguardandoId(cautelaData.policialId);
+          setPolicialAguardandoNome(nomePolicial);
+          setMateriaisAguardando(cautelaData.materiais || []);
+          setModalAguardando(true);
+          return;
+        }
+
+        // 2. Verificar complementos pendentes
+        const complementosSnapshot = await getDocs(
+          query(
+            collection(db, 'cautelas_provisorias'),
+            where('statusComplemento', '==', 'aguardando_confirmacao')
+          )
+        );
+
+        if (!complementosSnapshot.empty) {
+          const cautelaDoc = complementosSnapshot.docs[0];
+          const data = cautelaDoc.data();
+          
+          console.log('[Armeiro] Recuperando complemento aguardando confirmação:', cautelaDoc.id);
+          
+          const nomePolicial = `${data.postoGrad || ''} ${data.policialNomeGuerra || data.policialNome}`.trim();
+          
+          // Mapear materiais existentes limpando undefined
+          const materiaisExistentes = (data.materiais || []).map((m: any) => {
+            const mat: any = { materialId: m.materialId, nome: m.nome, quantidade: m.quantidade };
+            if (m.categoria) mat.categoria = m.categoria;
+            if (m.numeroSerie) mat.numeroSerie = m.numeroSerie;
+            if (m.carregadores !== undefined) mat.carregadores = m.carregadores;
+            return mat;
+          });
+          
+          setComplementarCautelaId(cautelaDoc.id);
+          setComplementarPolicialId(data.policialId);
+          setComplementarPolicialNome(nomePolicial);
+          setComplementarMateriais(materiaisExistentes);
+          setModalComplementar(true);
+          return;
+        }
+
+        // 3. Verificar transferências pendentes
+        const transferenciasSnapshot = await getDocs(
+          query(
+            collection(db, 'cautelas_provisorias'),
+            where('statusTransferencia', '==', 'aguardando_confirmacao')
+          )
+        );
+
+        if (!transferenciasSnapshot.empty) {
+          console.log('[Armeiro] Transferência pendente detectada - recarregar movimentações');
+          // Transferências são tratadas pelo BaixaMaterialSection ao carregar
+          // Aqui apenas forçamos recarregar os dados para o modal aparecer
+        }
+      } catch (error) {
+        console.error('Erro ao verificar cautelas aguardando:', error);
+      }
+    };
     
     carregarPolicialLogado();
     verificarLivroAtivo();
+    verificarCautelasAguardando();
   }, [carregarMovimentacoesDoDia]);
 
   // Carregar policiais do Firebase
@@ -384,6 +546,9 @@ const ArmeiroInterface = () => {
         status: 'aberto'
       });
       
+      // Limpar movimentações do dia anterior ao abrir novo livro
+      setMovimentacoesDoDia([]);
+      
       toast({
         title: "Livro Diário Aberto",
         description: `Livro aberto por ${armeiroNome}.`,
@@ -402,7 +567,42 @@ const ArmeiroInterface = () => {
 
   // Fechar Livro Diário
   const handleFecharLivro = async (senha: string, alteracoes: any[]) => {
+    if (!policialLogado || !livroAtivo) return false;
+    
+    // Verificar senha do armeiro
+    if (senha !== policialLogado.senha) {
+      toast({
+        title: "Senha Incorreta",
+        description: "A senha digitada não corresponde à sua senha.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
     try {
+      // PROTEÇÃO: Verificar se o livro ainda está aberto no Firebase
+      const livroDocCheck = await getDoc(doc(db, 'livros_reserva_armamento', livroAtivo.id));
+      if (!livroDocCheck.exists()) {
+        toast({
+          title: "Erro",
+          description: "O livro não foi encontrado.",
+          variant: "destructive",
+        });
+        setLivroAtivo(null);
+        return false;
+      }
+      
+      const livroDataCheck = livroDocCheck.data();
+      if (livroDataCheck.status === 'fechado') {
+        toast({
+          title: "Livro já fechado",
+          description: "Este livro já foi fechado anteriormente.",
+          variant: "destructive",
+        });
+        setLivroAtivo(null);
+        return false;
+      }
+      
       // Buscar cautelas pendentes do livro
       const cautelasPendentesSnapshot = await getDocs(
         query(
@@ -411,6 +611,11 @@ const ArmeiroInterface = () => {
           where('status', '==', 'pendente')
         )
       );
+
+      // Buscar alterações automáticas do livro (ex: faltas de munição)
+      const livroDoc = await getDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id));
+      const livroData = livroDoc.data();
+      const alteracoesAutomaticas = livroData?.alteracoesAutomaticas || [];
 
       // Criar alertas para materiais pendentes
       if (cautelasPendentesSnapshot.size > 0) {
@@ -434,11 +639,14 @@ const ArmeiroInterface = () => {
         }
       }
 
-      // Criar alertas para observações/alterações do livro
-      if (alteracoes && alteracoes.length > 0) {
-        for (const alteracao of alteracoes) {
+      // Combinar alterações manuais + automáticas
+      const todasAlteracoes = [...alteracoesAutomaticas, ...alteracoes];
+
+      // Criar alertas para observações/alterações do livro (manuais e automáticas)
+      if (todasAlteracoes && todasAlteracoes.length > 0) {
+        for (const alteracao of todasAlteracoes) {
           await addDoc(collection(db, 'alertas_gestao'), {
-            tipo: 'observacao_livro',
+            tipo: alteracao.tipo || 'observacao_livro',
             dataHora: new Date(),
             observacao: alteracao.descricao,
             armeiroNome: livroAtivo!.armeiroNome,
@@ -451,7 +659,7 @@ const ArmeiroInterface = () => {
       await updateDoc(doc(db, 'livros_reserva_armamento', livroAtivo!.id), {
         status: 'fechado',
         dataFechamento: new Date(),
-        alteracoes,
+        alteracoes: todasAlteracoes,
         totalCautelas: totalCautelasHoje,
         totalBaixas: totalBaixasHoje,
         materiaisPendentes: cautelasPendentesSnapshot.size
@@ -472,6 +680,29 @@ const ArmeiroInterface = () => {
     } catch (error) {
       console.error('Erro ao fechar livro:', error);
       return false;
+    }
+  };
+
+  // Abrir modal de fechamento com alterações automáticas carregadas
+  const abrirModalFechamento = async () => {
+    if (!livroAtivo) return;
+    
+    try {
+      const livroDoc = await getDoc(doc(db, 'livros_reserva_armamento', livroAtivo.id));
+      const livroData = livroDoc.data();
+      const autoAlteracoes = (livroData?.alteracoesAutomaticas || []).map((a: any) => ({
+        id: a.id || Date.now().toString(),
+        descricao: a.descricao,
+        dataHora: typeof a.dataHora === 'string' ? new Date(a.dataHora) : (a.dataHora?.toDate?.() || new Date()),
+        tipo: a.tipo
+      }));
+      
+      setAlteracoesAutomaticasModal(autoAlteracoes);
+      setModalFechamento(true);
+    } catch (error) {
+      console.error('Erro ao carregar alterações:', error);
+      // Mesmo com erro, abre o modal
+      setModalFechamento(true);
     }
   };
 
@@ -514,6 +745,13 @@ const ArmeiroInterface = () => {
       title: "Material Adicionado",
       description: `${material.nome} foi adicionado à seleção.`,
     });
+    
+    // Limpar campo de busca e focar novamente
+    setSearchMaterial('');
+    setTimeout(() => {
+      const searchInput = document.getElementById('search-material-input');
+      searchInput?.focus();
+    }, 100);
   };
 
   // Clique em material - verificar tipo para modal
@@ -547,8 +785,8 @@ const ArmeiroInterface = () => {
     setMateriaisSelecionados(prev => prev.filter(m => m.materialId !== materialId));
   };
 
-  // Enviar para Confirmação
-  const enviarParaConfirmacao = () => {
+  // Enviar para Confirmação - Salvar com status aguardando_confirmacao
+  const enviarParaConfirmacao = async () => {
     if (!policialSelecionado || materiaisSelecionados.length === 0) {
       toast({
         title: "Erro",
@@ -558,7 +796,118 @@ const ArmeiroInterface = () => {
       return;
     }
     
-    setModalConfirmacao(true);
+    try {
+      setLoading(true);
+      
+      // Preparar materiais sem campos undefined
+      const materiaisLimpos = materiaisSelecionados.map(m => ({
+        materialId: m.materialId,
+        nome: m.nome,
+        categoria: m.categoria,
+        quantidade: m.quantidade,
+        ...(m.numeroSerie && { numeroSerie: m.numeroSerie }),
+        ...(m.carregadores && { carregadores: m.carregadores }),
+        ...(m.modelo && { modelo: m.modelo }),
+        ...(m.fabricante && { fabricante: m.fabricante })
+      }));
+      
+      const agora = new Date();
+      const horaCautela = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const nomeGuerra = policialSelecionado['NOME DE GUERRA1'] || policialSelecionado['NOME DE GUERRA'] || '';
+      const numeral = policialSelecionado.NUMERAL;
+      
+      // Criar cautela com status aguardando_confirmacao
+      const cautelaData: Record<string, any> = {
+        policialId: policialSelecionado.id,
+        policialNome: policialSelecionado.NOME,
+        policialNomeGuerra: nomeGuerra,
+        ...(numeral !== undefined && { policialNumeral: numeral }),
+        policialMatricula: String(policialSelecionado['Matrícula'] || ''),
+        postoGrad: policialSelecionado['Post/Grad'],
+        armeiroId: policialLogado?.id || livroAtivo?.armeiroId,
+        materiais: materiaisLimpos,
+        dataCautela: agora,
+        horaCautela,
+        status: 'aguardando_confirmacao', // Status para tela externa
+        sequencial: movimentacoesDoDia.length + 1
+      };
+
+      if (livroAtivo?.id) {
+        cautelaData.livroId = livroAtivo.id;
+      }
+
+      const cautelaRef = await addDoc(collection(db, 'cautelas_provisorias'), cautelaData);
+      
+      // Guardar informações para o modal de aguardando
+      const nomePolicial = `${policialSelecionado['Post/Grad'] || ''} ${nomeGuerra || policialSelecionado.NOME}`.trim();
+      setCautelaAguardandoId(cautelaRef.id);
+      setPolicialAguardandoId(policialSelecionado.id);
+      setPolicialAguardandoNome(nomePolicial);
+      setMateriaisAguardando(materiaisLimpos);
+      
+      // Limpar seleção
+      setMateriaisSelecionados([]);
+      setPolicialSelecionado(null);
+      
+      // Abrir modal de aguardando
+      setModalAguardando(true);
+      
+    } catch (error) {
+      console.error('Erro ao enviar para confirmação:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar para confirmação.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Callback quando policial confirmar recebimento
+  const handleConfirmacaoRecebida = () => {
+    toast({
+      title: "✅ Material Recebido",
+      description: `${policialAguardandoNome} confirmou o recebimento.`,
+    });
+    
+    // Recarregar movimentações do dia
+    if (livroAtivo?.id) {
+      carregarMovimentacoesDoDia(livroAtivo.id);
+    }
+    carregarMateriaisDisponiveis();
+    
+    // Limpar estados do modal
+    setCautelaAguardandoId(null);
+    setPolicialAguardandoNome("");
+  };
+
+  // Cancelar cautela pendente
+  const handleCancelarCautela = async () => {
+    if (!cautelaAguardandoId) return;
+    
+    try {
+      // Deletar a cautela provisória
+      await deleteDoc(doc(db, 'cautelas_provisorias', cautelaAguardandoId));
+      
+      // Fechar modal e limpar estados
+      setModalAguardando(false);
+      setCautelaAguardandoId(null);
+      setPolicialAguardandoNome("");
+      
+      toast({
+        title: "Cautela Cancelada",
+        description: "A cautela foi cancelada.",
+        variant: "destructive"
+      });
+    } catch (error) {
+      console.error('Erro ao cancelar cautela:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao cancelar cautela.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Confirmar Cautela
@@ -607,7 +956,7 @@ const ArmeiroInterface = () => {
         policialId: policialSelecionado.id,
         policialNome: policialSelecionado.NOME,
         policialNomeGuerra: nomeGuerra,
-        policialNumeral: numeral,
+        ...(numeral !== undefined && { policialNumeral: numeral }),
         policialMatricula: String(policialSelecionado['Matrícula'] || ''),
         postoGrad: policialSelecionado['Post/Grad'],
         armeiroId: policialLogado?.id || livroAtivo?.armeiroId,
@@ -720,20 +1069,28 @@ const ArmeiroInterface = () => {
   const policiaisFiltrados = policiais.filter(p => {
     const filtroLower = searchPolicial.toLowerCase();
     const nomeMatch = (p.NOME?.toLowerCase() || '').includes(filtroLower);
+    const nomeGuerraMatch = (p['NOME DE GUERRA1']?.toLowerCase() || '').includes(filtroLower);
     const matriculaMatch = String(p['Matrícula'] || '').includes(searchPolicial);
-    return nomeMatch || matriculaMatch;
+    const numeralMatch = String(p.NUMERAL || '').includes(searchPolicial);
+    return nomeMatch || nomeGuerraMatch || matriculaMatch || numeralMatch;
   });
 
   // Mapear categoria para o filtro usando tipoArma do Firebase
   const mapearCategoria = (material: Material) => {
     const categoria = (material.categoria || '').toLowerCase();
     
-    // Materiais com número de série vão para a aba "serie"
-    if (material.numeroSerie) return 'serie';
-    
-    // Fallback para categoria
+    // Verificar primeiro pela categoria do material (prioridade)
     if (categoria.includes('munição') || categoria.includes('municao')) return 'municao';
-    if (categoria.includes('epi') || categoria.includes('colete')) return 'epi';
+    
+    // Coletes balísticos vão para aba de número de série (junto com armas)
+    if (categoria.includes('colete')) return 'serie';
+    
+    // EPI (exceto coletes)
+    if (categoria.includes('epi')) return 'epi';
+    if (categoria.includes('acessório') || categoria.includes('acessorio')) return 'acessorio';
+    
+    // Materiais com número de série (armas) vão para a aba "serie"
+    if (material.numeroSerie) return 'serie';
     
     return 'acessorio';
   };
@@ -795,14 +1152,25 @@ const ArmeiroInterface = () => {
                 Abrir Livro Diário
               </Button>
             ) : (
-              <Button 
-                onClick={() => setModalFechamento(true)}
-                disabled={loading}
-                variant="destructive"
-              >
-                <Lock className="h-4 w-4 mr-2" />
-                Fechar Livro Diário
-              </Button>
+              <>
+                <Button 
+                  onClick={abrirModalFechamento}
+                  disabled={loading}
+                  variant="destructive"
+                >
+                  <Lock className="h-4 w-4 mr-2" />
+                  Fechar Livro Diário
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => window.open('/reserva-armamento/totem', '_blank')}
+                  className="gap-2"
+                >
+                  <Monitor className="h-4 w-4" />
+                  Abrir Totem
+                </Button>
+              </>
             )}
           </div>
         </CardContent>
@@ -814,6 +1182,7 @@ const ArmeiroInterface = () => {
           {/* Pendências de Turnos Anteriores */}
           <PendenciasAnterioresSection 
             livroAtualId={livroAtivo.id}
+            armeiroLogadoId={policialLogado?.id}
             onRecebimentoRealizado={() => {
               if (livroAtivo?.id) {
                 carregarMovimentacoesDoDia(livroAtivo.id);
@@ -998,6 +1367,7 @@ const ArmeiroInterface = () => {
                       <div className="relative">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
+                          id="search-material-input"
                           placeholder="Buscar por nome ou nº série..."
                           value={searchMaterial}
                           onChange={(e) => setSearchMaterial(e.target.value)}
@@ -1119,6 +1489,24 @@ const ArmeiroInterface = () => {
                 movimentacoes={movimentacoesDoDia}
                 dataAbertura={livroAtivo.dataAbertura}
                 armeiroNome={livroAtivo.armeiroNome}
+                onComplementarCautela={(cautelaId, policialId, policialNome, materiais) => {
+                  setComplementarCautelaId(cautelaId);
+                  setComplementarPolicialId(policialId);
+                  setComplementarPolicialNome(policialNome);
+                  // Limpar undefined dos materiais para evitar erro no Firebase
+                  setComplementarMateriais(materiais.map(m => {
+                    const material: any = {
+                      materialId: m.materialId || m.id,
+                      nome: m.nome,
+                      quantidade: m.quantidade
+                    };
+                    if (m.categoria) material.categoria = m.categoria;
+                    if (m.numeroSerie) material.numeroSerie = m.numeroSerie;
+                    if (m.carregadores !== undefined) material.carregadores = m.carregadores;
+                    return material;
+                  }));
+                  setModalComplementar(true);
+                }}
               />
             </TabsContent>
 
@@ -1167,6 +1555,58 @@ const ArmeiroInterface = () => {
           onClose={() => setModalFechamento(false)}
           armeiroNome={livroAtivo.armeiroNome}
           onFechar={handleFecharLivro}
+          alteracoesAutomaticas={alteracoesAutomaticasModal}
+        />
+      )}
+
+      {/* Modal de Aguardando Confirmação */}
+      {cautelaAguardandoId && policialAguardandoId && (
+        <ModalAguardandoConfirmacao
+          open={modalAguardando}
+          onClose={() => setModalAguardando(false)}
+          cautelaId={cautelaAguardandoId}
+          policialId={policialAguardandoId}
+          policialNome={policialAguardandoNome}
+          materiais={materiaisAguardando}
+          onConfirmado={handleConfirmacaoRecebida}
+          onCancelar={handleCancelarCautela}
+        />
+      )}
+
+      {/* Modal de Complementar Cautela */}
+      <ModalComplementarCautela
+        open={modalComplementar}
+        onClose={() => setModalComplementar(false)}
+        cautelaId={complementarCautelaId}
+        policialId={complementarPolicialId}
+        policialNome={complementarPolicialNome}
+        materiaisAtuais={complementarMateriais}
+        onComplementado={() => {
+          if (livroAtivo?.id) {
+            carregarMovimentacoesDoDia(livroAtivo.id);
+          }
+          carregarMateriaisDisponiveis();
+        }}
+      />
+
+      {/* Modal de Transferência de Material */}
+      {transferenciaCautela && transferenciaPolicialOrigem && livroAtivo && (
+        <ModalTransferenciaMaterial
+          open={modalTransferencia}
+          onClose={() => {
+            setModalTransferencia(false);
+            setTransferenciaCautela(null);
+            setTransferenciaPolicialOrigem(null);
+          }}
+          cautela={transferenciaCautela}
+          policialOrigem={transferenciaPolicialOrigem}
+          livroId={livroAtivo.id}
+          onTransferido={() => {
+            if (livroAtivo?.id) {
+              carregarMovimentacoesDoDia(livroAtivo.id);
+            }
+            carregarMateriaisDisponiveis();
+          }}
         />
       )}
     </div>

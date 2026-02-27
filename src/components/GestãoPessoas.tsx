@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Users, UserCheck, UserX, TrendingUp, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { CalendarDays, Users, UserCheck, UserX, TrendingUp, AlertTriangle, ArrowLeft, BarChart3 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { format, startOfMonth, endOfMonth, isWithinInterval, addDays, parseISO } from 'date-fns';
@@ -16,6 +16,8 @@ import MovimentacoesTab from './gestao-pessoas/MovimentacoesTab';
 import SituacaoTab from './gestao-pessoas/SituacaoTab';
 import FuncaoTab from './gestao-pessoas/FuncaoTab';
 import TransferidosTab from './gestao-pessoas/TransferidosTab';
+import AtestadosMedicosTab from './gestao-pessoas/AtestadosMedicosTab';
+import EstatisticasTab from './gestao-pessoas/EstatisticasTab';
 
 interface Policial {
   id: string;
@@ -182,7 +184,7 @@ const GestãoPessoas: React.FC = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="flex flex-wrap gap-1 h-auto w-full">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="ferias">Férias</TabsTrigger>
           <TabsTrigger value="efetivo">Efetivo</TabsTrigger>
@@ -190,6 +192,11 @@ const GestãoPessoas: React.FC = () => {
           <TabsTrigger value="situacao">Situação</TabsTrigger>
           <TabsTrigger value="funcao">Função</TabsTrigger>
           <TabsTrigger value="transferidos">Transferidos</TabsTrigger>
+          <TabsTrigger value="atestados">Atestados</TabsTrigger>
+          <TabsTrigger value="estatisticas" className="flex items-center gap-1">
+            <BarChart3 className="h-4 w-4" />
+            Estatísticas
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
@@ -375,6 +382,14 @@ const GestãoPessoas: React.FC = () => {
 
         <TabsContent value="transferidos">
           <TransferidosTab policiais={policiais} onUpdate={fetchPoliciais} />
+        </TabsContent>
+
+        <TabsContent value="atestados">
+          <AtestadosMedicosTab policiais={policiais} onUpdate={fetchPoliciais} />
+        </TabsContent>
+
+        <TabsContent value="estatisticas">
+          <EstatisticasTab policiais={policiais} />
         </TabsContent>
       </Tabs>
     </div>

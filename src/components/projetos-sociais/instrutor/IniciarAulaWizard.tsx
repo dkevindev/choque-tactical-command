@@ -164,7 +164,7 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
 
   const carregarAlunos = async () => {
     try {
-      let q;
+      let alunosData: any[] = [];
       
       if (usaTurmas && turmaSelecionada) {
         // Buscar turma e seus alunos
@@ -176,32 +176,67 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
           const turmaData = turmaDoc.docs[0].data();
           const alunosIds = turmaData.alunos || [];
           
-          // Buscar detalhes dos alunos
+          // Buscar detalhes dos alunos da turma (excluindo os que têm horário especial)
           const alunosPromises = alunosIds.map(async (alunoId: string) => {
             const alunoSnap = await getDocs(
               query(collection(db, 'projetos_alunos'), where('__name__', '==', alunoId))
             );
             if (!alunoSnap.empty) {
+              const alunoData = alunoSnap.docs[0].data();
+              // Se tem horário especial, não incluir na lista normal da turma
+              if (alunoData.horarioEspecial) {
+                return null;
+              }
               return {
                 id: alunoSnap.docs[0].id,
-                ...alunoSnap.docs[0].data()
+                ...alunoData
               };
             }
             return null;
           });
           
-          const alunosData = (await Promise.all(alunosPromises)).filter(a => a !== null);
-          setAlunos(alunosData);
+          const alunosTurma = (await Promise.all(alunosPromises)).filter(a => a !== null);
+          
+          // Buscar alunos com horário especial que devem aparecer nesta turma hoje
+          const qEspeciais = query(
+            collection(db, 'projetos_alunos'),
+            where('projetoId', '==', projeto.id),
+            where('ativo', '==', true),
+            where('horarioEspecial', '==', true)
+          );
+          const snapEspeciais = await getDocs(qEspeciais);
+          
+          const alunosEspeciaisFiltrados = snapEspeciais.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter((aluno: any) => {
+              // Verificar se tem config para esta turma e este dia
+              return aluno.diasEspeciais?.some(
+                (d: any) => d.turmaId === turmaSelecionada && d.diaSemana === diaAtual
+              );
+            })
+            // Excluir se já está na lista da turma
+            .filter((aluno: any) => !alunosIds.includes(aluno.id));
+          
+          // Combinar e marcar alunos especiais
+          alunosData = [
+            ...alunosTurma,
+            ...alunosEspeciaisFiltrados.map(a => ({
+              ...a,
+              isHorarioEspecial: true  // Flag para UI
+            }))
+          ];
         }
+        
+        setAlunos(alunosData);
       } else {
         // Buscar todos os alunos ativos
-        q = query(
+        const q = query(
           collection(db, 'projetos_alunos'),
           where('projetoId', '==', projeto.id),
           where('ativo', '==', true)
         );
         const snapshot = await getDocs(q);
-        const alunosData = snapshot.docs.map(doc => ({
+        alunosData = snapshot.docs.map(doc => ({
           id: doc.id,
           ...(doc.data() as any)
         }));
@@ -343,7 +378,7 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
                   className={`p-6 transition-all ${
                     turnoOcupado 
                       ? 'opacity-50 cursor-not-allowed' 
-                      : `cursor-pointer hover:border-primary ${turnoSelecionado === turno ? 'border-primary border-2' : ''}`
+                      : `cursor-pointer hover:border-green-500 ${turnoSelecionado === turno ? 'border-green-500 border-2 bg-green-500/10' : ''}`
                   }`}
                   onClick={() => !turnoOcupado && setTurnoSelecionado(turno)}
                 >
@@ -384,7 +419,7 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
                   className={`p-6 transition-all ${
                     turmaOcupada 
                       ? 'opacity-50 cursor-not-allowed' 
-                      : `cursor-pointer hover:border-primary ${turmaSelecionada === turma.id ? 'border-primary border-2' : ''}`
+                      : `cursor-pointer hover:border-green-500 ${turmaSelecionada === turma.id ? 'border-green-500 border-2 bg-green-500/10' : ''}`
                   }`}
                   onClick={() => !turmaOcupada && setTurmaSelecionada(turma.id)}
                 >
@@ -432,12 +467,16 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
             {instrutoresDisponiveis.map((instrutor) => (
               <label
                 key={instrutor.id}
-                className="flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted"
+                className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-muted ${
+                  instrutoresSelecionados.includes(instrutor.id) 
+                    ? 'border-green-500 bg-green-500/10' 
+                    : 'border-border'
+                }`}
               >
                 <Checkbox
                   checked={instrutoresSelecionados.includes(instrutor.id)}
                   onCheckedChange={() => toggleInstrutor(instrutor.id)}
-                  className="h-6 w-6"
+                  className="h-6 w-6 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                 />
                 <div className="flex-1">
                   <p className="font-medium">
@@ -480,15 +519,26 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
               {alunosFiltrados.map((aluno) => (
                 <label
                   key={aluno.id}
-                  className="flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted"
+                  className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-muted ${
+                    alunosPresentes.includes(aluno.id) 
+                      ? 'border-green-500 bg-green-500/10' 
+                      : 'border-border'
+                  }`}
                 >
                   <Checkbox
                     checked={alunosPresentes.includes(aluno.id)}
                     onCheckedChange={() => toggleAluno(aluno.id)}
-                    className="h-6 w-6"
+                    className="h-6 w-6 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                   />
                   <div className="flex-1">
-                    <p className="font-medium">{aluno.nomeCompleto}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{aluno.nomeCompleto}</p>
+                      {aluno.isHorarioEspecial && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-600 font-medium">
+                          Horário Especial
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {aluno.nomeGuerra} • {aluno.idade} anos
                     </p>

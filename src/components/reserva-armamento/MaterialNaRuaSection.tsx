@@ -90,12 +90,14 @@ const PolicialAvatar = ({
       }}
       onClick={onClick}
     >
-      {/* Balão de Fala */}
+      {/* Balão de Fala - só aparece no hover ou click */}
       <div className={cn(
         "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-2 rounded-lg",
         "bg-card/95 backdrop-blur-sm border border-border shadow-lg",
         "min-w-[120px] max-w-[160px] text-xs",
-        "opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-200",
+        "opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100",
+        "pointer-events-none group-hover:pointer-events-auto",
+        "transition-all duration-300 ease-out",
         "group-hover:shadow-xl group-hover:z-50"
       )}>
         <div className="space-y-0.5">
@@ -124,7 +126,10 @@ const PolicialAvatar = ({
           "bg-primary/20 text-primary-foreground border border-primary/30",
           "whitespace-nowrap max-w-[100px] truncate"
         )}>
-          {cautela.postoGrad ? `${cautela.postoGrad} ` : ''}{cautela.policialNomeGuerra || cautela.policialNome.split(' ')[0]}
+          {cautela.postoGrad && !(cautela.policialNomeGuerra || cautela.policialNome)?.toUpperCase().startsWith(cautela.postoGrad?.toUpperCase()) 
+            ? `${cautela.postoGrad} ` 
+            : ''}
+          {cautela.policialNomeGuerra || cautela.policialNome.split(' ')[0]}
         </div>
       </div>
     </div>
@@ -185,7 +190,12 @@ const ModalDetalhePolicial = ({
           <DialogTitle className="flex items-center gap-3">
             <span className="text-4xl">👮‍♂️</span>
             <div>
-              <div className="text-lg">{cautela.postoGrad ? `${cautela.postoGrad} ` : ''}{cautela.policialNomeGuerra || cautela.policialNome}</div>
+              <div className="text-lg">
+                {cautela.postoGrad && !(cautela.policialNomeGuerra || cautela.policialNome)?.toUpperCase().startsWith(cautela.postoGrad?.toUpperCase()) 
+                  ? `${cautela.postoGrad} ` 
+                  : ''}
+                {cautela.policialNomeGuerra || cautela.policialNome}
+              </div>
               <div className="text-sm text-muted-foreground font-normal">Mat: {cautela.policialMatricula}</div>
             </div>
           </DialogTitle>
@@ -249,41 +259,65 @@ const MaterialNaRuaSection = () => {
         } as CautelaAtiva;
       });
       
-      // Detectar cautelas removidas para animação
+      // Detectar cautelas removidas para animação usando ref
       const novosIds = new Set(novasCautelas.map(c => c.id));
-      const idsAtuais = new Set(cautelasAtivas.map(c => c.id));
       
-      idsAtuais.forEach(id => {
-        if (!novosIds.has(id)) {
-          setExitingIds(prev => new Set([...prev, id]));
-          setTimeout(() => {
-            setExitingIds(prev => {
-              const next = new Set(prev);
-              next.delete(id);
-              return next;
-            });
-          }, 500);
-        }
+      setCautelasAtivas(prev => {
+        const idsAtuais = new Set(prev.map(c => c.id));
+        idsAtuais.forEach(id => {
+          if (!novosIds.has(id)) {
+            setExitingIds(exitPrev => new Set([...exitPrev, id]));
+            setTimeout(() => {
+              setExitingIds(exitPrev => {
+                const next = new Set(exitPrev);
+                next.delete(id);
+                return next;
+              });
+            }, 500);
+          }
+        });
+        return novasCautelas;
       });
-      
-      setCautelasAtivas(novasCautelas);
       setLoading(false);
     });
 
     return () => unsubscribe();
+  }, []);
+
+  // Agrupar cautelas por policial (evitar múltiplos avatares)
+  const cautelasAgrupadas = useMemo(() => {
+    const mapa = new Map<string, CautelaAtiva>();
+    
+    cautelasAtivas.forEach(cautela => {
+      const policialId = cautela.policialId;
+      
+      if (mapa.has(policialId)) {
+        // Já existe - juntar materiais
+        const existente = mapa.get(policialId)!;
+        existente.materiais = [...existente.materiais, ...cautela.materiais];
+      } else {
+        // Primeira cautela deste policial - criar cópia
+        mapa.set(policialId, {
+          ...cautela,
+          materiais: [...cautela.materiais]
+        });
+      }
+    });
+    
+    return Array.from(mapa.values());
   }, [cautelasAtivas]);
 
   // Calcular totais por categoria
   const totaisPorCategoria = useMemo(() => {
     const totais: Record<string, number> = {};
-    cautelasAtivas.forEach(cautela => {
+    cautelasAgrupadas.forEach(cautela => {
       cautela.materiais.forEach(material => {
         const cat = material.categoria.toLowerCase();
         totais[cat] = (totais[cat] || 0) + material.quantidade;
       });
     });
     return totais;
-  }, [cautelasAtivas]);
+  }, [cautelasAgrupadas]);
 
   if (loading) {
     return (
@@ -310,12 +344,12 @@ const MaterialNaRuaSection = () => {
       <CardContent className="space-y-4">
         {/* Dashboard de Estatísticas */}
         <DashboardStats 
-          totalPoliciais={cautelasAtivas.length}
+          totalPoliciais={cautelasAgrupadas.length}
           totaisPorCategoria={totaisPorCategoria}
         />
 
         {/* Mapa Visual */}
-        {cautelasAtivas.length === 0 ? (
+        {cautelasAgrupadas.length === 0 ? (
           <div className="text-center py-12 bg-gradient-to-b from-muted/30 to-muted/10 rounded-xl border border-dashed">
             <div className="text-6xl mb-4">✅</div>
             <div className="text-lg font-medium text-muted-foreground">
@@ -358,11 +392,11 @@ const MaterialNaRuaSection = () => {
               </div>
 
               {/* Policiais no Mapa */}
-              {cautelasAtivas.map((cautela, index) => {
-                const posicao = gerarPosicao(cautela.id, index, cautelasAtivas.length);
+              {cautelasAgrupadas.map((cautela, index) => {
+                const posicao = gerarPosicao(cautela.policialId, index, cautelasAgrupadas.length);
                 return (
                   <PolicialAvatar
-                    key={cautela.id}
+                    key={cautela.policialId}
                     cautela={cautela}
                     posicao={posicao}
                     onClick={() => setSelectedCautela(cautela)}
@@ -379,9 +413,9 @@ const MaterialNaRuaSection = () => {
               </div>
               <ScrollArea className="h-[150px]">
                 <div className="space-y-2 pr-4">
-                  {cautelasAtivas.map((cautela) => (
+                  {cautelasAgrupadas.map((cautela) => (
                     <div 
-                      key={cautela.id}
+                      key={cautela.policialId}
                       className={cn(
                         "flex items-center justify-between p-3 rounded-lg border bg-muted/30",
                         "hover:bg-muted/50 cursor-pointer transition-colors"
@@ -391,7 +425,12 @@ const MaterialNaRuaSection = () => {
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">👮‍♂️</span>
                         <div>
-                          <div className="font-medium text-sm">{cautela.postoGrad ? `${cautela.postoGrad} ` : ''}{cautela.policialNomeGuerra || cautela.policialNome}</div>
+                          <div className="font-medium text-sm">
+                            {cautela.postoGrad && !(cautela.policialNomeGuerra || cautela.policialNome)?.toUpperCase().startsWith(cautela.postoGrad?.toUpperCase()) 
+                              ? `${cautela.postoGrad} ` 
+                              : ''}
+                            {cautela.policialNomeGuerra || cautela.policialNome}
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             Mat: {cautela.policialMatricula} • {cautela.dataCautela.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                           </div>

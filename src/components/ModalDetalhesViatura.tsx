@@ -83,6 +83,21 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   const [bandeiraCartao, setBandeiraCartao] = useState('');
   const [nomeCondutor, setNomeCondutor] = useState('');
   const [matriculaCondutor, setMatriculaCondutor] = useState('');
+  
+  // Estados para edição de KM
+  const [editandoKm, setEditandoKm] = useState(false);
+  const [novoKm, setNovoKm] = useState('');
+  const [novoKmOleo, setNovoKmOleo] = useState('');
+  
+  // Estados para edição completa dos dados
+  const [editandoDados, setEditandoDados] = useState(false);
+  const [salvandoDados, setSalvandoDados] = useState(false);
+  const [dadosEdicao, setDadosEdicao] = useState({
+    CADASTRO: '', PLACA: '', MODELO: '', PREFIXO: '', CHASSI: '', RENAVAM: '',
+    GOODCARD: '', RADIO: '', ORD: '', SITUACAO: '', UTILIZACAO: '', OBS: '', tipo: '' as string,
+  });
+  const [salvandoKm, setSalvandoKm] = useState(false);
+  
   const { toast } = useToast();
 
   // Novo hook para dados FIPE
@@ -213,6 +228,147 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
     setDataInicio(undefined);
     setDataFim(undefined);
     setDataEspecifica(undefined);
+  };
+
+  const handleAtualizarKm = async () => {
+    if (!viatura) return;
+    
+    const km = parseInt(novoKm);
+    const kmOleo = parseInt(novoKmOleo);
+    
+    if (isNaN(km) || km < 0) {
+      toast({
+        title: "Erro",
+        description: "O KM atual deve ser um número válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isNaN(kmOleo) || kmOleo < 0) {
+      toast({
+        title: "Erro",
+        description: "O KM próximo óleo deve ser um número válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (kmOleo <= km) {
+      toast({
+        title: "Atenção",
+        description: "O KM próximo óleo deve ser maior que o KM atual.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSalvandoKm(true);
+    
+    try {
+      const viaturaRef = doc(db, 'frota', viatura.id);
+      await updateDoc(viaturaRef, {
+        KM: km,
+        KMOLEO: kmOleo
+      });
+      
+      toast({
+        title: "KM atualizado",
+        description: `KM atual: ${km.toLocaleString()} | KM próximo óleo: ${kmOleo.toLocaleString()}`,
+      });
+      
+      setEditandoKm(false);
+      
+      // Atualizar os dados locais
+      if (viatura) {
+        viatura.KM = km;
+        viatura.KMOLEO = kmOleo;
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar KM:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar KM. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSalvandoKm(false);
+    }
+  };
+
+  const iniciarEdicaoKm = () => {
+    if (viatura) {
+      setNovoKm(viatura.KM?.toString() || '0');
+      setNovoKmOleo(viatura.KMOLEO?.toString() || '0');
+      setEditandoKm(true);
+    }
+  };
+
+  const iniciarEdicaoDados = () => {
+    if (viatura) {
+      setDadosEdicao({
+        CADASTRO: viatura.CADASTRO || '',
+        PLACA: viatura.PLACA || '',
+        MODELO: viatura.MODELO || '',
+        PREFIXO: String(viatura.PREFIXO || ''),
+        CHASSI: viatura.CHASSI || '',
+        RENAVAM: String(viatura.RENAVAM || ''),
+        GOODCARD: viatura.GOODCARD || '',
+        RADIO: String(viatura.RADIO || ''),
+        ORD: String(viatura.ORD || ''),
+        SITUACAO: viatura.SITUACAO || '',
+        UTILIZACAO: viatura.UTILIZACAO || '',
+        OBS: viatura.OBS || '',
+        tipo: viatura.tipo || '',
+      });
+      setEditandoDados(true);
+    }
+  };
+
+  const handleSalvarDados = async () => {
+    if (!viatura) return;
+    setSalvandoDados(true);
+    try {
+      const viaturaRef = doc(db, 'frota', viatura.id);
+      await updateDoc(viaturaRef, {
+        CADASTRO: dadosEdicao.CADASTRO,
+        PLACA: dadosEdicao.PLACA,
+        MODELO: dadosEdicao.MODELO,
+        PREFIXO: dadosEdicao.PREFIXO ? Number(dadosEdicao.PREFIXO) : '',
+        CHASSI: dadosEdicao.CHASSI,
+        RENAVAM: dadosEdicao.RENAVAM ? Number(dadosEdicao.RENAVAM) : '',
+        GOODCARD: dadosEdicao.GOODCARD,
+        RADIO: dadosEdicao.RADIO ? Number(dadosEdicao.RADIO) : '',
+        ORD: dadosEdicao.ORD ? Number(dadosEdicao.ORD) : '',
+        SITUACAO: dadosEdicao.SITUACAO,
+        UTILIZACAO: dadosEdicao.UTILIZACAO,
+        OBS: dadosEdicao.OBS,
+        tipo: dadosEdicao.tipo || null,
+      });
+      toast({ title: "Dados atualizados", description: "Os dados da viatura foram salvos com sucesso." });
+      setEditandoDados(false);
+      // Atualizar dados locais
+      Object.assign(viatura, {
+        CADASTRO: dadosEdicao.CADASTRO,
+        PLACA: dadosEdicao.PLACA,
+        MODELO: dadosEdicao.MODELO,
+        PREFIXO: dadosEdicao.PREFIXO ? Number(dadosEdicao.PREFIXO) : viatura.PREFIXO,
+        CHASSI: dadosEdicao.CHASSI,
+        RENAVAM: dadosEdicao.RENAVAM ? Number(dadosEdicao.RENAVAM) : viatura.RENAVAM,
+        GOODCARD: dadosEdicao.GOODCARD,
+        RADIO: dadosEdicao.RADIO ? Number(dadosEdicao.RADIO) : viatura.RADIO,
+        ORD: dadosEdicao.ORD ? Number(dadosEdicao.ORD) : viatura.ORD,
+        SITUACAO: dadosEdicao.SITUACAO,
+        UTILIZACAO: dadosEdicao.UTILIZACAO,
+        OBS: dadosEdicao.OBS,
+        tipo: dadosEdicao.tipo || viatura.tipo,
+      });
+    } catch (error) {
+      console.error('Erro ao salvar dados:', error);
+      toast({ title: "Erro", description: "Erro ao salvar os dados da viatura.", variant: "destructive" });
+    } finally {
+      setSalvandoDados(false);
+    }
   };
 
   const getOrdensComFiltro = (filtro: string) => {
@@ -496,7 +652,24 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <Car className="h-5 w-5" />
                   Dados Completos da Viatura
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  {!editandoDados ? (
+                    <Button variant="outline" size="sm" onClick={iniciarEdicaoDados} className="gap-2">
+                      <Edit className="h-4 w-4" />
+                      Editar Dados
+                    </Button>
+                  ) : (
+                    <>
+                      <Button size="sm" onClick={handleSalvarDados} disabled={salvandoDados}>
+                        <Save className="h-4 w-4 mr-1" />
+                        {salvandoDados ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditandoDados(false)} disabled={salvandoDados}>
+                        <X className="h-4 w-4 mr-1" />
+                        Cancelar
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -509,26 +682,16 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                         });
                         return;
                       }
-
                       const textoWhatsApp = `${viatura?.CADASTRO} - ${viatura?.PLACA}\nCartão: ${numeroCartaoManutencao} - ${bandeiraCartao}\nCondutor: ${nomeCondutor}\nMatrícula: ${matriculaCondutor}`;
                       const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(textoWhatsApp)}`;
                       window.open(urlWhatsApp, '_blank');
-                      
-                      toast({
-                        title: "Cartão Exportado",
-                        description: "Mensagem preparada para WhatsApp.",
-                      });
+                      toast({ title: "Cartão Exportado", description: "Mensagem preparada para WhatsApp." });
                     }}
                     className="gap-2"
                   >
                     Exportar Cartão
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCartaoManutencao(true)}
-                    className="gap-2"
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setShowCartaoManutencao(true)} className="gap-2">
                     <Wrench className="h-4 w-4" />
                     Definir Cartão
                   </Button>
@@ -536,6 +699,76 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {editandoDados ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Cadastro</Label>
+                    <Input value={dadosEdicao.CADASTRO} onChange={e => setDadosEdicao(p => ({ ...p, CADASTRO: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Placa</Label>
+                    <Input value={dadosEdicao.PLACA} onChange={e => setDadosEdicao(p => ({ ...p, PLACA: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Modelo</Label>
+                    <Input value={dadosEdicao.MODELO} onChange={e => setDadosEdicao(p => ({ ...p, MODELO: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Prefixo</Label>
+                    <Input value={dadosEdicao.PREFIXO} onChange={e => setDadosEdicao(p => ({ ...p, PREFIXO: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Chassi</Label>
+                    <Input value={dadosEdicao.CHASSI} onChange={e => setDadosEdicao(p => ({ ...p, CHASSI: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Renavam</Label>
+                    <Input value={dadosEdicao.RENAVAM} onChange={e => setDadosEdicao(p => ({ ...p, RENAVAM: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">GoodCard</Label>
+                    <Input value={dadosEdicao.GOODCARD} onChange={e => setDadosEdicao(p => ({ ...p, GOODCARD: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Rádio</Label>
+                    <Input value={dadosEdicao.RADIO} onChange={e => setDadosEdicao(p => ({ ...p, RADIO: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">ORD</Label>
+                    <Input value={dadosEdicao.ORD} onChange={e => setDadosEdicao(p => ({ ...p, ORD: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Situação</Label>
+                    <Select value={dadosEdicao.SITUACAO} onValueChange={v => setDadosEdicao(p => ({ ...p, SITUACAO: v }))}>
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="OPERANTE">OPERANTE</SelectItem>
+                        <SelectItem value="INOPERANTE">INOPERANTE</SelectItem>
+                        <SelectItem value="OFICINA">OFICINA</SelectItem>
+                        <SelectItem value="RESERVA">RESERVA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Utilização</Label>
+                    <Input value={dadosEdicao.UTILIZACAO} onChange={e => setDadosEdicao(p => ({ ...p, UTILIZACAO: e.target.value }))} className="h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-muted-foreground">Tipo</Label>
+                    <Select value={dadosEdicao.tipo} onValueChange={v => setDadosEdicao(p => ({ ...p, tipo: v }))}>
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="leve">Frota Leve</SelectItem>
+                        <SelectItem value="pesada">Frota Pesada</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 md:col-span-2 lg:col-span-3">
+                    <Label className="text-sm font-medium text-muted-foreground">Observações</Label>
+                    <Input value={dadosEdicao.OBS} onChange={e => setDadosEdicao(p => ({ ...p, OBS: e.target.value }))} className="h-8" />
+                  </div>
+                </div>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Cadastro</p>
@@ -561,14 +794,45 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   <p className="text-sm font-medium text-muted-foreground">Renavam</p>
                   <p className="text-sm font-semibold">{viatura.RENAVAM || 'N/A'}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">KM Atual</p>
-                  <p className="text-sm font-semibold">{viatura.KM?.toLocaleString() || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">KM Próximo Óleo</p>
-                  <p className="text-sm font-semibold">{viatura.KMOLEO?.toLocaleString() || 'N/A'}</p>
-                </div>
+                {editandoKm ? (
+                  <>
+                    <div className="space-y-1">
+                      <Label htmlFor="novoKm" className="text-sm font-medium text-muted-foreground">KM Atual</Label>
+                      <Input id="novoKm" type="number" value={novoKm} onChange={(e) => setNovoKm(e.target.value)} className="h-8" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="novoKmOleo" className="text-sm font-medium text-muted-foreground">KM Próximo Óleo</Label>
+                      <Input id="novoKmOleo" type="number" value={novoKmOleo} onChange={(e) => setNovoKmOleo(e.target.value)} className="h-8" />
+                    </div>
+                    <div className="flex items-end gap-2 md:col-span-2">
+                      <Button size="sm" onClick={handleAtualizarKm} disabled={salvandoKm}>
+                        <Save className="h-4 w-4 mr-1" />
+                        {salvandoKm ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditandoKm(false)} disabled={salvandoKm}>
+                        <X className="h-4 w-4 mr-1" />
+                        Cancelar
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-muted-foreground">KM Atual</p>
+                      <p className="text-sm font-semibold">{viatura.KM?.toLocaleString() || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-muted-foreground">KM Próximo Óleo</p>
+                      <p className="text-sm font-semibold">{viatura.KMOLEO?.toLocaleString() || 'N/A'}</p>
+                    </div>
+                    <div className="flex items-end">
+                      <Button size="sm" variant="outline" onClick={iniciarEdicaoKm}>
+                        <Edit className="h-4 w-4 mr-1" />
+                        Atualizar KM
+                      </Button>
+                    </div>
+                  </>
+                )}
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Saldo</p>
                   <p className="text-sm font-semibold">
@@ -626,6 +890,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                   </div>
                 )}
               </div>
+              )}
             </CardContent>
           </Card>
 

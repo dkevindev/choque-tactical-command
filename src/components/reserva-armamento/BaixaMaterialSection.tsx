@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, User, Package, CheckCircle, RotateCcw } from "lucide-react";
+import { Search, User, Package, CheckCircle, RotateCcw, ArrowRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, getDocs, updateDoc, doc, addDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import ModalDevolucaoMunicao from './ModalDevolucaoMunicao';
+import ModalTransferenciaMaterial from './ModalTransferenciaMaterial';
 
 interface MaterialCautela {
   materialId: string;
@@ -56,11 +58,16 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
   const [cautelasAtivas, setCautelasAtivas] = useState<CautelaProvisoria[]>([]);
   const [materiaisSelecionados, setMateriaisSelecionados] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingInicial, setLoadingInicial] = useState(true);
   
   // Modal de devolução de munição
   const [modalMunicao, setModalMunicao] = useState(false);
   const [materialMunicao, setMaterialMunicao] = useState<MaterialCautela | null>(null);
   const [cautelaMunicao, setCautelaMunicao] = useState<CautelaProvisoria | null>(null);
+  
+  // Modal de transferência
+  const [modalTransferencia, setModalTransferencia] = useState(false);
+  const [cautelaTransferencia, setCautelaTransferencia] = useState<CautelaProvisoria | null>(null);
   
   const { toast } = useToast();
 
@@ -82,55 +89,51 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
     return maiorSequencial + 1;
   };
 
+  // Função reutilizável para carregar policiais com cautela
+  const recarregarPoliciaisComCautela = async () => {
+    try {
+      console.log('[BaixaMaterial] Recarregando lista de policiais...');
+      const querySnapshot = await getDocs(
+        query(collection(db, 'cautelas_provisorias'), where('status', '==', 'pendente'))
+      );
+      
+      console.log('[BaixaMaterial] Cautelas encontradas:', querySnapshot.size);
+      
+      const cautelasData = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          dataCautela: data.dataCautela?.toDate?.() || new Date()
+        } as CautelaProvisoria;
+      });
+
+      // Extrair policiais únicos
+      const policialIds = [...new Set(cautelasData.map(c => c.policialId))];
+      console.log('[BaixaMaterial] IDs de policiais com cautela:', policialIds);
+      
+      // Carregar dados dos policiais (em paralelo)
+      const policiaisData = (await Promise.all(
+        policialIds.map(async (policialId) => {
+          const policialDoc = await getDoc(doc(db, 'policiais', policialId));
+          return policialDoc.exists()
+            ? { id: policialDoc.id, ...policialDoc.data() } as Policial
+            : null;
+        })
+      )).filter((p): p is Policial => p !== null);
+      
+      console.log('[BaixaMaterial] Lista atualizada:', policiaisData.length, 'policiais');
+      setPoliciaisComCautela(policiaisData);
+    } catch (error) {
+      console.error('[BaixaMaterial] Erro ao recarregar:', error);
+    } finally {
+      setLoadingInicial(false);
+    }
+  };
+
   // Carregar policiais com cautela ativa
   useEffect(() => {
-    const carregarPoliciaisComCautela = async () => {
-      try {
-        console.log('[BaixaMaterial] Buscando cautelas pendentes...');
-        const querySnapshot = await getDocs(
-          query(collection(db, 'cautelas_provisorias'), where('status', '==', 'pendente'))
-        );
-        
-        console.log('[BaixaMaterial] Cautelas encontradas:', querySnapshot.size);
-        
-        const cautelasData = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          console.log('[BaixaMaterial] Cautela:', doc.id, data);
-          return {
-            id: doc.id,
-            ...data,
-            dataCautela: data.dataCautela?.toDate?.() || new Date()
-          } as CautelaProvisoria;
-        });
-
-        // Extrair policiais únicos
-        const policialIds = [...new Set(cautelasData.map(c => c.policialId))];
-        console.log('[BaixaMaterial] IDs de policiais com cautela:', policialIds);
-        
-        // Carregar dados dos policiais
-        const policiaisData: Policial[] = [];
-        for (const policialId of policialIds) {
-          const policialDoc = await getDoc(doc(db, 'policiais', policialId));
-          if (policialDoc.exists()) {
-            const policialData = policialDoc.data();
-            console.log('[BaixaMaterial] Policial encontrado:', policialId, policialData.NOME);
-            policiaisData.push({
-              id: policialDoc.id,
-              ...policialData
-            } as Policial);
-          } else {
-            console.log('[BaixaMaterial] Policial NÃO encontrado:', policialId);
-          }
-        }
-        
-        console.log('[BaixaMaterial] Total de policiais com cautela:', policiaisData.length);
-        setPoliciaisComCautela(policiaisData);
-      } catch (error) {
-        console.error('[BaixaMaterial] Erro ao carregar policiais com cautela:', error);
-      }
-    };
-
-    carregarPoliciaisComCautela();
+    recarregarPoliciaisComCautela();
   }, []);
 
   // Carregar cautelas do policial selecionado
@@ -179,9 +182,16 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
            material.categoria?.toLowerCase().includes('municao');
   };
 
-  // Quando clica no checkbox de munição
+  // Verificar se material precisa informar quantidade (munição ou EPI com quantidade > 1)
+  const precisaQuantidade = (material: MaterialCautela) => {
+    const ehMunicao = isMunicao(material);
+    const ehEpiComQuantidade = material.categoria?.toLowerCase() === 'epi' && material.quantidade > 1;
+    return ehMunicao || ehEpiComQuantidade;
+  };
+
+  // Quando clica no checkbox de material
   const handleClickMaterial = (material: MaterialCautela, cautela: CautelaProvisoria) => {
-    if (isMunicao(material)) {
+    if (precisaQuantidade(material)) {
       // Abrir modal de quantidade
       setMaterialMunicao(material);
       setCautelaMunicao(cautela);
@@ -209,6 +219,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       let armeiroNome = 'Armeiro';
       if (userStorage) {
         const userData = JSON.parse(userStorage);
+        if (!userData?.id) { toast({ title: "Erro", description: "ID do armeiro não encontrado." }); return; }
         const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
         if (armeiroDoc.exists()) {
           const armeiroData = armeiroDoc.data();
@@ -217,6 +228,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       }
 
       // Devolver munição ao estoque
+      if (!materialMunicao.materialId) { toast({ title: "Erro", description: "ID do material não encontrado." }); return; }
       const materialRef = doc(db, 'materiais_belicos', materialMunicao.materialId);
       const materialDoc = await getDoc(materialRef);
       
@@ -302,30 +314,32 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
 
       await addDoc(collection(db, 'movimentacoes_belicas'), movimentacaoData);
 
-      // Se houver falta de munição, criar alerta
+      // Se houver falta de munição, criar alerta e registrar alteração automática no livro
       if (quantidadeFaltante > 0 && motivoFalta) {
         // Buscar nome do armeiro
         const userStorage = localStorage.getItem('user');
-        let armeiroNome = 'Armeiro';
-        let armeiroId = '';
+        let armeiroNomeLocal = 'Armeiro';
+        let armeiroIdLocal = '';
         if (userStorage) {
           const userData = JSON.parse(userStorage);
-          armeiroId = userData.id;
+          if (!userData?.id) { console.warn('userData.id não encontrado'); return; }
+          armeiroIdLocal = userData.id;
           const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
           if (armeiroDoc.exists()) {
             const armeiroData = armeiroDoc.data();
-            armeiroNome = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+            armeiroNomeLocal = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
           }
         }
 
+        // Criar alerta de falta de munição
         await addDoc(collection(db, 'alertas_gestao'), {
           tipo: 'falta_municao',
           dataHora: agora,
           policialId: policialSelecionado.id,
           policialNome: policialSelecionado.NOME,
           policialNomeGuerra: policialSelecionado['NOME DE GUERRA1'] || policialSelecionado['NOME DE GUERRA'] || '',
-          armeiroId,
-          armeiroNome,
+          armeiroId: armeiroIdLocal,
+          armeiroNome: armeiroNomeLocal,
           materialNome: materialMunicao.nome,
           quantidadeCautelada: materialMunicao.quantidade,
           quantidadeDevolvida,
@@ -333,6 +347,29 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
           motivoFalta,
           lido: false
         });
+
+        // Registrar alteração automática no livro para aparecer ao fechar
+        if (livroId) {
+          const livroRef = doc(db, 'livros_reserva_armamento', livroId);
+          const livroDoc = await getDoc(livroRef);
+          
+          if (livroDoc.exists()) {
+            const livroData = livroDoc.data();
+            const alteracoesAutomaticas = livroData.alteracoesAutomaticas || [];
+            
+            const policialDisplay = policialSelecionado['NOME DE GUERRA1'] || policialSelecionado['NOME DE GUERRA'] || policialSelecionado.NOME;
+            const novaAlteracao = {
+              id: Date.now().toString(),
+              tipo: 'falta_municao',
+              descricao: `FALTA DE MUNIÇÃO: ${policialDisplay} não devolveu ${quantidadeFaltante}x ${materialMunicao.nome}. Motivo: ${motivoFalta}`,
+              dataHora: agora.toISOString()
+            };
+            
+            await updateDoc(livroRef, {
+              alteracoesAutomaticas: [...alteracoesAutomaticas, novaAlteracao]
+            });
+          }
+        }
       }
 
       toast({
@@ -365,21 +402,10 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
 
       if (cautelasData.length === 0) {
         setPolicialSelecionado(null);
-        // Recarregar lista de policiais
-        const allCautelas = await getDocs(
-          query(collection(db, 'cautelas_provisorias'), where('status', '==', 'pendente'))
-        );
-        
-        const policialIds = [...new Set(allCautelas.docs.map(d => d.data().policialId))];
-        const policiaisData: Policial[] = [];
-        for (const pid of policialIds) {
-          const policialDoc = await getDoc(doc(db, 'policiais', pid));
-          if (policialDoc.exists()) {
-            policiaisData.push({ id: policialDoc.id, ...policialDoc.data() } as Policial);
-          }
-        }
-        setPoliciaisComCautela(policiaisData);
       }
+      
+      // Sempre recarregar lista de policiais após baixa de munição
+      await recarregarPoliciaisComCautela();
 
     } catch (error) {
       console.error('Erro ao devolver munição:', error);
@@ -403,18 +429,30 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       return;
     }
 
+    // Verificar se policialSelecionado existe
+    if (!policialSelecionado) {
+      toast({
+        title: "Erro",
+        description: "Policial não selecionado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
       // Buscar nome do armeiro atual
       const userStorage = localStorage.getItem('user');
-      let armeiroNome = 'Armeiro';
+      let armeiroNomeBaixa = 'Armeiro';
       if (userStorage) {
         const userData = JSON.parse(userStorage);
-        const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
-        if (armeiroDoc.exists()) {
-          const armeiroData = armeiroDoc.data();
-          armeiroNome = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+        if (userData?.id) {
+          const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
+          if (armeiroDoc.exists()) {
+            const armeiroData = armeiroDoc.data();
+            armeiroNomeBaixa = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+          }
         }
       }
 
@@ -429,104 +467,147 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
       const agora = new Date();
       const horaBaixa = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-      // Processar cada cautela
+      // Coletar TODOS os materiais devolvidos de TODAS as cautelas
+      const cautelasParaAtualizar: { 
+        id: string; 
+        materiaisRestantes: MaterialCautela[];
+        materiaisDevolvidos: MaterialCautela[];
+        cautela: CautelaProvisoria;
+      }[] = [];
+
+      // Processar cada cautela e separar materiais
       for (const cautela of cautelasAtivas) {
         const materiaisParaBaixa = cautela.materiais.filter(m => 
           materiaisSelecionados.includes(m.materialId)
         );
-        
-        if (materiaisParaBaixa.length === 0) continue;
-
-        // Devolver materiais ao estoque
-        for (const material of materiaisParaBaixa) {
-          const materialRef = doc(db, 'materiais_belicos', material.materialId);
-          const materialDoc = await getDoc(materialRef);
-          
-          if (materialDoc.exists()) {
-            const materialData = materialDoc.data();
-            const isMunicaoMaterial = materialData?.categoria?.toLowerCase().includes('munição') || 
-                             materialData?.categoria?.toLowerCase().includes('municao');
-            
-            if (isMunicaoMaterial) {
-              const quantidadeAtual = materialData.quantidade || 0;
-              const novaQuantidade = quantidadeAtual + material.quantidade;
-              await updateDoc(materialRef, {
-                quantidade: novaQuantidade,
-                disponivel: true
-              });
-            } else {
-              await updateDoc(materialRef, {
-                disponivel: true,
-                cauteladoPara: null,
-                dataCautela: null
-              });
-            }
-            
-            materiaisDevolvidos.push({
-              materialId: material.materialId,
-              nome: material.nome,
-              quantidade: material.quantidade,
-              categoria: material.categoria,
-              numeroSerie: material.numeroSerie
-            });
-          }
-        }
-
-        // Verificar se todos os materiais da cautela foram devolvidos
         const materiaisRestantes = cautela.materiais.filter(m =>
           !materiaisSelecionados.includes(m.materialId)
         );
+        
+        if (materiaisParaBaixa.length > 0) {
+          cautelasParaAtualizar.push({
+            id: cautela.id,
+            materiaisRestantes,
+            materiaisDevolvidos: materiaisParaBaixa,
+            cautela
+          });
 
-        const materiaisParaEntrega = cautela.materiais.filter(m =>
-          materiaisSelecionados.includes(m.materialId)
-        );
-
-        if (materiaisRestantes.length === 0) {
-          // BAIXA TOTAL: marcar cautela como entregue
-          await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
-            status: 'entregue',
-            dataBaixa: agora,
-            horaBaixa,
-            recebidoPorNome: armeiroNome
-          });
-        } else {
-          // BAIXA PARCIAL: Criar nova entrada para materiais devolvidos
-          const proximoSequencial = await obterProximoSequencial(livroId);
-          
-          // Criar nova cautela para os materiais devolvidos
-          await addDoc(collection(db, 'cautelas_provisorias'), {
-            livroId,
-            policialId: cautela.policialId,
-            policialNome: cautela.policialNome,
-            policialMatricula: cautela.policialMatricula,
-            policialNomeGuerra: cautela.policialNomeGuerra,
-            postoGrad: cautela.postoGrad,
-            armeiroId: cautela.armeiroId,
-            materiais: materiaisParaEntrega,
-            dataCautela: cautela.dataCautela,
-            horaCautela: cautela.horaCautela,
-            status: 'entregue',
-            dataBaixa: agora,
-            horaBaixa,
-            recebidoPorNome: armeiroNome,
-            sequencial: proximoSequencial,
-            cautelaOriginalId: cautela.id
-          });
-          
-          // Atualizar cautela original mantendo apenas materiais pendentes
-          await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
-            materiais: materiaisRestantes
-          });
+          // Devolver materiais ao estoque
+          for (const material of materiaisParaBaixa) {
+            if (!material.materialId) continue;
+            const materialRef = doc(db, 'materiais_belicos', material.materialId);
+            const materialDoc = await getDoc(materialRef);
+            
+            if (materialDoc.exists()) {
+              const materialData = materialDoc.data();
+              const isMunicaoMaterial = materialData?.categoria?.toLowerCase().includes('munição') || 
+                               materialData?.categoria?.toLowerCase().includes('municao');
+              
+              if (isMunicaoMaterial) {
+                const quantidadeAtual = materialData.quantidade || 0;
+                const novaQuantidade = quantidadeAtual + material.quantidade;
+                await updateDoc(materialRef, {
+                  quantidade: novaQuantidade,
+                  disponivel: true
+                });
+              } else {
+                await updateDoc(materialRef, {
+                  disponivel: true,
+                  cauteladoPara: null,
+                  dataCautela: null
+                });
+              }
+              
+              materiaisDevolvidos.push({
+                materialId: material.materialId,
+                nome: material.nome,
+                quantidade: material.quantidade,
+                categoria: material.categoria,
+                numeroSerie: material.numeroSerie
+              });
+            }
+          }
         }
       }
+
+      // Verificar se TODAS as cautelas foram totalmente baixadas
+      const todasCautelasCompletas = cautelasParaAtualizar.every(c => c.materiaisRestantes.length === 0);
+
+      if (todasCautelasCompletas) {
+        // BAIXA TOTAL: marcar todas as cautelas como entregue
+        for (const { id } of cautelasParaAtualizar) {
+          await updateDoc(doc(db, 'cautelas_provisorias', id), {
+            status: 'entregue',
+            dataBaixa: agora,
+            horaBaixa,
+            recebidoPorNome: armeiroNomeBaixa
+          });
+        }
+      } else {
+        // BAIXA PARCIAL: Criar UMA ÚNICA cautela para TODOS os materiais devolvidos
+        const todosMateriaisDevolvidos = cautelasParaAtualizar.flatMap(c => c.materiaisDevolvidos);
+        const proximoSequencial = await obterProximoSequencial(livroId);
+        const primeiroItem = cautelasParaAtualizar[0];
+        
+        // Criar nova cautela com todos os materiais devolvidos
+        await addDoc(collection(db, 'cautelas_provisorias'), {
+          livroId,
+          policialId: primeiroItem.cautela.policialId,
+          policialNome: primeiroItem.cautela.policialNome,
+          policialMatricula: primeiroItem.cautela.policialMatricula,
+          policialNomeGuerra: primeiroItem.cautela.policialNomeGuerra,
+          postoGrad: primeiroItem.cautela.postoGrad,
+          armeiroId: primeiroItem.cautela.armeiroId,
+          materiais: todosMateriaisDevolvidos,
+          dataCautela: primeiroItem.cautela.dataCautela,
+          horaCautela: primeiroItem.cautela.horaCautela,
+          status: 'entregue',
+          dataBaixa: agora,
+          horaBaixa,
+          recebidoPorNome: armeiroNomeBaixa,
+          sequencial: proximoSequencial,
+          baixaParcial: true,
+          cautelasOriginais: cautelasParaAtualizar.map(c => c.id)
+        });
+        
+        // Atualizar cautelas originais
+        for (const { id, materiaisRestantes } of cautelasParaAtualizar) {
+          if (materiaisRestantes.length === 0) {
+            // Cautela completamente baixada
+            await updateDoc(doc(db, 'cautelas_provisorias', id), {
+              status: 'entregue',
+              dataBaixa: agora,
+              horaBaixa,
+              recebidoPorNome: armeiroNomeBaixa
+            });
+          } else {
+            // Ainda tem materiais pendentes
+            await updateDoc(doc(db, 'cautelas_provisorias', id), {
+              materiais: materiaisRestantes
+            });
+          }
+        }
+      }
+
+      // Filtrar materiais removendo campos undefined para evitar erro do Firebase
+      const materiaisLimpos = materiaisDevolvidos.map(m => {
+        const materialLimpo: Record<string, any> = {
+          materialId: m.materialId,
+          nome: m.nome,
+          quantidade: m.quantidade
+        };
+        if (m.categoria) materialLimpo.categoria = m.categoria;
+        if (m.numeroSerie) materialLimpo.numeroSerie = m.numeroSerie;
+        return materialLimpo;
+      });
 
       // Registrar baixa no histórico
       const movimentacaoData: Record<string, any> = {
         tipo: 'baixa',
-        policialId: policialSelecionado!.id,
-        policialNome: policialSelecionado!.NOME,
-        policialMatricula: String(policialSelecionado!['Matrícula'] || ''),
-        materiais: materiaisDevolvidos,
+        policialId: policialSelecionado.id,
+        policialNome: policialSelecionado.NOME || '',
+        policialMatricula: String(policialSelecionado['Matrícula'] || ''),
+        materiais: materiaisLimpos,
         dataBaixa: agora,
         horaBaixa
       };
@@ -553,6 +634,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
 
       setMateriaisSelecionados([]);
       setPolicialSelecionado(null);
+      await recarregarPoliciaisComCautela();
       onBaixaRealizada();
 
     } catch (error) {
@@ -600,7 +682,16 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                 />
               </div>
 
-              {policiaisComCautela.length === 0 ? (
+              {loadingInicial ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="p-3 border rounded-lg">
+                      <Skeleton className="h-5 w-48 mb-1" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                  ))}
+                </div>
+              ) : policiaisComCautela.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>Nenhum policial com material cautelado</p>
@@ -646,6 +737,19 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                   }}>
                     Alterar
                   </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={() => {
+                      if (cautelasAtivas.length > 0) {
+                        setCautelaTransferencia(cautelasAtivas[0]);
+                        setModalTransferencia(true);
+                      }
+                    }}
+                  >
+                    <ArrowRight className="h-4 w-4 mr-1" />
+                    Transferir
+                  </Button>
                 </div>
               </div>
 
@@ -659,7 +763,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                     Selecione os materiais para dar baixa:
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Para munições, clique no item para informar a quantidade devolvida.
+                    Para munições e EPIs com quantidade, clique no item para informar a quantidade devolvida.
                   </p>
                   <div className="max-h-60 overflow-y-auto space-y-2">
                     {cautelasAtivas.flatMap(cautela =>
@@ -674,7 +778,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                           onClick={() => handleClickMaterial(material, cautela)}
                         >
                           <div className="flex items-center gap-3">
-                            {!isMunicao(material) && (
+                            {!precisaQuantidade(material) && (
                               <Checkbox 
                                 checked={materiaisSelecionados.includes(material.materialId)}
                                 onCheckedChange={() => toggleMaterial(material.materialId)}
@@ -683,7 +787,7 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
                             <div className="flex-1">
                               <div className="font-medium flex items-center gap-2">
                                 {material.nome}
-                                {isMunicao(material) && (
+                                {precisaQuantidade(material) && (
                                   <Badge variant="outline" className="text-xs">
                                     Clique para devolver
                                   </Badge>
@@ -729,6 +833,28 @@ const BaixaMaterialSection = ({ livroId, onBaixaRealizada }: BaixaMaterialSectio
         material={materialMunicao}
         onConfirmar={handleConfirmarMunicao}
       />
+
+      {/* Modal de Transferência de Material */}
+      {cautelaTransferencia && policialSelecionado && (
+        <ModalTransferenciaMaterial
+          open={modalTransferencia}
+          onClose={() => {
+            setModalTransferencia(false);
+            setCautelaTransferencia(null);
+          }}
+          cautela={cautelaTransferencia}
+          policialOrigem={policialSelecionado}
+          livroId={livroId}
+          onTransferido={() => {
+            setModalTransferencia(false);
+            setCautelaTransferencia(null);
+            setPolicialSelecionado(null);
+            setMateriaisSelecionados([]);
+            recarregarPoliciaisComCautela();
+            onBaixaRealizada();
+          }}
+        />
+      )}
     </>
   );
 };

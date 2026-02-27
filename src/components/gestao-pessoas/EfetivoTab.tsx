@@ -7,9 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Edit, Search, Filter, Eye, User, Phone, MapPin, CreditCard, Mail, Building, TrendingUp } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Edit, Search, Filter, Eye, User, Phone, MapPin, CreditCard, Mail, Building, TrendingUp, FileText, Calendar, Clock } from 'lucide-react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { format, parseISO } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
 
 interface Policial {
@@ -86,7 +89,9 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
     setLoading(true);
     try {
       const policialRef = doc(db, 'policiais', editingPolicial.id);
-      await updateDoc(policialRef, updatedData);
+      
+      // Usar setDoc com merge para evitar problemas com campos como "Post/Grad"
+      await setDoc(policialRef, updatedData, { merge: true });
 
       toast({
         title: "Sucesso",
@@ -287,159 +292,89 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
             <DialogTitle>Informações Completas do Policial</DialogTitle>
           </DialogHeader>
           {viewingPolicial && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Dados Pessoais */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Dados Pessoais
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <span className="font-semibold">Nome:</span>
-                    <p>{viewingPolicial.NOME || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Nome de Guerra:</span>
-                    <p>{viewingPolicial['NOME DE GUERRA'] || viewingPolicial.nomeGuerra || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Nome de Guerra 1:</span>
-                    <p>{viewingPolicial['NOME DE GUERRA1'] || viewingPolicial.nomeGuerra1 || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">CPF:</span>
-                    <p>{viewingPolicial.CPF || viewingPolicial.cpf || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Idade:</span>
-                    <p>{viewingPolicial.IDADE || viewingPolicial.idade || 'N/A'} anos</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Nascimento:</span>
-                    <p>{formatDate(viewingPolicial.NASCIMENTO) || (viewingPolicial.dataNascimento ? new Date(viewingPolicial.dataNascimento).toLocaleDateString('pt-BR') : 'N/A')}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Mês Aniversário:</span>
-                    <p>{viewingPolicial['MÊS ANIVERSARIO'] || viewingPolicial.mesAniversario || 'N/A'}</p>
-                  </div>
-                </CardContent>
-              </Card>
+            <Tabs defaultValue="dados">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="dados">Dados Pessoais</TabsTrigger>
+                <TabsTrigger value="assentamentos">Assentamentos</TabsTrigger>
+              </TabsList>
 
-              {/* Dados Profissionais */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Building className="h-5 w-5" />
-                    Dados Profissionais
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <span className="font-semibold">Matrícula:</span>
-                    <p>{viewingPolicial.Matrícula || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Numeral:</span>
-                    <p>{viewingPolicial.NUMERAL || viewingPolicial.numeral || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Posto/Graduação:</span>
-                    <p>{viewingPolicial['Post/Grad'] || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Função:</span>
-                    <p>{viewingPolicial['FUNÇÃO'] || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Unidade:</span>
-                    <p>{viewingPolicial.Unidade || viewingPolicial.unidade || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Situação:</span>
-                    <div className="mt-1">
-                      <Badge variant={
-                        viewingPolicial.SITUAÇÃO?.includes('FÉRIAS') ? 'secondary' :
-                        viewingPolicial.SITUAÇÃO?.includes('LICENÇA') ? 'destructive' :
-                        'default'
-                      }>
-                        {viewingPolicial.SITUAÇÃO || 'N/A'}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Inclusão:</span>
-                    <p>{formatDate(viewingPolicial.inclusão) || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Última Promoção:</span>
-                    <p>{formatDate(viewingPolicial['ULTIMA PROMOÇÃO']) || (viewingPolicial.dataUltimaPromocao ? new Date(viewingPolicial.dataUltimaPromocao).toLocaleDateString('pt-BR') : 'N/A')}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Previsão Férias 2024:</span>
-                    <p>{viewingPolicial['PREVISAO FÉRIAS - AQUISITIVO 2024'] || viewingPolicial.previsaoFerias2024 || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Mudança Comportamento:</span>
-                    <p>{viewingPolicial['MUDANÇA COMPORTAMENTO'] || 'N/A'}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <TabsContent value="dados">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Dados Pessoais */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <User className="h-5 w-5" />
+                        Dados Pessoais
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div><span className="font-semibold">Nome:</span><p>{viewingPolicial.NOME || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Nome de Guerra:</span><p>{viewingPolicial['NOME DE GUERRA'] || viewingPolicial.nomeGuerra || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Nome de Guerra 1:</span><p>{viewingPolicial['NOME DE GUERRA1'] || viewingPolicial.nomeGuerra1 || 'N/A'}</p></div>
+                      <div><span className="font-semibold">CPF:</span><p>{viewingPolicial.CPF || viewingPolicial.cpf || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Idade:</span><p>{viewingPolicial.IDADE || viewingPolicial.idade || 'N/A'} anos</p></div>
+                      <div><span className="font-semibold">Nascimento:</span><p>{formatDate(viewingPolicial.NASCIMENTO) || (viewingPolicial.dataNascimento ? new Date(viewingPolicial.dataNascimento).toLocaleDateString('pt-BR') : 'N/A')}</p></div>
+                      <div><span className="font-semibold">Mês Aniversário:</span><p>{viewingPolicial['MÊS ANIVERSARIO'] || viewingPolicial.mesAniversario || 'N/A'}</p></div>
+                    </CardContent>
+                  </Card>
 
-              {/* Contato e Dados Bancários */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Phone className="h-5 w-5" />
-                    Contato e Dados Bancários
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <span className="font-semibold flex items-center gap-1">
-                      <Phone className="h-4 w-4" />
-                      Telefone:
-                    </span>
-                    <p>{viewingPolicial.telefone || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold flex items-center gap-1">
-                      <Mail className="h-4 w-4" />
-                      E-mail:
-                    </span>
-                    <p>{viewingPolicial['E-MAIL'] || viewingPolicial.email || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      Endereço:
-                    </span>
-                    <p>{viewingPolicial.Endereço || viewingPolicial.endereco || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Bairro:</span>
-                    <p>{viewingPolicial.Bairro || viewingPolicial.bairro || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold flex items-center gap-1">
-                      <CreditCard className="h-4 w-4" />
-                      Banco:
-                    </span>
-                    <p>{viewingPolicial.BANCO || viewingPolicial.banco || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Agência:</span>
-                    <p>{viewingPolicial.AGÊNCIA || viewingPolicial.agencia || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold">Conta:</span>
-                    <p>{viewingPolicial.CONTA || viewingPolicial.conta || 'N/A'}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                  {/* Dados Profissionais */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Building className="h-5 w-5" />
+                        Dados Profissionais
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div><span className="font-semibold">Matrícula:</span><p>{viewingPolicial.Matrícula || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Numeral:</span><p>{viewingPolicial.NUMERAL || viewingPolicial.numeral || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Posto/Graduação:</span><p>{viewingPolicial['Post/Grad'] || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Função:</span><p>{viewingPolicial['FUNÇÃO'] || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Unidade:</span><p>{viewingPolicial.Unidade || viewingPolicial.unidade || 'N/A'}</p></div>
+                      <div>
+                        <span className="font-semibold">Situação:</span>
+                        <div className="mt-1">
+                          <Badge variant={
+                            viewingPolicial.SITUAÇÃO?.includes('FÉRIAS') ? 'secondary' :
+                            viewingPolicial.SITUAÇÃO?.includes('LICENÇA') ? 'destructive' :
+                            'default'
+                          }>{viewingPolicial.SITUAÇÃO || 'N/A'}</Badge>
+                        </div>
+                      </div>
+                      <div><span className="font-semibold">Inclusão:</span><p>{formatDate(viewingPolicial.inclusão) || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Última Promoção:</span><p>{formatDate(viewingPolicial['ULTIMA PROMOÇÃO']) || (viewingPolicial.dataUltimaPromocao ? new Date(viewingPolicial.dataUltimaPromocao).toLocaleDateString('pt-BR') : 'N/A')}</p></div>
+                      <div><span className="font-semibold">Previsão Férias 2024:</span><p>{viewingPolicial['PREVISAO FÉRIAS - AQUISITIVO 2024'] || viewingPolicial.previsaoFerias2024 || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Mudança Comportamento:</span><p>{viewingPolicial['MUDANÇA COMPORTAMENTO'] || 'N/A'}</p></div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Contato e Dados Bancários */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Phone className="h-5 w-5" />
+                        Contato e Dados Bancários
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div><span className="font-semibold flex items-center gap-1"><Phone className="h-4 w-4" />Telefone:</span><p>{viewingPolicial.telefone || 'N/A'}</p></div>
+                      <div><span className="font-semibold flex items-center gap-1"><Mail className="h-4 w-4" />E-mail:</span><p>{viewingPolicial['E-MAIL'] || viewingPolicial.email || 'N/A'}</p></div>
+                      <div><span className="font-semibold flex items-center gap-1"><MapPin className="h-4 w-4" />Endereço:</span><p>{viewingPolicial.Endereço || viewingPolicial.endereco || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Bairro:</span><p>{viewingPolicial.Bairro || viewingPolicial.bairro || 'N/A'}</p></div>
+                      <div><span className="font-semibold flex items-center gap-1"><CreditCard className="h-4 w-4" />Banco:</span><p>{viewingPolicial.BANCO || viewingPolicial.banco || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Agência:</span><p>{viewingPolicial.AGÊNCIA || viewingPolicial.agencia || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Conta:</span><p>{viewingPolicial.CONTA || viewingPolicial.conta || 'N/A'}</p></div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="assentamentos">
+                <AssentamentosSection policialId={viewingPolicial.id} policial={viewingPolicial} />
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>
@@ -451,6 +386,131 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
           onClose={() => setShowPromocaoDialog(false)}
           onUpdate={onUpdate}
         />
+      )}
+    </div>
+  );
+};
+
+// Componente de Assentamentos
+const AssentamentosSection: React.FC<{ policialId: string; policial: Policial }> = ({ policialId, policial }) => {
+  const [atestados, setAtestados] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchAssentamentos = async () => {
+      try {
+        setLoading(true);
+        // Buscar atestados médicos
+        const atestadosRef = collection(db, 'atestados_medicos');
+        const q = query(atestadosRef, where('policialId', '==', policialId));
+        const snap = await getDocs(q);
+        const atestadosData = snap.docs.map(d => ({ id: d.id, tipo: 'Atestado Médico', ...d.data() }));
+        setAtestados(atestadosData);
+      } catch (error) {
+        console.error('Erro ao buscar assentamentos:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAssentamentos();
+  }, [policialId]);
+
+  const formatDateStr = (d: string) => {
+    if (!d) return 'N/A';
+    try { return format(parseISO(d), 'dd/MM/yyyy'); } catch { return d; }
+  };
+
+  // Montar timeline com atestados + dados do policial (férias, situação)
+  const timeline = React.useMemo(() => {
+    const items: { data: string; tipo: string; descricao: string; status?: string }[] = [];
+
+    // Atestados
+    atestados.forEach(a => {
+      items.push({
+        data: a.dataInicio || a.criadoEm || '',
+        tipo: 'Atestado Médico',
+        descricao: `CID ${a.cid} - ${a.cidDescricao} | ${a.dias} dias | Médico: ${a.medico || 'N/A'}`,
+        status: a.statusPericia === 'PENDENTE' ? 'Pendente Perícia' :
+                a.statusPericia === 'AGENDADO' ? 'Perícia Agendada' :
+                a.statusPericia === 'HOMOLOGADO' ? 'Homologado' : 'OK',
+      });
+    });
+
+    // Férias (se houver)
+    if (policial.inicioFerias) {
+      items.push({
+        data: policial.inicioFerias,
+        tipo: 'Férias',
+        descricao: `Férias de ${formatDateStr(policial.inicioFerias)} a ${formatDateStr(policial.fimFerias || '')}`,
+        status: policial.SITUAÇÃO?.includes('FÉRIAS') ? 'Em andamento' : 'Concluído',
+      });
+    }
+
+    // Situação atual
+    if (policial.SITUAÇÃO && !policial.SITUAÇÃO.includes('PRONTO')) {
+      items.push({
+        data: new Date().toISOString(),
+        tipo: 'Situação',
+        descricao: policial.SITUAÇÃO,
+        status: 'Atual',
+      });
+    }
+
+    // Ordenar por data (mais recente primeiro)
+    items.sort((a, b) => {
+      const dateA = a.data ? new Date(a.data).getTime() : 0;
+      const dateB = b.data ? new Date(b.data).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return items;
+  }, [atestados, policial]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-2"></div>
+        Carregando assentamentos...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="font-semibold flex items-center gap-2">
+        <FileText className="h-5 w-5" />
+        Ficha de Assentamentos — {policial['Post/Grad']} {policial.NOME}
+      </h3>
+
+      {timeline.length === 0 ? (
+        <p className="text-center py-8 text-muted-foreground">Nenhum assentamento registrado para este policial</p>
+      ) : (
+        <div className="space-y-3">
+          {timeline.map((item, idx) => (
+            <div key={idx} className="flex gap-4 p-3 border rounded-lg">
+              <div className="flex flex-col items-center">
+                <div className={`w-3 h-3 rounded-full ${
+                  item.tipo === 'Atestado Médico' ? 'bg-red-500' :
+                  item.tipo === 'Férias' ? 'bg-blue-500' : 'bg-muted-foreground'
+                }`} />
+                {idx < timeline.length - 1 && <div className="w-px h-full bg-border mt-1" />}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline">{item.tipo}</Badge>
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {formatDateStr(item.data)}
+                  </span>
+                </div>
+                <p className="text-sm mt-1">{item.descricao}</p>
+                {item.status && (
+                  <Badge variant="secondary" className="mt-1 text-xs">{item.status}</Badge>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

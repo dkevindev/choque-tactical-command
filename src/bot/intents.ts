@@ -1,5 +1,6 @@
 import { responderConsultaViatura } from './responderConsultaViatura';
 import { handleEntradaOficina, handleSaidaOficina, listarViaturasNaOficina, buscarServicosPorTipo, consultarOSPorNumero } from './oficinaHandler';
+import { responderConsultaPatrimonio } from './patrimonioHandler';
 import type { BotResponse } from './types';
 
 export interface Intent {
@@ -82,5 +83,10 @@ export const intents: Intent[] = [
       
       return { type: 'text', text: 'Por favor, informe o número da OS. Exemplo: "consultar OS 45646"' };
     },
+  },
+  {
+    name: 'consultar_patrimonio',
+    patterns: ['patrimônio', 'patrimonio', 'tombo', 'localizar item', 'onde está o', 'onde fica o'],
+    handler: responderConsultaPatrimonio,
   },
 ];

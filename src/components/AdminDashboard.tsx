@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -32,8 +32,10 @@ import GerenciarCautelas from '@/components/admin-belico/GerenciarCautelas';
 import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferidos';
 import ColetesTab from '@/components/admin-belico/ColetesTab';
+import SaiuDaCarga from '@/components/admin-belico/SaiuDaCarga';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import ReservaAdminPage from '@/components/admin/ReservaAdminPage';
+import PatrimonioPage from '@/components/patrimonio/PatrimonioPage';
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -177,6 +179,7 @@ const DashboardOverview = () => {
   const [coletesVencendo, setColetesVencendo] = useState<any[]>([]);
   const [alertasChegada, setAlertasChegada] = useState<any[]>([]);
   const [alertasChecklist, setAlertasChecklist] = useState<any[]>([]);
+  const [viaturasData, setViaturasData] = useState<any[]>([]);
   const [showColetesVencendoModal, setShowColetesVencendoModal] = useState(false);
   const [showColetesVencidosModal, setShowColetesVencidosModal] = useState(false);
 
@@ -195,6 +198,8 @@ const DashboardOverview = () => {
       // Buscar viaturas
       const viaturasSnapshot = await getDocs(collection(db, 'frota'));
       const totalViaturas = viaturasSnapshot.size;
+      const viaturasArray = viaturasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setViaturasData(viaturasArray);
 
       // Buscar materiais bélicos
       const materiaisSnapshot = await getDocs(collection(db, 'materiais_belicos'));
@@ -718,10 +723,10 @@ const DashboardOverview = () => {
       {/* Dashboard Rico com Múltiplas Informações */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Alerta de Óleo ATRASADO (crítico) */}
-        <AlertaOleoAtrasado />
+        <AlertaOleoAtrasado viaturas={viaturasData} />
         
         {/* Alerta de Troca de Óleo PRÓXIMA (aviso) */}
-        <AlertaTrocaOleo />
+        <AlertaTrocaOleo viaturas={viaturasData} />
       </div>
 
       {/* Alertas da Reserva de Armamento */}
@@ -731,19 +736,7 @@ const DashboardOverview = () => {
   );
 };
 
-const PatrimonioContent = () => (
-  <Card className="bg-card border-border shadow-tactical">
-    <CardHeader>
-      <CardTitle className="text-foreground">GESTÃO DE PATRIMÔNIO</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-muted-foreground">
-        Módulo de controle patrimonial em desenvolvimento...
-      </p>
-    </CardContent>
-  </Card>
-);
-
+const PatrimonioContent = () => <PatrimonioPage />;
 const BelicoContent = () => {
   return (
     <div className="space-y-6">
@@ -759,13 +752,14 @@ const BelicoContent = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="cautelas" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="cautelas">Cautelas</TabsTrigger>
               <TabsTrigger value="coletes">Coletes</TabsTrigger>
-              <TabsTrigger value="transferencias">Transferências</TabsTrigger>
+              <TabsTrigger value="saiu-carga">Saiu da Carga</TabsTrigger>
               <TabsTrigger value="materiais">Materiais</TabsTrigger>
               <TabsTrigger value="estoque">Carga</TabsTrigger>
               <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+              <TabsTrigger value="transferencias">Transferências</TabsTrigger>
             </TabsList>
 
             <TabsContent value="cautelas">
@@ -776,8 +770,8 @@ const BelicoContent = () => {
               <ColetesTab />
             </TabsContent>
 
-            <TabsContent value="transferencias">
-              <MateriaisTransferidos />
+            <TabsContent value="saiu-carga">
+              <SaiuDaCarga />
             </TabsContent>
 
             <TabsContent value="materiais">
@@ -790,6 +784,10 @@ const BelicoContent = () => {
 
             <TabsContent value="relatorios">
               <RelatoriosBelico />
+            </TabsContent>
+
+            <TabsContent value="transferencias">
+              <MateriaisTransferidos />
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -834,38 +832,18 @@ const GestaoContent = () => (
 );
 
 // Alerta de viaturas ATRASADAS na troca de óleo (km ultrapassada)
-const AlertaOleoAtrasado = () => {
-  const [viaturasAtrasadas, setViaturasAtrasadas] = useState<any[]>([]);
+const AlertaOleoAtrasado = ({ viaturas }: { viaturas: any[] }) => {
+  const VIATURAS_MONITORADAS = [
+    'CAV - 04', 'CAV - 05', 'CAV - 06', 'CAV - 08', 'CAV - 11', 
+    'CAV - 12', 'CAV - 13', 'TA - 01', 'TA - 02', 'TA - 03', 
+    'TP', '6398', 'DUSTER'
+  ];
 
-  useEffect(() => {
-    fetchViaturasAtrasadas();
-  }, []);
-
-  const fetchViaturasAtrasadas = async () => {
-    try {
-      const VIATURAS_MONITORADAS = [
-        'CAV - 04', 'CAV - 05', 'CAV - 06', 'CAV - 08', 'CAV - 11', 
-        'CAV - 12', 'CAV - 13', 'TA - 01', 'TA - 02', 'TA - 03', 
-        'TP', '6398', 'DUSTER'
-      ];
-
-      const viaturasSnapshot = await getDocs(collection(db, 'frota'));
-      const todasViaturas = viaturasSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as any[];
-
-      const atrasadas = todasViaturas.filter(v => {
-        const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
-        const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
-        return isMonitorada && kmRestante <= 0;
-      });
-
-      setViaturasAtrasadas(atrasadas);
-    } catch (error) {
-      console.error('Erro ao buscar viaturas atrasadas:', error);
-    }
-  };
+  const viaturasAtrasadas = viaturas.filter(v => {
+    const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
+    const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
+    return isMonitorada && kmRestante <= 0;
+  });
 
   if (viaturasAtrasadas.length === 0) {
     return null;
@@ -907,38 +885,18 @@ const AlertaOleoAtrasado = () => {
 };
 
 // Alerta de viaturas SE APROXIMANDO da troca de óleo
-const AlertaTrocaOleo = () => {
-  const [viaturasAlerta, setViaturasAlerta] = useState<any[]>([]);
+const AlertaTrocaOleo = ({ viaturas }: { viaturas: any[] }) => {
+  const VIATURAS_MONITORADAS = [
+    'CAV - 04', 'CAV - 05', 'CAV - 06', 'CAV - 08', 'CAV - 11', 
+    'CAV - 12', 'CAV - 13', 'TA - 01', 'TA - 02', 'TA - 03', 
+    'TP', '6398', 'DUSTER'
+  ];
 
-  useEffect(() => {
-    fetchViaturasAlerta();
-  }, []);
-
-  const fetchViaturasAlerta = async () => {
-    try {
-      const VIATURAS_MONITORADAS = [
-        'CAV - 04', 'CAV - 05', 'CAV - 06', 'CAV - 08', 'CAV - 11', 
-        'CAV - 12', 'CAV - 13', 'TA - 01', 'TA - 02', 'TA - 03', 
-        'TP', '6398', 'DUSTER'
-      ];
-
-      const viaturasSnapshot = await getDocs(collection(db, 'frota'));
-      const todasViaturas = viaturasSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as any[];
-
-      const viaturasComAlerta = todasViaturas.filter(v => {
-        const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
-        const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
-        return isMonitorada && kmRestante > 0 && kmRestante <= 500;
-      });
-
-      setViaturasAlerta(viaturasComAlerta);
-    } catch (error) {
-      console.error('Erro ao buscar viaturas com alerta:', error);
-    }
-  };
+  const viaturasAlerta = viaturas.filter(v => {
+    const isMonitorada = VIATURAS_MONITORADAS.includes(v.CADASTRO || '');
+    const kmRestante = (v.KMOLEO || 0) - (v.KM || 0);
+    return isMonitorada && kmRestante > 0 && kmRestante <= 500;
+  });
 
   if (viaturasAlerta.length === 0) {
     return null;
@@ -980,9 +938,7 @@ const AlertaTrocaOleo = () => {
 };
 
 const GuardaQuartelContent = () => {
-  const navigate = (path: string) => {
-    window.location.href = path;
-  };
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-6">

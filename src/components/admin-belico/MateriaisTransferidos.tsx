@@ -6,8 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowRight, Search, Eye, FileText, CheckCircle, XCircle } from 'lucide-react';
-import { collection, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+import { Search, Eye, FileText } from 'lucide-react';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 
@@ -35,19 +35,19 @@ interface Transferencia {
   numeroCautelaOriginal: string;
   materiaisLevados: Material[];
   materiaisDevolvidos: Material[];
-  documentosGerados: {
-    baixaCautela?: { gerado: boolean; numeroOficio?: string; dataGeracao?: Date };
-    transferenciaCautela?: { gerado: boolean; numeroOficio?: string; dataGeracao?: Date };
-    termoEntrega?: { gerado: boolean; numeroTermo?: string; dataGeracao?: Date };
+  documentosGerados?: {
+    baixaCautela?: { gerado: boolean };
+    transferenciaCautela?: { gerado: boolean };
+    termoEntrega?: { gerado: boolean };
   };
   status: string;
 }
 
 const MateriaisTransferidos = () => {
   const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('');
-  const [localFiltro, setLocalFiltro] = useState('todos');
-  const [statusFiltro, setStatusFiltro] = useState('todos');
+  const [filtroLocal, setFiltroLocal] = useState('todos');
   const [detalhes, setDetalhes] = useState<Transferencia | null>(null);
 
   useEffect(() => {
@@ -55,6 +55,7 @@ const MateriaisTransferidos = () => {
   }, []);
 
   const loadTransferencias = async () => {
+    setLoading(true);
     try {
       const q = query(collection(db, 'transferencias_policiais'), orderBy('dataTransferencia', 'desc'));
       const querySnapshot = await getDocs(q);
@@ -62,89 +63,60 @@ const MateriaisTransferidos = () => {
         id: doc.id,
         ...doc.data(),
         dataTransferencia: doc.data().dataTransferencia?.toDate() || new Date(),
-        documentosGerados: {
-          baixaCautela: doc.data().documentosGerados?.baixaCautela || { gerado: false },
-          transferenciaCautela: doc.data().documentosGerados?.transferenciaCautela || { gerado: false },
-          termoEntrega: doc.data().documentosGerados?.termoEntrega || { gerado: false }
-        }
       })) as Transferencia[];
       setTransferencias(data);
     } catch (error) {
       console.error('Erro ao carregar transferências:', error);
       toast.error('Erro ao carregar transferências');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const locaisUnicos = [...new Set(transferencias.map(t => t.localDestino).filter(Boolean))];
+
   const transferenciasFiltradas = transferencias.filter((t) => {
-    const matchNome = t.policialNome?.toLowerCase().includes(filtro.toLowerCase());
-    const matchMatricula = t.policialMatricula?.toString().includes(filtro);
-    const matchLocal = localFiltro === 'todos' || t.localDestino === localFiltro;
-    const matchStatus = statusFiltro === 'todos' || t.status === statusFiltro;
-    return (matchNome || matchMatricula) && matchLocal && matchStatus;
+    const matchTexto =
+      t.policialNome?.toLowerCase().includes(filtro.toLowerCase()) ||
+      t.policialMatricula?.toLowerCase().includes(filtro.toLowerCase()) ||
+      t.publicacao?.toLowerCase().includes(filtro.toLowerCase());
+    const matchLocal = filtroLocal === 'todos' || t.localDestino === filtroLocal;
+    return matchTexto && matchLocal;
   });
-
-  const getStatusDocumentos = (docs: Transferencia['documentosGerados']) => {
-    const total = 3;
-    const gerados = [
-      docs.baixaCautela?.gerado,
-      docs.transferenciaCautela?.gerado,
-      docs.termoEntrega?.gerado
-    ].filter(Boolean).length;
-
-    if (gerados === 0) return <Badge variant="outline">0/3 Documentos</Badge>;
-    if (gerados === total) return <Badge variant="default">3/3 Documentos</Badge>;
-    return <Badge variant="secondary">{gerados}/3 Documentos</Badge>;
-  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Materiais Transferidos</h3>
+        <h3 className="text-lg font-semibold text-foreground">Transferências de Policiais</h3>
         <p className="text-sm text-muted-foreground">
-          Histórico de transferências de policiais com materiais bélicos
+          Histórico de policiais transferidos e seus materiais
         </p>
       </div>
 
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nome ou matrícula..."
+                placeholder="Buscar por policial, matrícula ou publicação..."
                 value={filtro}
                 onChange={(e) => setFiltro(e.target.value)}
                 className="pl-10"
               />
             </div>
-
-            <Select value={localFiltro} onValueChange={setLocalFiltro}>
+            <Select value={filtroLocal} onValueChange={setFiltroLocal}>
               <SelectTrigger>
-                <SelectValue placeholder="Filtrar por local" />
+                <SelectValue placeholder="Local de destino" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos os locais</SelectItem>
-                <SelectItem value="Fortaleza">Fortaleza</SelectItem>
-                <SelectItem value="Crato">Crato</SelectItem>
+                <SelectItem value="todos">Todos os Destinos</SelectItem>
+                {locaisUnicos.map((local) => (
+                  <SelectItem key={local} value={local}>{local}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-
-            <Select value={statusFiltro} onValueChange={setStatusFiltro}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os status</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="documentos_gerados">Documentos Gerados</SelectItem>
-                <SelectItem value="finalizado">Finalizado</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Badge variant="outline">
-              Exibindo: {transferenciasFiltradas.length} de {transferencias.length}
-            </Badge>
           </div>
         </CardContent>
       </Card>
@@ -152,55 +124,68 @@ const MateriaisTransferidos = () => {
       {/* Tabela */}
       <Card>
         <CardHeader>
-          <CardTitle>Transferências Registradas</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Policiais Transferidos</span>
+            <Badge variant="outline">{transferenciasFiltradas.length} registros</Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Data</TableHead>
                   <TableHead>Policial</TableHead>
+                  <TableHead>Matrícula</TableHead>
                   <TableHead>Destino</TableHead>
                   <TableHead>Publicação</TableHead>
-                  <TableHead>Levados</TableHead>
-                  <TableHead>Devolvidos</TableHead>
-                  <TableHead>Documentos</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Materiais</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transferenciasFiltradas.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="text-sm">
-                      {t.dataTransferencia.toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">
-                          {t.policialPatente} {t.policialNome}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Mat: {t.policialMatricula}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{t.localDestino}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{t.publicacao}</TableCell>
-                    <TableCell>
-                      <Badge>{t.materiaisLevados.length}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{t.materiaisDevolvidos.length}</Badge>
-                    </TableCell>
-                    <TableCell>{getStatusDocumentos(t.documentosGerados)}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => setDetalhes(t)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                {loading ? (
+                  <TableRow>
+                     <TableCell colSpan={7} className="text-center py-8">
+                      Carregando...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : transferenciasFiltradas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      Nenhuma transferência encontrada
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  transferenciasFiltradas.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium">
+                        {t.policialPatente} {t.policialNome}
+                      </TableCell>
+                      <TableCell className="text-sm">{t.policialMatricula}</TableCell>
+                      <TableCell className="text-sm">{t.localDestino}</TableCell>
+                      <TableCell className="text-sm">{t.publicacao}</TableCell>
+                      <TableCell className="text-sm">
+                        {t.dataTransferencia.toLocaleDateString('pt-BR')}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Badge variant="outline" className="text-xs">
+                            {t.materiaisLevados?.length || 0} levados
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            {t.materiaisDevolvidos?.length || 0} devolvidos
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => setDetalhes(t)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -210,32 +195,20 @@ const MateriaisTransferidos = () => {
       {/* Modal de Detalhes */}
       {detalhes && (
         <Dialog open={!!detalhes} onOpenChange={() => setDetalhes(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Detalhes da Transferência</DialogTitle>
             </DialogHeader>
 
             <div className="space-y-6">
-              {/* Dados do Policial */}
               <div className="p-4 bg-muted rounded-lg">
                 <h4 className="font-semibold mb-2">Policial</h4>
-                <p>
-                  {detalhes.policialPatente} {detalhes.policialNome}
-                </p>
+                <p>{detalhes.policialPatente} {detalhes.policialNome}</p>
                 <p className="text-sm text-muted-foreground">Matrícula: {detalhes.policialMatricula}</p>
-                <p className="text-sm text-muted-foreground">
-                  Cautela Original: {detalhes.numeroCautelaOriginal}
-                </p>
+                <p className="text-sm text-muted-foreground">Cautela Original: {detalhes.numeroCautelaOriginal}</p>
               </div>
 
-              {/* Dados da Transferência */}
               <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Data</p>
-                  <p className="text-sm text-muted-foreground">
-                    {detalhes.dataTransferencia.toLocaleDateString()}
-                  </p>
-                </div>
                 <div>
                   <p className="text-sm font-medium">Destino</p>
                   <p className="text-sm text-muted-foreground">{detalhes.localDestino}</p>
@@ -244,10 +217,15 @@ const MateriaisTransferidos = () => {
                   <p className="text-sm font-medium">Publicação</p>
                   <p className="text-sm text-muted-foreground">{detalhes.publicacao}</p>
                 </div>
+                <div>
+                  <p className="text-sm font-medium">Data</p>
+                  <p className="text-sm text-muted-foreground">{detalhes.dataTransferencia.toLocaleDateString('pt-BR')}</p>
+                </div>
               </div>
 
-              {/* Materiais Levados */}
-              {detalhes.materiaisLevados.length > 0 && (
+
+
+              {detalhes.materiaisLevados?.length > 0 && (
                 <div>
                   <h4 className="font-semibold mb-2">Materiais Levados</h4>
                   <div className="space-y-2">
@@ -256,7 +234,7 @@ const MateriaisTransferidos = () => {
                         <p className="font-medium">{m.nome}</p>
                         <p className="text-xs text-muted-foreground">
                           {m.numeroSerie && `N/S: ${m.numeroSerie}`}
-                          {m.fabricante && ` - ${m.fabricante} ${m.modelo}`}
+                          {m.fabricante && ` — ${m.fabricante} ${m.modelo || ''}`}
                         </p>
                       </div>
                     ))}
@@ -264,17 +242,16 @@ const MateriaisTransferidos = () => {
                 </div>
               )}
 
-              {/* Materiais Devolvidos */}
-              {detalhes.materiaisDevolvidos.length > 0 && (
+              {detalhes.materiaisDevolvidos?.length > 0 && (
                 <div>
-                  <h4 className="font-semibold mb-2">Materiais Devolvidos</h4>
+                  <h4 className="font-semibold mb-2">Materiais Devolvidos ao Batalhão</h4>
                   <div className="space-y-2">
                     {detalhes.materiaisDevolvidos.map((m, i) => (
                       <div key={i} className="p-2 border rounded">
                         <p className="font-medium">{m.nome}</p>
                         <p className="text-xs text-muted-foreground">
                           {m.numeroSerie && `N/S: ${m.numeroSerie}`}
-                          {m.fabricante && ` - ${m.fabricante} ${m.modelo}`}
+                          {m.fabricante && ` — ${m.fabricante} ${m.modelo || ''}`}
                         </p>
                       </div>
                     ))}
@@ -282,36 +259,25 @@ const MateriaisTransferidos = () => {
                 </div>
               )}
 
-              {/* Status dos Documentos */}
-              <div>
-                <h4 className="font-semibold mb-2">Documentos</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 border rounded">
-                    <span>Baixa de Cautela</span>
-                    {detalhes.documentosGerados.baixaCautela?.gerado ? (
-                      <Badge variant="default">Gerado</Badge>
-                    ) : (
-                      <Badge variant="outline">Não Gerado</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between p-2 border rounded">
-                    <span>Transferência de Cautela</span>
-                    {detalhes.documentosGerados.transferenciaCautela?.gerado ? (
-                      <Badge variant="default">Gerado</Badge>
-                    ) : (
-                      <Badge variant="outline">Não Gerado</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between p-2 border rounded">
-                    <span>Termo de Entrega</span>
-                    {detalhes.documentosGerados.termoEntrega?.gerado ? (
-                      <Badge variant="default">Gerado</Badge>
-                    ) : (
-                      <Badge variant="outline">Não Gerado</Badge>
-                    )}
+              {detalhes.documentosGerados && (
+                <div>
+                  <h4 className="font-semibold mb-2">Documentos</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant={detalhes.documentosGerados.baixaCautela?.gerado ? 'default' : 'outline'}>
+                      <FileText className="h-3 w-3 mr-1" />
+                      Baixa Cautela {detalhes.documentosGerados.baixaCautela?.gerado ? '✓' : '—'}
+                    </Badge>
+                    <Badge variant={detalhes.documentosGerados.transferenciaCautela?.gerado ? 'default' : 'outline'}>
+                      <FileText className="h-3 w-3 mr-1" />
+                      Transferência {detalhes.documentosGerados.transferenciaCautela?.gerado ? '✓' : '—'}
+                    </Badge>
+                    <Badge variant={detalhes.documentosGerados.termoEntrega?.gerado ? 'default' : 'outline'}>
+                      <FileText className="h-3 w-3 mr-1" />
+                      Termo Entrega {detalhes.documentosGerados.termoEntrega?.gerado ? '✓' : '—'}
+                    </Badge>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>

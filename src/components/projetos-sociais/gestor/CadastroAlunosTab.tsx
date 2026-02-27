@@ -7,12 +7,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, MoreHorizontal, Edit } from 'lucide-react';
+import { UserPlus, MoreHorizontal, Edit, Clock, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface DiaEspecial {
+  diaSemana: string;
+  turmaId: string;
+  turno: string;
+}
 
 interface CadastroAlunosTabProps {
   projeto: any;
@@ -23,7 +30,20 @@ interface Turma {
   id: string;
   nome: string;
   alunos: string[];
+  diasSemana?: string[];
+  turnos?: string[];
+  turnoNome?: string;
 }
+
+const DIAS_SEMANA = [
+  { value: 'segunda', label: 'Segunda-feira' },
+  { value: 'terca', label: 'Terça-feira' },
+  { value: 'quarta', label: 'Quarta-feira' },
+  { value: 'quinta', label: 'Quinta-feira' },
+  { value: 'sexta', label: 'Sexta-feira' },
+  { value: 'sabado', label: 'Sábado' },
+  { value: 'domingo', label: 'Domingo' },
+];
 
 const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
   const [alunos, setAlunos] = useState<any[]>([]);
@@ -42,7 +62,9 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
     endereco: '',
     contatoResponsavel: '',
     observacoes: '',
-    turmaId: ''
+    turmaId: '',
+    horarioEspecial: false,
+    diasEspeciais: [] as DiaEspecial[]
   });
 
   useEffect(() => {
@@ -101,7 +123,9 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
       endereco: '',
       contatoResponsavel: '',
       observacoes: '',
-      turmaId: ''
+      turmaId: '',
+      horarioEspecial: false,
+      diasEspeciais: []
     });
     setAlunoEditando(null);
   };
@@ -117,10 +141,38 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
       endereco: aluno.endereco || '',
       contatoResponsavel: aluno.contatoResponsavel || '',
       observacoes: aluno.observacoes || '',
-      turmaId: turmaAtual
+      turmaId: turmaAtual,
+      horarioEspecial: aluno.horarioEspecial || false,
+      diasEspeciais: aluno.diasEspeciais || []
     });
     setAlunoEditando(aluno);
     setDialogOpen(true);
+  };
+
+  const adicionarDiaEspecial = () => {
+    setFormData(prev => ({
+      ...prev,
+      diasEspeciais: [
+        ...prev.diasEspeciais,
+        { diaSemana: 'segunda', turmaId: '', turno: 'manha' }
+      ]
+    }));
+  };
+
+  const removerDiaEspecial = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      diasEspeciais: prev.diasEspeciais.filter((_, i) => i !== index)
+    }));
+  };
+
+  const atualizarDiaEspecial = (index: number, campo: keyof DiaEspecial, valor: string) => {
+    setFormData(prev => ({
+      ...prev,
+      diasEspeciais: prev.diasEspeciais.map((dia, i) => 
+        i === index ? { ...dia, [campo]: valor } : dia
+      )
+    }));
   };
 
   const salvarAluno = async (e: React.FormEvent) => {
@@ -128,13 +180,15 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
     try {
       setLoading(true);
 
-      const { turmaId, ...dadosAluno } = formData;
+      const { turmaId, horarioEspecial, diasEspeciais, ...dadosAluno } = formData;
       
       const alunoData = {
         ...dadosAluno,
         idade: Number(formData.idade),
         projetoId: projeto.id,
         ativo: true,
+        horarioEspecial: horarioEspecial,
+        diasEspeciais: horarioEspecial ? diasEspeciais : [],
         ...(alunoEditando ? {} : { dataCadastro: new Date() })
       };
 
@@ -305,7 +359,7 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
                 </div>
 
                 <div className="col-span-2">
-                  <Label htmlFor="turma">Turma</Label>
+                  <Label htmlFor="turma">Turma Principal</Label>
                   <Select
                     value={formData.turmaId}
                     onValueChange={(value) => setFormData({...formData, turmaId: value})}
@@ -321,7 +375,7 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
                       ) : (
                         turmas.map((turma) => (
                           <SelectItem key={turma.id} value={turma.id}>
-                            {turma.nome}
+                            {turma.nome} {turma.turnoNome && `(${turma.turnoNome})`}
                           </SelectItem>
                         ))
                       )}
@@ -331,6 +385,88 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
                     <p className="text-xs text-muted-foreground mt-1">
                       Cadastre turmas na aba "Turmas" antes de vincular alunos
                     </p>
+                  )}
+                </div>
+
+                {/* Horário Especial */}
+                <div className="col-span-2 border-t pt-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Checkbox
+                      id="horarioEspecial"
+                      checked={formData.horarioEspecial}
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData, 
+                        horarioEspecial: checked as boolean,
+                        diasEspeciais: checked ? formData.diasEspeciais : []
+                      })}
+                    />
+                    <Label htmlFor="horarioEspecial" className="cursor-pointer flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Horário Especial (frequenta dias de outras turmas)
+                    </Label>
+                  </div>
+
+                  {formData.horarioEspecial && (
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Configure os dias e turmas que este aluno frequenta:
+                      </p>
+                      
+                      {formData.diasEspeciais.map((dia, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Select
+                            value={dia.diaSemana}
+                            onValueChange={(value) => atualizarDiaEspecial(index, 'diaSemana', value)}
+                          >
+                            <SelectTrigger className="w-[140px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DIAS_SEMANA.map(d => (
+                                <SelectItem key={d.value} value={d.value}>
+                                  {d.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Select
+                            value={dia.turmaId}
+                            onValueChange={(value) => atualizarDiaEspecial(index, 'turmaId', value)}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Turma" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {turmas.map(turma => (
+                                <SelectItem key={turma.id} value={turma.id}>
+                                  {turma.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removerDiaEspecial(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={adicionarDiaEspecial}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Adicionar Dia
+                      </Button>
+                    </div>
                   )}
                 </div>
 
@@ -391,11 +527,19 @@ const CadastroAlunosTab = ({ projeto, onUpdate }: CadastroAlunosTabProps) => {
                     <TableCell>{aluno.nomeGuerra}</TableCell>
                     <TableCell>{aluno.idade} anos</TableCell>
                     <TableCell>
-                      {turmaNome ? (
-                        <Badge variant="outline">{turmaNome}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">Sem turma</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {turmaNome ? (
+                          <Badge variant="outline">{turmaNome}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">Sem turma</span>
+                        )}
+                        {aluno.horarioEspecial && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Especial
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>{aluno.contatoResponsavel}</TableCell>
                     <TableCell>

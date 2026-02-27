@@ -7,7 +7,7 @@ import {
   AlertTriangle, Bell, CheckCircle, Package, FileText, 
   User, Clock, ChevronDown, ChevronUp 
 } from "lucide-react";
-import { collection, query, where, getDocs, doc, updateDoc, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
 
@@ -43,15 +43,17 @@ const AlertasGestaoSection = () => {
     const unsubscribe = onSnapshot(
       query(
         collection(db, 'alertas_gestao'),
-        where('lido', '==', false),
-        orderBy('dataHora', 'desc')
+        where('lido', '==', false)
       ),
       (snapshot) => {
-        const alertasData = snapshot.docs.map(doc => ({
+        const alertasData = (snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
           dataHora: doc.data().dataHora?.toDate?.() || new Date()
-        })) as AlertaGestao[];
+        })) as AlertaGestao[]).filter(alerta => alerta.tipo !== 'material_pendente');
+        
+        // Ordenar em memória para evitar necessidade de índice composto
+        alertasData.sort((a, b) => b.dataHora.getTime() - a.dataHora.getTime());
         
         setAlertas(alertasData);
         setLoading(false);

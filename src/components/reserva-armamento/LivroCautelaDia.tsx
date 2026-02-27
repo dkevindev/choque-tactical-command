@@ -1,18 +1,28 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BookOpen, Clock, CheckCircle } from "lucide-react";
+import { BookOpen, Clock, CheckCircle, Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 
 interface MovimentacaoDia {
   id: string;
   cautelaId?: string;
+  policialId?: string;
   policialNome: string;
   policialNomeGuerra?: string;
   policialMatricula?: string;
   policialNumeral?: number;
   postoGrad?: string;
   materiais: Array<{
+    materialId?: string;
     nome: string;
     quantidade: number;
     numeroSerie?: string;
@@ -31,6 +41,8 @@ interface LivroCautelaDiaProps {
   movimentacoes: MovimentacaoDia[];
   dataAbertura: Date;
   armeiroNome: string;
+  onComplementarCautela?: (cautelaId: string, policialId: string, policialNome: string, materiais: any[]) => void;
+  
 }
 
 const formatarAssinatura = (data: Date, hora: string) => {
@@ -69,7 +81,7 @@ const formatarDevolucao = (data: Date, hora: string, armeiroNome?: string) => {
   );
 };
 
-const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCautelaDiaProps) => {
+const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome, onComplementarCautela }: LivroCautelaDiaProps) => {
   if (movimentacoes.length === 0) {
     return (
       <Card>
@@ -117,6 +129,7 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                   <TableHead className="w-[100px] text-center">Status</TableHead>
                   <TableHead className="min-w-[180px] text-center">Assinatura Saída</TableHead>
                   <TableHead className="min-w-[180px] text-center">Devolução</TableHead>
+                  {onComplementarCautela && <TableHead className="w-[100px] text-center">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -130,7 +143,9 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">
-                        {mov.postoGrad && `${mov.postoGrad} `}
+                        {mov.postoGrad && !mov.policialNomeGuerra?.toUpperCase().startsWith(mov.postoGrad?.toUpperCase()) 
+                          ? `${mov.postoGrad} ` 
+                          : ''}
                         {mov.policialNomeGuerra || mov.policialNome}
                       </div>
                       <div className="text-xs text-muted-foreground space-y-0.5">
@@ -178,6 +193,27 @@ const LivroCautelaDia = ({ movimentacoes, dataAbertura, armeiroNome }: LivroCaut
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </TableCell>
+                    {onComplementarCautela && (
+                      <TableCell className="text-center">
+                        {mov.status === 'pendente' && mov.cautelaId && mov.policialId ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onComplementarCautela(
+                              mov.cautelaId!,
+                              mov.policialId!,
+                              `${mov.postoGrad || ''} ${mov.policialNomeGuerra || mov.policialNome}`.trim(),
+                              mov.materiais
+                            )}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Compl.
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

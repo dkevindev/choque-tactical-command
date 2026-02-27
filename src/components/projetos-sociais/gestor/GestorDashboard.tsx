@@ -3,7 +3,8 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, UserCheck, Calendar, Clock } from 'lucide-react';
+import { Users, UserCheck, Calendar, Clock, ArrowLeft, CalendarPlus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import ConfiguracaoProjetoTab from './ConfiguracaoProjetoTab';
 import CadastroAlunosTab from './CadastroAlunosTab';
 import VisualizarAulasTab from './VisualizarAulasTab';
@@ -11,22 +12,23 @@ import RelatoriosGestorTab from './RelatoriosGestorTab';
 import TurmasTab from './TurmasTab';
 import ConteudosAulaTab from './ConteudosAulaTab';
 import FrequenciaMensalTab from './FrequenciaMensalTab';
+import LancarAulaRetroativaTab from './LancarAulaRetroativaTab';
 
 interface GestorDashboardProps {
   projetos: any[];
+  projetoInicial: any;
   policialLogado: any;
+  onVoltarSelecao?: () => void;
 }
 
-const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorDashboardProps) => {
-  const [projetos, setProjetos] = useState(projetosIniciais);
+const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialLogado, onVoltarSelecao }: GestorDashboardProps) => {
+  const [projetoSelecionado, setProjetoSelecionado] = useState(projetoInicial);
   const [stats, setStats] = useState({
     totalAlunos: 0,
     totalInstrutores: 0,
     aulasMes: 0,
     horasMes: 0
   });
-
-  const projetoSelecionado = projetos[0]; // Por enquanto, pega o primeiro projeto
 
   useEffect(() => {
     if (projetoSelecionado) {
@@ -47,7 +49,7 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
           ...projetoDoc.docs[0].data()
         };
         console.log('Projeto recarregado:', projetoAtualizado);
-        setProjetos([projetoAtualizado]);
+        setProjetoSelecionado(projetoAtualizado);
       }
     } catch (error) {
       console.error('Erro ao recarregar projeto:', error);
@@ -114,7 +116,15 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">
+          <div className="flex items-center gap-4">
+            {onVoltarSelecao && (
+              <Button variant="ghost" size="sm" onClick={onVoltarSelecao}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Trocar Projeto
+              </Button>
+            )}
+          </div>
+          <h1 className="text-3xl font-bold text-foreground mt-2">
             {projetoSelecionado?.nome}
           </h1>
           <p className="text-muted-foreground mt-2">
@@ -123,32 +133,40 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
         </header>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className={`grid w-full ${projetoSelecionado?.configuracao?.usaFrequencia !== false ? 'grid-cols-9' : 'grid-cols-8'}`}>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="configuracao">Configuração</TabsTrigger>
-            <TabsTrigger value="alunos">Alunos</TabsTrigger>
+            {projetoSelecionado?.configuracao?.usaFrequencia !== false && (
+              <TabsTrigger value="alunos">Alunos</TabsTrigger>
+            )}
             <TabsTrigger value="turmas">Turmas</TabsTrigger>
             <TabsTrigger value="conteudos">Conteúdos</TabsTrigger>
             <TabsTrigger value="aulas">Aulas</TabsTrigger>
+            <TabsTrigger value="lancar-aula" className="flex items-center gap-1">
+              <CalendarPlus className="h-3 w-3" />
+              Lançar Aula
+            </TabsTrigger>
             <TabsTrigger value="frequencia">Frequência</TabsTrigger>
             <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
-            <div className="grid grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Alunos Ativos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-3">
-                    <Users className="h-8 w-8 text-primary" />
-                    <p className="text-3xl font-bold">{stats.totalAlunos}</p>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className={`grid gap-6 ${projetoSelecionado?.configuracao?.usaFrequencia !== false ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              {projetoSelecionado?.configuracao?.usaFrequencia !== false && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Alunos Ativos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-3">
+                      <Users className="h-8 w-8 text-primary" />
+                      <p className="text-3xl font-bold">{stats.totalAlunos}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               <Card>
                 <CardHeader className="pb-3">
@@ -198,9 +216,11 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
             <ConfiguracaoProjetoTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
           </TabsContent>
 
-          <TabsContent value="alunos">
-            <CadastroAlunosTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
-          </TabsContent>
+          {projetoSelecionado?.configuracao?.usaFrequencia !== false && (
+            <TabsContent value="alunos">
+              <CadastroAlunosTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
+            </TabsContent>
+          )}
 
           <TabsContent value="turmas">
             <TurmasTab projeto={projetoSelecionado} onUpdate={handleUpdate} />
@@ -212,6 +232,10 @@ const GestorDashboard = ({ projetos: projetosIniciais, policialLogado }: GestorD
 
           <TabsContent value="aulas">
             <VisualizarAulasTab projeto={projetoSelecionado} />
+          </TabsContent>
+
+          <TabsContent value="lancar-aula">
+            <LancarAulaRetroativaTab projeto={projetoSelecionado} onSuccess={handleUpdate} />
           </TabsContent>
 
           <TabsContent value="frequencia">

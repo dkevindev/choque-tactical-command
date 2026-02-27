@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,16 @@ const ModalQuantidadeMaterial = ({
 
   if (!material) return null;
 
+  // Detectar se é Calibre 12 (não usa carregadores)
+  const isCalibre12 = tipo === 'arma' && material?.calibre?.toLowerCase().includes('12');
+
+  const handleCalibre12 = () => {
+    onConfirmar(1, 0);
+    setQuantidade(tipo === 'municao' ? 15 : 1);
+    setCarregadores(2);
+    onClose();
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-sm">
@@ -61,6 +71,7 @@ const ModalQuantidadeMaterial = ({
             <Package className="h-5 w-5 text-primary" />
             {tipo === 'municao' ? 'Quantidade de Munição' : 'Configurar Armamento'}
           </DialogTitle>
+          <DialogDescription className="sr-only">Configure a quantidade do material selecionado</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -119,6 +130,22 @@ const ModalQuantidadeMaterial = ({
                 </p>
               )}
             </div>
+          ) : isCalibre12 ? (
+            /* Calibre 12 - Sem carregadores */
+            <div className="space-y-3">
+              <Button
+                onClick={handleCalibre12}
+                className="w-full h-16 bg-amber-600 hover:bg-amber-700 text-white border-2 border-amber-500"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <span className="font-bold text-lg">CALIBRE 12</span>
+                  <span className="text-sm opacity-90">Não possui carregador</span>
+                </div>
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Espingardas calibre 12 não utilizam carregadores convencionais.
+              </p>
+            </div>
           ) : (
             /* Quantidade de Carregadores */
             <div className="space-y-3">
@@ -167,9 +194,11 @@ const ModalQuantidadeMaterial = ({
           <Button variant="outline" onClick={handleClose}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirmar}>
-            Adicionar
-          </Button>
+          {!isCalibre12 && (
+            <Button onClick={handleConfirmar}>
+              Adicionar
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

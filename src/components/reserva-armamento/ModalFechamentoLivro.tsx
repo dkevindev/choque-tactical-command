@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,7 @@ interface Alteracao {
   id: string;
   descricao: string;
   dataHora: Date;
+  tipo?: string;
 }
 
 interface ModalFechamentoLivroProps {
@@ -18,13 +19,15 @@ interface ModalFechamentoLivroProps {
   onClose: () => void;
   armeiroNome: string;
   onFechar: (senha: string, alteracoes: Alteracao[]) => Promise<boolean>;
+  alteracoesAutomaticas?: Alteracao[];
 }
 
 const ModalFechamentoLivro = ({
   open,
   onClose,
   armeiroNome,
-  onFechar
+  onFechar,
+  alteracoesAutomaticas = []
 }: ModalFechamentoLivroProps) => {
   const [senha, setSenha] = useState('');
   const [alteracoes, setAlteracoes] = useState<Alteracao[]>([]);
@@ -50,6 +53,9 @@ const ModalFechamentoLivro = ({
   };
 
   const handleFechar = async () => {
+    // Proteção contra cliques duplos
+    if (loading) return;
+    
     if (!senha.trim()) {
       setErro('Digite sua senha para fechar o livro.');
       return;
@@ -91,6 +97,7 @@ const ModalFechamentoLivro = ({
             <BookOpen className="h-5 w-5 text-primary" />
             Fechar Livro Diário
           </DialogTitle>
+          <DialogDescription className="sr-only">Registre alterações e feche o livro diário</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -99,6 +106,29 @@ const ModalFechamentoLivro = ({
             <p className="text-sm text-muted-foreground">Armeiro responsável:</p>
             <p className="font-semibold text-foreground">{armeiroNome}</p>
           </div>
+
+          {/* Alterações Automáticas (falta de munição, etc) */}
+          {alteracoesAutomaticas && alteracoesAutomaticas.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <AlertCircle className="h-4 w-4" />
+                Alterações automáticas ({alteracoesAutomaticas.length})
+              </Label>
+              <div className="max-h-32 overflow-y-auto space-y-2">
+                {alteracoesAutomaticas.map((alteracao) => (
+                  <div 
+                    key={alteracao.id}
+                    className="p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded"
+                  >
+                    <p className="text-sm text-amber-800 dark:text-amber-200">{alteracao.descricao}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      {alteracao.dataHora.toLocaleTimeString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Adicionar Alterações */}
           <div className="space-y-2">
@@ -163,7 +193,7 @@ const ModalFechamentoLivro = ({
               placeholder="Digite sua senha para fechar o livro"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleFechar()}
+              onKeyDown={(e) => e.key === 'Enter' && handleFechar()}
             />
           </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,6 +37,7 @@ interface ModalRecebimentoPendenteProps {
   onClose: () => void;
   cautela: CautelaPendente | null;
   onRecebimentoConcluido: () => void;
+  armeiroLogadoId?: string;
 }
 
 interface MaterialDevolucao {
@@ -48,7 +49,7 @@ interface MaterialDevolucao {
   motivoFalta?: string;
 }
 
-const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConcluido }: ModalRecebimentoPendenteProps) => {
+const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConcluido, armeiroLogadoId }: ModalRecebimentoPendenteProps) => {
   const [etapa, setEtapa] = useState<'senha' | 'materiais'>('senha');
   const [senha, setSenha] = useState('');
   const [senhaErro, setSenhaErro] = useState('');
@@ -81,17 +82,34 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
       setLoading(true);
       setSenhaErro('');
 
-      const policialDoc = await getDoc(doc(db, 'policiais', cautela.policialId));
+      // Buscar armeiro logado (não o policial da cautela)
+      // Priorizar armeiroLogadoId passado via prop, fallback para localStorage
+      let armeiroIdToUse = armeiroLogadoId;
       
-      if (!policialDoc.exists()) {
-        setSenhaErro('Policial não encontrado.');
+      if (!armeiroIdToUse) {
+        const userStorage = localStorage.getItem('user');
+        if (userStorage) {
+          const userData = JSON.parse(userStorage);
+          armeiroIdToUse = userData.id;
+        }
+      }
+      
+      if (!armeiroIdToUse) {
+        setSenhaErro('Usuário não logado.');
+        return;
+      }
+      
+      const armeiroDoc = await getDoc(doc(db, 'policiais', armeiroIdToUse));
+      
+      if (!armeiroDoc.exists()) {
+        setSenhaErro('Armeiro não encontrado.');
         return;
       }
 
-      const policialData = policialDoc.data();
+      const armeiroData = armeiroDoc.data();
       
-      if (policialData.senha !== senha) {
-        setSenhaErro('Senha incorreta. Verifique e tente novamente.');
+      if (armeiroData.senha !== senha) {
+        setSenhaErro('Senha do armeiro incorreta. Verifique e tente novamente.');
         return;
       }
 
@@ -134,21 +152,31 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
       const horaBaixa = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
       // Buscar nome do armeiro atual
-      const userStorage = localStorage.getItem('user');
+      let armeiroId = armeiroLogadoId || '';
       let armeiroNome = 'Armeiro';
-      let armeiroId = '';
-      if (userStorage) {
-        const userData = JSON.parse(userStorage);
-        armeiroId = userData.id;
-        const armeiroDoc = await getDoc(doc(db, 'policiais', userData.id));
+      
+      if (!armeiroId) {
+        const userStorage = localStorage.getItem('user');
+        if (userStorage) {
+          const userData = JSON.parse(userStorage);
+          armeiroId = userData.id || '';
+        }
+      }
+      
+      if (armeiroId) {
+        const armeiroDoc = await getDoc(doc(db, 'policiais', armeiroId));
         if (armeiroDoc.exists()) {
           const armeiroData = armeiroDoc.data();
-          armeiroNome = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME;
+          armeiroNome = armeiroData['NOME DE GUERRA1'] || armeiroData['NOME DE GUERRA'] || armeiroData.NOME || 'Armeiro';
         }
       }
 
       // Processar cada material
       for (const mat of materiaisDevolucao) {
+        if (!mat.materialId) {
+          console.warn('Material sem materialId, pulando atualização de estoque:', mat.nome);
+          continue;
+        }
         const materialRef = doc(db, 'materiais_belicos', mat.materialId);
         const materialDoc = await getDoc(materialRef);
         
@@ -180,7 +208,7 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
                 quantidadeDevolvida: mat.quantidadeDevolvida,
                 quantidadeFaltante: faltante,
                 motivoFalta: mat.motivoFalta,
-                livroOriginal: cautela.livroId,
+                livroOriginal: cautela.livroId || '',
                 lido: false
               });
             }
@@ -196,58 +224,62 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
       }
 
       // Atualizar a cautela original com status entregue
-      await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
-        status: 'entregue',
-        dataBaixa: agora,
-        horaBaixa,
-        recebidoPorId: armeiroId,
-        recebidoPorNome: armeiroNome,
-        assinaturaEntrada: {
-          data: agora,
-          hora: horaBaixa,
-          policialId: cautela.policialId,
-          validadoPorSenha: true
-        }
-      });
+      if (cautela.id) {
+        await updateDoc(doc(db, 'cautelas_provisorias', cautela.id), {
+          status: 'entregue',
+          dataBaixa: agora,
+          horaBaixa,
+          recebidoPorId: armeiroId,
+          recebidoPorNome: armeiroNome,
+          assinaturaEntrada: {
+            data: agora,
+            hora: horaBaixa,
+            policialId: cautela.policialId,
+            validadoPorSenha: true
+          }
+        });
+      }
 
       // Registrar entrada no livro original (assinatura digital)
-      try {
-        const livroOriginalRef = doc(db, 'livros_reserva_armamento', cautela.livroId);
-        const livroOriginalDoc = await getDoc(livroOriginalRef);
+      if (cautela.livroId) {
+        try {
+          const livroOriginalRef = doc(db, 'livros_reserva_armamento', cautela.livroId);
+          const livroOriginalDoc = await getDoc(livroOriginalRef);
 
-        if (livroOriginalDoc.exists()) {
-          const livroData = livroOriginalDoc.data();
-          const entradasExternas = livroData.entradasExternas || [];
-          
-          await updateDoc(livroOriginalRef, {
-            entradasExternas: [
-              ...entradasExternas,
-              {
-                cautelaId: cautela.id,
-                policialId: cautela.policialId,
-                policialNome: cautela.policialNome,
-                policialNomeGuerra: cautela.policialNomeGuerra,
-                policialMatricula: cautela.policialMatricula,
-                materiais: materiaisDevolucao.map(m => ({
-                  materialId: m.materialId,
-                  nome: m.nome,
-                  quantidadeCautelada: m.quantidadeCautelada,
-                  quantidadeDevolvida: m.quantidadeDevolvida
-                })),
-                dataEntrada: agora,
-                horaEntrada: horaBaixa,
-                recebidoPorId: armeiroId,
-                recebidoPorNome: armeiroNome,
-                assinatura: {
-                  validadoPorSenha: true,
-                  dataValidacao: agora
+          if (livroOriginalDoc.exists()) {
+            const livroData = livroOriginalDoc.data();
+            const entradasExternas = livroData.entradasExternas || [];
+            
+            await updateDoc(livroOriginalRef, {
+              entradasExternas: [
+                ...entradasExternas,
+                {
+                  cautelaId: cautela.id,
+                  policialId: cautela.policialId,
+                  policialNome: cautela.policialNome,
+                  policialNomeGuerra: cautela.policialNomeGuerra,
+                  policialMatricula: cautela.policialMatricula,
+                  materiais: materiaisDevolucao.map(m => ({
+                    materialId: m.materialId,
+                    nome: m.nome,
+                    quantidadeCautelada: m.quantidadeCautelada,
+                    quantidadeDevolvida: m.quantidadeDevolvida
+                  })),
+                  dataEntrada: agora,
+                  horaEntrada: horaBaixa,
+                  recebidoPorId: armeiroId,
+                  recebidoPorNome: armeiroNome,
+                  assinatura: {
+                    validadoPorSenha: true,
+                    dataValidacao: agora
+                  }
                 }
-              }
-            ]
-          });
+              ]
+            });
+          }
+        } catch (e) {
+          console.error('Erro ao registrar entrada no livro original:', e);
         }
-      } catch (e) {
-        console.error('Erro ao registrar entrada no livro original:', e);
       }
 
       // Registrar movimentação
@@ -267,7 +299,7 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
         dataBaixa: agora,
         horaBaixa,
         cautelaId: cautela.id,
-        livroOriginalId: cautela.livroId,
+        livroOriginalId: cautela.livroId || '',
         recebidoPorId: armeiroId,
         recebidoPorNome: armeiroNome
       });
@@ -299,6 +331,9 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
+          <DialogDescription className="sr-only">
+            Modal de recebimento de material pendente
+          </DialogDescription>
           <DialogTitle className="flex items-center gap-2">
             {etapa === 'senha' ? (
               <>
@@ -318,7 +353,10 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
           <div className="space-y-4 py-4">
             <div className="p-4 bg-muted rounded-lg">
               <div className="font-semibold">
-                {cautela.postoGrad} {cautela.policialNomeGuerra || cautela.policialNome}
+                {cautela.postoGrad && !(cautela.policialNomeGuerra || cautela.policialNome)?.toUpperCase().startsWith(cautela.postoGrad?.toUpperCase()) 
+                  ? `${cautela.postoGrad} ` 
+                  : ''}
+                {cautela.policialNomeGuerra || cautela.policialNome}
               </div>
               <div className="text-sm text-muted-foreground">
                 Mat: {cautela.policialMatricula}
@@ -327,12 +365,12 @@ const ModalRecebimentoPendente = ({ open, onClose, cautela, onRecebimentoConclui
 
             <div className="space-y-2">
               <Label htmlFor="senha">
-                Digite a senha do policial para confirmar recebimento:
+                Digite SUA SENHA (armeiro) para confirmar recebimento:
               </Label>
               <Input
                 id="senha"
                 type="password"
-                placeholder="Senha do policial"
+                placeholder="Senha do armeiro"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && validarSenha()}

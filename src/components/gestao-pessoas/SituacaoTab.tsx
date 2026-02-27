@@ -168,7 +168,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
             fimSituacao: fimSituacao || null,
             observacaoSituacao: observacao || '',
             publicacaoSituacao: publicacao || '',
-            funcaoOrigem: policial['FUNÇÃO'] || 'VIATURA'
+            funcaoOrigem: policial['FUNÇÃO'] || 'MONTADO - POLICIAMENTO OSTENSIVO'
           });
 
           // Salvar na coleção específica da situação
@@ -183,7 +183,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
             dataSaida: null,
             observacao: observacao || '',
             publicacao: publicacao || '',
-            funcaoOrigem: policial['FUNÇÃO'] || 'VIATURA',
+            funcaoOrigem: policial['FUNÇÃO'] || 'MONTADO - POLICIAMENTO OSTENSIVO',
             status: 'ATIVO',
             createdAt: new Date().toISOString()
           });
@@ -226,7 +226,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
       const policialRef = doc(db, 'policiais', policialId);
       await updateDoc(policialRef, {
         SITUAÇÃO: 'MONTADO - POLICIAMENTO OSTENSIVO',
-        'FUNÇÃO': policial.funcaoOrigem || 'VIATURA',
+        'FUNÇÃO': policial.funcaoOrigem || 'MONTADO - POLICIAMENTO OSTENSIVO',
         inicioSituacao: null,
         fimSituacao: null,
         observacaoSituacao: null,
@@ -247,7 +247,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
           dataSaida: new Date().toISOString().split('T')[0],
           observacao: policial.observacaoSituacao || '',
           publicacao: policial.publicacaoSituacao || '',
-          funcaoOrigem: policial.funcaoOrigem || 'VIATURA',
+          funcaoOrigem: policial.funcaoOrigem || 'MONTADO - POLICIAMENTO OSTENSIVO',
           status: 'INATIVO',
           createdAt: new Date().toISOString()
         });

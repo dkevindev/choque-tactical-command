@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Calendar, Users, Clock, Download, Loader2 } from 'lucide-react';
+import { FileText, Calendar, Users, Clock, Download, Loader2, Star } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface FrequenciaMensalTabProps {
@@ -20,7 +20,8 @@ interface Turma {
   descricao?: string;
   alunos: string[];
   diasSemana: string[];
-  turno: string;
+  turno?: string;
+  turnos?: string[];
   turnoNome: string;
 }
 
@@ -28,6 +29,12 @@ interface Aluno {
   id: string;
   nomeGuerra: string;
   nomeCompleto: string;
+  horarioEspecial?: boolean;
+  diasEspeciais?: Array<{
+    diaSemana: string;
+    turmaId: string;
+    turno: string;
+  }>;
 }
 
 interface Aula {
@@ -76,6 +83,14 @@ const DIAS_SEMANA_NOMES: Record<string, string> = {
   'sabado': 'Sábado'
 };
 
+// Mapeamento de turno string (usado nas turmas) para número (usado nas aulas)
+const TURNO_STRING_PARA_NUMERO: Record<string, number> = {
+  'manha': 1,
+  'tarde': 2,
+  'noite': 3,
+  'noturno': 4
+};
+
 const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmasComContagem, setTurmasComContagem] = useState<Map<string, number>>(new Map());
@@ -83,12 +98,15 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
   const [anoSelecionado, setAnoSelecionado] = useState<string>(String(new Date().getFullYear()));
   const [loading, setLoading] = useState(false);
   const [gerando, setGerando] = useState<string | null>(null);
+  const [alunosHorarioEspecial, setAlunosHorarioEspecial] = useState<any[]>([]);
+  const [gerandoEspecial, setGerandoEspecial] = useState<string | null>(null);
 
   const anos = [2024, 2025, 2026, 2027];
 
   useEffect(() => {
     if (projeto) {
       carregarTurmas();
+      carregarAlunosHorarioEspecial();
     }
   }, [projeto?.id]);
 
@@ -134,6 +152,25 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
     }
   };
 
+  const carregarAlunosHorarioEspecial = async () => {
+    try {
+      const q = query(
+        collection(db, 'projetos_alunos'),
+        where('projetoId', '==', projeto.id),
+        where('ativo', '==', true),
+        where('horarioEspecial', '==', true)
+      );
+      const snapshot = await getDocs(q);
+      const alunos = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setAlunosHorarioEspecial(alunos);
+    } catch (error) {
+      console.error('Erro ao carregar alunos com horário especial:', error);
+    }
+  };
+
   const calcularDiasAula = (ano: number, mes: number, diasSemana: string[]): Date[] => {
     if (!diasSemana || diasSemana.length === 0) return [];
     
@@ -143,6 +180,33 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
     
     const todosDias = eachDayOfInterval({ start: inicio, end: fim });
     return todosDias.filter(dia => diasNumericos.includes(getDay(dia)));
+  };
+
+  const buscarDiasSemAula = async (ano: number, mes: number): Promise<Date[]> => {
+    try {
+      const q = query(
+        collection(db, 'projetos_dias_sem_aula'),
+        where('projetoId', '==', projeto.id)
+      );
+      const snapshot = await getDocs(q);
+      const inicio = startOfMonth(new Date(ano, mes - 1));
+      const fim = endOfMonth(new Date(ano, mes - 1));
+      
+      return snapshot.docs
+        .map(doc => {
+          const data = doc.data().data;
+          return data?.toDate ? data.toDate() : new Date(data);
+        })
+        .filter(data => data >= inicio && data <= fim);
+    } catch (error) {
+      console.error('Erro ao buscar dias sem aula:', error);
+      return [];
+    }
+  };
+
+  const getDiaSemana = (date: Date): string => {
+    const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+    return dias[getDay(date)];
   };
 
   const buscarAlunosTurma = async (alunosIds: string[]): Promise<Aluno[]> => {
@@ -156,16 +220,26 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
     const snapshot = await getDocs(q);
     return snapshot.docs
       .filter(doc => alunosIds.includes(doc.id))
-      .map(doc => ({
-        id: doc.id,
-        nomeGuerra: doc.data().nomeGuerra || doc.data().nomeCompleto,
-        nomeCompleto: doc.data().nomeCompleto
-      }));
+      .map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          nomeGuerra: data.nomeGuerra || data.nomeCompleto,
+          nomeCompleto: data.nomeCompleto,
+          horarioEspecial: data.horarioEspecial || false,
+          diasEspeciais: data.diasEspeciais || []
+        };
+      });
   };
 
-  const buscarAulasMes = async (turmaId: string, turno: string, ano: number, mes: number): Promise<Aula[]> => {
+  const buscarAulasMes = async (turmaId: string, turnoString: string, ano: number, mes: number): Promise<Aula[]> => {
     const inicio = startOfMonth(new Date(ano, mes - 1));
     const fim = endOfMonth(new Date(ano, mes - 1));
+    
+    // Converter turno string ("manha", "tarde") para número (1, 2, 3, 4)
+    const turnoNumero = TURNO_STRING_PARA_NUMERO[turnoString];
+    
+    console.log('buscarAulasMes - turnoString:', turnoString, 'turnoNumero:', turnoNumero);
     
     const q = query(
       collection(db, 'projetos_aulas'),
@@ -175,40 +249,90 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
     );
     
     const snapshot = await getDocs(q);
-    return snapshot.docs
-      .map(doc => {
-        const data = doc.data();
-        const aulaData = data.data?.toDate ? data.data.toDate() : new Date(data.data);
-        return {
-          id: doc.id,
-          data: aulaData,
-          turmaId: data.turmaId,
-          turno: data.turno,
-          alunosPresentes: data.alunosPresentes || [],
-          instrutores: data.instrutores || [],
-          conteudo: data.conteudo || '',
-          status: data.status
-        };
-      })
-      .filter(aula => {
-        return aula.data >= inicio && aula.data <= fim && aula.turno === turno;
-      });
+    const todasAulas = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const aulaData = data.data?.toDate ? data.data.toDate() : new Date(data.data);
+      return {
+        id: doc.id,
+        data: aulaData,
+        turmaId: data.turmaId,
+        turno: data.turno,
+        alunosPresentes: data.alunosPresentes || [],
+        instrutores: data.instrutores || [],
+        conteudo: data.conteudo || '',
+        status: data.status
+      };
+    });
+    
+    console.log('Total de aulas encerradas encontradas:', todasAulas.length);
+    console.log('Aulas:', todasAulas.map(a => ({ data: format(a.data, 'dd/MM'), turno: a.turno, instrutores: a.instrutores })));
+    
+    const aulasFiltradas = todasAulas.filter(aula => {
+      const dentroDoMes = aula.data >= inicio && aula.data <= fim;
+      // Comparar turno como número (aula.turno é número, turnoNumero é a conversão da string)
+      const turnoCorreto = aula.turno === turnoNumero;
+      return dentroDoMes && turnoCorreto;
+    });
+    
+    console.log('Aulas filtradas para o mês/turno:', aulasFiltradas.length);
+    
+    return aulasFiltradas;
   };
 
   const buscarInstrutores = async (instrutoresIds: string[]): Promise<any[]> => {
     if (!instrutoresIds || instrutoresIds.length === 0) return [];
+    
+    console.log('buscarInstrutores - IDs recebidos:', instrutoresIds);
     
     const q = query(
       collection(db, 'projetos_instrutores'),
       where('projetoId', '==', projeto.id)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs
-      .filter(doc => instrutoresIds.includes(doc.id))
+    
+    // Filtrar por policialId, não por doc.id
+    const instrutoresVinculados = snapshot.docs
+      .filter(doc => {
+        const policialId = doc.data().policialId;
+        const match = instrutoresIds.includes(policialId);
+        console.log('Comparando policialId:', policialId, 'match:', match);
+        return match;
+      })
       .map(doc => ({
         id: doc.id,
+        policialId: doc.data().policialId,
         ...doc.data()
       }));
+    
+    console.log('Instrutores vinculados encontrados:', instrutoresVinculados.length);
+    
+    // Buscar dados completos dos policiais
+    const instrutoresCompletos = await Promise.all(
+      instrutoresVinculados.map(async (inst) => {
+        try {
+          const policialDocRef = doc(db, 'policiais', inst.policialId);
+          const policialSnap = await getDoc(policialDocRef);
+          
+          if (policialSnap.exists()) {
+            const policialData = policialSnap.data();
+            return {
+              ...inst,
+              postGrad: policialData['Post/Grad'] || policialData.postGrad || '',
+              nomeGuerra: policialData['NOME DE GUERRA'] || policialData.nomeGuerra || '',
+              nome: policialData.NOME || policialData.nome || ''
+            };
+          }
+          return inst;
+        } catch (error) {
+          console.error('Erro ao buscar policial:', inst.policialId, error);
+          return inst;
+        }
+      })
+    );
+    
+    console.log('Instrutores completos:', instrutoresCompletos.map((i: any) => ({ policialId: i.policialId, nome: i.nomeGuerra })));
+    
+    return instrutoresCompletos;
   };
 
   const buscarConteudoMes = async (mes: number, ano: number): Promise<string> => {
@@ -238,7 +362,8 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       return;
     }
 
-    if (!turma.turno) {
+    const turnoAtivo = turma.turnos?.[0] || turma.turno;
+    if (!turnoAtivo) {
       toast.error('Esta turma não tem turno configurado');
       return;
     }
@@ -250,30 +375,72 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       const mes = parseInt(mesSelecionado);
       
       // 1. Calcular dias de aula do mês
-      const diasAula = calcularDiasAula(ano, mes, turma.diasSemana);
+      let diasAula = calcularDiasAula(ano, mes, turma.diasSemana);
+      
+      // 1.1 Buscar e filtrar dias sem aula (feriados, etc.)
+      const diasSemAula = await buscarDiasSemAula(ano, mes);
+      diasAula = diasAula.filter(dia => 
+        !diasSemAula.some(dsa => isSameDay(dsa, dia))
+      );
       
       if (diasAula.length === 0) {
-        toast.error('Nenhum dia de aula encontrado para este mês');
+        toast.error('Nenhum dia de aula encontrado para este mês (considerando feriados)');
         return;
       }
       
       // 2. Buscar aulas encerradas do mês para essa turma/turno
-      const aulas = await buscarAulasMes(turma.id, turma.turno, ano, mes);
+      const aulas = await buscarAulasMes(turma.id, turnoAtivo, ano, mes);
       
-      // 3. Buscar alunos da turma
-      const alunos = await buscarAlunosTurma(turma.alunos || []);
+      // 3. Verificar se projeto usa frequência de alunos
+      const usaFrequencia = projeto?.configuracao?.usaFrequencia !== false;
       
-      // 4. Identificar instrutores que deram aula
+      // 4. Buscar alunos da turma (normais) + alunos com horário especial que participam desta turma
+      let todosAlunos: Aluno[] = [];
+      
+      if (usaFrequencia) {
+        // 4.1 Buscar alunos normais da turma (excluindo os que têm horário especial)
+        const alunosNormais = await buscarAlunosTurma(turma.alunos || []);
+        const alunosNormaisFiltrados = alunosNormais.filter(a => !a.horarioEspecial);
+        
+        // 4.2 Buscar alunos com horário especial que participam DESTA turma
+        const qEspeciais = query(
+          collection(db, 'projetos_alunos'),
+          where('projetoId', '==', projeto.id),
+          where('ativo', '==', true),
+          where('horarioEspecial', '==', true)
+        );
+        const snapEspeciais = await getDocs(qEspeciais);
+        const alunosEspeciaisDaTurma = snapEspeciais.docs
+          .map(docSnap => {
+            const data = docSnap.data();
+            return {
+              id: docSnap.id,
+              nomeGuerra: data.nomeGuerra || data.nomeCompleto,
+              nomeCompleto: data.nomeCompleto,
+              horarioEspecial: true,
+              diasEspeciais: data.diasEspeciais || []
+            } as Aluno;
+          })
+          .filter(aluno => {
+            // Aluno tem algum dia configurado para ESTA turma
+            return aluno.diasEspeciais?.some((d: any) => d.turmaId === turma.id);
+          });
+        
+        // 4.3 Combinar listas
+        todosAlunos = [...alunosNormaisFiltrados, ...alunosEspeciaisDaTurma];
+      }
+      
+      // 5. Identificar instrutores que deram aula
       const instrutoresIdsSet = new Set<string>();
       aulas.forEach(aula => {
         (aula.instrutores || []).forEach(id => instrutoresIdsSet.add(id));
       });
       const instrutores = await buscarInstrutores([...instrutoresIdsSet]);
       
-      // 5. Buscar conteúdo cadastrado para o mês
+      // 6. Buscar conteúdo cadastrado para o mês
       const conteudoCadastrado = await buscarConteudoMes(mes, ano);
       
-      // 6. Preparar datas para as colunas (máximo 10)
+      // 7. Preparar datas para as colunas (máximo 10)
       const datasFormatadas = diasAula.slice(0, 10).map(d => format(d, 'dd/MM'));
       
       // Preencher até 10 colunas
@@ -282,25 +449,42 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
         datasPadded[`data${i}`] = datasFormatadas[i - 1] || '';
       }
       
-      // 7. Montar presença dos alunos
-      const alunosComPresenca = alunos.map(aluno => {
+      // 8. Montar presença dos alunos (apenas se usa frequência)
+      // Lógica: todos os dias iniciam com "-", só fica vazio (para assinar) quando teve aula E estava presente
+      // Considera horário especial: se aluno tem diasEspeciais, verifica se deve estar neste dia/turma
+      const alunosComPresenca = usaFrequencia ? todosAlunos.map(aluno => {
         const presencas: Record<string, string> = {};
         
         diasAula.slice(0, 10).forEach((dia, idx) => {
           const dataStr = format(dia, 'dd/MM');
-          // Verificar se houve aula neste dia
-          const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
+          const diaSemana = getDiaSemana(dia);
           
-          if (!aulaData) {
-            // Não houve aula registrada - deixar vazio (dia ainda não aconteceu ou sem registro)
-            presencas[`p${idx + 1}`] = '';
+          // Verificar se aluno deveria estar neste dia (horário especial)
+          let deveEstarNoDia = true;
+          if (aluno.horarioEspecial && aluno.diasEspeciais && aluno.diasEspeciais.length > 0) {
+            // Se tem horário especial configurado, verifica se está configurado para este dia e turma
+            const diaConfig = aluno.diasEspeciais.find(d => d.diaSemana === diaSemana);
+            deveEstarNoDia = diaConfig?.turmaId === turma.id;
+          }
+          
+          if (!deveEstarNoDia) {
+            // Não é dia deste aluno nesta turma
+            presencas[`p${idx + 1}`] = '-';
           } else {
-            // Houve aula - verificar se aluno estava presente
-            presencas[`p${idx + 1}`] = aulaData.alunosPresentes.includes(aluno.id) ? '' : '-';
+            // Verificar se houve aula neste dia
+            const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
+            
+            if (aulaData && aulaData.alunosPresentes.includes(aluno.id)) {
+              // Teve aula E aluno estava presente → vazio (disponível para assinar)
+              presencas[`p${idx + 1}`] = '';
+            } else {
+              // Não teve aula OU aluno faltou → "-"
+              presencas[`p${idx + 1}`] = '-';
+            }
           }
         });
         
-        // Preencher colunas restantes até 10
+        // Preencher colunas restantes até 10 (dias que não existem no mês)
         for (let i = diasAula.length + 1; i <= 10; i++) {
           presencas[`p${i}`] = '';
         }
@@ -309,9 +493,10 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           nome: aluno.nomeGuerra || aluno.nomeCompleto,
           ...presencas
         };
-      });
+      }) : [];
       
-      // 8. Montar presença dos instrutores
+      // 9. Montar presença dos instrutores
+      // Mesma lógica: só fica vazio quando deu aula naquele dia
       const instrutoresComPresenca = instrutores.map(inst => {
         const presencas: Record<string, string> = {};
         
@@ -319,13 +504,16 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           const dataStr = format(dia, 'dd/MM');
           const aulaData = aulas.find(a => format(a.data, 'dd/MM') === dataStr);
           
-          if (!aulaData) {
+          if (aulaData && aulaData.instrutores.includes(inst.policialId)) {
+            // Teve aula E instrutor participou → vazio (disponível para assinar)
             presencas[`p${idx + 1}`] = '';
           } else {
-            presencas[`p${idx + 1}`] = aulaData.instrutores.includes(inst.id) ? '' : '-';
+            // Não teve aula OU instrutor não participou → "-"
+            presencas[`p${idx + 1}`] = '-';
           }
         });
         
+        // Preencher colunas restantes até 10
         for (let i = diasAula.length + 1; i <= 10; i++) {
           presencas[`p${i}`] = '';
         }
@@ -340,19 +528,20 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
       const dadosFrequencia = {
         mes: MESES.find(m => m.value === mesSelecionado)?.label.toUpperCase() || '',
         turma: turma.nome,
-        turno: turma.turnoNome || turma.turno.toUpperCase(),
+        turno: turma.turnoNome || turnoAtivo.toUpperCase(),
         conteudo: conteudoCadastrado || 'CONTEÚDO PROGRAMÁTICO',
         projeto: projeto.nome || 'PROJETO CÉLERIS',
+        usaFrequencia: usaFrequencia,
         ...datasPadded,
         instrutores: instrutoresComPresenca,
-        alunos: alunosComPresenca
+        alunos: usaFrequencia ? alunosComPresenca : []
       };
       
       console.log('Dados para frequência mensal:', dadosFrequencia);
       
       // 10. Chamar a Cloud Function
       const response = await fetch(
-        'https://us-central1-regimento-fbc77.cloudfunctions.net/gerarFrequenciaMensalDocx',
+        'https://us-central1-finkevin-fbd9a.cloudfunctions.net/gerarFrequenciaMensalDocx',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -389,6 +578,216 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
   const formatarDiasSemana = (dias: string[]): string => {
     if (!dias || dias.length === 0) return 'Não configurado';
     return dias.map(d => DIAS_SEMANA_NOMES[d] || d).join(' e ');
+  };
+
+  const formatarDiasEspeciais = (diasEspeciais: any[], turmasLista: Turma[]): string => {
+    if (!diasEspeciais || diasEspeciais.length === 0) return 'Não configurado';
+    return diasEspeciais.map(d => {
+      const turmaNome = turmasLista.find(t => t.id === d.turmaId)?.nome || 'Turma';
+      const diaNome = DIAS_SEMANA_NOMES[d.diaSemana] || d.diaSemana;
+      return `${diaNome}/${turmaNome}`;
+    }).join(', ');
+  };
+
+  const gerarFrequenciaAlunoEspecial = async (aluno: any) => {
+    try {
+      setGerandoEspecial(aluno.id);
+      
+      const ano = parseInt(anoSelecionado);
+      const mes = parseInt(mesSelecionado);
+      const diasEspeciais = aluno.diasEspeciais || [];
+      
+      if (diasEspeciais.length === 0) {
+        toast.error('Aluno não tem dias especiais configurados');
+        return;
+      }
+      
+      // 1. Buscar dias sem aula
+      const diasSemAula = await buscarDiasSemAula(ano, mes);
+      
+      // 2. Calcular todos os dias do mês que o aluno deveria comparecer
+      const inicio = startOfMonth(new Date(ano, mes - 1));
+      const fim = endOfMonth(new Date(ano, mes - 1));
+      const todosDias = eachDayOfInterval({ start: inicio, end: fim });
+      
+      // 3. Filtrar dias baseado nos diasEspeciais do aluno
+      const diasAlunoDeveComparecer = todosDias.filter(dia => {
+        const diaSemana = getDiaSemana(dia);
+        return diasEspeciais.some((d: any) => d.diaSemana === diaSemana);
+      });
+      
+      // 4. Remover feriados/dias sem aula
+      const diasAulaAluno = diasAlunoDeveComparecer.filter(dia =>
+        !diasSemAula.some(dsa => isSameDay(dsa, dia))
+      );
+      
+      if (diasAulaAluno.length === 0) {
+        toast.error('Nenhum dia de aula encontrado para este aluno no mês');
+        return;
+      }
+      
+      // 5. Buscar todas as aulas das turmas que o aluno participa
+      const turmasIds = [...new Set(diasEspeciais.map((d: any) => d.turmaId))];
+      const todasAulas: any[] = [];
+      
+      for (const turmaId of turmasIds) {
+        const turmaConfig = turmas.find(t => t.id === turmaId as string);
+        if (turmaConfig) {
+          const turnoAtivo = turmaConfig.turnos?.[0] || turmaConfig.turno;
+          if (turnoAtivo) {
+            const aulas = await buscarAulasMes(turmaId as string, turnoAtivo, ano, mes);
+            todasAulas.push(...aulas);
+          }
+        }
+      }
+      
+      // 6. Montar presença do aluno
+      const presencas: Record<string, string> = {};
+      diasAulaAluno.slice(0, 10).forEach((dia, idx) => {
+        const dataStr = format(dia, 'dd/MM');
+        const diaSemana = getDiaSemana(dia);
+        const diaConfig = diasEspeciais.find((d: any) => d.diaSemana === diaSemana);
+        
+        if (diaConfig) {
+          // Buscar aula desta turma neste dia
+          const aulaData = todasAulas.find(a => 
+            format(a.data, 'dd/MM') === dataStr && a.turmaId === diaConfig.turmaId
+          );
+          
+          if (aulaData && aulaData.alunosPresentes?.includes(aluno.id)) {
+            presencas[`p${idx + 1}`] = '';  // Presente - disponível para assinar
+          } else {
+            presencas[`p${idx + 1}`] = '-';  // Faltou ou não teve aula
+          }
+        } else {
+          presencas[`p${idx + 1}`] = '-';
+        }
+      });
+      
+      // 7. Preencher colunas restantes
+      for (let i = diasAulaAluno.length + 1; i <= 10; i++) {
+        presencas[`p${i}`] = '';
+      }
+      
+      // 8. Preparar datas para as colunas
+      const datasPadded: Record<string, string> = {};
+      diasAulaAluno.slice(0, 10).forEach((dia, idx) => {
+        datasPadded[`data${idx + 1}`] = format(dia, 'dd/MM');
+      });
+      for (let i = diasAulaAluno.length + 1; i <= 10; i++) {
+        datasPadded[`data${i}`] = '';
+      }
+      
+      // 9. Buscar conteúdo do mês
+      const conteudoCadastrado = await buscarConteudoMes(mes, ano);
+      
+      // 10. Buscar instrutores que deram aula nos dias do aluno
+      const instrutoresIdsSet = new Set<string>();
+      diasAulaAluno.slice(0, 10).forEach(dia => {
+        const dataStr = format(dia, 'dd/MM');
+        const diaSemana = getDiaSemana(dia);
+        const diaConfig = diasEspeciais.find((d: any) => d.diaSemana === diaSemana);
+        if (diaConfig) {
+          const aulaData = todasAulas.find(a => 
+            format(a.data, 'dd/MM') === dataStr && a.turmaId === diaConfig.turmaId
+          );
+          if (aulaData) {
+            (aulaData.instrutores || []).forEach((id: string) => instrutoresIdsSet.add(id));
+          }
+        }
+      });
+      const instrutores = await buscarInstrutores([...instrutoresIdsSet]);
+      
+      // 11. Montar presença dos instrutores
+      const instrutoresComPresenca = instrutores.map(inst => {
+        const presencasInst: Record<string, string> = {};
+        
+        diasAulaAluno.slice(0, 10).forEach((dia, idx) => {
+          const dataStr = format(dia, 'dd/MM');
+          const diaSemana = getDiaSemana(dia);
+          const diaConfig = diasEspeciais.find((d: any) => d.diaSemana === diaSemana);
+          
+          if (diaConfig) {
+            const aulaData = todasAulas.find(a => 
+              format(a.data, 'dd/MM') === dataStr && a.turmaId === diaConfig.turmaId
+            );
+            
+            if (aulaData && aulaData.instrutores?.includes(inst.policialId)) {
+              presencasInst[`p${idx + 1}`] = '';
+            } else {
+              presencasInst[`p${idx + 1}`] = '-';
+            }
+          } else {
+            presencasInst[`p${idx + 1}`] = '-';
+          }
+        });
+        
+        for (let i = diasAulaAluno.length + 1; i <= 10; i++) {
+          presencasInst[`p${i}`] = '';
+        }
+        
+        return {
+          nome: `${inst.postGrad || ''} ${inst.nomeGuerra || ''}`.trim(),
+          ...presencasInst
+        };
+      });
+      
+      // 12. Preparar dados para a Cloud Function
+      const dadosFrequencia = {
+        mes: MESES.find(m => m.value === mesSelecionado)?.label.toUpperCase() || '',
+        turma: `HORÁRIO ESPECIAL - ${aluno.nomeGuerra || aluno.nomeCompleto}`,
+        turno: diasEspeciais.map((d: any) => {
+          const turmaNome = turmas.find(t => t.id === d.turmaId)?.nome || 'Turma';
+          const diaNome = DIAS_SEMANA_NOMES[d.diaSemana] || d.diaSemana;
+          return `${diaNome}/${turmaNome}`;
+        }).join(' | '),
+        conteudo: conteudoCadastrado || 'CONTEÚDO PROGRAMÁTICO',
+        projeto: projeto.nome || 'PROJETO CÉLERIS',
+        usaFrequencia: true,
+        ...datasPadded,
+        instrutores: instrutoresComPresenca,
+        alunos: [{
+          nome: aluno.nomeGuerra || aluno.nomeCompleto,
+          ...presencas
+        }]
+      };
+      
+      console.log('Dados para frequência aluno especial:', dadosFrequencia);
+      
+      // 13. Chamar a Cloud Function
+      const response = await fetch(
+        'https://us-central1-finkevin-fbd9a.cloudfunctions.net/gerarFrequenciaMensalDocx',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dadosFrequencia)
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Erro ao gerar documento');
+      }
+      
+      // 14. Download do arquivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Frequencia_HorarioEspecial_${aluno.nomeGuerra}_${MESES.find(m => m.value === mesSelecionado)?.label}_${anoSelecionado}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Lista de frequência gerada com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao gerar frequência do aluno especial:', error);
+      toast.error('Erro ao gerar lista de frequência');
+    } finally {
+      setGerandoEspecial(null);
+    }
   };
 
   return (
@@ -450,7 +849,7 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {turmas.map(turma => {
-                const temConfiguracao = turma.diasSemana?.length > 0 && turma.turno;
+                const temConfiguracao = turma.diasSemana?.length > 0 && (turma.turnos?.length > 0 || turma.turno);
                 const diasAula = calcularDiasAula(
                   parseInt(anoSelecionado),
                   parseInt(mesSelecionado),
@@ -485,10 +884,12 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
                         <span>{turma.turnoNome || 'Turno não definido'}</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        <span>{turmasComContagem.get(turma.id) || 0} aluno(s) ativos</span>
-                      </div>
+                      {projeto?.configuracao?.usaFrequencia !== false && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Users className="h-4 w-4" />
+                          <span>{turmasComContagem.get(turma.id) || 0} aluno(s) ativos</span>
+                        </div>
+                      )}
                       
                       {temConfiguracao && (
                         <div className="text-sm text-muted-foreground">
@@ -527,6 +928,75 @@ const FrequenciaMensalTab = ({ projeto }: FrequenciaMensalTabProps) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Quadro de Alunos com Horário Especial */}
+      {alunosHorarioEspecial.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-amber-500" />
+              Alunos com Horário Especial
+            </CardTitle>
+            <CardDescription>
+              Alunos que frequentam dias específicos de turmas diferentes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              {alunosHorarioEspecial.map(aluno => {
+                const diasConfig = aluno.diasEspeciais || [];
+                
+                return (
+                  <Card key={aluno.id} className="border-amber-500/30 bg-amber-500/5">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">{aluno.nomeGuerra || aluno.nomeCompleto}</CardTitle>
+                          <CardDescription className="mt-1">
+                            {aluno.nomeCompleto}
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="border-amber-500 text-amber-600">
+                          Especial
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        <span>{formatarDiasEspeciais(diasConfig, turmas)}</span>
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground">
+                        <span className="font-medium">{diasConfig.length}</span> dia(s) de aula por semana
+                      </div>
+                      
+                      <Button 
+                        onClick={() => gerarFrequenciaAlunoEspecial(aluno)}
+                        disabled={gerandoEspecial === aluno.id || diasConfig.length === 0}
+                        className="w-full mt-2"
+                        variant="outline"
+                      >
+                        {gerandoEspecial === aluno.id ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Gerando...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="mr-2 h-4 w-4" />
+                            Gerar Lista de Frequência
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

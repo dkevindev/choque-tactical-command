@@ -49,10 +49,9 @@ const ColetesTab = () => {
         where('categoria', '==', 'Colete Balístico')
       );
       const snapshot = await getDocs(q);
-      const dados = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Colete[];
+      const dados = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((d: any) => !d.transferido && !d.baixado) as Colete[];
       setColetes(dados);
     } catch (error) {
       console.error('Erro ao buscar coletes:', error);
@@ -116,6 +115,12 @@ const ColetesTab = () => {
         if (filtros.status === 'proximo' && status !== 'proximo') return false;
       }
       return true;
+    }).sort((a, b) => {
+      // Ordenar por vencimento do mais antigo para o mais novo
+      if (!a.vencimento && !b.vencimento) return 0;
+      if (!a.vencimento) return 1;
+      if (!b.vencimento) return -1;
+      return a.vencimento.localeCompare(b.vencimento);
     });
   }, [coletes, filtros]);
 

@@ -141,55 +141,91 @@ const GerarTermoEntregaForm = () => {
     setLoading(true);
 
     try {
-      // Formatar materiais - agora com dados completos no banco
-      const materiais: Array<{ descricaoCompleta: string }> = [];
+      // Formatar materiais em formato tabular para o template DOCX
+      const materiais: Array<{ qtd: string; nome: string; modelo: string; serie: string }> = [];
+      
+      // Rastrear se já adicionamos munições/carregadores de um armamento
+      // para evitar duplicação com itens separados
+      const processedCarregadores = new Set<string>();
+      const processedMunicoes = new Set<string>();
 
       transferencia.materiaisDevolvidos.forEach((m) => {
         if (m.categoria === 'Armamento') {
-          // 1. Arma principal
+          // 1. Arma principal - nome + calibre
           materiais.push({
-            descricaoCompleta: `${m.nome || 'Pistola'}, Marca: ${m.fabricante || 'N/D'}, Modelo: ${
-              m.modelo || 'N/D'
-            }, Calibre: ${m.calibre || 'N/D'}, Nº Série: ${m.numeroSerie || 'N/D'}`
+            qtd: '01',
+            nome: `${m.nome || 'Pistola'} ${m.calibre || ''}`.trim(),
+            modelo: m.fabricante || m.modelo || '-',
+            serie: m.numeroSerie || '-'
           });
 
-          // 2. Carregadores (usando dados da arma)
+          // 2. Carregadores (se houver) - marcar como processado
           if (m.quantidadeCarregadores && m.quantidadeCarregadores > 0) {
             materiais.push({
-              descricaoCompleta: `${m.quantidadeCarregadores} carregador${m.quantidadeCarregadores > 1 ? 'es' : ''} ${m.fabricante || ''} ${m.modelo || ''} Calibre ${m.calibre || 'N/D'}`.trim().replace(/\s+/g, ' ')
+              qtd: String(m.quantidadeCarregadores).padStart(2, '0'),
+              nome: `Carregadores ${m.calibre || ''}`.trim(),
+              modelo: m.fabricante || '-',
+              serie: '-'
             });
+            // Marcar este calibre como já processado
+            if (m.calibre) processedCarregadores.add(m.calibre.toLowerCase());
           }
 
-          // 3. Munições (usando dados da arma)
+          // 3. Munições (se houver) - marcar como processado
           if (m.quantidadeMunicoes && m.quantidadeMunicoes > 0) {
             materiais.push({
-              descricaoCompleta: `${m.quantidadeMunicoes} Munições calibre ${m.calibre || 'N/D'}`
+              qtd: String(m.quantidadeMunicoes).padStart(2, '0'),
+              nome: `Munições ${m.calibre || ''}`.trim(),
+              modelo: '-',
+              serie: '-'
             });
+            // Marcar este calibre como já processado
+            if (m.calibre) processedMunicoes.add(m.calibre.toLowerCase());
           }
         } else if (m.categoria === 'Acessório' && m.nome?.toLowerCase().includes('carregador')) {
-          // Carregador separado (fallback para dados antigos)
-          materiais.push({
-            descricaoCompleta: `${m.quantidade} carregador${m.quantidade > 1 ? 'es' : ''} ${m.fabricante || ''} ${m.modelo || ''} Calibre ${m.calibre || 'N/D'}`.trim().replace(/\s+/g, ' ')
-          });
+          // Carregador separado - só adicionar se não foi processado no armamento
+          const calibreLower = m.calibre?.toLowerCase() || '';
+          if (!processedCarregadores.has(calibreLower)) {
+            materiais.push({
+              qtd: String(m.quantidade).padStart(2, '0'),
+              nome: `Carregadores ${m.calibre || ''}`.trim(),
+              modelo: m.fabricante || '-',
+              serie: '-'
+            });
+          }
         } else if (m.categoria === 'Munição') {
-          // Munição separada (fallback para dados antigos)
-          materiais.push({
-            descricaoCompleta: `${m.quantidade} Munições calibre ${m.calibre || 'N/D'}`
-          });
+          // Munição separada - só adicionar se não foi processada no armamento
+          const calibreLower = m.calibre?.toLowerCase() || '';
+          if (!processedMunicoes.has(calibreLower)) {
+            materiais.push({
+              qtd: String(m.quantidade).padStart(2, '0'),
+              nome: `Munições ${m.calibre || ''}`.trim(),
+              modelo: '-',
+              serie: '-'
+            });
+          }
         } else if (m.categoria === 'Colete Balístico') {
+          // Colete - nome + tamanho + sexo
+          const sexoAbrev = m.sexo === 'Masculino' ? 'Masc' : m.sexo === 'Feminino' ? 'Fem' : '';
           materiais.push({
-            descricaoCompleta: `${m.nome}, Tamanho: ${m.tamanhoColete || 'N/D'}, Vencimento: ${
-              m.vencimento || 'N/D'
-            }`
+            qtd: '01',
+            nome: `${m.nome || 'Colete balístico'} Tamanho ${m.tamanhoColete || '-'} ${sexoAbrev}`.trim(),
+            modelo: m.fabricante || '-',
+            serie: m.numeroSerie || '-'
           });
         } else {
+          // Outros materiais genéricos
           materiais.push({
-            descricaoCompleta: `${m.nome}, Marca: ${m.fabricante || 'N/D'}, Nº Série: ${
-              m.numeroSerie || 'N/D'
-            }`
+            qtd: String(m.quantidade || 1).padStart(2, '0'),
+            nome: m.nome || '-',
+            modelo: m.fabricante || m.modelo || '-',
+            serie: m.numeroSerie || '-'
           });
         }
       });
+
+      // Converter itensAdicionais para array de strings (a Cloud Function espera strings)
+      const itensAdicionaisStrings = itensAdicionais.map(item => item.descricao);
 
       const response = await fetch('https://gerartermoentregadocx-owvlmrnsjq-uc.a.run.app', {
         method: 'POST',
@@ -205,7 +241,7 @@ const GerarTermoEntregaForm = () => {
           transferidoPara: transferencia.localDestino,
           publicacao: transferencia.publicacao,
           materiais,
-          itensAdicionais
+          itensAdicionais: itensAdicionaisStrings
         })
       });
 

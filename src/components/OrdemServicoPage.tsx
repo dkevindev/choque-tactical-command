@@ -83,6 +83,7 @@ const OrdemServicoPage = () => {
   const [searchViatura, setSearchViatura] = useState('');
   const [searchDefeito, setSearchDefeito] = useState('');
   const [searchNumeroOS, setSearchNumeroOS] = useState('');
+  const [searchOficina, setSearchOficina] = useState('');
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [selectedMonthYear, setSelectedMonthYear] = useState('all');
   const monthYearOptions = useMemo(() => getMonthYearOptions(), []);
@@ -142,6 +143,7 @@ const OrdemServicoPage = () => {
       const lowerSearchViatura = searchViatura.trim().toLowerCase();
       const lowerSearchDefeito = searchDefeito.trim().toLowerCase();
       const lowerSearchNumeroOS = searchNumeroOS.trim().toLowerCase();
+      const lowerSearchOficina = searchOficina.trim().toLowerCase();
 
       // Aplicar filtro de data
       if (dateRange.from || dateRange.to || (selectedMonthYear && selectedMonthYear !== 'all')) {
@@ -173,19 +175,19 @@ const OrdemServicoPage = () => {
       }
 
       // Aplicar filtros de texto
-      if (lowerSearchViatura || lowerSearchDefeito || lowerSearchNumeroOS) {
+      if (lowerSearchViatura || lowerSearchDefeito || lowerSearchNumeroOS || lowerSearchOficina) {
         filteredDocs = filteredDocs.filter(os => {
           const viaturaData = `${os.cadastroViatura || ''} ${os.modeloViatura || ''} ${os.placaViatura || ''}`.toLowerCase();
           const observacaoData = (os.observacao || '').toLowerCase();
           const numeroOSData = (os.numeroOS || '').toLowerCase();
+          const oficinaData = (os.oficinaResponsavel || '').toLowerCase();
 
           const viaturaMatch = lowerSearchViatura === '' || viaturaData.includes(lowerSearchViatura);
           const defeitoMatch = lowerSearchDefeito === '' || observacaoData.includes(lowerSearchDefeito);
           const numeroOSMatch = lowerSearchNumeroOS === '' || numeroOSData.includes(lowerSearchNumeroOS);
+          const oficinaMatch = lowerSearchOficina === '' || oficinaData.includes(lowerSearchOficina);
 
-          return (lowerSearchViatura === '' || viaturaMatch) && 
-                 (lowerSearchDefeito === '' || defeitoMatch) && 
-                 (lowerSearchNumeroOS === '' || numeroOSMatch);
+          return viaturaMatch && defeitoMatch && numeroOSMatch && oficinaMatch;
         });
       }
 
@@ -202,6 +204,7 @@ const OrdemServicoPage = () => {
       searchViatura,
       searchDefeito,
       searchNumeroOS,
+      searchOficina,
       dateRange,
       selectedMonthYear
   ]);
@@ -210,7 +213,7 @@ const OrdemServicoPage = () => {
   useEffect(() => {
     fetchOrdensServico();
     fetchViaturas();
-  }, [fetchOrdensServico, searchViatura, searchDefeito, searchNumeroOS, dateRange, selectedMonthYear]);
+  }, [fetchOrdensServico, searchViatura, searchDefeito, searchNumeroOS, searchOficina, dateRange, selectedMonthYear]);
 
   const fetchViaturas = async () => {
     try {
@@ -515,10 +518,16 @@ const OrdemServicoPage = () => {
             className="col-span-full md:col-span-1 lg:col-span-1"
           />
           <Input
-            placeholder="Buscar por Defeito ou Viatura (detalhado)..."
+            placeholder="Buscar por Defeito..."
             value={searchDefeito}
             onChange={(e) => setSearchDefeito(e.target.value)}
-            className="col-span-full md:col-span-2 lg:col-span-2"
+            className="col-span-full md:col-span-1 lg:col-span-1"
+          />
+          <Input
+            placeholder="Buscar por Oficina..."
+            value={searchOficina}
+            onChange={(e) => setSearchOficina(e.target.value)}
+            className="col-span-full md:col-span-1 lg:col-span-1"
           />
 
           <Popover>
@@ -571,6 +580,7 @@ const OrdemServicoPage = () => {
               setSearchViatura('');
               setSearchDefeito('');
               setSearchNumeroOS('');
+              setSearchOficina('');
               setDateRange({ from: undefined, to: undefined });
               setSelectedMonthYear('all');
               fetchOrdensServico(); // Dispara a busca com filtros limpos

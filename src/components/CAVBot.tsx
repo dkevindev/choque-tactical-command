@@ -9,6 +9,9 @@ import { Mic, MicOff, Send } from 'lucide-react';
 import { buscarViaturasLeves, buscarViaturasPesadas, type ViaturaBasica } from '@/lib/viaturaUtils';
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, getDoc, updateDoc, addDoc } from 'firebase/firestore';
+import QRCodeScanner from '@/components/patrimonio/QRCodeScanner';
+import CadastroPatrimonioCavbot from '@/components/patrimonio/CadastroPatrimonioCavbot';
+import ModalAuthPatrimonio from '@/components/patrimonio/ModalAuthPatrimonio';
 
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
@@ -101,7 +104,9 @@ const CAVBot = () => {
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmNovaSenha, setConfirmNovaSenha] = useState('');
   const [trocarSenhaMsg, setTrocarSenhaMsg] = useState('');
-
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showCadastroPatrimonio, setShowCadastroPatrimonio] = useState(false);
+  const [showAuthPatrimonio, setShowAuthPatrimonio] = useState(false);
   // Checklist de Verificação da Viatura
   interface ChecklistViatura {
     oleoMotor: 'abaixo' | 'nivel' | 'acima';
@@ -842,6 +847,30 @@ const CAVBot = () => {
                 >
                   🚗 Iniciar Serviço
                 </button>
+                <button 
+                  className="quick-button"
+                  onClick={() => setShowQRScanner(true)}
+                >
+                  📷 Escanear Patrimônio
+                </button>
+                {/* Cadastrar Patrimônio - só para quem tem acesso Gestão e Logística */}
+                {policialLogado?.acessos?.gestaoLogistica && (
+                  <button 
+                    className="quick-button"
+                    onClick={() => setShowCadastroPatrimonio(true)}
+                  >
+                    📦 Cadastrar Patrimônio
+                  </button>
+                )}
+                {/* Botão Cadastrar Patrimônio - abre modal de auth se não logado */}
+                {!policialLogado?.acessos?.gestaoLogistica && (
+                  <button 
+                    className="quick-button"
+                    onClick={() => setShowAuthPatrimonio(true)}
+                  >
+                    📦 Cadastrar Patrimônio
+                  </button>
+                )}
                 <button
                   className="quick-button"
                   onClick={async () => {
@@ -1830,6 +1859,36 @@ const CAVBot = () => {
           }
         }
       `}</style>
+
+      {/* QR Code Scanner para Patrimônio */}
+      <QRCodeScanner
+        open={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+        onItemFound={(item) => {
+          const valor = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor);
+          pushBot(`✅ **Item Encontrado!**\n\n📦 ${item.nome}\n🏷️ Tombo: ${item.numeroTombo}\n📍 Seção: ${item.secaoNome}\n💰 Valor: ${valor}`);
+        }}
+      />
+
+      {/* Modal de Autenticação para Cadastrar Patrimônio */}
+      <ModalAuthPatrimonio
+        open={showAuthPatrimonio}
+        onClose={() => setShowAuthPatrimonio(false)}
+        onSuccess={(pol) => {
+          setPolicialLogado(pol as any);
+          setShowAuthPatrimonio(false);
+          setShowCadastroPatrimonio(true);
+        }}
+      />
+
+      {/* Cadastro de Patrimônio via CAVBot */}
+      <CadastroPatrimonioCavbot
+        open={showCadastroPatrimonio}
+        onClose={() => setShowCadastroPatrimonio(false)}
+        onSuccess={() => {
+          pushBot('✅ Item de patrimônio cadastrado com sucesso!');
+        }}
+      />
     </>
   );
 };

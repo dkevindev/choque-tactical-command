@@ -20,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Filter, Calendar, FileText, DollarSign } from 'lucide-react';
+import { Search, Filter, Calendar, FileText, DollarSign, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import ModalEditarOS from './ModalEditarOS';
 
 interface OrdemServico {
   id: string;
@@ -32,6 +33,16 @@ interface OrdemServico {
   observacao: string;
   oficinaResponsavel: string;
   dataCriacao: any;
+  saldoId?: string;
+}
+
+interface SaldoOficina {
+  id: string;
+  mes: number;
+  ano: number;
+  valorInicial: number;
+  valorUtilizado: number;
+  valorRestante: number;
 }
 
 const OrdensServicoPage = () => {
@@ -45,14 +56,84 @@ const OrdensServicoPage = () => {
     oficina: ''
   });
   const [loading, setLoading] = useState(true);
+  
+  // Modal de edição
+  const [modalEditar, setModalEditar] = useState(false);
+  const [osParaEditar, setOsParaEditar] = useState<OrdemServico | null>(null);
+  
+  // Cota do mês selecionado
+  const [cotaMes, setCotaMes] = useState<number>(new Date().getMonth());
+  const [cotaAno, setCotaAno] = useState<number>(new Date().getFullYear());
+  const [cotaValor, setCotaValor] = useState<SaldoOficina | null>(null);
+  const [loadingCota, setLoadingCota] = useState(false);
 
   useEffect(() => {
     fetchOrdensServico();
   }, []);
 
   useEffect(() => {
+    fetchCotaMes();
+  }, [cotaMes, cotaAno]);
+
+  useEffect(() => {
     aplicarFiltros();
   }, [filtros, ordensServico]);
+
+  const fetchCotaMes = async () => {
+    try {
+      setLoadingCota(true);
+      const saldosSnap = await getDocs(
+        query(
+          collection(db, 'saldoOficina'),
+          where('mes', '==', cotaMes + 1),
+          where('ano', '==', cotaAno)
+        )
+      );
+
+      if (!saldosSnap.empty) {
+        const saldoData = saldosSnap.docs[0].data();
+        setCotaValor({
+          id: saldosSnap.docs[0].id,
+          mes: saldoData.mes,
+          ano: saldoData.ano,
+          valorInicial: saldoData.valorInicial || 0,
+          valorUtilizado: saldoData.valorUtilizado || 0,
+          valorRestante: saldoData.valorRestante || saldoData.valorInicial || 0
+        });
+      } else {
+        setCotaValor(null);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar cota:', error);
+      setCotaValor(null);
+    } finally {
+      setLoadingCota(false);
+    }
+  };
+
+  const handleMesAnterior = () => {
+    if (cotaMes === 0) {
+      setCotaMes(11);
+      setCotaAno(cotaAno - 1);
+    } else {
+      setCotaMes(cotaMes - 1);
+    }
+  };
+
+  const handleProximoMes = () => {
+    if (cotaMes === 11) {
+      setCotaMes(0);
+      setCotaAno(cotaAno + 1);
+    } else {
+      setCotaMes(cotaMes + 1);
+    }
+  };
+
+  const getNomeMes = (mes: number) => {
+    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    return meses[mes];
+  };
 
   const fetchOrdensServico = async () => {
     try {
@@ -158,10 +239,58 @@ const OrdensServicoPage = () => {
     <div className="space-y-6">
       <Card className="bg-card border-border shadow-tactical">
         <CardHeader>
-          <CardTitle className="text-foreground flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            ORDENS DE SERVIÇO
-          </CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              GESTÃO DE ORDENS DE SERVIÇO (OS's)
+            </CardTitle>
+            
+            {/* Cota do Mês */}
+            <div className="flex items-center gap-3 bg-muted/50 rounded-lg px-4 py-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={handleMesAnterior}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <div className="text-center min-w-[140px]">
+                <div className="text-xs text-muted-foreground uppercase">Cota do Mês</div>
+                <div className="font-semibold text-sm">{getNomeMes(cotaMes)} {cotaAno}</div>
+              </div>
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={handleProximoMes}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              
+              <div className="border-l pl-3 ml-1">
+                {loadingCota ? (
+                  <div className="text-sm text-muted-foreground">Carregando...</div>
+                ) : cotaValor ? (
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">Restante / Total</div>
+                    <div className="font-bold text-sm">
+                      <span className={cotaValor.valorRestante < 0 ? 'text-destructive' : 'text-green-600'}>
+                        R$ {cotaValor.valorRestante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-muted-foreground font-normal">
+                        {' / R$ '}{cotaValor.valorInicial.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Sem cota definida</div>
+                )}
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {/* Filtros */}
@@ -295,6 +424,7 @@ const OrdensServicoPage = () => {
                   <TableHead>Valor</TableHead>
                   <TableHead>Oficina</TableHead>
                   <TableHead>Observações</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -318,6 +448,18 @@ const OrdensServicoPage = () => {
                     <TableCell className="max-w-md truncate" title={os.observacao}>
                       {os.observacao}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setOsParaEditar(os);
+                          setModalEditar(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -331,6 +473,21 @@ const OrdensServicoPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Edição */}
+      {osParaEditar && (
+        <ModalEditarOS
+          open={modalEditar}
+          onClose={() => {
+            setModalEditar(false);
+            setOsParaEditar(null);
+          }}
+          os={osParaEditar}
+          onSalvar={() => {
+            fetchOrdensServico();
+          }}
+        />
+      )}
     </div>
   );
 };
