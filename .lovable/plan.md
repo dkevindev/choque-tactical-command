@@ -1,76 +1,35 @@
 
+# Corrigir Nome nos Documentos e Ordenacao do SUBCMT
 
-# Corrigir Resolucao Dinamica de Dados de Policiais
+## Duas correcoes necessarias
 
-## Problema identificado
+### 1. Documentos DOCX: usar `Post/Grad` + `NOME` (nome completo)
 
-Existem **dois problemas distintos** que fazem o sistema continuar mostrando "SD" ao inves do posto atual:
+Atualmente os 4 arquivos de geracao de documentos usam `dadosAtuais?.nomeGuerra` que retorna o nome de guerra (ex: "K RIBEIRO"). O correto para documentos oficiais e usar `dadosAtuais?.nome` que corresponde ao campo `NOME` do Firebase (ex: "KEVIN RIBEIRO DOS SANTOS").
 
-### Problema 1: Race condition no carregamento
-Em `CadastroMateriais.tsx`, o `loadMateriais()` roda no `useEffect([], [])` e chama `resolverNome()` internamente. Porem, o hook `usePolicialResolver` tambem carrega de forma assincrona -- quando `loadMateriais` executa, o `policiaisMap` ainda esta vazio (Map vazia). O `resolverNome` cai no fallback e retorna os dados estaticos da cautela (`SD ...`).
+O campo `postGrad` ja corresponde a `Post/Grad` do Firebase, entao esta correto.
 
-**Correcao**: Adicionar `policiaisMap` como dependencia do useEffect que chama `loadMateriais`, para recarregar quando o mapa estiver pronto.
+**Arquivos afetados** (trocar `nomeGuerra` por `nome` apenas no payload do documento):
 
-### Problema 2: DOCX gerado com dados estaticos
-Em `GerenciarCautelas.tsx`, a funcao `gerarDocumento` (linha 161) envia `cautela.policialNome` e `cautela.policialPatente` diretamente para a Cloud Function. Esses sao os dados gravados na hora da cautela -- nunca atualizados apos promocao.
+- `src/components/admin-belico/GerenciarCautelas.tsx` (linha 155): `dadosAtuais?.nomeGuerra` -> `dadosAtuais?.nome`
+- `src/components/admin-belico/documentos/GerarNadaConstaForm.tsx` (linha 73): idem
+- `src/components/admin-belico/documentos/GerarTermoEntregaForm.tsx` (linha 236): idem
+- `src/components/admin-belico/documentos/GerarTransferenciaCautelaForm.tsx` (linha 88): idem
 
-**Correcao**: Usar `resolverNome` para obter dados atuais e enviar ao endpoint DOCX.
+Nas telas/UI continua usando `nomeGuerra` normalmente.
 
-O mesmo problema ocorre nos 3 formularios de documentos (`GerarNadaConstaForm`, `GerarTermoEntregaForm`, `GerarTransferenciaCautelaForm`) que usam dados estaticos da colecao `transferencias_policiais`.
+### 2. Ordenacao: SUBCMT e desempate de mesmo posto, nao sobrepoe graduacao
 
-## Arquivos a modificar
+No `src/lib/policialUtils.ts`, a verificacao do SUBCMT (etapa 2, linhas 65-68) esta ANTES da comparacao de posto (etapa 3, linhas 71-72). Isso faz um MAJ SUBCMT aparecer antes de um TEN CEL, o que esta errado.
 
-### 1. src/components/admin-belico/CadastroMateriais.tsx
-- Mudar o `useEffect` de `[]` para `[policiaisMap]` -- so carregar materiais quando o mapa de policiais estiver pronto
-- Adicionar guard `if (policiaisMap.size === 0) return` para nao rodar com mapa vazio
+**Correcao**: mover a verificacao do SUBCMT para DEPOIS da comparacao de posto, tornando-a o primeiro criterio de desempate quando os postos sao iguais.
 
-### 2. src/components/admin-belico/GerenciarCautelas.tsx
-- Na funcao `gerarDocumento`, resolver nome e patente atuais via `policiaisMap` antes de enviar ao endpoint
-- Substituir `cautela.policialNome` por nome resolvido e `cautela.policialPatente` por patente resolvida
-- Tambem corrigir o nome do arquivo de download
+Nova ordem:
+1. CMT RPMONT sempre primeiro
+2. Comparar posto/graduacao
+3. Mesmo posto: SUBCMT primeiro (desempate)
+4. Mesmo posto e oficial: QOPM antes de QOAPM
+5. Data ultima promocao
+6. Numeral
 
-### 3. src/components/admin-belico/documentos/GerarNadaConstaForm.tsx
-- Adicionar `usePolicialResolver`
-- Na funcao `handleGerar`, resolver dados atuais do policial pelo `policialId` da transferencia antes de enviar ao endpoint
-- Corrigir exibicao na lista e detalhes
-
-### 4. src/components/admin-belico/documentos/GerarTermoEntregaForm.tsx
-- Adicionar `usePolicialResolver`
-- Na funcao de geracao, resolver dados atuais antes de enviar ao endpoint
-- Corrigir exibicao na lista e detalhes
-
-### 5. src/components/admin-belico/documentos/GerarTransferenciaCautelaForm.tsx
-- Adicionar `usePolicialResolver`
-- Na funcao `handleGerar`, resolver dados atuais antes de enviar ao endpoint
-- Corrigir exibicao na lista e detalhes
-
-### 6. src/components/consultas/ConsultaMaterialPolicial.tsx
-- Mesmo problema de timing: cautelas sao carregadas no useEffect mas `policiaisMap` pode nao estar pronto
-- Adicionar dependencia no useEffect de cautelas para recarregar quando o mapa estiver disponivel
-
-## Detalhes tecnicos
-
-### Race condition fix (CadastroMateriais)
-```text
-Antes:  useEffect(() => { loadMateriais(); }, []);
-Depois: useEffect(() => { if (policiaisMap.size > 0) loadMateriais(); }, [policiaisMap]);
-```
-
-### DOCX fix (GerenciarCautelas)
-```text
-Antes:
-  policial: { nome: cautela.policialNome, grad: cautela.policialPatente }
-
-Depois:
-  const dadosAtuais = policiaisMap.get(cautela.policialId);
-  policial: {
-    nome: dadosAtuais?.nomeGuerra || cautela.policialNome,
-    grad: dadosAtuais?.postGrad || cautela.policialPatente
-  }
-```
-
-### Formularios de documentos (3 arquivos)
-Cada formulario precisa:
-1. Importar e usar `usePolicialResolver`
-2. Na hora de enviar dados ao endpoint, resolver `policialId` -> dados atuais
-3. Na exibicao de lista/detalhes, usar `resolverNome` ao inves de dados estaticos
+**Arquivo**: `src/lib/policialUtils.ts` -- reordenar blocos dentro de `sortByHierarquia`
