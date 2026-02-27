@@ -165,7 +165,7 @@ const GestaoFeriasTab: React.FC<GestaoFeriasTabProps> = ({ policiais, onUpdate }
       const policialRef = doc(db, 'policiais', policialId);
       await updateDoc(policialRef, {
         SITUAÇÃO: 'MONTADO - POLICIAMENTO OSTENSIVO',
-        'FUNÇÃO': policial.funcaoOrigem || 'VIATURA',
+        'FUNÇÃO': policial.funcaoOrigem || 'MONTADO - POLICIAMENTO OSTENSIVO',
         inicioFerias: null,
         fimFerias: null,
         publicacaoFerias: null
