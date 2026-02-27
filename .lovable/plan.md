@@ -1,47 +1,69 @@
 
+# Corrigir Assentamentos e Reformular Estatisticas
 
-# Registrar Promocoes nos Assentamentos do Policial
+## 1. Corrigir registro de assentamentos ao mudar situacao
 
-## Resumo
-Adicionar registro automatico na colecao `assentamentos` do Firebase sempre que uma promocao for realizada (novas promocoes) e tambem retroativamente ao sincronizar datas de promocoes ja feitas.
+O codigo atual em `SituacaoTab.tsx` ja cria assentamentos ao colocar e retirar policiais de situacao. Vou investigar se ha algum problema no `policialId` que impede a consulta posterior, e garantir que a descricao inclua claramente a situacao anterior e a nova situacao.
+
+**Ajuste**: Na funcao `handleColocarSituacao`, melhorar a descricao para incluir explicitamente: `Situacao anterior: X. Nova situacao: Y. Publicacao: Z`.
+
+---
+
+## 2. Reformular completamente a aba Estatisticas
+
+### Remover
+- Todos os graficos (PieChart, BarChart, LineChart)
+- Imports do recharts
+- Sub-abas antigas (graficos, situacao, funcao, postgrad, afastados)
+
+### Novas abas por unidade
+Substituir por 4 abas:
+- **Regimento** (primeira, padrao) - engloba TODOS os policiais de todas as unidades
+- **1 Esqd** - filtra por UNIDADE contendo "1" + "ESQD"
+- **2 Esqd** - filtra por UNIDADE contendo "2" + "ESQD"
+- **3 Pel/2 Esqd** - filtra por UNIDADE contendo "3" + "PEL"
+
+### Conteudo de cada aba
+
+**Cards de resumo (6 cards)**:
+- Total Efetivo
+- Total Efetivo Disponivel
+- Total Efetivo Indisponivel
+- Total de Ferias
+- Total em LTS
+- Total Outros Afastamentos
+
+**Tabela de Indisponibilidades**: Mostra todos os policiais indisponiveis da unidade com colunas:
+- NOME DE GUERRA1
+- Numeral
+- Matricula
+- Situacao
+- Data Inicio
+- Data Final
+
+**Botoes "Mostrar" ao lado de Ferias, LTS e Outros Afastamentos**: Cada botao expande/recolhe uma lista dos policiais nessa categoria, mostrando:
+- NOME DE GUERRA1
+- Numeral
+- Matricula
+- Data Inicio
+- Data Final
+
+**Estatisticas adicionais (sem graficos)**:
+- Resumo por Posto/Graduacao (tabela simples com quantidade por posto)
+- Percentual de disponibilidade da unidade
 
 ---
 
 ## Detalhes Tecnicos
 
-### Arquivo: `src/components/gestao-pessoas/PromocaoDialog.tsx`
+### Arquivo: `src/components/gestao-pessoas/EstatisticasTab.tsx`
+- Reescrever completamente o componente
+- Remover imports do recharts
+- Carregar `config_situacoes` do Firebase para determinar quais situacoes sao "indisponivel"
+- Filtrar policiais por campo `UNIDADE` (usando `policial.UNIDADE || policial.Unidade`)
+- Para cada aba, computar os 6 totais filtrando por situacao (FERIAS, LTS, outros)
+- Usar estado `showFerias`, `showLTS`, `showOutros` para controlar visibilidade das listas expandidas
+- Manter os botoes de exportacao CSV existentes
 
-#### 1. Novas promocoes (funcao `handleConfirmar`, apos linha 273)
-Apos criar o registro em `historico_promocoes`, adicionar um `addDoc` na colecao `assentamentos` com:
-- `policialId`: novo ID do policial
-- `tipo`: "Promocao"
-- `data`: data da promocao (formato YYYY-MM-DD)
-- `descricao`: ex. "Promovido de SD para CB. Publicacao: Portaria no 123/2024"
-- `graduacaoAnterior`: posto antigo
-- `graduacaoNova`: posto novo
-- `publicacao`: numero da publicacao/portaria
-- `criadoEm`: timestamp atual
-
-#### 2. Sincronizacao retroativa (funcao `handleSincronizarDatasPromocao`, apos linha 164)
-Ao atualizar cada policial, tambem criar um assentamento retroativo para cada promocao encontrada no historico:
-- Consultar todos os registros de `historico_promocoes` para cada policial
-- Para cada registro, verificar se ja existe assentamento de promocao correspondente (evitar duplicatas)
-- Se nao existir, criar assentamento com os dados da promocao historica (data, graduacao anterior, nova, publicacao)
-
-### Estrutura do assentamento de promocao
-```text
-{
-  policialId: "CB_KEVIN_123",
-  tipo: "Promocao",
-  data: "2024-06-15",
-  descricao: "Promovido de SD para CB. Publicacao: Portaria no 123/2024",
-  graduacaoAnterior: "SD",
-  graduacaoNova: "CB",
-  publicacao: "Portaria no 123/2024",
-  criadoEm: "2024-06-15T10:00:00.000Z"
-}
-```
-
-### Exibicao nos assentamentos
-O componente `AssentamentosSection` em `EfetivoTab.tsx` ja exibe assentamentos genericamente (linha 441-448), entao os novos registros de promocao aparecerrao automaticamente na timeline. Nenhuma alteracao necessaria na exibicao.
-
+### Arquivo: `src/components/gestao-pessoas/SituacaoTab.tsx`
+- Verificar e garantir que `handleColocarSituacao` registra corretamente a nova situacao nos assentamentos com descricao clara incluindo situacao anterior e nova
