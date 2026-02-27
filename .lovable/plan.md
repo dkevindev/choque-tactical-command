@@ -1,87 +1,118 @@
 
 
-# Plano: Gerador Automatico do Resumo de Efetivo
+# Plano: Usar Template DOCX com Docxtemplater para Resumo de Efetivo
 
-## O que sera feito
+## Problema dos Zeros
+O arquivo `gerar-resumo-efetivo.js` e separado do `index.js` e nao chama `admin.initializeApp()`. Por isso o Firestore nao funciona e retorna tudo zero. A solucao e mover a funcao para dentro do `index.js`.
 
-Criar um sistema que gera automaticamente o documento "RESUMO DE EFETIVO POR UNIDADE" em DOCX, preenchido com dados reais do Firebase. O documento sera identico ao modelo enviado, com tabelas de efetivo por unidade e descricao detalhada das indisponibilidades.
-
----
-
-## Estrutura do Documento Gerado
-
-1. **Resumo de Efetivo por Unidade** - Tabela com colunas: Unidade, Total, Indisponivel, Operacional
-   - RPMONT - SEDE
-   - 1o Esquadrao/RPMONT
-   - 2o Esquadrao/RPMONT
-   - 3o Pelotao/2oESQD (Crato)
-   - BSP
-   - EFETIVO TOTAL RPMONT
-
-2. **Descricao Indisponibilidade por Unidade** - Agrupado por unidade, cada tipo de indisponibilidade com quantidade e nomes dos policiais
-
-3. **Observacao de ferias** - Quantidade de policiais de ferias por unidade
+## Abordagem: Template com Docxtemplater
+Igual as outras funcoes do projeto (OS, Cautela, Termo de Entrega, etc.), usaremos um template DOCX no Firebase Storage com placeholders do docxtemplater.
 
 ---
 
-## Mapeamento de Unidades
+## Tags para o Template DOCX
 
-O campo `Unidade` no Firebase sera mapeado para os nomes do documento:
+Voce precisa criar o arquivo `template-resumo-efetivo.docx` no Word com estas tags exatas e subir para o Firebase Storage em `templates/template-resumo-efetivo.docx`.
 
-```text
-"1º ESQD"  -->  "1o Esquadrao/RPMONT"
-"2º ESQD"  -->  "2o Esquadrao/RPMONT"
-"3º PEL"   -->  "3o Pelotao/2oESQD/RPMONT (Crato)"
-"SEDE"     -->  "RPMONT - SEDE"
-"BSP"      -->  "BSP"
+### Cabecalho (texto fixo no template)
+O cabecalho "COMANDO DE POLICIAMENTO DE CHOQUE / REGIMENTO DE POLICIA MONTADA DO CEARA / CEL MOURA BRASIL" fica fixo no template, sem tags.
+
+### Tabela Principal - Resumo de Efetivo
+
+Criar uma tabela com 4 colunas. A primeira linha e cabecalho fixo. A segunda linha contem as tags de loop:
+
+| UNIDADE | TOTAL | INDISPONIVEL | OPERACIONAL |
+|---------|-------|--------------|-------------|
+| `{#unidades}{nome}` | `{total}` | `{indisponivel}` | `{operacional}{/unidades}` |
+
+Apos a tabela, uma linha extra (fora do loop) com totais:
+
+**EFETIVO TOTAL RPMONT: `{totalGeral}` | `{totalIndisponivel}` | `{totalOperacional}`**
+
+Ou melhor, incluir o total como ultima entrada do loop (a function vai adicionar automaticamente).
+
+### Tabela de Indisponibilidades
+
+Criar uma tabela com 3 colunas. Usar loop aninhado:
+
+```
+{#indisponibilidades}
+```
+Linha com colspan 3: `{nomeUnidade}`
+```
+{#situacoes}
+```
+| `{situacao}` | `{quantidade}` | `{policiais}` |
+```
+{/situacoes}
+{/indisponibilidades}
 ```
 
-## Situacoes que contam como Indisponivel
+### Observacao de Ferias
 
-Todas as situacoes do `SITUACOES_DISPONIVEIS` (exceto operacionais):
-- FERIAS, READAPTACAO FUNCIONAL, LICENCA TRATAMENTO DE SAUDE, LICENCA PATERNIDADE, LICENCA MATERNIDADE, RECOMPENSA MILITAR, NUPCIAS, LUTO, CURSANDO, TRANSITO, RESP. PROCESSO, DESERTOR, A DISP. DE OUTROS ORGAOS, RECOLHIDO PRES. MILITAR, AGREGADO, AGREGADO - AGUARDANDO RESERVA
+```
+{#temFerias}
+Obs. Encontram-se em gozo de ferias:
+{#ferias}
+{texto}
+{/ferias}
+{/temFerias}
+```
+
+### Data do Documento
+
+```
+{dataDocumento}
+```
 
 ---
 
-## Alteracoes Tecnicas
+## Lista Completa de Tags
 
-### 1. Template DOCX (upload para Firebase Storage)
+| Tag | Descricao | Exemplo |
+|-----|-----------|---------|
+| `{#unidades}` | Inicio do loop de unidades | - |
+| `{nome}` | Nome da unidade | "RPMONT - SEDE" |
+| `{total}` | Total de policiais da unidade | "3" |
+| `{indisponivel}` | Indisponiveis da unidade | "1" |
+| `{operacional}` | Operacionais da unidade | "2" |
+| `{/unidades}` | Fim do loop de unidades | - |
+| `{totalGeral}` | Total geral de policiais | "133" |
+| `{totalIndisponivel}` | Total geral indisponiveis | "26" |
+| `{totalOperacional}` | Total geral operacionais | "107" |
+| `{#indisponibilidades}` | Loop de unidades com indisponiveis | - |
+| `{nomeUnidade}` | Nome da unidade + total | "RPMONT - SEDE - TOTAL: 3" |
+| `{#situacoes}` | Loop de situacoes dentro da unidade | - |
+| `{situacao}` | Tipo de situacao | "READAPTACAO FUNCIONAL" |
+| `{quantidade}` | Quantidade nessa situacao | "2" |
+| `{policiais}` | Nomes dos policiais | "CAP 12345 SILVA, 1o SGT 67890 SOUZA" |
+| `{/situacoes}` | Fim do loop de situacoes | - |
+| `{/indisponibilidades}` | Fim do loop de indisponibilidades | - |
+| `{#temFerias}` | Condicional: so aparece se tem ferias | - |
+| `{#ferias}` | Loop de ferias por unidade | - |
+| `{texto}` | Texto da observacao de ferias | "03 PPMM do 1o Esquadrao/RPMONT" |
+| `{/ferias}` | Fim do loop de ferias | - |
+| `{/temFerias}` | Fim da condicional de ferias | - |
+| `{dataDocumento}` | Data formatada | "Quartel do RPMONT, 27 de Fevereiro de 2026." |
 
-Criar `public/templates/template-resumo-efetivo.docx` com os placeholders do docxtemplater:
-- `{mesAno}` - mes e ano do relatorio
-- `{#unidades}` - loop das unidades com `{nome}`, `{total}`, `{indisponivel}`, `{operacional}`
-- `{totalGeral}`, `{totalIndisponivel}`, `{totalOperacional}`
-- `{#indisponibilidades}` - loop agrupado por unidade e tipo de situacao com nomes
-- `{#ferias}` - observacao de ferias por unidade
-- `{dataDocumento}` - data formatada
+---
 
-### 2. Firebase Cloud Function (`functions/index.js`)
+## Alteracoes nos Arquivos
 
-Nova funcao `gerarResumoEfetivo`:
-- Endpoint POST que recebe `{ mes, ano }` (opcional, default = mes atual)
-- Busca todos os policiais da colecao `policiais`
-- Agrupa por `Unidade`
-- Calcula indisponiveis (qualquer SITUACAO que nao seja 'MONTADO - POLICIAMENTO OSTENSIVO' ou 'VIATURA')
-- Para cada unidade, lista os indisponiveis agrupados por tipo de situacao com Post/Grad + Matricula + Nome
-- Separa ferias em observacao a parte
-- Preenche o template e retorna o DOCX
+### 1. `functions/index.js` - Adicionar funcao ao final
+- Nova funcao `gerarResumoEfetivoDocx` usando o mesmo padrao das outras (Express + docxtemplater)
+- Baixa template de `templates/template-resumo-efetivo.docx` do Firebase Storage
+- Busca policiais do Firestore com `admin.firestore()` (que ja esta inicializado)
+- Agrupa por unidade, calcula totais, monta dados para o template
+- Logs de debug para verificar valores reais do campo `Unidade`
 
-### 3. Frontend - Botao no modulo de Gestao de Pessoas
+### 2. `functions/gerar-resumo-efetivo.js` - Limpar
+- Remover todo o conteudo (logica movida para index.js)
 
-Adicionar botao "Gerar Resumo de Efetivo" em dois locais:
-- **EstatisticasTab** (`src/components/gestao-pessoas/EstatisticasTab.tsx`): junto aos botoes de exportacao existentes
-- **DocumentosPage** (`src/components/DocumentosPaga.tsx`): na aba "Expediente" que hoje esta vazia
-
-O botao abre um dialog simples para selecionar mes/ano e chama a Cloud Function, fazendo download do DOCX gerado.
-
-### 4. Componente de formulario
-
-Criar `src/components/gestao-pessoas/GerarResumoEfetivoForm.tsx`:
-- Select de mes (janeiro a dezembro)
-- Select de ano (ano atual e anterior)
-- Botao "Gerar Documento"
-- Chama a Cloud Function via fetch
-- Faz download automatico do arquivo
+### 3. Template DOCX (manual)
+- Voce cria o documento Word com o layout exato do modelo que anexou
+- Substitui os dados por tags listadas acima
+- Sobe para Firebase Storage em `templates/template-resumo-efetivo.docx`
 
 ---
 
@@ -89,15 +120,7 @@ Criar `src/components/gestao-pessoas/GerarResumoEfetivoForm.tsx`:
 
 | Arquivo | Acao |
 |---------|------|
-| `public/templates/template-resumo-efetivo.docx` | NOVO - Template DOCX |
-| `functions/index.js` | MODIFICAR - Adicionar funcao gerarResumoEfetivo |
-| `src/components/gestao-pessoas/GerarResumoEfetivoForm.tsx` | NOVO - Formulario de geracao |
-| `src/components/gestao-pessoas/EstatisticasTab.tsx` | MODIFICAR - Adicionar botao |
-| `src/components/DocumentosPaga.tsx` | MODIFICAR - Adicionar na aba Expediente |
-
----
-
-## Observacao importante
-
-Como o Lovable nao consegue criar arquivos .docx programaticamente, a Cloud Function gerara o documento **sem template**, construindo as tabelas diretamente no DOCX usando a biblioteca docxtemplater com um template minimo. Alternativamente, o template DOCX precisara ser criado externamente e enviado ao Firebase Storage manualmente (como ja e feito com os outros templates do projeto). A Cloud Function seguira o mesmo padrao das funcoes existentes (gerarOrdemServicoDocx, gerarCautelaDocx, etc).
+| `functions/index.js` | MODIFICAR - Adicionar funcao gerarResumoEfetivoDocx com docxtemplater |
+| `functions/gerar-resumo-efetivo.js` | MODIFICAR - Limpar conteudo |
+| Template DOCX (manual) | CRIAR no Word e subir ao Firebase Storage |
 
