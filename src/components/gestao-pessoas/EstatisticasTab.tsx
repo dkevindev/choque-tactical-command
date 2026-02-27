@@ -79,6 +79,7 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
   const [situacoes, setSituacoes] = useState<ConfigSituacao[]>([]);
   const [atestadosMap, setAtestadosMap] = useState<Map<string, AtestadoMapa>>(new Map());
   const [allAtestados, setAllAtestados] = useState<any[]>([]);
+  const [allAssentamentos, setAllAssentamentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [abaUnidade, setAbaUnidade] = useState<UnidadeKey>('regimento');
   const [showFerias, setShowFerias] = useState(false);
@@ -88,10 +89,12 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [situacoesSnap, atestadosSnap] = await Promise.all([
+        const [situacoesSnap, atestadosSnap, assentamentosSnap] = await Promise.all([
           getDocs(collection(db, 'config_situacoes')),
           getDocs(collection(db, 'atestados_medicos')),
+          getDocs(collection(db, 'assentamentos')),
         ]);
+        setAllAssentamentos(assentamentosSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setSituacoes(situacoesSnap.docs.map(d => ({ id: d.id, nome: d.data().nome, indisponivel: d.data().indisponivel ?? true })));
 
         const allAtestadosData = atestadosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -133,8 +136,22 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
   // Top Assiduidade - últimos 12 meses
   const rankingAssiduidade = useMemo(() => {
     const limite = format(subMonths(new Date(), 12), 'yyyy-MM-dd');
+
+    // Identificar policiais que tiveram mudança para situação indisponível nos últimos 12 meses
+    const idsComIndisponibilidade = new Set<string>();
+    allAssentamentos.forEach((a: any) => {
+      if (!a.policialId) return;
+      const dataAssentamento = a.data || a.dataRegistro || '';
+      if (dataAssentamento < limite) return;
+      const tipo = (a.tipo || '').toLowerCase();
+      if (!tipo.includes('mudanca') && !tipo.includes('mudança') && !tipo.includes('situac')) return;
+      const sitNova = a.novaSituacao || a.situacaoNova || '';
+      if (sitNova && situacoesIndisponiveis.includes(sitNova)) {
+        idsComIndisponibilidade.add(a.policialId);
+      }
+    });
+
     const contagem: Record<string, number> = {};
-    
     allAtestados.forEach((a: any) => {
       if (!a.policialId || !a.dataInicio) return;
       if (a.dataInicio >= limite) {
@@ -143,13 +160,14 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
     });
 
     return policiaisFiltrados
+      .filter(p => !idsComIndisponibilidade.has(p.id))
       .map(p => ({
         id: p.id,
         nome: (p['NOME DE GUERRA1'] || p.NOME || '-').toUpperCase(),
         atestados: contagem[p.id] || 0,
       }))
       .sort((a, b) => a.atestados - b.atestados);
-  }, [policiaisFiltrados, allAtestados]);
+  }, [policiaisFiltrados, allAtestados, allAssentamentos, situacoesIndisponiveis]);
 
   const stats = useMemo(() => {
     const total = policiaisFiltrados.length;
