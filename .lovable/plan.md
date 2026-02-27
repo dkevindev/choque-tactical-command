@@ -1,39 +1,53 @@
 
 
-# Formatar datas de yyyy-MM-dd para dd/MM/yy
+# Normalizar "LICENCA" vs "LICENÇA TRATAMENTO DE SAUDE"
 
 ## Problema
-Em varias tabelas do sistema, datas armazenadas no formato `2026-02-19` estao sendo exibidas sem formatacao. O usuario quer que todas aparecam como `19/02/26`.
+O sistema tem duas variantes da mesma situacao sendo tratadas como diferentes:
+- `LICENÇA TRATAMENTO DE SAUDE` (com cedilha - vem da config_situacoes e do SituacaoTab)
+- `LICENCA TRATAMENTO DE SAUDE` (sem cedilha - gravado pela automacao de LTS)
 
-## Locais a corrigir
+## Solucao
 
-### 1. `src/components/gestao-pessoas/EstatisticasTab.tsx`
-- **Linha 200**: `p.inicioSituacao || '-'` (lista expandida de policiais)
-- **Linha 201**: `p.fimSituacao || '-'` (lista expandida de policiais)
-- **Linha 349**: `p.inicioSituacao || '-'` (tabela de indisponibilidades)
-- **Linha 350**: `p.fimSituacao || '-'` (tabela de indisponibilidades)
-- Criar funcao auxiliar `formatDateBR` que converte `yyyy-MM-dd` para `dd/MM/yy` usando `format(parseISO(d), 'dd/MM/yy')`
+Padronizar para **uma unica forma**: `LICENÇA TRATAMENTO DE SAUDE` (com cedilha, que e o portugues correto). E criar uma funcao auxiliar de normalizacao para que comparacoes nunca falhem por causa de acentuacao.
 
-### 2. `src/components/gestao-pessoas/GestaoFeriasTab.tsx`
-- **Linha 348**: `new Date(policial.inicioFerias).toLocaleDateString()` -- trocar para formato `dd/MM/yy`
+### 1. Criar funcao utilitaria de normalizacao
 
-### 3. `src/components/gestao-pessoas/SituacaoTab.tsx`
-- Verificar se exibe `inicioSituacao`/`fimSituacao` em alguma tabela sem formatacao
-
-## Implementacao
-
-Adicionar uma funcao utilitaria simples em cada arquivo (ou reutilizar existente):
+Em `src/lib/policialUtils.ts`, adicionar:
 
 ```typescript
-const formatDateBR = (d: string | undefined) => {
-  if (!d) return '-';
-  try { return format(parseISO(d), 'dd/MM/yy'); } catch { return d; }
+export const normalizarSituacao = (sit: string): string => {
+  return sit.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+};
+
+export const isLTS = (situacao: string | undefined): boolean => {
+  if (!situacao) return false;
+  const norm = normalizarSituacao(situacao);
+  return (norm.includes('LICEN') && norm.includes('TRATAMENTO')) || norm === 'LTS';
 };
 ```
 
-Substituir todas as exibicoes diretas de datas `inicioSituacao`, `fimSituacao`, `inicioFerias`, `fimFerias` por chamadas a `formatDateBR()`.
+### 2. Corrigir a gravacao para usar a forma com cedilha
+
+Nos arquivos que gravam `SITUAÇÃO: 'LICENCA TRATAMENTO DE SAUDE'`, trocar para `'LICENÇA TRATAMENTO DE SAUDE'`:
+
+- **`src/components/GestãoPessoas.tsx`** (linhas 180, 190) - automacao de entrada em LTS
+- **`src/components/gestao-pessoas/AtestadosMedicosTab.tsx`** (linhas 254, 264) - ao cadastrar atestado > 3 dias
+
+### 3. Usar `isLTS()` nas comparacoes
+
+Substituir todas as verificacoes manuais com `includes('LICENÇA')` / `includes('LICENCA')` pela funcao `isLTS()`:
+
+- **`src/components/GestãoPessoas.tsx`** (linhas 176, 204, 313-314)
+- **`src/components/gestao-pessoas/EstatisticasTab.tsx`** (linhas 122-125, 130)
+
+### 4. Migrar dados existentes (opcional mas recomendado)
+
+Adicionar na funcao `verificarSituacoesLTS` uma correcao silenciosa: se um policial tem `LICENCA` (sem cedilha), atualizar para `LICENÇA` no Firebase automaticamente.
 
 ## Arquivos modificados
-- `src/components/gestao-pessoas/EstatisticasTab.tsx` (4 pontos)
-- `src/components/gestao-pessoas/GestaoFeriasTab.tsx` (1 ponto)
-- `src/components/gestao-pessoas/SituacaoTab.tsx` (verificar e corrigir se necessario)
+- `src/lib/policialUtils.ts` - adicionar `normalizarSituacao` e `isLTS`
+- `src/components/GestãoPessoas.tsx` - usar `isLTS()` e gravar com cedilha
+- `src/components/gestao-pessoas/AtestadosMedicosTab.tsx` - gravar com cedilha
+- `src/components/gestao-pessoas/EstatisticasTab.tsx` - usar `isLTS()` nas filtragens
+
