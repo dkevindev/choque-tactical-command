@@ -57,9 +57,24 @@ interface Atestado {
   periciaDocumental?: boolean;
 }
 
+interface RetornoLTS {
+  policialId: string;
+  policialNome: string;
+  policialNomeGuerra: string;
+  policialNumeral: string;
+  policialMatricula: string;
+  cid: string;
+  cidDescricao: string;
+  dataInicio: string;
+  dataFim: string;
+}
+
 interface AtestadosMedicosTabProps {
   policiais: Policial[];
   onUpdate: () => void;
+  avisoRetornos?: RetornoLTS[];
+  onConfirmarAviso?: (policialId: string) => void;
+  onConfirmarTodos?: () => void;
 }
 
 const MESES = [
@@ -77,7 +92,8 @@ const MESES = [
   { value: '11', label: 'Dezembro' },
 ];
 
-const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, onUpdate }) => {
+const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, onUpdate, avisoRetornos = [], onConfirmarAviso, onConfirmarTodos }) => {
+  const [showAvisoModal, setShowAvisoModal] = useState(false);
   const [atestados, setAtestados] = useState<Atestado[]>([]);
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState('cadastro');
@@ -229,6 +245,34 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
       };
 
       await addDoc(collection(db, 'atestados_medicos'), atestado);
+
+      // Auto-LTS: se dias > 3, colocar policial em LTS automaticamente
+      if (numDias > 3) {
+        try {
+          const policialRef = doc(db, 'policiais', selectedPolicial.id);
+          await updateDoc(policialRef, {
+            SITUAÇÃO: 'LICENCA TRATAMENTO DE SAUDE',
+            inicioSituacao: dataInicio,
+            fimSituacao: dataFimCalculada,
+            funcaoOrigem: selectedPolicial['FUNÇÃO'] || selectedPolicial['funcao'] || '',
+          });
+          await addDoc(collection(db, 'assentamentos'), {
+            policialId: selectedPolicial.id,
+            tipo: 'mudanca_situacao',
+            descricao: `Entrada automática em LTS - Atestado de ${numDias} dias (CID: ${cidCodigo || 'N/I'})`,
+            situacaoAnterior: selectedPolicial.SITUAÇÃO || selectedPolicial['situacao'] || 'EM ATIVIDADE',
+            situacaoNova: 'LICENCA TRATAMENTO DE SAUDE',
+            funcaoAnterior: selectedPolicial['FUNÇÃO'] || '',
+            data: new Date().toISOString(),
+            automatico: true,
+          });
+          toast({ title: "LTS Automático", description: `${selectedPolicial.NOME} foi colocado em LTS automaticamente` });
+        } catch (e) {
+          console.error('Erro ao atualizar LTS automático:', e);
+        }
+        onUpdate();
+      }
+
       toast({ title: "Sucesso", description: "Atestado cadastrado com sucesso" });
       limparForm();
       fetchAtestados();
@@ -459,8 +503,74 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
     }
   };
 
+  // Mostrar modal de aviso quando há retornos
+  useEffect(() => {
+    if (avisoRetornos.length > 0) {
+      setShowAvisoModal(true);
+    }
+  }, [avisoRetornos]);
+
+  const formatDateSimple = (d: string) => {
+    if (!d) return '-';
+    try { return format(parseISO(d), 'dd/MM/yyyy'); } catch { return d; }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Modal de aviso de retornos de LTS */}
+      <Dialog open={showAvisoModal && avisoRetornos.length > 0} onOpenChange={setShowAvisoModal}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Policiais que retornaram de LTS automaticamente
+            </DialogTitle>
+            <DialogDescription>
+              Os policiais abaixo tiveram seus atestados vencidos e foram retornados automaticamente para "EM ATIVIDADE". Confirme a leitura de cada um.
+            </DialogDescription>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome de Guerra</TableHead>
+                <TableHead>Numeral</TableHead>
+                <TableHead>Matrícula</TableHead>
+                <TableHead>CID</TableHead>
+                <TableHead>Início</TableHead>
+                <TableHead>Fim</TableHead>
+                <TableHead>Ação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {avisoRetornos.map(r => (
+                <TableRow key={r.policialId}>
+                  <TableCell className="font-medium">{r.policialNomeGuerra}</TableCell>
+                  <TableCell>{r.policialNumeral || '-'}</TableCell>
+                  <TableCell>{r.policialMatricula || '-'}</TableCell>
+                  <TableCell>
+                    <span className="font-mono text-xs">{r.cid || '-'}</span>
+                    {r.cidDescricao && <span className="block text-xs text-muted-foreground">{r.cidDescricao}</span>}
+                  </TableCell>
+                  <TableCell>{formatDateSimple(r.dataInicio)}</TableCell>
+                  <TableCell>{formatDateSimple(r.dataFim)}</TableCell>
+                  <TableCell>
+                    <Button size="sm" variant="outline" onClick={() => onConfirmarAviso?.(r.policialId)}>
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Confirmar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <DialogFooter>
+            <Button onClick={() => { onConfirmarTodos?.(); setShowAvisoModal(false); }}>
+              Confirmar Todos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

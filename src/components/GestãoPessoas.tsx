@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { CalendarDays, Users, UserCheck, UserX, TrendingUp, AlertTriangle, ArrowLeft, BarChart3 } from 'lucide-react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { format, startOfMonth, endOfMonth, isWithinInterval, addDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -18,6 +19,7 @@ import FuncaoTab from './gestao-pessoas/FuncaoTab';
 import TransferidosTab from './gestao-pessoas/TransferidosTab';
 import AtestadosMedicosTab from './gestao-pessoas/AtestadosMedicosTab';
 import EstatisticasTab from './gestao-pessoas/EstatisticasTab';
+import logoRegimento from '@/assets/logo-regimento.jpg';
 
 interface Policial {
   id: string;
@@ -32,6 +34,24 @@ interface Policial {
   fimFerias?: string;
   funcaoOrigem?: string;
   publicacaoFerias?: string;
+  'NOME DE GUERRA1'?: string;
+  NUMERAL?: string;
+  numeral?: string;
+  Matrícula?: string;
+  inicioSituacao?: string;
+  fimSituacao?: string;
+}
+
+export interface RetornoLTS {
+  policialId: string;
+  policialNome: string;
+  policialNomeGuerra: string;
+  policialNumeral: string;
+  policialMatricula: string;
+  cid: string;
+  cidDescricao: string;
+  dataInicio: string;
+  dataFim: string;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
@@ -40,17 +60,19 @@ const GestãoPessoas: React.FC = () => {
   const navigate = useNavigate();
   const [policiais, setPoliciais] = useState<Policial[]>([]);
   const [loading, setLoading] = useState(true);
+  const [verificando, setVerificando] = useState(false);
+  const [progressValue, setProgressValue] = useState(0);
+  const [progressText, setProgressText] = useState('Carregando dados...');
+  const [fadeOut, setFadeOut] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [retornosLTS, setRetornosLTS] = useState<RetornoLTS[]>([]);
 
   useEffect(() => {
-    // Verificar autenticação
     const user = localStorage.getItem('user');
     if (!user) {
       navigate('/');
       return;
     }
-
-    // Verificar se tem acesso ao sistema de gestão de pessoas
     try {
       const userData = JSON.parse(user);
       if (!userData.acessos?.gestaoPessoas) {
@@ -62,29 +84,207 @@ const GestãoPessoas: React.FC = () => {
       navigate('/');
       return;
     }
-
-    fetchPoliciais();
+    iniciarSistema();
   }, [navigate]);
 
-  const fetchPoliciais = async () => {
+  const iniciarSistema = async () => {
+    setVerificando(true);
+    setProgressValue(10);
+    setProgressText('Carregando efetivo...');
+
     try {
-      setLoading(true);
+      // 1. Buscar policiais
       const policiaisRef = collection(db, 'policiais');
       const q = query(policiaisRef, orderBy('NOME'));
       const querySnapshot = await getDocs(q);
+      const policiaisData = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Policial[];
       
-      const policiaisData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Policial[];
-      
-      setPoliciais(policiaisData);
+      setProgressValue(40);
+      setProgressText('Verificando atestados médicos...');
+
+      // 2. Buscar atestados
+      const atestadosSnap = await getDocs(collection(db, 'atestados_medicos'));
+      const atestados = atestadosSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+
+      setProgressValue(60);
+      setProgressText('Verificando situações de LTS...');
+
+      // 3. Verificar situações LTS
+      const retornos = await verificarSituacoesLTS(policiaisData, atestados);
+
+      setProgressValue(90);
+      setProgressText('Finalizando...');
+
+      // Recarregar policiais após atualizações
+      if (retornos.length > 0 || true) {
+        const snap2 = await getDocs(q);
+        const updated = snap2.docs.map(d => ({ id: d.id, ...d.data() })) as Policial[];
+        setPoliciais(updated);
+      } else {
+        setPoliciais(policiaisData);
+      }
+
+      setRetornosLTS(retornos);
+      setProgressValue(100);
+
+      // Iniciar carregar os avisos confirmados do sessionStorage
+      const confirmados = JSON.parse(sessionStorage.getItem('retornosLTSConfirmados') || '[]') as string[];
+      const retornosFiltrados = retornos.filter(r => !confirmados.includes(r.policialId));
+      setRetornosLTS(retornosFiltrados);
+
+      // Fade out
+      setTimeout(() => {
+        setFadeOut(true);
+        setTimeout(() => {
+          setVerificando(false);
+          setLoading(false);
+        }, 500);
+      }, 600);
+
     } catch (error) {
-      console.error('Erro ao buscar policiais:', error);
-    } finally {
+      console.error('Erro ao iniciar sistema:', error);
+      setVerificando(false);
       setLoading(false);
     }
   };
+
+  const verificarSituacoesLTS = async (policiaisData: Policial[], atestados: any[]): Promise<RetornoLTS[]> => {
+    const hoje = new Date();
+    const hojeStr = format(hoje, 'yyyy-MM-dd');
+    const retornos: RetornoLTS[] = [];
+
+    // Atestados vigentes (dataInicio <= hoje <= dataFim) com dias > 3
+    const atestadosVigentes = atestados.filter(a => {
+      if (!a.dataInicio || !a.dataFim || !a.dias || a.dias <= 3) return false;
+      return a.dataInicio <= hojeStr && a.dataFim >= hojeStr;
+    });
+
+    // Mapa: policialId -> atestado vigente mais recente
+    const mapaVigentes = new Map<string, any>();
+    atestadosVigentes.forEach(a => {
+      const existing = mapaVigentes.get(a.policialId);
+      if (!existing || a.dataFim > existing.dataFim) {
+        mapaVigentes.set(a.policialId, a);
+      }
+    });
+
+    // ENTRAR EM LTS: policiais com atestado vigente >3 dias que não estão em LTS
+    for (const [policialId, atestado] of mapaVigentes.entries()) {
+      const pol = policiaisData.find(p => p.id === policialId);
+      if (!pol) continue;
+      const sit = (pol.SITUAÇÃO || '').toUpperCase();
+      const jaEmLTS = sit.includes('LICEN') && sit.includes('TRATAMENTO');
+      if (!jaEmLTS) {
+        try {
+          await updateDoc(doc(db, 'policiais', policialId), {
+            SITUAÇÃO: 'LICENCA TRATAMENTO DE SAUDE',
+            inicioSituacao: atestado.dataInicio,
+            fimSituacao: atestado.dataFim,
+            funcaoOrigem: pol['FUNÇÃO'] || '',
+          });
+          await addDoc(collection(db, 'assentamentos'), {
+            policialId,
+            tipo: 'mudanca_situacao',
+            descricao: `Entrada automática em LTS - Atestado de ${atestado.dias} dias (CID: ${atestado.cid || 'N/I'})`,
+            situacaoAnterior: pol.SITUAÇÃO,
+            situacaoNova: 'LICENCA TRATAMENTO DE SAUDE',
+            funcaoAnterior: pol['FUNÇÃO'] || '',
+            data: new Date().toISOString(),
+            automatico: true,
+          });
+        } catch (e) {
+          console.error('Erro ao colocar em LTS:', policialId, e);
+        }
+      }
+    }
+
+    // SAIR DE LTS: policiais em LTS sem atestado vigente
+    const policiaisEmLTS = policiaisData.filter(p => {
+      const sit = (p.SITUAÇÃO || '').toUpperCase();
+      return (sit.includes('LICEN') && sit.includes('TRATAMENTO')) || sit === 'LTS';
+    });
+
+    for (const pol of policiaisEmLTS) {
+      const temVigente = mapaVigentes.has(pol.id);
+      if (!temVigente) {
+        // Buscar o último atestado desse policial para info do modal
+        const ultimoAtestado = atestados
+          .filter(a => a.policialId === pol.id && a.dias > 3)
+          .sort((a: any, b: any) => (b.dataFim || '').localeCompare(a.dataFim || ''))[0];
+
+        try {
+          await updateDoc(doc(db, 'policiais', pol.id), {
+            SITUAÇÃO: 'EM ATIVIDADE',
+            inicioSituacao: '',
+            fimSituacao: '',
+            'FUNÇÃO': pol.funcaoOrigem || pol['FUNÇÃO'] || '',
+          });
+          await addDoc(collection(db, 'assentamentos'), {
+            policialId: pol.id,
+            tipo: 'mudanca_situacao',
+            descricao: `Retorno automático de LTS para EM ATIVIDADE`,
+            situacaoAnterior: pol.SITUAÇÃO,
+            situacaoNova: 'EM ATIVIDADE',
+            funcaoAnterior: pol['FUNÇÃO'] || '',
+            funcaoNova: pol.funcaoOrigem || pol['FUNÇÃO'] || '',
+            data: new Date().toISOString(),
+            automatico: true,
+          });
+
+          retornos.push({
+            policialId: pol.id,
+            policialNome: pol.NOME || '',
+            policialNomeGuerra: pol['NOME DE GUERRA1'] || pol.NOME || '',
+            policialNumeral: pol.NUMERAL || pol.numeral || '',
+            policialMatricula: pol.Matrícula || '',
+            cid: ultimoAtestado?.cid || '',
+            cidDescricao: ultimoAtestado?.cidDescricao || '',
+            dataInicio: ultimoAtestado?.dataInicio || '',
+            dataFim: ultimoAtestado?.dataFim || '',
+          });
+        } catch (e) {
+          console.error('Erro ao retirar de LTS:', pol.id, e);
+        }
+      }
+    }
+
+    return retornos;
+  };
+
+  const handleConfirmarAviso = (policialId: string) => {
+    const confirmados = JSON.parse(sessionStorage.getItem('retornosLTSConfirmados') || '[]') as string[];
+    confirmados.push(policialId);
+    sessionStorage.setItem('retornosLTSConfirmados', JSON.stringify(confirmados));
+    setRetornosLTS(prev => prev.filter(r => r.policialId !== policialId));
+  };
+
+  const handleConfirmarTodos = () => {
+    const confirmados = JSON.parse(sessionStorage.getItem('retornosLTSConfirmados') || '[]') as string[];
+    retornosLTS.forEach(r => confirmados.push(r.policialId));
+    sessionStorage.setItem('retornosLTSConfirmados', JSON.stringify(confirmados));
+    setRetornosLTS([]);
+  };
+
+  // Loading com banner do regimento
+  if (verificando || loading) {
+    return (
+      <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 transition-opacity duration-500 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}>
+        <div className="flex flex-col items-center gap-6 p-8 max-w-md w-full">
+          <img
+            src={logoRegimento}
+            alt="Logo do Regimento"
+            className="w-48 h-48 object-contain rounded-xl shadow-2xl animate-pulse"
+          />
+          <div className="w-full space-y-3">
+            <Progress value={progressValue} className="h-3 w-full" />
+            <p className="text-white text-center text-sm font-medium animate-pulse">
+              {progressText}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Dados do Dashboard
   const currentDate = new Date();
@@ -104,19 +304,16 @@ const GestãoPessoas: React.FC = () => {
     }
   });
 
-  // Policiais de férias
   const policiaisFerias = policiais.filter(p => 
     p.SITUAÇÃO?.toLowerCase().includes('férias') || 
     p.SITUAÇÃO?.toLowerCase().includes('ferias')
   );
 
-  // Policiais em licença médica
   const policiaisLicencaMedica = policiais.filter(p => 
     p.SITUAÇÃO?.toLowerCase().includes('licença tratamento') ||
     p.SITUAÇÃO?.toLowerCase().includes('licenca tratamento')
   );
 
-  // Próximos do fim das férias (próximos 7 dias)
   const proximosFimFerias = policiais.filter(p => {
     if (!p.fimFerias) return false;
     try {
@@ -128,17 +325,13 @@ const GestãoPessoas: React.FC = () => {
     }
   });
 
-  // Dados para gráficos
   const situacaoData = policiais.reduce((acc, policial) => {
     const situacao = policial.SITUAÇÃO || 'Não informado';
     acc[situacao] = (acc[situacao] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const pieData = Object.entries(situacaoData).map(([name, value]) => ({
-    name,
-    value
-  }));
+  const pieData = Object.entries(situacaoData).map(([name, value]) => ({ name, value }));
 
   const postGradData = policiais.reduce((acc, policial) => {
     const postGrad = policial['Post/Grad'] || 'Não informado';
@@ -146,31 +339,31 @@ const GestãoPessoas: React.FC = () => {
     return acc;
   }, {} as Record<string, number>);
 
-  const barData = Object.entries(postGradData).map(([name, value]) => ({
-    name,
-    value
-  }));
+  const barData = Object.entries(postGradData).map(([name, value]) => ({ name, value }));
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Carregando dados...</p>
-        </div>
-      </div>
-    );
-  }
+  const fetchPoliciais = async () => {
+    try {
+      setLoading(true);
+      const policiaisRef = collection(db, 'policiais');
+      const q = query(policiaisRef, orderBy('NOME'));
+      const querySnapshot = await getDocs(q);
+      const policiaisData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Policial[];
+      setPoliciais(policiaisData);
+    } catch (error) {
+      console.error('Erro ao buscar policiais:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate('/')}
-          >
+          <Button variant="outline" size="icon" onClick={() => navigate('/')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -209,12 +402,9 @@ const GestãoPessoas: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{policiais.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  Efetivo total
-                </p>
+                <p className="text-xs text-muted-foreground">Efetivo total</p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">De Férias</CardTitle>
@@ -222,12 +412,9 @@ const GestãoPessoas: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-orange-600">{policiaisFerias.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  Atualmente de férias
-                </p>
+                <p className="text-xs text-muted-foreground">Atualmente de férias</p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Licença Médica</CardTitle>
@@ -235,12 +422,9 @@ const GestãoPessoas: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">{policiaisLicencaMedica.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  Em tratamento de saúde
-                </p>
+                <p className="text-xs text-muted-foreground">Em tratamento de saúde</p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Aniversariantes</CardTitle>
@@ -248,9 +432,7 @@ const GestãoPessoas: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">{aniversariantes.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  Neste mês
-                </p>
+                <p className="text-xs text-muted-foreground">Neste mês</p>
               </CardContent>
             </Card>
           </div>
@@ -289,16 +471,7 @@ const GestãoPessoas: React.FC = () => {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
+                    <Pie data={pieData} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} outerRadius={80} fill="#8884d8" dataKey="value">
                       {pieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
@@ -308,7 +481,6 @@ const GestãoPessoas: React.FC = () => {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle>Distribuição por Post/Graduação</CardTitle>
@@ -338,18 +510,15 @@ const GestãoPessoas: React.FC = () => {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {aniversariantes.map(policial => {
-                    const dataNasc = typeof policial['Data de Nascimento'] === 'number' 
+                    const dataNasc = typeof policial['Data de Nascimento'] === 'number'
                       ? new Date((policial['Data de Nascimento'] - 25569) * 86400 * 1000)
                       : new Date(policial['Data de Nascimento']);
-                    
                     return (
                       <div key={policial.id} className="flex items-center space-x-3 p-3 bg-muted rounded-lg">
                         <CalendarDays className="h-8 w-8 text-primary" />
                         <div>
                           <p className="font-medium">{policial.NOME}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {policial['Post/Grad']} - {format(dataNasc, 'dd/MM')}
-                          </p>
+                          <p className="text-sm text-muted-foreground">{policial['Post/Grad']} - {format(dataNasc, 'dd/MM')}</p>
                         </div>
                       </div>
                     );
@@ -363,31 +532,30 @@ const GestãoPessoas: React.FC = () => {
         <TabsContent value="ferias">
           <GestaoFeriasTab policiais={policiais} onUpdate={fetchPoliciais} />
         </TabsContent>
-
         <TabsContent value="efetivo">
           <EfetivoTab policiais={policiais} onUpdate={fetchPoliciais} />
         </TabsContent>
-
         <TabsContent value="movimentacoes">
           <MovimentacoesTab policiais={policiais} onUpdate={fetchPoliciais} />
         </TabsContent>
-
         <TabsContent value="situacao">
           <SituacaoTab policiais={policiais} onUpdate={fetchPoliciais} />
         </TabsContent>
-
         <TabsContent value="funcao">
           <FuncaoTab policiais={policiais} onUpdate={fetchPoliciais} />
         </TabsContent>
-
         <TabsContent value="transferidos">
           <TransferidosTab policiais={policiais} onUpdate={fetchPoliciais} />
         </TabsContent>
-
         <TabsContent value="atestados">
-          <AtestadosMedicosTab policiais={policiais} onUpdate={fetchPoliciais} />
+          <AtestadosMedicosTab
+            policiais={policiais}
+            onUpdate={fetchPoliciais}
+            avisoRetornos={retornosLTS}
+            onConfirmarAviso={handleConfirmarAviso}
+            onConfirmarTodos={handleConfirmarTodos}
+          />
         </TabsContent>
-
         <TabsContent value="estatisticas">
           <EstatisticasTab policiais={policiais} />
         </TabsContent>

@@ -35,6 +35,14 @@ interface ConfigSituacao {
   indisponivel: boolean;
 }
 
+interface AtestadoMapa {
+  cid: string;
+  cidDescricao: string;
+  dataInicio: string;
+  dataFim: string;
+  dias: number;
+}
+
 interface EstatisticasTabProps {
   policiais: Policial[];
 }
@@ -50,6 +58,7 @@ const UNIDADES: { key: UnidadeKey; label: string; filter: (p: Policial) => boole
 
 const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
   const [situacoes, setSituacoes] = useState<ConfigSituacao[]>([]);
+  const [atestadosMap, setAtestadosMap] = useState<Map<string, AtestadoMapa>>(new Map());
   const [loading, setLoading] = useState(true);
   const [abaUnidade, setAbaUnidade] = useState<UnidadeKey>('regimento');
   const [showFerias, setShowFerias] = useState(false);
@@ -57,17 +66,40 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
   const [showOutros, setShowOutros] = useState(false);
 
   useEffect(() => {
-    const fetchSituacoes = async () => {
+    const fetchData = async () => {
       try {
-        const snap = await getDocs(collection(db, 'config_situacoes'));
-        setSituacoes(snap.docs.map(d => ({ id: d.id, nome: d.data().nome, indisponivel: d.data().indisponivel ?? true })));
+        const [situacoesSnap, atestadosSnap] = await Promise.all([
+          getDocs(collection(db, 'config_situacoes')),
+          getDocs(collection(db, 'atestados_medicos')),
+        ]);
+        setSituacoes(situacoesSnap.docs.map(d => ({ id: d.id, nome: d.data().nome, indisponivel: d.data().indisponivel ?? true })));
+
+        // Criar mapa policialId -> atestado vigente mais recente
+        const hoje = format(new Date(), 'yyyy-MM-dd');
+        const mapa = new Map<string, AtestadoMapa>();
+        atestadosSnap.docs.forEach(d => {
+          const data = d.data();
+          if (!data.policialId || !data.dataInicio || !data.dataFim) return;
+          // Pegar o mais recente por policial (vigente ou não, para exibir info)
+          const existing = mapa.get(data.policialId);
+          if (!existing || data.dataFim > existing.dataFim) {
+            mapa.set(data.policialId, {
+              cid: data.cid || '',
+              cidDescricao: data.cidDescricao || '',
+              dataInicio: data.dataInicio,
+              dataFim: data.dataFim,
+              dias: data.dias || 0,
+            });
+          }
+        });
+        setAtestadosMap(mapa);
       } catch (e) {
-        console.error('Erro ao carregar config_situacoes:', e);
+        console.error('Erro ao carregar dados:', e);
       } finally {
         setLoading(false);
       }
     };
-    fetchSituacoes();
+    fetchData();
   }, []);
 
   const situacoesIndisponiveis = useMemo(() => situacoes.filter(s => s.indisponivel).map(s => s.nome), [situacoes]);
@@ -80,38 +112,26 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
 
   const stats = useMemo(() => {
     const total = policiaisFiltrados.length;
-    
-    const indisponiveis = policiaisFiltrados.filter(p => 
-      p.SITUAÇÃO && situacoesIndisponiveis.includes(p.SITUAÇÃO)
-    );
-
-    const ferias = policiaisFiltrados.filter(p =>
-      p.SITUAÇÃO?.toUpperCase().includes('FÉRIAS') || p.SITUAÇÃO?.toUpperCase().includes('FERIAS')
-    );
-
+    const indisponiveis = policiaisFiltrados.filter(p => p.SITUAÇÃO && situacoesIndisponiveis.includes(p.SITUAÇÃO));
+    const ferias = policiaisFiltrados.filter(p => p.SITUAÇÃO?.toUpperCase().includes('FÉRIAS') || p.SITUAÇÃO?.toUpperCase().includes('FERIAS'));
     const lts = policiaisFiltrados.filter(p =>
       p.SITUAÇÃO?.toUpperCase().includes('LICENÇA TRATAMENTO') || 
       p.SITUAÇÃO?.toUpperCase().includes('LICENCA TRATAMENTO') ||
       p.SITUAÇÃO?.toUpperCase() === 'LTS'
     );
-
     const outrosAfastamentos = indisponiveis.filter(p => {
       const sit = p.SITUAÇÃO?.toUpperCase() || '';
       const isFerias = sit.includes('FÉRIAS') || sit.includes('FERIAS');
       const isLTS = sit.includes('LICENÇA TRATAMENTO') || sit.includes('LICENCA TRATAMENTO') || sit === 'LTS';
       return !isFerias && !isLTS;
     });
-
     const disponiveis = total - indisponiveis.length;
-
-    // Resumo por Posto/Graduação
     const postGradMap: Record<string, number> = {};
     policiaisFiltrados.forEach(p => {
       const pg = p['Post/Grad'] || 'N/I';
       postGradMap[pg] = (postGradMap[pg] || 0) + 1;
     });
     const postGradResumo = Object.entries(postGradMap).sort((a, b) => b[1] - a[1]);
-
     return { total, disponiveis, indisponiveis, ferias, lts, outrosAfastamentos, postGradResumo };
   }, [policiaisFiltrados, situacoesIndisponiveis]);
 
@@ -133,9 +153,10 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
     csv += `LTS;${stats.lts.length}\n`;
     csv += `Outros Afastamentos;${stats.outrosAfastamentos.length}\n\n`;
     csv += 'INDISPONÍVEIS\n';
-    csv += 'Nome de Guerra;Numeral;Matrícula;Situação;Data Início;Data Final\n';
+    csv += 'Nome de Guerra;Numeral;Matrícula;Situação;CID;Descrição CID;Data Início;Data Final\n';
     stats.indisponiveis.forEach(p => {
-      csv += `${getNomeGuerra(p)};${getNumeral(p)};${getMatricula(p)};${p.SITUAÇÃO};${p.inicioSituacao || '-'};${p.fimSituacao || '-'}\n`;
+      const atestado = atestadosMap.get(p.id);
+      csv += `${getNomeGuerra(p)};${getNumeral(p)};${getMatricula(p)};${p.SITUAÇÃO};${atestado?.cid || '-'};${atestado?.cidDescricao || '-'};${p.inicioSituacao || '-'};${p.fimSituacao || '-'}\n`;
     });
     csv += '\nRESUMO POR POSTO/GRADUAÇÃO\n';
     csv += 'Posto/Graduação;Quantidade\n';
@@ -150,29 +171,43 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
     URL.revokeObjectURL(url);
   };
 
-  const renderPolicialList = (list: Policial[]) => (
+  // Lista genérica de policiais
+  const renderPolicialList = (list: Policial[], options?: { showSituacao?: boolean; showCid?: boolean }) => (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Nome de Guerra</TableHead>
           <TableHead>Numeral</TableHead>
           <TableHead>Matrícula</TableHead>
+          {options?.showSituacao && <TableHead>Situação</TableHead>}
+          {options?.showCid && <TableHead>CID</TableHead>}
+          {options?.showCid && <TableHead>Descrição CID</TableHead>}
           <TableHead>Data Início</TableHead>
           <TableHead>Data Final</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {list.sort(sortByHierarquia).map(p => (
-          <TableRow key={p.id}>
-            <TableCell className="font-medium">{getNomeGuerra(p)}</TableCell>
-            <TableCell>{getNumeral(p)}</TableCell>
-            <TableCell>{getMatricula(p)}</TableCell>
-            <TableCell>{p.inicioSituacao || '-'}</TableCell>
-            <TableCell>{p.fimSituacao || '-'}</TableCell>
-          </TableRow>
-        ))}
+        {list.sort(sortByHierarquia).map(p => {
+          const atestado = atestadosMap.get(p.id);
+          return (
+            <TableRow key={p.id}>
+              <TableCell className="font-medium">{getNomeGuerra(p)}</TableCell>
+              <TableCell>{getNumeral(p)}</TableCell>
+              <TableCell>{getMatricula(p)}</TableCell>
+              {options?.showSituacao && <TableCell><Badge variant="outline">{p.SITUAÇÃO}</Badge></TableCell>}
+              {options?.showCid && <TableCell className="font-mono text-xs">{atestado?.cid || '-'}</TableCell>}
+              {options?.showCid && <TableCell className="text-xs">{atestado?.cidDescricao || '-'}</TableCell>}
+              <TableCell>{p.inicioSituacao || '-'}</TableCell>
+              <TableCell>{p.fimSituacao || '-'}</TableCell>
+            </TableRow>
+          );
+        })}
         {list.length === 0 && (
-          <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum policial</TableCell></TableRow>
+          <TableRow>
+            <TableCell colSpan={options?.showSituacao && options?.showCid ? 8 : options?.showSituacao || options?.showCid ? 7 : 5} className="text-center text-muted-foreground">
+              Nenhum policial
+            </TableCell>
+          </TableRow>
         )}
       </TableBody>
     </Table>
@@ -191,7 +226,6 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
 
   return (
     <div className="space-y-6">
-      {/* Abas por unidade */}
       <Tabs value={abaUnidade} onValueChange={(v) => { setAbaUnidade(v as UnidadeKey); setShowFerias(false); setShowLTS(false); setShowOutros(false); }}>
         <TabsList className="flex flex-wrap gap-1 h-auto">
           {UNIDADES.map(u => (
@@ -272,13 +306,13 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
             {showLTS && (
               <Card>
                 <CardHeader><CardTitle className="text-base">Policiais em LTS</CardTitle></CardHeader>
-                <CardContent>{renderPolicialList(stats.lts)}</CardContent>
+                <CardContent>{renderPolicialList(stats.lts, { showCid: true })}</CardContent>
               </Card>
             )}
             {showOutros && (
               <Card>
                 <CardHeader><CardTitle className="text-base">Outros Afastamentos</CardTitle></CardHeader>
-                <CardContent>{renderPolicialList(stats.outrosAfastamentos)}</CardContent>
+                <CardContent>{renderPolicialList(stats.outrosAfastamentos, { showSituacao: true })}</CardContent>
               </Card>
             )}
 
@@ -295,23 +329,30 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
                       <TableHead>Numeral</TableHead>
                       <TableHead>Matrícula</TableHead>
                       <TableHead>Situação</TableHead>
+                      <TableHead>CID</TableHead>
+                      <TableHead>Descrição CID</TableHead>
                       <TableHead>Data Início</TableHead>
                       <TableHead>Data Final</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stats.indisponiveis.sort(sortByHierarquia).map(p => (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-medium">{getNomeGuerra(p)}</TableCell>
-                        <TableCell>{getNumeral(p)}</TableCell>
-                        <TableCell>{getMatricula(p)}</TableCell>
-                        <TableCell><Badge variant="outline">{p.SITUAÇÃO}</Badge></TableCell>
-                        <TableCell>{p.inicioSituacao || '-'}</TableCell>
-                        <TableCell>{p.fimSituacao || '-'}</TableCell>
-                      </TableRow>
-                    ))}
+                    {stats.indisponiveis.sort(sortByHierarquia).map(p => {
+                      const atestado = atestadosMap.get(p.id);
+                      return (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">{getNomeGuerra(p)}</TableCell>
+                          <TableCell>{getNumeral(p)}</TableCell>
+                          <TableCell>{getMatricula(p)}</TableCell>
+                          <TableCell><Badge variant="outline">{p.SITUAÇÃO}</Badge></TableCell>
+                          <TableCell className="font-mono text-xs">{atestado?.cid || '-'}</TableCell>
+                          <TableCell className="text-xs">{atestado?.cidDescricao || '-'}</TableCell>
+                          <TableCell>{p.inicioSituacao || '-'}</TableCell>
+                          <TableCell>{p.fimSituacao || '-'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {stats.indisponiveis.length === 0 && (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum policial indisponível</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Nenhum policial indisponível</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -320,7 +361,6 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
 
             {/* Estatísticas adicionais */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Percentual de disponibilidade */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-base">Disponibilidade</CardTitle>
@@ -328,23 +368,14 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-green-600">{percentDisponivel}%</div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {stats.disponiveis} de {stats.total} policiais disponíveis
-                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">{stats.disponiveis} de {stats.total} policiais disponíveis</p>
                   <div className="w-full bg-muted rounded-full h-3 mt-3">
-                    <div
-                      className="bg-green-600 h-3 rounded-full transition-all"
-                      style={{ width: `${percentDisponivel}%` }}
-                    />
+                    <div className="bg-green-600 h-3 rounded-full transition-all" style={{ width: `${percentDisponivel}%` }} />
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Resumo por Posto/Graduação */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Resumo por Posto/Graduação</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base">Resumo por Posto/Graduação</CardTitle></CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
@@ -366,7 +397,6 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
               </Card>
             </div>
 
-            {/* Exportação */}
             <div className="flex flex-wrap gap-3">
               <Button onClick={exportarRelatorioCompleto} variant="outline">
                 <Download className="h-4 w-4 mr-2" />
@@ -374,7 +404,6 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
               </Button>
             </div>
 
-            {/* Gerador de Resumo de Efetivo DOCX */}
             <GerarResumoEfetivoForm />
           </TabsContent>
         ))}
