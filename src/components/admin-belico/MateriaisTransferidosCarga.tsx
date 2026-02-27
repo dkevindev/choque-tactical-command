@@ -9,6 +9,7 @@ import { Search, Eye } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
+import { usePolicialResolver } from '@/hooks/usePolicialResolver';
 
 interface Material {
   materialId: string;
@@ -24,6 +25,7 @@ interface Material {
 
 interface Transferencia {
   id: string;
+  policialId?: string;
   policialNome: string;
   policialPatente: string;
   policialMatricula: string;
@@ -46,6 +48,7 @@ const MateriaisTransferidosCarga = () => {
   const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
   const [filtro, setFiltro] = useState('');
   const [detalhes, setDetalhes] = useState<Transferencia | null>(null);
+  const { resolverNome } = usePolicialResolver();
 
   useEffect(() => {
     loadTransferencias();
@@ -146,7 +149,7 @@ const MateriaisTransferidosCarga = () => {
                       </TableCell>
                       <TableCell>
                         <p className="text-sm font-medium">
-                          {item.transferencia.policialPatente} {item.transferencia.policialNome}
+                          {resolverNome(item.transferencia.policialId, item.transferencia.policialPatente, item.transferencia.policialNome)}
                         </p>
                       </TableCell>
                       <TableCell className="text-sm">
@@ -176,7 +179,7 @@ const MateriaisTransferidosCarga = () => {
             <div className="space-y-6">
               <div className="p-4 bg-muted rounded-lg">
                 <h4 className="font-semibold mb-2">Policial</h4>
-                <p>{detalhes.policialPatente} {detalhes.policialNome}</p>
+                <p>{resolverNome(detalhes.policialId, detalhes.policialPatente, detalhes.policialNome)}</p>
                 <p className="text-sm text-muted-foreground">Matrícula: {detalhes.policialMatricula}</p>
                 <p className="text-sm text-muted-foreground">Cautela Original: {detalhes.numeroCautelaOriginal}</p>
               </div>

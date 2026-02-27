@@ -10,6 +10,7 @@ import { Search, Eye, FileText } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
+import { usePolicialResolver } from '@/hooks/usePolicialResolver';
 
 interface Material {
   materialId: string;
@@ -25,6 +26,7 @@ interface Material {
 
 interface Transferencia {
   id: string;
+  policialId?: string;
   policialNome: string;
   policialPatente: string;
   policialMatricula: string;
@@ -49,6 +51,7 @@ const MateriaisTransferidos = () => {
   const [filtro, setFiltro] = useState('');
   const [filtroLocal, setFiltroLocal] = useState('todos');
   const [detalhes, setDetalhes] = useState<Transferencia | null>(null);
+  const { resolverNome } = usePolicialResolver();
 
   useEffect(() => {
     loadTransferencias();
@@ -160,7 +163,7 @@ const MateriaisTransferidos = () => {
                   transferenciasFiltradas.map((t) => (
                     <TableRow key={t.id}>
                       <TableCell className="font-medium">
-                        {t.policialPatente} {t.policialNome}
+                        {resolverNome(t.policialId, t.policialPatente, t.policialNome)}
                       </TableCell>
                       <TableCell className="text-sm">{t.policialMatricula}</TableCell>
                       <TableCell className="text-sm">{t.localDestino}</TableCell>
@@ -203,7 +206,7 @@ const MateriaisTransferidos = () => {
             <div className="space-y-6">
               <div className="p-4 bg-muted rounded-lg">
                 <h4 className="font-semibold mb-2">Policial</h4>
-                <p>{detalhes.policialPatente} {detalhes.policialNome}</p>
+                <p>{resolverNome(detalhes.policialId, detalhes.policialPatente, detalhes.policialNome)}</p>
                 <p className="text-sm text-muted-foreground">Matrícula: {detalhes.policialMatricula}</p>
                 <p className="text-sm text-muted-foreground">Cautela Original: {detalhes.numeroCautelaOriginal}</p>
               </div>

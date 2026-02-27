@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { collection, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Package, ArrowRight } from 'lucide-react';
+import { usePolicialResolver } from '@/hooks/usePolicialResolver';
 
 interface Material {
   materialId: string;
@@ -55,7 +56,7 @@ const TransferenciaPolicialModal = ({ cautela, open, onClose, onSuccess }: Props
   const [publicacao, setPublicacao] = useState('');
   const [materiaisStatus, setMateriaisStatus] = useState<Record<string, 'levado' | 'devolvido' | null>>({});
   const [loading, setLoading] = useState(false);
-
+  const { resolverNome } = usePolicialResolver();
   const handleMaterialToggle = (materialId: string, status: 'levado' | 'devolvido') => {
     setMateriaisStatus(prev => ({
       ...prev,
@@ -193,7 +194,7 @@ const TransferenciaPolicialModal = ({ cautela, open, onClose, onSuccess }: Props
           <div className="p-4 bg-muted rounded-lg">
             <h4 className="font-semibold mb-2">Policial</h4>
             <p className="text-sm">
-              {cautela.policialPatente} {cautela.policialNome} - Mat: {cautela.policialMatricula}
+              {resolverNome(cautela.policialId, cautela.policialPatente, cautela.policialNome)} - Mat: {cautela.policialMatricula}
             </p>
             <p className="text-xs text-muted-foreground">Cautela: {cautela.numeroCautela}</p>
           </div>

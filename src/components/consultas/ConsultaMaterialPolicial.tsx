@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { usePolicialResolver } from '@/hooks/usePolicialResolver';
 import { 
   Package, 
   Search, 
@@ -55,6 +56,7 @@ interface Viatura {
 
 const ConsultaMaterialPolicial = () => {
   const [activeTab, setActiveTab] = useState('materiais');
+  const { resolverNome } = usePolicialResolver();
   const [loading, setLoading] = useState(false);
   const [materiais, setMateriais] = useState<MaterialBelico[]>([]);
   const [cautelas, setCautelas] = useState<CautelaAtiva[]>([]);
@@ -178,7 +180,7 @@ const ConsultaMaterialPolicial = () => {
       if (materialCautelado) {
         return {
           cautelado: true,
-          policial: cautela.policialNome,
+          policial: resolverNome(cautela.policialId, undefined, cautela.policialNome),
           matricula: cautela.policialMatricula,
           tipo: cautela.tipo
         };
@@ -305,7 +307,7 @@ const ConsultaMaterialPolicial = () => {
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <p className="font-semibold text-foreground">
-                            {c.policialNome || 'Policial não identificado'}
+                            {resolverNome(c.policialId, undefined, c.policialNome) || 'Policial não identificado'}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             Mat: {c.policialMatricula || '-'}

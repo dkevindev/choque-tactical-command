@@ -100,22 +100,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
     }
   };
 
-  // Função para ordenar por Post/Graduação (mesma lógica do PolicialTable)
-  const getPostGradOrder = (postGrad: string): number => {
-    const ordem = {
-      'TEN CEL': 1, 'MAJ': 2, 'CAP': 3, '1º TEN': 4, '2º TEN': 5,
-      '1º SGT': 6, '2º SGT': 7, '3º SGT': 8, 'CB': 9, 'SD': 10
-    };
-    return ordem[postGrad as keyof typeof ordem] || 999;
-  };
-
-  const hasCmtRpmont = (policial: Policial): boolean => {
-    return policial['FUNÇÃO']?.includes('CMT RPMONT') || false;
-  };
-
-  const shouldCapComeFirst = (policial: Policial): boolean => {
-    return policial['Post/Grad'] === 'CAP' && hasCmtRpmont(policial);
-  };
+  // Ordenação centralizada via sortByHierarquia (policialUtils.ts)
 
   // Filtrar e ordenar policiais
   const filteredPoliciais = policiais
