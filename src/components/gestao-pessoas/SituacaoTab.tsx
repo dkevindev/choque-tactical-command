@@ -9,11 +9,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircle, Calendar, Users, Bell, Search, Filter, Settings, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, Users, Search, Filter, Settings, Plus, Pencil, Trash2 } from 'lucide-react';
 import { doc, updateDoc, writeBatch, collection, addDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, isWithinInterval, addDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { sortByHierarquia } from '@/lib/policialUtils';
 
 interface Policial {
@@ -157,15 +157,8 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
     });
   }, [policiaisEmSituacao, searchTerm, filterSituacao]);
 
-  const alertasSituacao = policiaisEmSituacao.filter(policial => {
-    if (!policial.fimSituacao) return false;
-    try {
-      const fimData = parseISO(policial.fimSituacao);
-      const agora = new Date();
-      const em7dias = addDays(agora, 7);
-      return isWithinInterval(fimData, { start: agora, end: em7dias });
-    } catch { return false; }
-  });
+
+
 
   const handleSelectPolicial = (policialId: string, checked: boolean) => {
     setSelectedPoliciais(prev => checked ? [...prev, policialId] : prev.filter(id => id !== policialId));
@@ -411,33 +404,6 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
           </CardContent>
         )}
       </Card>
-
-      {/* Alertas */}
-      {alertasSituacao.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-800">
-              <Bell className="h-5 w-5" />
-              Alertas - Situações Terminando em Breve
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {alertasSituacao.map(policial => (
-                <div key={policial.id} className="flex justify-between items-center p-2 bg-white rounded">
-                  <div>
-                    <span className="font-medium">{policial['Post/Grad']} {policial.NOME}</span>
-                    <Badge variant="outline" className="ml-2">{policial.SITUAÇÃO}</Badge>
-                  </div>
-                  <Badge variant="destructive">
-                    Termina em {policial.fimSituacao ? format(parseISO(policial.fimSituacao), 'dd/MM/yyyy') : 'N/A'}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Filtros */}
       <Card>
