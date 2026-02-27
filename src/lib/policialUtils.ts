@@ -44,21 +44,46 @@ export const getPostGradOrder = (postGrad: string): number => {
   return ordem[postGrad] || 999;
 };
 
+const isOficial = (postGrad: string): boolean => {
+  return ['TEN CEL', 'TENCEL', 'MAJ', 'CAP', '1º TEN', '2º TEN'].includes(postGrad);
+};
+
+const getQuadroOrder = (quadro: string | undefined): number => {
+  if (quadro === 'QOPM') return 1;
+  if (quadro === 'QOAPM') return 2;
+  return 1.5; // sem quadro fica no meio
+};
+
 export const sortByHierarquia = (a: any, b: any): number => {
+  // 1. CMT RPMONT sempre primeiro
   const aIsCmt = a['FUNÇÃO']?.includes('CMT RPMONT');
   const bIsCmt = b['FUNÇÃO']?.includes('CMT RPMONT');
   if (aIsCmt && !bIsCmt) return -1;
   if (!aIsCmt && bIsCmt) return 1;
 
+  // 2. SUBCMT DO RPMONT segundo
+  const aIsSubCmt = a['FUNÇÃO']?.includes('SUBCMT');
+  const bIsSubCmt = b['FUNÇÃO']?.includes('SUBCMT');
+  if (aIsSubCmt && !bIsSubCmt) return -1;
+  if (!aIsSubCmt && bIsSubCmt) return 1;
+
+  // 3. Comparar posto/graduação
   const orderDiff = getPostGradOrder(a['Post/Grad'] || '') - getPostGradOrder(b['Post/Grad'] || '');
   if (orderDiff !== 0) return orderDiff;
 
-  // Mesma graduação: quem foi promovido primeiro é mais antigo
+  // 4. Mesmo posto e oficial: QOPM antes de QOAPM
+  const postGrad = a['Post/Grad'] || '';
+  if (isOficial(postGrad)) {
+    const quadroDiff = getQuadroOrder(a.quadro) - getQuadroOrder(b.quadro);
+    if (quadroDiff !== 0) return quadroDiff;
+  }
+
+  // 5. Data última promoção (mais antiga primeiro)
   const dateA = a.dataUltimaPromocao ? new Date(a.dataUltimaPromocao).getTime() : Infinity;
   const dateB = b.dataUltimaPromocao ? new Date(b.dataUltimaPromocao).getTime() : Infinity;
   if (dateA !== dateB) return dateA - dateB;
 
-  // Mesmo posto e data: ordenar por numeral
+  // 6. Numeral menor primeiro
   const numA = Number(a.NUMERAL || a.numeral || 9999);
   const numB = Number(b.NUMERAL || b.numeral || 9999);
   return numA - numB;

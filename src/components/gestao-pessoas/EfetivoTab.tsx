@@ -283,7 +283,15 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
                   <TableRow key={policial.id} className={policial.origemExterna ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
                     <TableCell>{policial.NUMERAL || policial.numeral || '-'}</TableCell>
                     <TableCell className="font-medium">
-                      {policial['Post/Grad']}
+                      <div className="flex items-center gap-1.5">
+                        {policial['Post/Grad']}
+                        {policial.quadro === 'QOPM' && (
+                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] px-1 py-0 leading-tight">QOPM</Badge>
+                        )}
+                        {policial.quadro === 'QOAPM' && (
+                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[9px] px-1 py-0 leading-tight">QOAPM</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {policial.NOME}
@@ -676,6 +684,8 @@ const EditPolicialForm: React.FC<{
   onCancel: () => void;
   loading: boolean;
 }> = ({ policial, onSave, onCancel, loading }) => {
+  const isOficialPost = ['TEN CEL', 'TENCEL', 'MAJ', 'CAP', '1º TEN', '2º TEN'].includes(policial['Post/Grad'] || '');
+
   const [formData, setFormData] = useState({
     // Dados Pessoais
     NOME: policial.NOME || '',
@@ -691,6 +701,7 @@ const EditPolicialForm: React.FC<{
     'FUNÇÃO': policial['FUNÇÃO'] || '',
     'UNIDADE"RPMONT"': policial.UNIDADE || policial['UNIDADE"RPMONT"'] || policial.Unidade || policial.unidade || '',
     SITUAÇÃO: policial.SITUAÇÃO || '',
+    quadro: policial.quadro || '__none__',
     'PREVISAO FÉRIAS - AQUISITIVO 2024': policial['PREVISAO FÉRIAS - AQUISITIVO 2024'] || policial.previsaoFerias2024 || '',
     'MUDANÇA COMPORTAMENTO': policial['MUDANÇA COMPORTAMENTO'] || '',
     
@@ -709,6 +720,10 @@ const EditPolicialForm: React.FC<{
     
     // Calcular idade e mês de aniversário se data de nascimento foi alterada
     let updateData: any = { ...formData };
+    // Converter quadro placeholder para undefined
+    if (updateData.quadro === '__none__') {
+      updateData.quadro = '';
+    }
     
     if (formData.dataNascimento) {
       const dataNasc = new Date(formData.dataNascimento);
@@ -831,6 +846,21 @@ const EditPolicialForm: React.FC<{
               onChange={(e) => setFormData(prev => ({ ...prev, 'FUNÇÃO': e.target.value }))}
             />
           </div>
+          {isOficialPost && (
+            <div>
+              <Label htmlFor="quadro">Quadro</Label>
+              <Select value={formData.quadro} onValueChange={v => setFormData(prev => ({ ...prev, quadro: v }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o quadro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum</SelectItem>
+                  <SelectItem value="QOPM">QOPM</SelectItem>
+                  <SelectItem value="QOAPM">QOAPM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <Label htmlFor="unidade">Unidade (RPMONT)</Label>
             <Input
