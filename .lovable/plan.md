@@ -1,53 +1,42 @@
 
 
-# Normalizar "LICENCA" vs "LICENÇA TRATAMENTO DE SAUDE"
+# Corrigir cedilha e cadastrar policiais BSP (cedidos)
 
-## Problema
-O sistema tem duas variantes da mesma situacao sendo tratadas como diferentes:
-- `LICENÇA TRATAMENTO DE SAUDE` (com cedilha - vem da config_situacoes e do SituacaoTab)
-- `LICENCA TRATAMENTO DE SAUDE` (sem cedilha - gravado pela automacao de LTS)
+## Parte 1: Botao para corrigir cedilha nos dados existentes
 
-## Solucao
+Na aba **Efetivo** (EfetivoTab.tsx), adicionar um botao "Corrigir Acentuacao" que:
+- Busca todos os policiais no Firebase cuja SITUACAO contenha "LICENCA" (sem cedilha)
+- Atualiza automaticamente para "LICENÇA TRATAMENTO DE SAUDE" (com cedilha)
+- Exibe um toast informando quantos registros foram corrigidos (ou "Nenhum registro para corrigir")
 
-Padronizar para **uma unica forma**: `LICENÇA TRATAMENTO DE SAUDE` (com cedilha, que e o portugues correto). E criar uma funcao auxiliar de normalizacao para que comparacoes nunca falhem por causa de acentuacao.
+O botao ficara ao lado do botao "Gerenciar Promocoes" no header do card de Efetivo.
 
-### 1. Criar funcao utilitaria de normalizacao
+## Parte 2: Cadastro de policiais BSP (cedidos)
 
-Em `src/lib/policialUtils.ts`, adicionar:
+### Conceito
+Policiais cedidos de outras unidades (ex: BSP) serao armazenados na mesma colecao `policiais` no Firebase, porem com um campo `origemExterna: 'BSP'` (ou outra unidade) e `UNIDADE: 'BSP'`. Isso permite que:
+- Aparecam na tabela de efetivo, diferenciados visualmente
+- Sejam contados nas estatisticas
+- Aparecam no documento de Resumo de Efetivo (a cloud function ja trata BSP como unidade)
 
-```typescript
-export const normalizarSituacao = (sit: string): string => {
-  return sit.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-};
+### Implementacao
 
-export const isLTS = (situacao: string | undefined): boolean => {
-  if (!situacao) return false;
-  const norm = normalizarSituacao(situacao);
-  return (norm.includes('LICEN') && norm.includes('TRATAMENTO')) || norm === 'LTS';
-};
-```
+**EfetivoTab.tsx:**
+- Adicionar botao "Cadastrar Policial Cedido (BSP)" no header
+- Abrir um Dialog com formulario simplificado: Nome, Nome de Guerra, Post/Grad, Matricula, Funcao, Situacao (padrao "EM ATIVIDADE"), Telefone
+- Ao salvar, gravar no Firebase com `origemExterna: 'BSP'`, `UNIDADE: 'BSP'`
+- Na tabela de efetivo, policiais com `origemExterna` terao um Badge "BSP" ou "CEDIDO" ao lado do nome, com cor diferenciada (ex: azul)
+- Filtro de situacao continuara funcionando normalmente
 
-### 2. Corrigir a gravacao para usar a forma com cedilha
+**EstatisticasTab.tsx:**
+- Os policiais BSP ja serao incluidos nos dados pois vem da mesma colecao `policiais`
+- O agrupamento por unidade ja funciona (a cloud function ja mapeia BSP)
 
-Nos arquivos que gravam `SITUAÇÃO: 'LICENCA TRATAMENTO DE SAUDE'`, trocar para `'LICENÇA TRATAMENTO DE SAUDE'`:
-
-- **`src/components/GestãoPessoas.tsx`** (linhas 180, 190) - automacao de entrada em LTS
-- **`src/components/gestao-pessoas/AtestadosMedicosTab.tsx`** (linhas 254, 264) - ao cadastrar atestado > 3 dias
-
-### 3. Usar `isLTS()` nas comparacoes
-
-Substituir todas as verificacoes manuais com `includes('LICENÇA')` / `includes('LICENCA')` pela funcao `isLTS()`:
-
-- **`src/components/GestãoPessoas.tsx`** (linhas 176, 204, 313-314)
-- **`src/components/gestao-pessoas/EstatisticasTab.tsx`** (linhas 122-125, 130)
-
-### 4. Migrar dados existentes (opcional mas recomendado)
-
-Adicionar na funcao `verificarSituacoesLTS` uma correcao silenciosa: se um policial tem `LICENCA` (sem cedilha), atualizar para `LICENÇA` no Firebase automaticamente.
+### Diferenciacao visual na tabela
+Na linha da tabela, se o policial tiver `origemExterna`, exibir:
+- Badge azul "BSP" na coluna Unidade
+- Linha com fundo levemente diferente (bg-blue-50)
 
 ## Arquivos modificados
-- `src/lib/policialUtils.ts` - adicionar `normalizarSituacao` e `isLTS`
-- `src/components/GestãoPessoas.tsx` - usar `isLTS()` e gravar com cedilha
-- `src/components/gestao-pessoas/AtestadosMedicosTab.tsx` - gravar com cedilha
-- `src/components/gestao-pessoas/EstatisticasTab.tsx` - usar `isLTS()` nas filtragens
+- `src/components/gestao-pessoas/EfetivoTab.tsx` -- botao corrigir cedilha + cadastro BSP + visual diferenciado na tabela
 
