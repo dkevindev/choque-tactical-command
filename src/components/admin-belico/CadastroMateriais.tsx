@@ -123,9 +123,15 @@ const CadastroMateriais = () => {
   ];
 
   useEffect(() => {
-    loadMateriais();
     carregarPoliciais();
   }, []);
+
+  // Recarregar materiais quando policiaisMap estiver pronto
+  useEffect(() => {
+    if (policiaisMap.size > 0) {
+      loadMateriais();
+    }
+  }, [policiaisMap]);
 
   const carregarPoliciais = async () => {
     try {
