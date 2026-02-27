@@ -580,7 +580,7 @@ appResumoEfetivo.post('/', async (req, res) => {
             if (u.includes('3') && u.includes('PEL')) return '3º PEL';
             if (u.includes('2') && u.includes('ESQD')) return '2º ESQD';
             if (u.includes('1') && u.includes('ESQD')) return '1º ESQD';
-            if (u === 'SEDE' || u.includes('SEDE')) return 'SEDE';
+            if (u === 'SEDE' || u.includes('SEDE') || u === 'RPMONT' || u.includes('RPMONT')) return 'SEDE';
             if (u === 'BSP' || u.includes('BSP')) return 'BSP';
             return null; // não mapeado
         };
