@@ -206,12 +206,13 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
 
           // Registrar assentamento
           const assentRef = doc(collection(db, 'assentamentos'));
+          const sitAnterior = policial.SITUAÇÃO || 'EM ATIVIDADE';
           batch.set(assentRef, {
             policialId,
             tipo: 'Mudança de Situação',
             data: new Date().toISOString().split('T')[0],
-            descricao: `Colocado em ${novaSituacao}. Função anterior: ${policial['FUNÇÃO'] || 'N/A'}`,
-            situacaoAnterior: policial.SITUAÇÃO || 'MONTADO - POLICIAMENTO OSTENSIVO',
+            descricao: `Situação anterior: ${sitAnterior}. Nova situação: ${novaSituacao}. Função anterior: ${policial['FUNÇÃO'] || 'N/A'}${publicacao ? `. Publicação: ${publicacao}` : ''}`,
+            situacaoAnterior: sitAnterior,
             novaSituacao,
             novaFuncao: policial['FUNÇÃO'] || '',
             publicacao: publicacao || '',
