@@ -76,7 +76,7 @@ const GerenciarCautelas = () => {
   const [cautelaDetalhes, setCautelaDetalhes] = useState<Cautela | null>(null);
   const [showNovaForm, setShowNovaForm] = useState(false);
   const [cautelaTransferencia, setCautelaTransferencia] = useState<Cautela | null>(null);
-  const { resolverNome } = usePolicialResolver();
+  const { policiaisMap, resolverNome } = usePolicialResolver();
   useEffect(() => {
     loadCautelas();
   }, []);
@@ -150,6 +150,11 @@ const GerenciarCautelas = () => {
       console.log('Gerando documento para cautela:', cautela.numeroCautela);
       console.log('Dados da cautela completa:', cautela);
       
+      // Resolver dados atuais do policial
+      const dadosAtuais = policiaisMap.get(cautela.policialId);
+      const nomeAtual = dadosAtuais?.nomeGuerra || cautela.policialNome;
+      const gradAtual = dadosAtuais?.postGrad || cautela.policialPatente || '';
+
       const response = await fetch('https://gerarcauteladocx-owvlmrnsjq-uc.a.run.app', {
         method: 'POST',
         headers: {
@@ -158,9 +163,9 @@ const GerenciarCautelas = () => {
         body: JSON.stringify({
           numeroCautela: cautela.numeroCautela || 'S/N',
           policial: {
-            nome: cautela.policialNome,
+            nome: nomeAtual,
             matricula: cautela.policialMatricula,
-            grad: cautela.policialPatente || '',
+            grad: gradAtual,
             numeral: cautela.numeral || ''
           },
           materiais: cautela.materiais.map(material => ({
@@ -191,7 +196,7 @@ const GerenciarCautelas = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
 
-      const nomeArquivo = `Cautela-${cautela.policialNome.replace(/\s+/g, '_')}-${Date.now()}.docx`;
+      const nomeArquivo = `Cautela-${nomeAtual.replace(/\s+/g, '_')}-${Date.now()}.docx`;
       link.href = url;
       link.setAttribute('download', nomeArquivo);
       document.body.appendChild(link);

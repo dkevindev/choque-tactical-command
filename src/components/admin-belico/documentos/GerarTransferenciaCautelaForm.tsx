@@ -8,9 +8,11 @@ import { FileDown } from 'lucide-react';
 import { collection, getDocs, query, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
+import { usePolicialResolver } from '@/hooks/usePolicialResolver';
 
 interface Transferencia {
   id: string;
+  policialId?: string;
   policialNome: string;
   policialPatente: string;
   policialMatricula: string;
@@ -35,6 +37,7 @@ const GerarTransferenciaCautelaForm = () => {
   const [transferenciaId, setTransferenciaId] = useState('');
   const [numeroOficio, setNumeroOficio] = useState('');
   const [loading, setLoading] = useState(false);
+  const { policiaisMap, resolverNome } = usePolicialResolver();
 
   useEffect(() => {
     loadTransferencias();
@@ -79,13 +82,18 @@ const GerarTransferenciaCautelaForm = () => {
     setLoading(true);
 
     try {
+      // Resolver dados atuais do policial
+      const dadosAtuais = policiaisMap.get(transferencia.policialId || '');
+      const gradAtual = dadosAtuais?.postGrad || transferencia.policialPatente;
+      const nomeAtual = dadosAtuais?.nomeGuerra || transferencia.policialNome;
+
       const response = await fetch('https://gerartransferenciacauteladocx-owvlmrnsjq-uc.a.run.app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           policial: {
-            grad: transferencia.policialPatente,
-            nome: transferencia.policialNome,
+            grad: gradAtual,
+            nome: nomeAtual,
             matricula: transferencia.policialMatricula
           },
           numeroOficio,
@@ -156,7 +164,7 @@ const GerarTransferenciaCautelaForm = () => {
             <SelectContent>
               {transferencias.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
-                  {t.policialPatente} {t.policialNome} - {t.localDestino} (
+                  {resolverNome(t.policialId, t.policialPatente, t.policialNome)} - {t.localDestino} (
                   {t.dataTransferencia.toLocaleDateString()})
                 </SelectItem>
               ))}
@@ -168,8 +176,7 @@ const GerarTransferenciaCautelaForm = () => {
           <>
             <div className="p-4 bg-muted rounded-lg space-y-2">
               <p className="text-sm">
-                <strong>Policial:</strong> {selectedTransferencia.policialPatente}{' '}
-                {selectedTransferencia.policialNome}
+                <strong>Policial:</strong> {resolverNome(selectedTransferencia.policialId, selectedTransferencia.policialPatente, selectedTransferencia.policialNome)}
               </p>
               <p className="text-sm">
                 <strong>Matrícula:</strong> {selectedTransferencia.policialMatricula}

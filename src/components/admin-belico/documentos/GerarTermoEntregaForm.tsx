@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { collection, getDocs, query, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
+import { usePolicialResolver } from '@/hooks/usePolicialResolver';
 
 interface ItemAdicional {
   descricao: string;
@@ -18,6 +19,7 @@ interface ItemAdicional {
 
 interface Transferencia {
   id: string;
+  policialId?: string;
   policialNome: string;
   policialPatente: string;
   policialMatricula: string;
@@ -50,6 +52,7 @@ const GerarTermoEntregaForm = () => {
   const [showModalItem, setShowModalItem] = useState(false);
   const [itemCustomizado, setItemCustomizado] = useState('');
   const [loading, setLoading] = useState(false);
+  const { policiaisMap, resolverNome } = usePolicialResolver();
 
   useEffect(() => {
     loadTransferencias();
@@ -227,13 +230,18 @@ const GerarTermoEntregaForm = () => {
       // Converter itensAdicionais para array de strings (a Cloud Function espera strings)
       const itensAdicionaisStrings = itensAdicionais.map(item => item.descricao);
 
+      // Resolver dados atuais do policial
+      const dadosAtuais = policiaisMap.get(transferencia.policialId || '');
+      const gradAtual = dadosAtuais?.postGrad || transferencia.policialPatente;
+      const nomeAtual = dadosAtuais?.nomeGuerra || transferencia.policialNome;
+
       const response = await fetch('https://gerartermoentregadocx-owvlmrnsjq-uc.a.run.app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           policial: {
-            grad: transferencia.policialPatente,
-            nome: transferencia.policialNome,
+            grad: gradAtual,
+            nome: nomeAtual,
             matricula: transferencia.policialMatricula
           },
           numeroTermo,
@@ -301,8 +309,8 @@ const GerarTermoEntregaForm = () => {
               </SelectTrigger>
               <SelectContent>
                 {transferencias.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.policialPatente} {t.policialNome} - {t.localDestino} (
+                <SelectItem key={t.id} value={t.id}>
+                    {resolverNome(t.policialId, t.policialPatente, t.policialNome)} - {t.localDestino} (
                     {t.dataTransferencia.toLocaleDateString()})
                   </SelectItem>
                 ))}
@@ -314,8 +322,7 @@ const GerarTermoEntregaForm = () => {
             <>
               <div className="p-4 bg-muted rounded-lg space-y-2">
                 <p className="text-sm">
-                  <strong>Policial:</strong> {selectedTransferencia.policialPatente}{' '}
-                  {selectedTransferencia.policialNome}
+                  <strong>Policial:</strong> {resolverNome(selectedTransferencia.policialId, selectedTransferencia.policialPatente, selectedTransferencia.policialNome)}
                 </p>
                 <p className="text-sm">
                   <strong>Matrícula:</strong> {selectedTransferencia.policialMatricula}
