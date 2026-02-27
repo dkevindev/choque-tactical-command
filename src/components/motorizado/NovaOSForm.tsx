@@ -377,10 +377,8 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
       let oficiais = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Policial))
         .filter(policial => {
-          const situacaoNormalizada = policial['SITUAÇÃO']
-            ? String(policial['SITUAÇÃO']).replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '').trim().toUpperCase()
-            : '';
-          return situacaoNormalizada === 'OFICIAL';
+          const posto = policial['Post/Grad'] ? String(policial['Post/Grad']).trim().toUpperCase() : '';
+          return ['TEN CEL', 'TENCEL', 'CAP', '1º TEN', '2º TEN'].includes(posto);
         });
 
       oficiais.sort((a, b) => {
