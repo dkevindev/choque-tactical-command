@@ -554,7 +554,36 @@ appResumoEfetivo.post('/', async (req, res) => {
             'BSP': 'BSP'
         };
         const ORDEM_UNIDADES = ['SEDE', '1º ESQD', '2º ESQD', '3º PEL', 'BSP'];
-        const SITUACOES_OPERACIONAIS = ['MONTADO - POLICIAMENTO OSTENSIVO', 'VIATURA'];
+        const SITUACOES_INDISPONIVEIS = [
+            'FERIAS', 'FÉRIAS',
+            'READAPTACAO FUNCIONAL', 'READAPTAÇÃO FUNCIONAL',
+            'LICENCA TRATAMENTO DE SAUDE', 'LICENÇA TRATAMENTO DE SAÚDE', 'LICENÇA TRATAMENTO DE SAUDE',
+            'LICENCA PATERNIDADE', 'LICENÇA PATERNIDADE',
+            'LICENCA MATERNIDADE', 'LICENÇA MATERNIDADE',
+            'LICENCA PATERNIDADE / MATERNIDADE', 'LICENÇA PATERNIDADE / MATERNIDADE',
+            'RECOMPENSA MILITAR',
+            'NUPCIAS', 'NÚPCIAS', 'NUPCIAS / LUTO', 'NÚPCIAS / LUTO',
+            'LUTO',
+            'CURSANDO', 'CURSANDO / TRANSITO', 'CURSANDO / TRÂNSITO',
+            'TRANSITO', 'TRÂNSITO',
+            'RESP. PROCESSO', 'RESP A PROCESSO (PAD/CD...)',
+            'DESERTOR',
+            'A DISP. DE OUTROS ORGAOS', 'A DISP. DE OUTROS ÓRGÃOS',
+            'RECOLHIDO PRES. MILITAR',
+            'AGREGADO', 'AGREGADO - AGUARDANDO RESERVA'
+        ];
+
+        // Normalização de unidades do Firestore para chaves esperadas
+        const normalizarUnidade = (unidade) => {
+            if (!unidade) return 'OUTROS';
+            const u = unidade.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (u.includes('3') && u.includes('PEL')) return '3º PEL';
+            if (u.includes('2') && u.includes('ESQD')) return '2º ESQD';
+            if (u.includes('1') && u.includes('ESQD')) return '1º ESQD';
+            if (u === 'SEDE' || u.includes('SEDE')) return 'SEDE';
+            if (u === 'BSP' || u.includes('BSP')) return 'BSP';
+            return null; // não mapeado
+        };
 
         console.log(`[ResumoEfetivo] Gerando para ${MESES_NOMES[mesAtual]}/${anoAtual}`);
 
@@ -583,18 +612,29 @@ appResumoEfetivo.post('/', async (req, res) => {
         ORDEM_UNIDADES.forEach(u => { porUnidade[u] = { todos: [], indisponiveis: [], operacionais: [] }; });
         porUnidade['OUTROS'] = { todos: [], indisponiveis: [], operacionais: [] };
 
+        const unidadesNaoMapeadas = new Set();
         policiais.forEach(p => {
-            const unidade = p.UNIDADE || p.Unidade || 'OUTROS';
+            const unidadeRaw = p.UNIDADE || p.Unidade || '';
+            const unidadeNorm = normalizarUnidade(unidadeRaw);
+            if (!unidadeNorm) {
+                unidadesNaoMapeadas.add(unidadeRaw);
+            }
+            const unidade = unidadeNorm || 'OUTROS';
             const grupo = porUnidade[unidade] || porUnidade['OUTROS'];
             grupo.todos.push(p);
 
-            const situacao = p['SITUAÇÃO'] || p.SITUAÇÃO || '';
-            if (!situacao || SITUACOES_OPERACIONAIS.includes(situacao)) {
-                grupo.operacionais.push(p);
-            } else {
+            const situacao = (p['SITUAÇÃO'] || p.SITUAÇÃO || '').trim().toUpperCase();
+            const isIndisponivel = SITUACOES_INDISPONIVEIS.some(s => s.toUpperCase() === situacao);
+            if (isIndisponivel) {
                 grupo.indisponiveis.push(p);
+            } else {
+                grupo.operacionais.push(p);
             }
         });
+
+        if (unidadesNaoMapeadas.size > 0) {
+            console.warn('[ResumoEfetivo] ⚠️ Unidades NÃO mapeadas:', JSON.stringify([...unidadesNaoMapeadas]));
+        }
 
         // 4. Montar dados para o template
         let totalGeral = 0, totalIndisponivel = 0, totalOperacional = 0;
