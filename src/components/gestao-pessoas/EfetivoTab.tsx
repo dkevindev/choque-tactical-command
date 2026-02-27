@@ -14,6 +14,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { format, parseISO } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
+import { sortByHierarquia } from '@/lib/policialUtils';
 
 interface Policial {
   id: string;
@@ -71,13 +72,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
       
       return matchesSearch && matchesSituacao && matchesPostGrad;
     })
-    .sort((a, b) => {
-      if (shouldCapComeFirst(a) && !shouldCapComeFirst(b)) return -1;
-      if (!shouldCapComeFirst(a) && shouldCapComeFirst(b)) return 1;
-      if (hasCmtRpmont(a) && !hasCmtRpmont(b)) return -1;
-      if (!hasCmtRpmont(a) && hasCmtRpmont(b)) return 1;
-      return getPostGradOrder(a['Post/Grad'] || '') - getPostGradOrder(b['Post/Grad'] || '');
-    });
+    .sort(sortByHierarquia);
 
   // Obter valores únicos para filtros
   const situacoes = [...new Set(policiais.map(p => p.SITUAÇÃO).filter(Boolean))];
