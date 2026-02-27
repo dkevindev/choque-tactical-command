@@ -1,58 +1,57 @@
 
 
-# Melhorias em Estatisticas, Funcao e Performance
+# Adicionar QOPM/QOAPM e prioridade SUBCMT RPMONT na ordenacao
 
-## 1. Top Policiais Assiduidade (EstatisticasTab.tsx)
+## Contexto
+Oficiais podem ser de dois quadros: **QOPM** (mais antigo) ou **QOAPM** (menos antigo). Alem disso, quem exerce a funcao de **SUBCMT DO RPMONT** deve aparecer antes dos oficiais de mesmo posto. Atualmente o sistema nao diferencia esses quadros nem prioriza o SUBCMT.
 
-No grid onde aparece o card "Disponibilidade" e "Resumo por Posto/Graduacao", transformar em grid de 3 colunas e adicionar um terceiro card **"Top Assiduidade"** que:
-- Busca atestados dos ultimos 12 meses da colecao `atestados_medicos`
-- Conta quantos atestados cada policial teve
-- Lista TODOS os policiais em ordem crescente (quem tem MENOS atestados primeiro)
-- Formato de cada item: posicao + NOME DE GUERRA1 (maiusculo, campo do Firebase)
-- Policiais com 0 atestados aparecem primeiro (mais assíduos)
-- Card com scroll interno (max-height) para nao estourar o layout
-- Usa os dados de `atestados_medicos` ja carregados no useEffect existente, apenas expandindo o calculo
+## Alteracoes
 
-## 2. Resumo por Funcao mais bonito (EstatisticasTab.tsx)
+### 1. Formulario de edicao - checkboxes QOPM/QOAPM (EfetivoTab.tsx)
 
-Substituir a tabela simples de "Resumo por Posto/Graduacao" no grid inferior por um layout visual melhor:
-- Usar cards pequenos ou badges coloridos em grid ao inves de tabela crua
-- Adicionar tambem um resumo por funcao (agrupando policiais por FUNCAO)
-- Cada item com icone, nome da funcao e quantidade em destaque
-- Layout em grid responsivo (3-4 colunas)
+No `EditPolicialForm`, na secao "Dados Profissionais", adicionar um campo **"Quadro"** que aparece apenas para oficiais (TEN CEL, MAJ, CAP, 1 TEN, 2 TEN). O campo sera um Select com opcoes: "Nenhum", "QOPM", "QOAPM". O valor sera salvo no Firebase no campo `quadro`.
 
-## 3. Correcoes de Performance no modulo Gestao de Pessoas
+Tambem adicionar o campo `quadro` ao estado inicial do formulario, lendo de `policial.quadro`.
 
-### 3.1 Remover carregamento duplicado de policiais (GestãoPessoas.tsx)
-- Linha 120: `if (retornos.length > 0 || true)` -- o `|| true` forca SEMPRE um segundo `getDocs` desnecessario. Remover o `|| true` para so recarregar quando houve mudancas reais
+### 2. Logica de ordenacao (policialUtils.ts)
 
-### 3.2 Evitar re-fetch de atestados no EstatisticasTab
-- O componente pai (`GestãoPessoas`) ja carrega atestados no `iniciarSistema`. Passar esses dados via props para `EstatisticasTab` ao inves de fazer outra query ao Firebase
-- Isso elimina uma chamada duplicada ao Firestore
+Atualizar `sortByHierarquia` para incluir duas novas regras apos o CMT RPMONT:
 
-### 3.3 Otimizar FuncaoTab
-- A tab de Funcao faz seed de `config_funcoes` toda vez que a lista esta vazia -- isso e correto mas o `useEffect` nao tem dependencias que mudem, entao roda so 1x. OK.
+```text
+Ordem de prioridade:
+1. CMT RPMONT sempre primeiro (ja existe)
+2. SUBCMT DO RPMONT antes dos demais de mesmo posto
+3. Mesmo posto: QOPM antes de QOAPM
+4. Mesmo quadro: data de promocao mais antiga primeiro
+5. Mesmo tudo: numeral menor primeiro
+```
 
-## Arquivos a modificar
+A logica especifica:
+- Apos verificar CMT RPMONT, verificar se a funcao inclui "SUBCMT" (para SUBCMT DO RPMONT)
+- Apos verificar posto/graduacao, se o posto for de oficial e ambos tiverem o mesmo posto, comparar quadro: QOPM (valor 1) antes de QOAPM (valor 2), sem quadro definido fica no meio
 
-1. **src/components/gestao-pessoas/EstatisticasTab.tsx** -- adicionar card Top Assiduidade no grid, melhorar visual do resumo por funcao, receber atestados via props
-2. **src/components/GestãoPessoas.tsx** -- remover `|| true` no carregamento duplicado, passar atestados como prop para EstatisticasTab
+### 3. Exibir quadro na tabela (EfetivoTab.tsx)
+
+Na coluna Post/Grad da tabela, se o policial tiver `quadro` definido, exibir um badge pequeno ao lado: "QOPM" (verde) ou "QOAPM" (amarelo).
+
+## Arquivos modificados
+
+1. **src/lib/policialUtils.ts** -- atualizar `sortByHierarquia` com regras de SUBCMT e QOPM/QOAPM
+2. **src/components/gestao-pessoas/EfetivoTab.tsx** -- adicionar campo `quadro` no formulario de edicao + badge na tabela
 
 ## Detalhes tecnicos
 
-### Top Assiduidade (calculo)
+### sortByHierarquia atualizado
 ```text
-1. Filtrar atestados com dataInicio nos ultimos 12 meses
-2. Agrupar por policialId -> contar quantidade
-3. Para cada policial do efetivo filtrado, buscar contagem (0 se nao tem)
-4. Ordenar crescente (menos atestados = mais assiduo)
-5. Exibir: #1 - NOME DE GUERRA1
+1. CMT RPMONT primeiro
+2. SUBCMT RPMONT segundo (novo)
+3. Comparar posto/graduacao
+4. Se mesmo posto E for oficial: QOPM < QOAPM (novo)
+5. Data ultima promocao
+6. Numeral
 ```
 
-### Grid Estatisticas (layout)
-```text
-Antes:  grid 1x2 -> [Disponibilidade] [Posto/Grad]
-Depois: grid 1x3 -> [Disponibilidade] [Top Assiduidade] [Resumo Funcao]
-```
-
-O resumo por Posto/Graduacao sera mantido mas com visual de badges/chips ao inves de tabela.
+### Campo Firebase
+- Nome: `quadro`
+- Valores: `'QOPM'` | `'QOAPM'` | `undefined`
+- Apenas relevante para oficiais (TEN CEL ate 2 TEN)
