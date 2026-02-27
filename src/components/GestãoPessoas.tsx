@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { CalendarDays, Users, UserCheck, UserX, TrendingUp, AlertTriangle, ArrowLeft, BarChart3 } from 'lucide-react';
 import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { isLTS } from '@/lib/policialUtils';
 import { format, startOfMonth, endOfMonth, isWithinInterval, addDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
@@ -173,11 +174,11 @@ const GestãoPessoas: React.FC = () => {
       const pol = policiaisData.find(p => p.id === policialId);
       if (!pol) continue;
       const sit = (pol.SITUAÇÃO || '').toUpperCase();
-      const jaEmLTS = sit.includes('LICEN') && sit.includes('TRATAMENTO');
+      const jaEmLTS = isLTS(sit);
       if (!jaEmLTS) {
         try {
           await updateDoc(doc(db, 'policiais', policialId), {
-            SITUAÇÃO: 'LICENCA TRATAMENTO DE SAUDE',
+            SITUAÇÃO: 'LICENÇA TRATAMENTO DE SAUDE',
             inicioSituacao: atestado.dataInicio,
             fimSituacao: atestado.dataFim,
             funcaoOrigem: pol['FUNÇÃO'] || '',
@@ -187,7 +188,7 @@ const GestãoPessoas: React.FC = () => {
             tipo: 'mudanca_situacao',
             descricao: `Entrada automática em LTS - Atestado de ${atestado.dias} dias (CID: ${atestado.cid || 'N/I'})`,
             situacaoAnterior: pol.SITUAÇÃO,
-            situacaoNova: 'LICENCA TRATAMENTO DE SAUDE',
+            situacaoNova: 'LICENÇA TRATAMENTO DE SAUDE',
             funcaoAnterior: pol['FUNÇÃO'] || '',
             data: new Date().toISOString(),
             automatico: true,
@@ -199,10 +200,7 @@ const GestãoPessoas: React.FC = () => {
     }
 
     // SAIR DE LTS: policiais em LTS sem atestado vigente
-    const policiaisEmLTS = policiaisData.filter(p => {
-      const sit = (p.SITUAÇÃO || '').toUpperCase();
-      return (sit.includes('LICEN') && sit.includes('TRATAMENTO')) || sit === 'LTS';
-    });
+    const policiaisEmLTS = policiaisData.filter(p => isLTS(p.SITUAÇÃO));
 
     for (const pol of policiaisEmLTS) {
       const temVigente = mapaVigentes.has(pol.id);
@@ -309,10 +307,7 @@ const GestãoPessoas: React.FC = () => {
     p.SITUAÇÃO?.toLowerCase().includes('ferias')
   );
 
-  const policiaisLicencaMedica = policiais.filter(p => 
-    p.SITUAÇÃO?.toLowerCase().includes('licença tratamento') ||
-    p.SITUAÇÃO?.toLowerCase().includes('licenca tratamento')
-  );
+  const policiaisLicencaMedica = policiais.filter(p => isLTS(p.SITUAÇÃO));
 
   const proximosFimFerias = policiais.filter(p => {
     if (!p.fimFerias) return false;

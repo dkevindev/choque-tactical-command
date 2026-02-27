@@ -70,3 +70,13 @@ export const formatarNomePolicial = (policial: any): string => {
   const nomeGuerra = policial['NOME DE GUERRA'] || policial.nomeGuerra || '';
   return `${postGrad} ${nomeGuerra}`.trim() || 'Desconhecido';
 };
+
+export const normalizarSituacao = (sit: string): string => {
+  return sit.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+};
+
+export const isLTS = (situacao: string | undefined): boolean => {
+  if (!situacao) return false;
+  const norm = normalizarSituacao(situacao);
+  return (norm.includes('LICEN') && norm.includes('TRATAMENTO')) || norm === 'LTS';
+};
