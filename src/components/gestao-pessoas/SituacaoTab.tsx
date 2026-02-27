@@ -91,6 +91,9 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
   const [retiradaNovaFuncao, setRetiradaNovaFuncao] = useState('');
   const [retiradaPublicacao, setRetiradaPublicacao] = useState('');
 
+  // Retirada em lote
+  const [selectedRetirada, setSelectedRetirada] = useState<string[]>([]);
+
   // Carregar configurações
   useEffect(() => {
     const fetchConfigs = async () => {
@@ -217,45 +220,72 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
     }
   };
 
-  const openRetiradaDialog = (policial: Policial) => {
-    setPolicialRetirada(policial);
+  const openRetiradaDialog = (policial?: Policial) => {
+    setPolicialRetirada(policial || null);
     setRetiradaNovaSituacao('MONTADO - POLICIAMENTO OSTENSIVO');
-    setRetiradaNovaFuncao(policial.funcaoOrigem || 'MONTADO - POLICIAMENTO OSTENSIVO');
+    setRetiradaNovaFuncao(policial?.funcaoOrigem || 'MONTADO - POLICIAMENTO OSTENSIVO');
+    setRetiradaPublicacao('');
+    setShowRetiradaDialog(true);
+  };
+
+  const openRetiradaLoteDialog = () => {
+    if (selectedRetirada.length === 0) {
+      toast({ title: "Erro", description: "Selecione ao menos um policial", variant: "destructive" });
+      return;
+    }
+    setPolicialRetirada(null);
+    setRetiradaNovaSituacao('MONTADO - POLICIAMENTO OSTENSIVO');
+    setRetiradaNovaFuncao('MONTADO - POLICIAMENTO OSTENSIVO');
     setRetiradaPublicacao('');
     setShowRetiradaDialog(true);
   };
 
   const handleConfirmarRetirada = async () => {
-    if (!policialRetirada) return;
+    // Determinar quais policiais processar
+    const idsParaProcessar = policialRetirada
+      ? [policialRetirada.id]
+      : selectedRetirada;
+
+    if (idsParaProcessar.length === 0) return;
     setLoading(true);
     try {
-      const policialRef = doc(db, 'policiais', policialRetirada.id);
-      await updateDoc(policialRef, {
-        SITUAÇÃO: retiradaNovaSituacao,
-        'FUNÇÃO': retiradaNovaFuncao,
-        funcaoOrigem: retiradaNovaFuncao,
-        inicioSituacao: null,
-        fimSituacao: null,
-        observacaoSituacao: null,
-        publicacaoSituacao: null
-      });
+      const batch = writeBatch(db);
 
-      // Registrar assentamento
-      await addDoc(collection(db, 'assentamentos'), {
-        policialId: policialRetirada.id,
-        tipo: 'Mudança de Situação',
-        data: new Date().toISOString().split('T')[0],
-        descricao: `Retirado de ${policialRetirada.SITUAÇÃO}. Nova situação: ${retiradaNovaSituacao}. Nova função: ${retiradaNovaFuncao}${retiradaPublicacao ? `. Publicação: ${retiradaPublicacao}` : ''}`,
-        situacaoAnterior: policialRetirada.SITUAÇÃO,
-        novaSituacao: retiradaNovaSituacao,
-        novaFuncao: retiradaNovaFuncao,
-        publicacao: retiradaPublicacao || '',
-        criadoEm: new Date().toISOString()
-      });
+      for (const policialId of idsParaProcessar) {
+        const policial = policiais.find(p => p.id === policialId);
+        if (!policial) continue;
 
-      toast({ title: "Sucesso", description: `${policialRetirada['Post/Grad']} ${policialRetirada.NOME} retirado da situação` });
+        const policialRef = doc(db, 'policiais', policialId);
+        batch.update(policialRef, {
+          SITUAÇÃO: retiradaNovaSituacao,
+          'FUNÇÃO': retiradaNovaFuncao,
+          funcaoOrigem: retiradaNovaFuncao,
+          inicioSituacao: null,
+          fimSituacao: null,
+          observacaoSituacao: null,
+          publicacaoSituacao: null
+        });
+
+        // Registrar assentamento individual
+        const assentRef = doc(collection(db, 'assentamentos'));
+        batch.set(assentRef, {
+          policialId,
+          tipo: 'Mudança de Situação',
+          data: new Date().toISOString().split('T')[0],
+          descricao: `Retirado de ${policial.SITUAÇÃO}. Nova situação: ${retiradaNovaSituacao}. Nova função: ${retiradaNovaFuncao}${retiradaPublicacao ? `. Publicação: ${retiradaPublicacao}` : ''}`,
+          situacaoAnterior: policial.SITUAÇÃO,
+          novaSituacao: retiradaNovaSituacao,
+          novaFuncao: retiradaNovaFuncao,
+          publicacao: retiradaPublicacao || '',
+          criadoEm: new Date().toISOString()
+        });
+      }
+
+      await batch.commit();
+      toast({ title: "Sucesso", description: `${idsParaProcessar.length} policial(is) retirado(s) da situação` });
       setShowRetiradaDialog(false);
       setPolicialRetirada(null);
+      setSelectedRetirada([]);
       onUpdate();
     } catch (error) {
       console.error('Erro:', error);
@@ -503,11 +533,37 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
         {/* Policiais em Situação */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Policiais em Situação ({policiaisEmSituacaoFiltrados.length})
-            </CardTitle>
-            <CardDescription>Policiais atualmente em situação especial</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Policiais em Situação ({policiaisEmSituacaoFiltrados.length})
+                </CardTitle>
+                <CardDescription>Policiais atualmente em situação especial</CardDescription>
+              </div>
+              {policiaisEmSituacaoFiltrados.length > 0 && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedRetirada.length === policiaisEmSituacaoFiltrados.length) {
+                        setSelectedRetirada([]);
+                      } else {
+                        setSelectedRetirada(policiaisEmSituacaoFiltrados.map(p => p.id));
+                      }
+                    }}
+                  >
+                    {selectedRetirada.length === policiaisEmSituacaoFiltrados.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                  </Button>
+                  {selectedRetirada.length > 0 && (
+                    <Button size="sm" variant="destructive" onClick={openRetiradaLoteDialog}>
+                      Retirar Selecionados ({selectedRetirada.length})
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -516,30 +572,41 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
               ) : (
                 policiaisEmSituacaoFiltrados.map(policial => (
                   <div key={policial.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium">{policial['Post/Grad']} {policial.NOME}</p>
-                      <Badge variant={getBadgeVariant(policial.SITUAÇÃO)} className="mt-1">{policial.SITUAÇÃO}</Badge>
-                      <div className="flex gap-2 mt-2">
-                        {policial.inicioSituacao && (
-                          <Badge variant="outline" className="text-xs">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {new Date(policial.inicioSituacao).toLocaleDateString()}
-                            {policial.fimSituacao && ` - ${new Date(policial.fimSituacao).toLocaleDateString()}`}
-                          </Badge>
+                    <div className="flex items-start gap-3 flex-1">
+                      <Checkbox
+                        checked={selectedRetirada.includes(policial.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedRetirada(prev =>
+                            checked ? [...prev, policial.id] : prev.filter(id => id !== policial.id)
+                          );
+                        }}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium">{policial['Post/Grad']} {policial.NOME}</p>
+                        <Badge variant={getBadgeVariant(policial.SITUAÇÃO)} className="mt-1">{policial.SITUAÇÃO}</Badge>
+                        <div className="flex gap-2 mt-2">
+                          {policial.inicioSituacao && (
+                            <Badge variant="outline" className="text-xs">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {new Date(policial.inicioSituacao).toLocaleDateString()}
+                              {policial.fimSituacao && ` - ${new Date(policial.fimSituacao).toLocaleDateString()}`}
+                            </Badge>
+                          )}
+                          {policial.publicacaoSituacao && (
+                            <Badge variant="secondary" className="text-xs">{policial.publicacaoSituacao}</Badge>
+                          )}
+                        </div>
+                        {policial.observacaoSituacao && (
+                          <p className="text-xs text-muted-foreground mt-1">{policial.observacaoSituacao}</p>
                         )}
-                        {policial.publicacaoSituacao && (
-                          <Badge variant="secondary" className="text-xs">{policial.publicacaoSituacao}</Badge>
+                        {policial.funcaoOrigem && (
+                          <p className="text-xs text-muted-foreground mt-1">Função original: {policial.funcaoOrigem}</p>
                         )}
                       </div>
-                      {policial.observacaoSituacao && (
-                        <p className="text-xs text-muted-foreground mt-1">{policial.observacaoSituacao}</p>
-                      )}
-                      {policial.funcaoOrigem && (
-                        <p className="text-xs text-muted-foreground mt-1">Função original: {policial.funcaoOrigem}</p>
-                      )}
                     </div>
                     <Button variant="outline" size="sm" onClick={() => openRetiradaDialog(policial)} disabled={loading}>
-                      Retirar da Situação
+                      Retirar
                     </Button>
                   </div>
                 ))
@@ -580,7 +647,9 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
           <DialogHeader>
             <DialogTitle>Retirar da Situação</DialogTitle>
             <DialogDescription>
-              {policialRetirada && `${policialRetirada['Post/Grad']} ${policialRetirada.NOME} — ${policialRetirada.SITUAÇÃO}`}
+              {policialRetirada
+                ? `${policialRetirada['Post/Grad']} ${policialRetirada.NOME} — ${policialRetirada.SITUAÇÃO}`
+                : `${selectedRetirada.length} policial(is) selecionado(s)`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -590,7 +659,6 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MONTADO - POLICIAMENTO OSTENSIVO">MONTADO - POLICIAMENTO OSTENSIVO</SelectItem>
-                  <SelectItem value="VIATURA">VIATURA</SelectItem>
                   {situacoesNomes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
