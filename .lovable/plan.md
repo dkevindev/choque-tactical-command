@@ -1,34 +1,18 @@
 
-# Filtrar Lista de Policiais em Situacao por Indisponibilidade
+# Botao para Migrar Policiais de "MONTADO - POLICIAMENTO OSTENSIVO" / "VIATURA" para "EM ATIVIDADE"
 
 ## Resumo
-Na lista "Policiais em Situacao", mostrar apenas policiais cuja situacao esteja marcada como `indisponivel: true` na colecao `config_situacoes`. Situacoes que nao geram indisponibilidade serao excluidas da lista.
+Adicionar um botao no topo da secao "Policiais Disponíveis" (ou na lista principal) que permita alterar em massa a situacao de todos os policiais que estao com `SITUAÇÃO` igual a "MONTADO - POLICIAMENTO OSTENSIVO" ou "VIATURA" para "EM ATIVIDADE".
 
 ## Detalhes Tecnicos
 
 ### Arquivo: `src/components/gestao-pessoas/SituacaoTab.tsx`
 
-Alterar o `useMemo` de `policiaisEmSituacao` (linha ~135) para cruzar com a lista de situacoes cadastradas e filtrar apenas aquelas com `indisponivel === true`:
-
-**De:**
-```typescript
-const policiaisEmSituacao = useMemo(() => {
-  return policiais
-    .filter(p => p.SITUAÇÃO !== 'MONTADO - POLICIAMENTO OSTENSIVO' && p.SITUAÇÃO !== 'VIATURA' && p.SITUAÇÃO)
-    .sort(sortByHierarquia);
-}, [policiais]);
-```
-
-**Para:**
-```typescript
-const policiaisEmSituacao = useMemo(() => {
-  const situacoesIndisponiveis = situacoes
-    .filter(s => s.indisponivel)
-    .map(s => s.nome);
-  return policiais
-    .filter(p => p.SITUAÇÃO && situacoesIndisponiveis.includes(p.SITUAÇÃO))
-    .sort(sortByHierarquia);
-}, [policiais, situacoes]);
-```
-
-Isso garante que apenas situacoes marcadas como indisponibilidade aparecam na lista "Policiais em Situacao".
+1. **Adicionar botao** na area dos policiais disponiveis (proximo a linha 131 onde eles sao filtrados) com texto como "Migrar todos para EM ATIVIDADE"
+2. **Nova funcao `handleMigrarParaEmAtividade`**:
+   - Filtra policiais com `SITUAÇÃO` igual a "MONTADO - POLICIAMENTO OSTENSIVO" ou "VIATURA" (ou sem situacao)
+   - Usa `writeBatch` do Firestore para atualizar todos de uma vez, setando `SITUAÇÃO: "EM ATIVIDADE"`
+   - Exibe toast de sucesso com quantidade migrada
+   - Recarrega a lista de policiais
+3. **Confirmacao via AlertDialog** antes de executar, mostrando quantos policiais serao afetados
+4. O botao ficara no `CardHeader` da secao de policiais disponiveis, ao lado do titulo
