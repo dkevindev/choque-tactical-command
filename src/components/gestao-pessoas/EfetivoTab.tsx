@@ -227,7 +227,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
                       </Badge>
                     </TableCell>
                     <TableCell>{policial['FUNÇÃO']}</TableCell>
-                    <TableCell>{policial.Unidade}</TableCell>
+                    <TableCell>{policial['UNIDADE"RPMONT"'] || policial.Unidade || 'N/A'}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
@@ -327,7 +327,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
                       <div><span className="font-semibold">Numeral:</span><p>{viewingPolicial.NUMERAL || viewingPolicial.numeral || 'N/A'}</p></div>
                       <div><span className="font-semibold">Posto/Graduação:</span><p>{viewingPolicial['Post/Grad'] || 'N/A'}</p></div>
                       <div><span className="font-semibold">Função:</span><p>{viewingPolicial['FUNÇÃO'] || 'N/A'}</p></div>
-                      <div><span className="font-semibold">Unidade:</span><p>{viewingPolicial.Unidade || viewingPolicial.unidade || 'N/A'}</p></div>
+                      <div><span className="font-semibold">Unidade:</span><p>{viewingPolicial['UNIDADE"RPMONT"'] || viewingPolicial.Unidade || viewingPolicial.unidade || 'N/A'}</p></div>
                       <div>
                         <span className="font-semibold">Situação:</span>
                         <div className="mt-1">
@@ -551,7 +551,7 @@ const EditPolicialForm: React.FC<{
     NUMERAL: policial.NUMERAL || policial.numeral || '',
     'Post/Grad': policial['Post/Grad'] || '',
     'FUNÇÃO': policial['FUNÇÃO'] || '',
-    Unidade: policial.Unidade || policial.unidade || '',
+    'UNIDADE"RPMONT"': policial['UNIDADE"RPMONT"'] || policial.Unidade || policial.unidade || '',
     SITUAÇÃO: policial.SITUAÇÃO || '',
     'PREVISAO FÉRIAS - AQUISITIVO 2024': policial['PREVISAO FÉRIAS - AQUISITIVO 2024'] || policial.previsaoFerias2024 || '',
     'MUDANÇA COMPORTAMENTO': policial['MUDANÇA COMPORTAMENTO'] || '',
@@ -694,11 +694,11 @@ const EditPolicialForm: React.FC<{
             />
           </div>
           <div>
-            <Label htmlFor="unidade">Unidade</Label>
+            <Label htmlFor="unidade">Unidade (RPMONT)</Label>
             <Input
               id="unidade"
-              value={formData.Unidade}
-              onChange={(e) => setFormData(prev => ({ ...prev, Unidade: e.target.value }))}
+              value={formData['UNIDADE"RPMONT"']}
+              onChange={(e) => setFormData(prev => ({ ...prev, 'UNIDADE"RPMONT"': e.target.value }))}
             />
           </div>
           <div>
