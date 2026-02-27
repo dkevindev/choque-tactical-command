@@ -61,15 +61,15 @@ export const sortByHierarquia = (a: any, b: any): number => {
   if (aIsCmt && !bIsCmt) return -1;
   if (!aIsCmt && bIsCmt) return 1;
 
-  // 2. SUBCMT DO RPMONT segundo
+  // 2. Comparar posto/graduação
+  const orderDiff = getPostGradOrder(a['Post/Grad'] || '') - getPostGradOrder(b['Post/Grad'] || '');
+  if (orderDiff !== 0) return orderDiff;
+
+  // 3. Mesmo posto: SUBCMT DO RPMONT primeiro (desempate)
   const aIsSubCmt = a['FUNÇÃO']?.includes('SUBCMT');
   const bIsSubCmt = b['FUNÇÃO']?.includes('SUBCMT');
   if (aIsSubCmt && !bIsSubCmt) return -1;
   if (!aIsSubCmt && bIsSubCmt) return 1;
-
-  // 3. Comparar posto/graduação
-  const orderDiff = getPostGradOrder(a['Post/Grad'] || '') - getPostGradOrder(b['Post/Grad'] || '');
-  if (orderDiff !== 0) return orderDiff;
 
   // 4. Mesmo posto e oficial: QOPM antes de QOAPM
   const postGrad = a['Post/Grad'] || '';

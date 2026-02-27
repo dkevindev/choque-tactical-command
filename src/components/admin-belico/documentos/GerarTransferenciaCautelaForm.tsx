@@ -85,7 +85,7 @@ const GerarTransferenciaCautelaForm = () => {
       // Resolver dados atuais do policial
       const dadosAtuais = policiaisMap.get(transferencia.policialId || '');
       const gradAtual = dadosAtuais?.postGrad || transferencia.policialPatente;
-      const nomeAtual = dadosAtuais?.nomeGuerra || transferencia.policialNome;
+      const nomeAtual = dadosAtuais?.nome || transferencia.policialNome;
 
       const response = await fetch('https://gerartransferenciacauteladocx-owvlmrnsjq-uc.a.run.app', {
         method: 'POST',
