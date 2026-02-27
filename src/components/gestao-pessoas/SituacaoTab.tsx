@@ -133,10 +133,13 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
   }, [policiais]);
 
   const policiaisEmSituacao = useMemo(() => {
+    const situacoesIndisponiveis = situacoes
+      .filter(s => s.indisponivel)
+      .map(s => s.nome);
     return policiais
-      .filter(p => p.SITUAÇÃO !== 'MONTADO - POLICIAMENTO OSTENSIVO' && p.SITUAÇÃO !== 'VIATURA' && p.SITUAÇÃO)
+      .filter(p => p.SITUAÇÃO && situacoesIndisponiveis.includes(p.SITUAÇÃO))
       .sort(sortByHierarquia);
-  }, [policiais]);
+  }, [policiais, situacoes]);
 
   const policiaisDisponiveisFiltrados = useMemo(() => {
     return policiaisDisponiveis.filter(policial => {
