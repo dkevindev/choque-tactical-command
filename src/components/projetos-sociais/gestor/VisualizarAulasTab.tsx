@@ -317,18 +317,6 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
           </div>
         ) : null}
 
-        <DialogFooter>
-          <Button
-            onClick={() => { if (aulaModal) gerarListaFrequencia(aulaModal); }}
-            disabled={gerando === aulaModal?.id || carregandoModal}
-          >
-            {gerando === aulaModal?.id ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando...</>
-            ) : (
-              <><FileText className="h-4 w-4 mr-2" /> Gerar Documento</>
-            )}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
     </>
