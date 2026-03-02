@@ -24,9 +24,9 @@ const QuotaGremio = () => {
           const postGrad = (p['Post/Grad'] || '').toUpperCase().trim();
           const unidade = (p.UNIDADE || '').toUpperCase().trim();
           const isCbSd = postGrad === 'CB' || postGrad === 'SD';
-          const isEsq = unidade.includes('1ESQ') || unidade.includes('2ESQ') || 
-                        unidade.includes('1 ESQ') || unidade.includes('2 ESQ') ||
-                        unidade === '1º ESQ' || unidade === '2º ESQ';
+          const isEsq = unidade.includes('1ESQD') || unidade.includes('2ESQD') || 
+                        unidade.includes('1º ESQD') || unidade.includes('2º ESQD') ||
+                        unidade === '1º ESQD' || unidade === '2º ESQD';
           return isCbSd && isEsq;
         });
 
