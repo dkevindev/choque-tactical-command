@@ -36,6 +36,7 @@ import SaiuDaCarga from '@/components/admin-belico/SaiuDaCarga';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import ReservaAdminPage from '@/components/admin/ReservaAdminPage';
 import PatrimonioPage from '@/components/patrimonio/PatrimonioPage';
+import QuotaGremio from '@/components/QuotaGremio';
 import { db } from '@/firebase';
 import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -801,14 +802,25 @@ const FrotaContent = () => (
 );
 
 const PolicialContent = () => (
-  <Card className="bg-card border-border shadow-tactical">
-    <CardHeader>
-      <CardTitle className="text-foreground">GESTÃO DE PESSOAL</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <PolicialTable />
-    </CardContent>
-  </Card>
+  <Tabs defaultValue="efetivo" className="space-y-4">
+    <TabsList>
+      <TabsTrigger value="efetivo">Efetivo</TabsTrigger>
+      <TabsTrigger value="quota-gremio">Quota Grêmio</TabsTrigger>
+    </TabsList>
+    <TabsContent value="efetivo">
+      <Card className="bg-card border-border shadow-tactical">
+        <CardHeader>
+          <CardTitle className="text-foreground">GESTÃO DE PESSOAL</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PolicialTable />
+        </CardContent>
+      </Card>
+    </TabsContent>
+    <TabsContent value="quota-gremio">
+      <QuotaGremio />
+    </TabsContent>
+  </Tabs>
 );
 
 const DocumentosContent = ({ locationState }: { locationState?: any }) => (
