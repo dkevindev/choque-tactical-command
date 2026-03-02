@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '@/firebase';
 import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface VisualizarAulasTabProps {
   projeto: any;
@@ -20,6 +22,9 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
   const [aulas, setAulas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [gerando, setGerando] = useState<string | null>(null);
+  const [aulaModal, setAulaModal] = useState<any | null>(null);
+  const [dadosModal, setDadosModal] = useState<{ instrutores: any[]; alunos: any[] } | null>(null);
+  const [carregandoModal, setCarregandoModal] = useState(false);
 
   useEffect(() => {
     carregarAulas();
@@ -75,6 +80,41 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
       return format(dataObj, "dd/MM/yyyy", { locale: ptBR });
     } catch {
       return 'Data inválida';
+    }
+  };
+
+  const abrirModalFrequencia = async (aula: any) => {
+    setAulaModal(aula);
+    setCarregandoModal(true);
+    setDadosModal(null);
+    try {
+      const [instrutores, alunos] = await Promise.all([
+        Promise.all(
+          (aula.instrutores || []).map(async (id: string) => {
+            const pol = await buscarPolicialPorId(id);
+            return pol ? {
+              postGrad: pol['Post/Grad'] || pol.postGrad || '',
+              nomeGuerra: pol['NOME DE GUERRA'] || pol.nomeGuerra || ''
+            } : { postGrad: '', nomeGuerra: 'Desconhecido' };
+          })
+        ),
+        Promise.all(
+          (aula.alunosPresentes || []).map(async (alunoId: string) => {
+            const alunoDoc = await getDoc(doc(db, 'projetos_alunos', alunoId));
+            if (alunoDoc.exists()) {
+              const d = alunoDoc.data();
+              return { nomeCompleto: d.nomeCompleto || d.nomeGuerra || '', turno: d.turno || '' };
+            }
+            return { nomeCompleto: 'Aluno não encontrado', turno: '' };
+          })
+        )
+      ]);
+      setDadosModal({ instrutores, alunos });
+    } catch (err) {
+      console.error('Erro ao carregar dados do modal:', err);
+      toast.error('Erro ao carregar detalhes da aula');
+    } finally {
+      setCarregandoModal(false);
     }
   };
 
@@ -165,6 +205,7 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
   }
 
   return (
+    <>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {aulas.map((aula) => (
         <Card key={aula.id} className="hover:border-primary transition-all">
@@ -218,8 +259,8 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
                   size="sm"
                   variant="outline"
                   className="w-full mt-2"
-                  onClick={() => gerarListaFrequencia(aula)}
-                  disabled={gerando === aula.id}
+                  onClick={() => abrirModalFrequencia(aula)}
+                  disabled={gerando === aula.id || carregandoModal}
                 >
                   {gerando === aula.id ? (
                     <>
@@ -239,6 +280,58 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
         </Card>
       ))}
     </div>
+
+    <Dialog open={!!aulaModal} onOpenChange={(open) => { if (!open) { setAulaModal(null); setDadosModal(null); } }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Lista de Frequência - {aulaModal ? formatarData(aulaModal.data) : ''}</DialogTitle>
+        </DialogHeader>
+
+        {carregandoModal ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : dadosModal ? (
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold mb-2">Instrutores</p>
+              <div className="flex flex-wrap gap-2">
+                {dadosModal.instrutores.map((inst, idx) => (
+                  <Badge key={idx} variant="secondary">
+                    {inst.postGrad} {inst.nomeGuerra}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold mb-2">Alunos Presentes ({dadosModal.alunos.length})</p>
+              <ScrollArea className="max-h-60">
+                <ol className="list-decimal list-inside space-y-1 text-sm">
+                  {dadosModal.alunos.map((aluno, idx) => (
+                    <li key={idx}>{aluno.nomeCompleto}</li>
+                  ))}
+                </ol>
+              </ScrollArea>
+            </div>
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          <Button
+            onClick={() => { if (aulaModal) gerarListaFrequencia(aulaModal); }}
+            disabled={gerando === aulaModal?.id || carregandoModal}
+          >
+            {gerando === aulaModal?.id ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando...</>
+            ) : (
+              <><FileText className="h-4 w-4 mr-2" /> Gerar Documento</>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
