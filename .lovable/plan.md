@@ -1,35 +1,35 @@
 
-# Modal de Detalhes da Aula antes de Gerar Lista de Frequencia
 
-## O que muda
+# Bug: Aluna de Horário Especial não aparece na lista da Turma 3 (terça-feira)
 
-Ao clicar em "Gerar Lista de Frequencia", em vez de chamar diretamente a cloud function, abre um **modal** exibindo:
-- Nomes dos instrutores (Post/Grad + Nome de Guerra)
-- Lista dos alunos presentes na aula
-- Botao "Gerar Documento" dentro do modal para confirmar e executar a geracao
+## Causa raiz
 
-## Arquivo a modificar
+No arquivo `IniciarAulaWizard.tsx`, há uma contradição na lógica de filtragem:
 
-**src/components/projetos-sociais/gestor/VisualizarAulasTab.tsx**
+1. **Linha 187-188**: Alunos com `horarioEspecial: true` são **removidos** da lista normal da turma
+2. **Linha 218**: Alunos especiais que já estão no array `alunos` da turma são **removidos** da lista de especiais
 
-### Alteracoes:
+Se a aluna está cadastrada como membro da Turma 3 (seu ID está no array `alunos` da turma) E tem `horarioEspecial: true`, ela é excluída dos dois lados:
+- Excluída da lista normal (porque tem horário especial)
+- Excluída da lista especial (porque seu ID já está no array `alunosIds` da turma)
 
-1. Adicionar estado `aulaModal` para controlar qual aula esta com o modal aberto
-2. Adicionar estado `dadosModal` para armazenar instrutores e alunos carregados
-3. Adicionar estado `carregandoModal` para exibir loading enquanto busca os dados
+Resultado: a aluna desaparece completamente.
 
-4. Criar funcao `abrirModalFrequencia(aula)` que:
-   - Seta `aulaModal = aula`
-   - Busca instrutores detalhados (Post/Grad + Nome de Guerra) via `buscarPolicialPorId`
-   - Busca alunos presentes via `getDoc` na colecao `projetos_alunos`
-   - Armazena em `dadosModal`
+## Correção
 
-5. Alterar o `onClick` do botao "Gerar Lista de Frequencia" para chamar `abrirModalFrequencia` em vez de `gerarListaFrequencia`
+**Arquivo**: `src/components/projetos-sociais/instrutor/IniciarAulaWizard.tsx`
 
-6. Adicionar componente `Dialog` (ja existe em `@/components/ui/dialog`) com:
-   - Titulo: "Lista de Frequencia - {data da aula}"
-   - Secao "Instrutores" com badges mostrando Post/Grad + Nome de Guerra
-   - Secao "Alunos Presentes" com lista numerada dos nomes
-   - Botao "Gerar Documento" no footer que chama `gerarListaFrequencia` com a aula do modal
+Remover o filtro da linha 218 que exclui alunos especiais que já estão na lista da turma. A exclusão da lista normal (linha 187-188) já garante que não haverá duplicatas, pois alunos com `horarioEspecial` nunca entram em `alunosTurma`.
 
-7. Imports adicionais: `Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter` de `@/components/ui/dialog`
+```text
+Antes (linha 217-218):
+  // Excluir se já está na lista da turma
+  .filter((aluno: any) => !alunosIds.includes(aluno.id));
+
+Depois:
+  // Removido filtro que excluía alunos especiais já cadastrados na turma
+  // pois eles já foram excluídos da lista normal (linha 187-188)
+```
+
+Isso é uma correção de uma única linha — remover o `.filter` da linha 218.
+
