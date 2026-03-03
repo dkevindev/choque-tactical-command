@@ -73,10 +73,12 @@ const ConsultaMaterialPolicial = () => {
       setLoading(true);
       try {
         const snap = await getDocs(collection(db, 'materiais_belicos'));
-        const lista = snap.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as MaterialBelico[];
+        const lista = snap.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .filter((m: any) => !m.transferido && !m.baixado) as MaterialBelico[];
         setMateriais(lista);
       } catch (error) {
         console.error('Erro ao carregar materiais:', error);

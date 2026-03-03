@@ -163,7 +163,7 @@ const CadastroMateriais = () => {
           ...doc.data(),
           createdAt: doc.data().createdAt?.toDate() || new Date()
         } as Material))
-        .filter((m: any) => !m.transferido); // Excluir materiais transferidos
+        .filter((m: any) => !m.transferido && !m.baixado); // Excluir materiais transferidos/baixados da carga ativa
 
       // Carregar cautelas ativas para sincronizar status dos materiais
       const cautelasQuery = query(collection(db, 'cautelas_permanentes'));

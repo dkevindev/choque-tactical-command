@@ -202,24 +202,25 @@ const DashboardOverview = () => {
       const viaturasArray = viaturasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setViaturasData(viaturasArray);
 
-      // Buscar materiais bélicos
+      // Buscar materiais bélicos da carga ativa
       const materiaisSnapshot = await getDocs(collection(db, 'materiais_belicos'));
       const materiais = materiaisSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const materiaisAtivos = materiais.filter((m: any) => !m.transferido && !m.baixado);
       
       // Contar armamentos (excluindo coletes)
-      const armamentos = materiais.filter((m: any) => 
+      const armamentos = materiaisAtivos.filter((m: any) => 
         m.categoria && m.categoria !== 'Colete Balístico'
       );
       
-      // Total de equipamentos (todos os materiais)
-      const totalEquipamentos = materiais.length;
+      // Total de equipamentos (apenas carga ativa)
+      const totalEquipamentos = materiaisAtivos.length;
 
       // Verificar coletes vencidos e vencendo
       const hoje = new Date();
       const seisAPartir = new Date();
       seisAPartir.setMonth(seisAPartir.getMonth() + 6);
 
-      const coletes = materiais.filter((m: any) => m.categoria === 'Colete Balístico' && !m.baixado);
+      const coletes = materiaisAtivos.filter((m: any) => m.categoria === 'Colete Balístico');
       
       const vencidos = coletes.filter((c: any) => {
         if (!c.vencimento) return false;
