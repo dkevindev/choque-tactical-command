@@ -28,6 +28,7 @@ interface MaterialEstoque {
   statusManutencao?: 'ok' | 'manutencao' | 'baixa';
   observacoes?: string;
   transferido?: boolean;
+  baixado?: boolean;
   localTransferencia?: string;
   dataTransferencia?: Date;
   local?: string; // Fortaleza ou Crato
@@ -120,7 +121,7 @@ const ControleEstoque = () => {
           ...doc.data(),
           dataUltimaMovimentacao: doc.data().dataUltimaMovimentacao?.toDate()
         } as MaterialEstoque))
-        .filter(m => !m.transferido); // Não mostrar materiais transferidos na carga
+        .filter(m => !m.transferido && !m.baixado); // Não mostrar materiais transferidos/baixados na carga
 
       setMateriais(materiaisData);
       calcularEstatisticas(materiaisData);
