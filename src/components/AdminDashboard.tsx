@@ -219,7 +219,7 @@ const DashboardOverview = () => {
       const seisAPartir = new Date();
       seisAPartir.setMonth(seisAPartir.getMonth() + 6);
 
-      const coletes = materiais.filter((m: any) => m.categoria === 'Colete Balístico');
+      const coletes = materiais.filter((m: any) => m.categoria === 'Colete Balístico' && !m.baixado);
       
       const vencidos = coletes.filter((c: any) => {
         if (!c.vencimento) return false;
