@@ -214,8 +214,8 @@ const IniciarAulaWizard = ({ projetos, policialLogado, onSuccess }: WizardProps)
                 (d: any) => d.turmaId === turmaSelecionada && d.diaSemana === diaAtual
               );
             })
-            // Excluir se já está na lista da turma
-            .filter((aluno: any) => !alunosIds.includes(aluno.id));
+            // Não excluir alunos especiais que já estão na turma
+            // pois eles já foram removidos da lista normal (horarioEspecial: true);
           
           // Combinar e marcar alunos especiais
           alunosData = [
