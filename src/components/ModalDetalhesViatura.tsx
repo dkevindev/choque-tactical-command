@@ -48,6 +48,7 @@ import { isFroteLeve, isFrotePesada, getPlacasViaturasLeves } from '@/lib/viatur
 import { useFipeData } from '@/hooks/useFipeData';
 import ConfiguracaoFipe from '@/components/ConfiguracaoFipe';
 import SaldoAnualCard from '@/components/SaldoAnualCard';
+import ProcessosPneusSection from '@/components/frota/ProcessosPneusSection';
 
 interface OrdemServico {
   id: string;
@@ -1096,6 +1097,9 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
               </Card>
             </TabsContent>
           </Tabs>
+
+          {/* Seção de Processos de Troca de Pneus */}
+          <ProcessosPneusSection viaturaId={viatura.id} />
         </div>
 
         {/* Modal do Cadastro */}

@@ -1,87 +1,35 @@
 
 
-# Gestao de Processos de Troca de Pneus por Viatura
+# Bug: Aluna de Horário Especial não aparece na lista da Turma 3 (terça-feira)
 
-## Resumo
+## Causa raiz
 
-Criar um sistema de processos de troca de pneus com 3 etapas (Solicitacao → Aprovacao → Conclusao), integrado ao modal de detalhes da viatura. Processos negados sao arquivados separadamente e nao entram no historico de trocas.
+No arquivo `IniciarAulaWizard.tsx`, há uma contradição na lógica de filtragem:
 
-## Estrutura de Dados (Firestore)
+1. **Linha 187-188**: Alunos com `horarioEspecial: true` são **removidos** da lista normal da turma
+2. **Linha 218**: Alunos especiais que já estão no array `alunos` da turma são **removidos** da lista de especiais
 
-Colecao: `frota/{viaturaId}/processos_pneus`
+Se a aluna está cadastrada como membro da Turma 3 (seu ID está no array `alunos` da turma) E tem `horarioEspecial: true`, ela é excluída dos dois lados:
+- Excluída da lista normal (porque tem horário especial)
+- Excluída da lista especial (porque seu ID já está no array `alunosIds` da turma)
 
-```text
-{
-  id: string (auto)
-  status: 'solicitado' | 'aprovado' | 'finalizado' | 'negado'
-  
-  // Etapa 1 - Solicitacao
-  nup: string                    // Numero do processo
-  kmAtual: number
-  quantidadePneus: number
-  anexoLaudo_url: string | null  // PDF do laudo (Firebase Storage)
-  dataSolicitacao: timestamp
-  
-  // Etapa 2 - Aprovacao
-  origem: 'COLOG' | 'OFICINA' | null
-  nomeOficina: string | null     // se origem === 'OFICINA'
-  referenciaPneus: string | null
-  dataAprovacao: timestamp | null
-  
-  // Etapa 3 - Conclusao
-  numeroOS: string | null
-  anexoOS_url: string | null     // se comprado em oficina
-  pneusRecebidosColog: boolean   // se cedido pela COLOG
-  dataConclusao: timestamp | null
-  
-  // Negacao
-  motivoNegacao: string | null
-  dataNegacao: timestamp | null
-  
-  criadoEm: timestamp
-  criadoPor: string
-}
-```
+Resultado: a aluna desaparece completamente.
 
-Storage path: `processos_pneus/{viaturaId}/{processoId}/{nomeArquivo}`
+## Correção
 
-## Arquivos
+**Arquivo**: `src/components/projetos-sociais/instrutor/IniciarAulaWizard.tsx`
 
-### 1. Criar: `src/components/frota/ProcessosPneusSection.tsx`
-
-Componente principal com:
-
-- **Lista de processos em andamento** (status != finalizado e != negado) com badges coloridos por status
-- **Botao "Novo Processo"** que abre formulario da Etapa 1 (NUP, KM atual, quantidade de pneus, upload do laudo)
-- **Ao clicar num processo existente**, exibe os dados ja preenchidos e libera o formulario da proxima etapa:
-  - Status `solicitado` → mostra botoes "Informar Aprovacao" e "Processo Negado"
-  - Status `aprovado` → mostra botao "Registrar Conclusao" e "Processo Negado"
-- **Formulario Etapa 2 (Aprovacao)**: origem (COLOG/Oficina), nome oficina (condicional), referencia dos pneus
-- **Formulario Etapa 3 (Conclusao)**: 
-  - Se OFICINA: numero OS + upload OS
-  - Se COLOG: checkbox "Pneus Recebidos na COLOG"
-- **Botao "Processo Negado"**: pede motivo, muda status para `negado`
-- **Historico de trocas finalizadas** (status === 'finalizado') em tabela com todos os dados consolidados
-- Processos negados visiveis em aba/secao separada "Negados" apenas para consulta
-
-### 2. Editar: `src/components/ModalDetalhesViatura.tsx`
-
-- Importar `ProcessosPneusSection`
-- Adicionar aba "Pneus" no TabsList
-- Passar `viaturaId` (o `id` do documento da viatura) como prop
-
-## Fluxo
+Remover o filtro da linha 218 que exclui alunos especiais que já estão na lista da turma. A exclusão da lista normal (linha 187-188) já garante que não haverá duplicatas, pois alunos com `horarioEspecial` nunca entram em `alunosTurma`.
 
 ```text
-[Novo Processo] → Preenche NUP, KM, Qtd, Laudo → status: SOLICITADO
-       │
-       ├── [Negado] → Motivo → Arquivado (nao entra em historico)
-       │
-       └── [Aprovado] → Origem, Oficina, Referencia → status: APROVADO
-              │
-              ├── [Negado] → Motivo → Arquivado
-              │
-              └── [Conclusao] → OS/Recebido COLOG → status: FINALIZADO
-                                                     (entra no historico)
+Antes (linha 217-218):
+  // Excluir se já está na lista da turma
+  .filter((aluno: any) => !alunosIds.includes(aluno.id));
+
+Depois:
+  // Removido filtro que excluía alunos especiais já cadastrados na turma
+  // pois eles já foram excluídos da lista normal (linha 187-188)
 ```
+
+Isso é uma correção de uma única linha — remover o `.filter` da linha 218.
 
