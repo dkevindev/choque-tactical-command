@@ -6,7 +6,11 @@ import {
 } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useState, useEffect } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/firebase';
 import NovaOSForm from './motorizado/NovaOSForm';
 import GerarBaixaCautelaForm from './admin-belico/documentos/GerarBaixaCautelaForm';
 import GerarTransferenciaCautelaForm from './admin-belico/documentos/GerarTransferenciaCautelaForm';
