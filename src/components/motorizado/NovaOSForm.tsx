@@ -699,7 +699,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         dataOS: formData.dataOS,
         defeitoRelatado: formData.defeito,
         oficinaResponsavel: formData.oficina,
-        numeroOficina: formData.numeroOficina,
+        numeroOficina: oficioAtivo ? formData.numeroOficina : '',
         numeroOS: formData.numeroOS,
         valorOS: formData.valorOS,
         cotaMensal: formData.cotaMensal,
