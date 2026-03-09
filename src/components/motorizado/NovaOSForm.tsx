@@ -870,12 +870,14 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
             )}
           </div>
 
-          <Input
-            name="numeroOficina"
-            placeholder="Nº (OF.)"
-            value={formData.numeroOficina}
-            onChange={handleChange}
-          />
+          {oficioAtivo && (
+            <Input
+              name="numeroOficina"
+              placeholder="Nº (OF.)"
+              value={formData.numeroOficina}
+              onChange={handleChange}
+            />
+          )}
 
           <Input
             name="numeroOS"
