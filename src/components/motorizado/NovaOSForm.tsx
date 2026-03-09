@@ -140,6 +140,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
 
   const [viaturasPendentes, setViaturasPendentes] = useState<ViaturaPendente[]>([]);
   const [viaturasSelecionadas, setViaturasSelecionadas] = useState<string[]>([]);
+  const [oficioAtivo, setOficioAtivo] = useState(false);
   
   const [valoresOriginais, setValoresOriginais] = useState({
     cotaMensal: 0,
