@@ -138,6 +138,18 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
           </TabsContent>
 
           <TabsContent value="motorizado">
+            <div className="flex items-center justify-end gap-2 mb-4">
+              <Label htmlFor="oficio-toggle" className="text-sm text-muted-foreground">
+                Geração de Ofício
+              </Label>
+              <Switch
+                id="oficio-toggle"
+                checked={oficioAtivo}
+                onCheckedChange={handleToggleOficio}
+                disabled={loadingConfig}
+              />
+            </div>
+
             {subsection === 'menu' && (
               <div className="space-y-4">
                 <p className="text-muted-foreground mb-2">Selecione o tipo de documento:</p>
