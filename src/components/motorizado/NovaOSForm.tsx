@@ -352,6 +352,19 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     };
 
     const initializeForm = async () => {
+      // Carregar configuração de ofício
+      try {
+        const configDoc = await getDoc(doc(db, 'configuracoes', 'motorizado'));
+        if (configDoc.exists()) {
+          setOficioAtivo(configDoc.data().oficioAtivo ?? false);
+        } else {
+          setOficioAtivo(false);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar config oficioAtivo:', error);
+        setOficioAtivo(false);
+      }
+
       await fetchOficinas();
       await fetchViaturasPendentes();
       
