@@ -977,8 +977,10 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
       )}
 
       <div className="flex justify-between items-center">
-        <Button onClick={handleSubmit}>Gerar OS e Documento</Button>
-        <Button onClick={() => setModalAssinarAberto(true)} variant="outline">Assinar Documento</Button>
+        <Button onClick={handleSubmit}>{oficioAtivo ? 'Gerar OS e Documento' : 'Registrar OS'}</Button>
+        {oficioAtivo && (
+          <Button onClick={() => setModalAssinarAberto(true)} variant="outline">Assinar Documento</Button>
+        )}
       </div>
 
       {modalCadastrarAberto && (
