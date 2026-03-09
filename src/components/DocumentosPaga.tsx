@@ -27,6 +27,34 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
   const [subsection, setSubsection] = useState<'menu' | 'nova-os' | 'email-os'>('menu');
   const [activeTab, setActiveTab] = useState('belico');
   const [belicoSubsection, setBelicoSubsection] = useState<'menu' | 'baixa-cautela' | 'transferencia-cautela' | 'termo-entrega' | 'nada-consta'>('menu');
+  const [oficioAtivo, setOficioAtivo] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const configDoc = await getDoc(doc(db, 'configuracoes', 'motorizado'));
+        if (configDoc.exists()) {
+          setOficioAtivo(configDoc.data().oficioAtivo ?? false);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar config:', error);
+      } finally {
+        setLoadingConfig(false);
+      }
+    };
+    loadConfig();
+  }, []);
+
+  const handleToggleOficio = async (checked: boolean) => {
+    setOficioAtivo(checked);
+    try {
+      await setDoc(doc(db, 'configuracoes', 'motorizado'), { oficioAtivo: checked }, { merge: true });
+    } catch (error) {
+      console.error('Erro ao salvar config:', error);
+      setOficioAtivo(!checked);
+    }
+  };
 
   useEffect(() => {
     if (locationState?.subSection === 'motorizado') {
