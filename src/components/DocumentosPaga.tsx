@@ -6,7 +6,11 @@ import {
 } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useState, useEffect } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/firebase';
 import NovaOSForm from './motorizado/NovaOSForm';
 import GerarBaixaCautelaForm from './admin-belico/documentos/GerarBaixaCautelaForm';
 import GerarTransferenciaCautelaForm from './admin-belico/documentos/GerarTransferenciaCautelaForm';
@@ -23,6 +27,34 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
   const [subsection, setSubsection] = useState<'menu' | 'nova-os' | 'email-os'>('menu');
   const [activeTab, setActiveTab] = useState('belico');
   const [belicoSubsection, setBelicoSubsection] = useState<'menu' | 'baixa-cautela' | 'transferencia-cautela' | 'termo-entrega' | 'nada-consta'>('menu');
+  const [oficioAtivo, setOficioAtivo] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const configDoc = await getDoc(doc(db, 'configuracoes', 'motorizado'));
+        if (configDoc.exists()) {
+          setOficioAtivo(configDoc.data().oficioAtivo ?? false);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar config:', error);
+      } finally {
+        setLoadingConfig(false);
+      }
+    };
+    loadConfig();
+  }, []);
+
+  const handleToggleOficio = async (checked: boolean) => {
+    setOficioAtivo(checked);
+    try {
+      await setDoc(doc(db, 'configuracoes', 'motorizado'), { oficioAtivo: checked }, { merge: true });
+    } catch (error) {
+      console.error('Erro ao salvar config:', error);
+      setOficioAtivo(!checked);
+    }
+  };
 
   useEffect(() => {
     if (locationState?.subSection === 'motorizado') {
@@ -106,6 +138,18 @@ const DocumentosPage = ({ locationState }: DocumentosPageProps) => {
           </TabsContent>
 
           <TabsContent value="motorizado">
+            <div className="flex items-center justify-end gap-2 mb-4">
+              <Label htmlFor="oficio-toggle" className="text-sm text-muted-foreground">
+                Geração de Ofício
+              </Label>
+              <Switch
+                id="oficio-toggle"
+                checked={oficioAtivo}
+                onCheckedChange={handleToggleOficio}
+                disabled={loadingConfig}
+              />
+            </div>
+
             {subsection === 'menu' && (
               <div className="space-y-4">
                 <p className="text-muted-foreground mb-2">Selecione o tipo de documento:</p>

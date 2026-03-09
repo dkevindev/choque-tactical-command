@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, serverTimestamp, Timestamp, FieldValue, query, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, serverTimestamp, Timestamp, FieldValue, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -140,6 +140,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
 
   const [viaturasPendentes, setViaturasPendentes] = useState<ViaturaPendente[]>([]);
   const [viaturasSelecionadas, setViaturasSelecionadas] = useState<string[]>([]);
+  const [oficioAtivo, setOficioAtivo] = useState(false);
   
   const [valoresOriginais, setValoresOriginais] = useState({
     cotaMensal: 0,
@@ -351,6 +352,19 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
     };
 
     const initializeForm = async () => {
+      // Carregar configuração de ofício
+      try {
+        const configDoc = await getDoc(doc(db, 'configuracoes', 'motorizado'));
+        if (configDoc.exists()) {
+          setOficioAtivo(configDoc.data().oficioAtivo ?? false);
+        } else {
+          setOficioAtivo(false);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar config oficioAtivo:', error);
+        setOficioAtivo(false);
+      }
+
       await fetchOficinas();
       await fetchViaturasPendentes();
       
@@ -675,7 +689,9 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
       const placaFormatada = (formData.placa && formData.placa !== 'N/D') ? formData.placa.replace(/\s/g, '').toUpperCase() : 'ND';
 
       // Gerar o valor do campo 'arquivo' usando formData.numeroOficina
-      const arquivoGerado = `${formData.numeroOficina} - COLOG - ${placaFormatada} - OS ${formData.numeroOS}`;
+      const arquivoGerado = oficioAtivo 
+        ? `${formData.numeroOficina} - COLOG - ${placaFormatada} - OS ${formData.numeroOS}`
+        : `COLOG - ${placaFormatada} - OS ${formData.numeroOS}`;
 
       osDataParaEnvio = {
         cadastroViatura: formData.cadastro,
@@ -683,7 +699,7 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         dataOS: formData.dataOS,
         defeitoRelatado: formData.defeito,
         oficinaResponsavel: formData.oficina,
-        numeroOficina: formData.numeroOficina,
+        numeroOficina: oficioAtivo ? formData.numeroOficina : '',
         numeroOS: formData.numeroOS,
         valorOS: formData.valorOS,
         cotaMensal: formData.cotaMensal,
@@ -734,43 +750,45 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         }
       }
 
-      const functionsUrl = `https://gerarordemservicodocx-owvlmrnsjq-uc.a.run.app`;
+      if (oficioAtivo) {
+        const functionsUrl = `https://gerarordemservicodocx-owvlmrnsjq-uc.a.run.app`;
 
-      const response = await fetch(functionsUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(osDataParaEnvio),
-      });
+        const response = await fetch(functionsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(osDataParaEnvio),
+        });
 
-     if (response.ok) {
-  const blob = await response.blob();
-  const disposition = response.headers.get('Content-Disposition');
-  let filename = `${formData.numeroOficina} - COLOG - ${formData.placa} - OS ${formData.numeroOS}`
+        if (response.ok) {
+          const blob = await response.blob();
+          const disposition = response.headers.get('Content-Disposition');
+          let filename = `${formData.numeroOficina} - COLOG - ${formData.placa} - OS ${formData.numeroOS}`;
 
-  if (disposition && disposition.indexOf('attachment') !== -1) {
-    const filenameRegex = /filename="?(.+)"?/;
-    const matches = filenameRegex.exec(disposition);
-    if (matches != null && matches[1]) {
-      filename = matches[1];
-    }
-  }
+          if (disposition && disposition.indexOf('attachment') !== -1) {
+            const filenameRegex = /filename="?(.+)"?/;
+            const matches = filenameRegex.exec(disposition);
+            if (matches != null && matches[1]) {
+              filename = matches[1];
+            }
+          }
 
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${osDataParaEnvio.numeroOficina || '000'} - COLOG -${osDataParaEnvio.cadastroViatura || 'SEM-PLACA'} - OS ${osDataParaEnvio.numeroOS || 'sem-numero'}`;  // usar o nome do backend aqui
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(url);
-  alert('Documento DOCX gerado e download iniciado!');
-} else {
-  const errorText = await response.text();
-  alert(`Erro ao gerar o documento DOCX. Detalhes: ${errorText}`);
-  console.error('Erro na geração do DOCX pela Cloud Function:', errorText);
-}
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${osDataParaEnvio.numeroOficina || '000'} - COLOG -${osDataParaEnvio.cadastroViatura || 'SEM-PLACA'} - OS ${osDataParaEnvio.numeroOS || 'sem-numero'}`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          alert('Documento DOCX gerado e download iniciado!');
+        } else {
+          const errorText = await response.text();
+          alert(`Erro ao gerar o documento DOCX. Detalhes: ${errorText}`);
+          console.error('Erro na geração do DOCX pela Cloud Function:', errorText);
+        }
+      }
 
     } catch (error) {
       console.error('Erro geral no processo:', error);
@@ -856,12 +874,14 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
             )}
           </div>
 
-          <Input
-            name="numeroOficina"
-            placeholder="Nº (OF.)"
-            value={formData.numeroOficina}
-            onChange={handleChange}
-          />
+          {oficioAtivo && (
+            <Input
+              name="numeroOficina"
+              placeholder="Nº (OF.)"
+              value={formData.numeroOficina}
+              onChange={handleChange}
+            />
+          )}
 
           <Input
             name="numeroOS"
@@ -961,8 +981,10 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
       )}
 
       <div className="flex justify-between items-center">
-        <Button onClick={handleSubmit}>Gerar OS e Documento</Button>
-        <Button onClick={() => setModalAssinarAberto(true)} variant="outline">Assinar Documento</Button>
+        <Button onClick={handleSubmit}>{oficioAtivo ? 'Gerar OS e Documento' : 'Registrar OS'}</Button>
+        {oficioAtivo && (
+          <Button onClick={() => setModalAssinarAberto(true)} variant="outline">Assinar Documento</Button>
+        )}
       </div>
 
       {modalCadastrarAberto && (
