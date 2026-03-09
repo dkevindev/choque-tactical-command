@@ -689,7 +689,9 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
       const placaFormatada = (formData.placa && formData.placa !== 'N/D') ? formData.placa.replace(/\s/g, '').toUpperCase() : 'ND';
 
       // Gerar o valor do campo 'arquivo' usando formData.numeroOficina
-      const arquivoGerado = `${formData.numeroOficina} - COLOG - ${placaFormatada} - OS ${formData.numeroOS}`;
+      const arquivoGerado = oficioAtivo 
+        ? `${formData.numeroOficina} - COLOG - ${placaFormatada} - OS ${formData.numeroOS}`
+        : `COLOG - ${placaFormatada} - OS ${formData.numeroOS}`;
 
       osDataParaEnvio = {
         cadastroViatura: formData.cadastro,
