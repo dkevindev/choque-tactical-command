@@ -750,43 +750,45 @@ const NovaOSForm = ({ onBack, prefilledData }: NovaOSFormProps) => {
         }
       }
 
-      const functionsUrl = `https://gerarordemservicodocx-owvlmrnsjq-uc.a.run.app`;
+      if (oficioAtivo) {
+        const functionsUrl = `https://gerarordemservicodocx-owvlmrnsjq-uc.a.run.app`;
 
-      const response = await fetch(functionsUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(osDataParaEnvio),
-      });
+        const response = await fetch(functionsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(osDataParaEnvio),
+        });
 
-     if (response.ok) {
-  const blob = await response.blob();
-  const disposition = response.headers.get('Content-Disposition');
-  let filename = `${formData.numeroOficina} - COLOG - ${formData.placa} - OS ${formData.numeroOS}`
+        if (response.ok) {
+          const blob = await response.blob();
+          const disposition = response.headers.get('Content-Disposition');
+          let filename = `${formData.numeroOficina} - COLOG - ${formData.placa} - OS ${formData.numeroOS}`;
 
-  if (disposition && disposition.indexOf('attachment') !== -1) {
-    const filenameRegex = /filename="?(.+)"?/;
-    const matches = filenameRegex.exec(disposition);
-    if (matches != null && matches[1]) {
-      filename = matches[1];
-    }
-  }
+          if (disposition && disposition.indexOf('attachment') !== -1) {
+            const filenameRegex = /filename="?(.+)"?/;
+            const matches = filenameRegex.exec(disposition);
+            if (matches != null && matches[1]) {
+              filename = matches[1];
+            }
+          }
 
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${osDataParaEnvio.numeroOficina || '000'} - COLOG -${osDataParaEnvio.cadastroViatura || 'SEM-PLACA'} - OS ${osDataParaEnvio.numeroOS || 'sem-numero'}`;  // usar o nome do backend aqui
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(url);
-  alert('Documento DOCX gerado e download iniciado!');
-} else {
-  const errorText = await response.text();
-  alert(`Erro ao gerar o documento DOCX. Detalhes: ${errorText}`);
-  console.error('Erro na geração do DOCX pela Cloud Function:', errorText);
-}
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${osDataParaEnvio.numeroOficina || '000'} - COLOG -${osDataParaEnvio.cadastroViatura || 'SEM-PLACA'} - OS ${osDataParaEnvio.numeroOS || 'sem-numero'}`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          alert('Documento DOCX gerado e download iniciado!');
+        } else {
+          const errorText = await response.text();
+          alert(`Erro ao gerar o documento DOCX. Detalhes: ${errorText}`);
+          console.error('Erro na geração do DOCX pela Cloud Function:', errorText);
+        }
+      }
 
     } catch (error) {
       console.error('Erro geral no processo:', error);
