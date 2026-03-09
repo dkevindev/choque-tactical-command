@@ -18,6 +18,7 @@ import GuardaQuartelHome from "./components/guarda-quartel/GuardaQuartelHome";
 import ProjetosSociaisSystem from "./components/projetos-sociais/ProjetosSociaisSystem";
 import InstrutorSystem from "./components/projetos-sociais/InstrutorSystem";
 import GestorSystem from "./components/projetos-sociais/GestorSystem";
+import TotemViaturas from "./components/frota/TotemViaturas";
 
 import NotFound from "./pages/NotFound";
 
