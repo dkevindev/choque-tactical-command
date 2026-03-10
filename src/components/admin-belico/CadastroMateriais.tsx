@@ -25,20 +25,22 @@ import {
   ArrowDownCircle,
   ArrowRightCircle,
   XCircle,
-  Package
+  Package,
+  BookOpen
 } from 'lucide-react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
+import AcervoModelos, { ModeloArmamento } from './AcervoModelos';
 
 interface Material {
   id: string;
   nome: string;
   categoria: string;
-  subcategoria?: string; // Para munição: "Letal" ou "IMPO"
+  subcategoria?: string;
   calibre?: string;
   numeroSerie?: string;
-  quantidade?: number; // Para munição e EPI
+  quantidade?: number;
   disponivel: boolean;
   cautelado?: boolean;
   cauteladoPara?: string;
@@ -48,15 +50,14 @@ interface Material {
   modelo?: string;
   observacoes?: string;
   createdAt: Date;
-  local: string; // Fortaleza ou Crato
-  // Campos específicos para armas
-  tipoArma?: string; // Arma Curta ou Arma Longa
+  local: string;
+  tipoArma?: string;
   quantidadeCarregadores?: number;
   quantidadeMunicoes?: number;
   calibreMunicao?: string;
   numeroSIARM?: string;
-  // Campos específicos para coletes
   termoEntrega?: string;
+  modeloArmamentoId?: string;
 }
 
 const CadastroMateriais = () => {
@@ -73,13 +74,18 @@ const CadastroMateriais = () => {
   const [showHistorico, setShowHistorico] = useState(false);
   const [historicoLoading, setHistoricoLoading] = useState(false);
   const [historicoNomeMaterial, setHistoricoNomeMaterial] = useState('');
-  // Batch mode states
   const [modoLote, setModoLote] = useState(false);
   const [seriesLote, setSeriesLote] = useState<string[]>([]);
   const [serieAtual, setSerieAtual] = useState('');
   const [cadastrandoLote, setCadastrandoLote] = useState(false);
   const [progressoLote, setProgressoLote] = useState(0);
   const [gerandoHistorico, setGerandoHistorico] = useState(false);
+  
+  // Acervo de modelos
+  const [showAcervo, setShowAcervo] = useState(false);
+  const [modelosArmamento, setModelosArmamento] = useState<ModeloArmamento[]>([]);
+  const [modeloSelecionadoId, setModeloSelecionadoId] = useState('');
+
   const [formData, setFormData] = useState({
     nome: '',
     categoria: '',
@@ -98,10 +104,8 @@ const CadastroMateriais = () => {
     anosValidade: '',
     sexo: '',
     termoEntrega: '',
-    // Campos para cautela
     policialAssociadoId: '',
     policialAssociadoNome: '',
-    // Campos específicos para armas
     tipoArma: '',
     quantidadeCarregadores: '',
     quantidadeMunicoes: '',
@@ -124,14 +128,29 @@ const CadastroMateriais = () => {
 
   useEffect(() => {
     carregarPoliciais();
+    carregarModelosArmamento();
   }, []);
 
-  // Recarregar materiais quando policiaisMap estiver pronto
   useEffect(() => {
     if (policiaisMap.size > 0) {
       loadMateriais();
     }
   }, [policiaisMap]);
+
+  const carregarModelosArmamento = async () => {
+    try {
+      const q = query(collection(db, 'modelos_armamento'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        createdAt: d.data().createdAt?.toDate() || new Date()
+      } as ModeloArmamento));
+      setModelosArmamento(data);
+    } catch (error) {
+      console.error('Erro ao carregar modelos:', error);
+    }
+  };
 
   const carregarPoliciais = async () => {
     try {
@@ -163,16 +182,14 @@ const CadastroMateriais = () => {
           ...doc.data(),
           createdAt: doc.data().createdAt?.toDate() || new Date()
         } as Material))
-        .filter((m: any) => !m.transferido && !m.baixado); // Excluir materiais transferidos/baixados da carga ativa
+        .filter((m: any) => !m.transferido && !m.baixado);
 
-      // Carregar cautelas ativas para sincronizar status dos materiais
       const cautelasQuery = query(collection(db, 'cautelas_permanentes'));
       const cautelasSnapshot = await getDocs(cautelasQuery);
       const cautelasAtivas = cautelasSnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter((c: any) => c.status === 'ativa');
 
-      // Criar mapa de materiais cautelados
       const materiaisCautelados = new Map<string, { policialNome: string, policialId: string }>();
       cautelasAtivas.forEach((cautela: any) => {
         if (cautela.materiais && Array.isArray(cautela.materiais)) {
@@ -187,7 +204,6 @@ const CadastroMateriais = () => {
         }
       });
 
-      // Atualizar status dos materiais baseado nas cautelas ativas
       materiaisData = materiaisData.map(material => {
         const cautelaInfo = materiaisCautelados.get(material.id);
         if (cautelaInfo) {
@@ -245,12 +261,27 @@ const CadastroMateriais = () => {
     setSerieAtual('');
     setCadastrandoLote(false);
     setProgressoLote(0);
+    setModeloSelecionadoId('');
+  };
+
+  const handleSelectModelo = (modeloId: string) => {
+    setModeloSelecionadoId(modeloId);
+    const modelo = modelosArmamento.find(m => m.id === modeloId);
+    if (modelo) {
+      setFormData(prev => ({
+        ...prev,
+        nome: modelo.nome,
+        fabricante: modelo.fabricante,
+        modelo: modelo.modelo,
+        calibre: modelo.calibre,
+        tipoArma: modelo.tipoArma,
+      }));
+    }
   };
 
   const adicionarSerie = () => {
     const input = serieAtual.trim();
     if (!input) return;
-    // Suporte a colar múltiplos separados por vírgula, ponto-e-vírgula ou quebra de linha
     const novos = input.split(/[,;\n]+/).map(s => s.trim()).filter(s => s.length > 0);
     const unicos = novos.filter(n => !seriesLote.includes(n));
     if (unicos.length === 0) {
@@ -268,13 +299,11 @@ const CadastroMateriais = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validação do modo lote
     if (modoLote && !editingMaterial && seriesLote.length === 0) {
       toast.error('Adicione pelo menos um número de série para o cadastro em lote');
       return;
     }
     
-    // Validação condicional: nome não é obrigatório para Colete Balístico
     if (formData.categoria !== 'Colete Balístico' && !formData.nome) {
       toast.error('Preencha o nome do material');
       return;
@@ -285,7 +314,12 @@ const CadastroMateriais = () => {
       return;
     }
 
-    // Validação para munição e EPI (apenas se NÃO estiver associando a um policial)
+    // Validação: Armamento exige modelo selecionado (exceto edição de materiais antigos)
+    if (formData.categoria === 'Armamento' && !modeloSelecionadoId && !editingMaterial) {
+      toast.error('Selecione um modelo do acervo para cadastrar armamento');
+      return;
+    }
+
     if ((formData.categoria === 'Munição' || formData.categoria === 'EPI') && 
         !formData.policialAssociadoId && 
         !formData.quantidade) {
@@ -298,7 +332,6 @@ const CadastroMateriais = () => {
       return;
     }
 
-    // Validação específica para Colete Balístico
     if (formData.categoria === 'Colete Balístico') {
       if (!formData.tamanhoColete || !formData.dataFabricacao || !formData.anosValidade || !formData.sexo) {
         toast.error('Preencha todos os campos obrigatórios do Colete Balístico');
@@ -306,20 +339,17 @@ const CadastroMateriais = () => {
       }
     }
 
-    // Validação específica para Armamento
     if (formData.categoria === 'Armamento' && !formData.tipoArma) {
       toast.error('Selecione o tipo de arma (Curta ou Longa)');
       return;
     }
 
-    // Validação obrigatória para armamentos
     if (formData.categoria === 'Armamento') {
       if (!formData.calibre) {
         toast.error('Calibre é obrigatório para armamentos');
         return;
       }
       
-      // Carregadores e munições são obrigatórios APENAS quando associando a um policial
       if (formData.policialAssociadoId) {
         if (!formData.quantidadeCarregadores || parseInt(formData.quantidadeCarregadores) === 0) {
           toast.error('Quantidade de carregadores é obrigatória ao cautelar um armamento');
@@ -333,7 +363,6 @@ const CadastroMateriais = () => {
     }
 
     try {
-      // Calcular vencimento automaticamente para Colete Balístico
       let vencimentoCalculado = formData.vencimento;
       if (formData.categoria === 'Colete Balístico' && formData.dataFabricacao && formData.anosValidade) {
         const dataFab = new Date(formData.dataFabricacao);
@@ -343,7 +372,6 @@ const CadastroMateriais = () => {
         vencimentoCalculado = dataVencimento.toISOString().split('T')[0];
       }
 
-      // Criar objeto base com campos obrigatórios
       const materialDataBase: any = {
         nome: formData.nome || formData.categoria,
         categoria: formData.categoria,
@@ -353,7 +381,6 @@ const CadastroMateriais = () => {
         createdAt: new Date()
       };
 
-      // Adicionar campos opcionais apenas se tiverem valor
       if (formData.subcategoria) materialDataBase.subcategoria = formData.subcategoria;
       if (formData.calibre) materialDataBase.calibre = formData.calibre;
       if (formData.numeroSerie) materialDataBase.numeroSerie = formData.numeroSerie;
@@ -374,6 +401,7 @@ const CadastroMateriais = () => {
       if (formData.quantidadeMunicoes) materialDataBase.quantidadeMunicoes = parseInt(formData.quantidadeMunicoes);
       if (formData.calibreMunicao) materialDataBase.calibreMunicao = formData.calibreMunicao;
       if (formData.numeroSIARM) materialDataBase.numeroSIARM = formData.numeroSIARM;
+      if (modeloSelecionadoId) materialDataBase.modeloArmamentoId = modeloSelecionadoId;
 
       const materialData = materialDataBase;
 
@@ -383,12 +411,10 @@ const CadastroMateriais = () => {
         await updateDoc(doc(db, 'materiais_belicos', editingMaterial.id), materialData);
         materialId = editingMaterial.id;
 
-        // Verificar se o policial mudou para atualizar cautelas
         const policialAntigoId = editingMaterial.policialAssociadoId || '';
         const policialNovoId = formData.policialAssociadoId || '';
 
         if (policialAntigoId !== policialNovoId) {
-          // 1. Remover da cautela do policial antigo
           if (policialAntigoId) {
             const cautelasAntigoSnapshot = await getDocs(
               query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
@@ -407,7 +433,6 @@ const CadastroMateriais = () => {
                 });
               }
             }
-            // Registrar devolução no histórico
             await addDoc(collection(db, 'historico_material'), {
               materialId: editingMaterial.id,
               materialNome: materialData.nome || materialData.categoria,
@@ -420,11 +445,9 @@ const CadastroMateriais = () => {
             });
           }
 
-          // 2. Adicionar na cautela do novo policial
           if (policialNovoId) {
             const policial = policiais.find(p => p.id === policialNovoId);
 
-            // Registrar cautela no histórico
             await addDoc(collection(db, 'historico_material'), {
               materialId: editingMaterial.id,
               materialNome: materialData.nome || materialData.categoria,
@@ -436,7 +459,6 @@ const CadastroMateriais = () => {
               observacoes: policialAntigoId ? 'Transferido de outro policial via edição' : 'Cautelado via edição'
             });
 
-            // Montar item para cautela
             const itemPrincipal: any = {
               materialId: editingMaterial.id,
               nome: materialData.nome,
@@ -483,7 +505,6 @@ const CadastroMateriais = () => {
               }
             }
 
-            // Buscar cautela ativa do novo policial
             const cautelasNovoSnapshot = await getDocs(
               query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
             );
@@ -520,7 +541,6 @@ const CadastroMateriais = () => {
 
         toast.success('Material atualizado com sucesso');
       } else if (modoLote && seriesLote.length > 0) {
-        // === CADASTRO EM LOTE ===
         setCadastrandoLote(true);
         setProgressoLote(0);
         const total = seriesLote.length;
@@ -532,7 +552,6 @@ const CadastroMateriais = () => {
           materiaisIds.push(docRef.id);
           setProgressoLote(i + 1);
 
-          // Se associado a policial, criar cautela para cada item
           if (formData.policialAssociadoId) {
             const policial = policiais.find(p => p.id === formData.policialAssociadoId);
             
@@ -547,7 +566,6 @@ const CadastroMateriais = () => {
               observacoes: `Cautela inicial no cadastro em lote (${i + 1}/${total})`
             });
 
-            // Montar item para cautela
             const itemCautela: any = {
               materialId: docRef.id,
               nome: loteData.nome,
@@ -566,7 +584,6 @@ const CadastroMateriais = () => {
               itemCautela.quantidadeMunicoes = parseInt(loteData.quantidadeMunicoes) || 0;
             }
 
-            // Buscar/criar cautela ativa (fazemos apenas na primeira iteração, depois reutilizamos)
             if (i === 0) {
               const cautelasQuery = query(collection(db, 'cautelas_permanentes'), orderBy('createdAt', 'desc'));
               const cautelasSnapshot = await getDocs(cautelasQuery);
@@ -574,17 +591,10 @@ const CadastroMateriais = () => {
                 const data = d.data();
                 return data.policialId === formData.policialAssociadoId && data.status === 'ativa';
               });
-
-              if (cautelaExistente) {
-                // Adicionar todos os itens do lote na cautela existente de uma vez ao final
-              } else {
-                // Criar nova cautela - será preenchida ao final
-              }
             }
           }
         }
 
-        // Após criar todos, se tem policial, adicionar todos de uma vez na cautela
         if (formData.policialAssociadoId) {
           const policial = policiais.find(p => p.id === formData.policialAssociadoId);
           const todosItensCautela: any[] = materiaisIds.map((mid, idx) => {
@@ -649,13 +659,11 @@ const CadastroMateriais = () => {
         toast.success('Material cadastrado com sucesso');
       }
 
-      // Se foi associado a um policial, criar ou atualizar cautela automaticamente
-      if (formData.policialAssociadoId && !editingMaterial) {
+      if (formData.policialAssociadoId && !editingMaterial && !(modoLote && seriesLote.length > 0)) {
         const policial = policiais.find(p => p.id === formData.policialAssociadoId);
         
-        // Registrar no histórico
         await addDoc(collection(db, 'historico_material'), {
-          materialId: materialId,
+          materialId: materialId!,
           materialNome: materialData.nome || materialData.categoria,
           numeroSerie: materialData.numeroSerie || '',
           policialNome: formData.policialAssociadoNome,
@@ -665,7 +673,6 @@ const CadastroMateriais = () => {
           observacoes: 'Cautela inicial no cadastro'
         });
         
-        // Verificar se já existe uma cautela ativa para este policial
         const cautelasQuery = query(
           collection(db, 'cautelas_permanentes'),
           orderBy('createdAt', 'desc')
@@ -676,18 +683,15 @@ const CadastroMateriais = () => {
           return data.policialId === formData.policialAssociadoId && data.status === 'ativa';
         });
 
-        // Criar array de materiais para a cautela
         const materiaisParaCautela: any[] = [];
         
-        // Item principal (arma/material)
         const itemPrincipal: any = {
-          materialId: materialId,
+          materialId: materialId!,
           nome: materialData.nome,
           categoria: materialData.categoria,
           quantidade: 1
         };
         
-        // Adicionar campos opcionais apenas se existirem
         if (materialData.numeroSerie) itemPrincipal.numeroSerie = materialData.numeroSerie;
         if (materialData.tamanhoColete) itemPrincipal.tamanhoColete = materialData.tamanhoColete;
         if (materialData.sexo) itemPrincipal.sexo = materialData.sexo;
@@ -695,7 +699,6 @@ const CadastroMateriais = () => {
         if (materialData.modelo) itemPrincipal.modelo = materialData.modelo;
         if (materialData.numeroSIARM) itemPrincipal.numeroSIARM = materialData.numeroSIARM;
         
-        // Para armamentos, adicionar calibre e quantidades na arma principal
         if (materialData.categoria === 'Armamento') {
           itemPrincipal.calibre = materialData.calibre;
           itemPrincipal.quantidadeCarregadores = parseInt(materialData.quantidadeCarregadores) || 0;
@@ -704,11 +707,10 @@ const CadastroMateriais = () => {
         
         materiaisParaCautela.push(itemPrincipal);
         
-        // Se for armamento, adicionar carregadores e munições como itens separados COM DADOS COMPLETOS
         if (materialData.categoria === 'Armamento') {
           if (materialData.quantidadeCarregadores && parseInt(materialData.quantidadeCarregadores) > 0) {
             materiaisParaCautela.push({
-              materialId: `${materialId}_carregadores`,
+              materialId: `${materialId!}_carregadores`,
               nome: `Carregadores - ${materialData.nome}`,
               categoria: 'Acessório',
               quantidade: parseInt(materialData.quantidadeCarregadores),
@@ -721,7 +723,7 @@ const CadastroMateriais = () => {
           
           if (materialData.quantidadeMunicoes && parseInt(materialData.quantidadeMunicoes) > 0) {
             materiaisParaCautela.push({
-              materialId: `${materialId}_municoes`,
+              materialId: `${materialId!}_municoes`,
               nome: `Munição ${materialData.calibre}`,
               categoria: 'Munição',
               subcategoria: 'Letal',
@@ -734,7 +736,6 @@ const CadastroMateriais = () => {
         }
 
         if (cautelaExistente) {
-          // Atualizar cautela existente adicionando os novos materiais
           const materiaisAtualizados = [...(cautelaExistente.data().materiais || []), ...materiaisParaCautela];
           await updateDoc(doc(db, 'cautelas_permanentes', cautelaExistente.id), {
             materiais: materiaisAtualizados,
@@ -744,16 +745,11 @@ const CadastroMateriais = () => {
           });
           toast.success('Material(is) adicionado(s) à cautela existente do policial');
         } else {
-          // Criar nova cautela com numeração
-          // Gerar número da cautela - sequência simples
           const querySnapshot = await getDocs(collection(db, 'cautelas_permanentes'));
           const totalCautelas = querySnapshot.size;
           
-          // Gerar próximo número
           const proximoNumero = totalCautelas + 1;
           const numeroCautela = String(proximoNumero).padStart(3, '0');
-          
-          console.log(`Gerando cautela ${numeroCautela} (${totalCautelas} cautelas existentes)`);
           
           const cautelaData = {
             numeroCautela,
@@ -815,6 +811,12 @@ const CadastroMateriais = () => {
     if (material.policialAssociadoNome) {
       setBuscaPolicial(material.policialAssociadoNome);
     }
+    // Se o material tem modeloArmamentoId, selecionar o modelo
+    if ((material as any).modeloArmamentoId) {
+      setModeloSelecionadoId((material as any).modeloArmamentoId);
+    } else {
+      setModeloSelecionadoId('');
+    }
     setEditingMaterial(material);
     setShowForm(true);
   };
@@ -825,7 +827,6 @@ const CadastroMateriais = () => {
     try {
       const material = materiais.find(m => m.id === id);
       
-      // Verificar se está em alguma cautela ativa e remover
       const cautelasSnapshot = await getDocs(
         query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
       );
@@ -835,7 +836,6 @@ const CadastroMateriais = () => {
           (m: any) => m.materialId !== id
         );
         if (materiaisAtualizados?.length !== cautela.materiais?.length) {
-          // Registrar no histórico antes de remover
           if (material) {
             await addDoc(collection(db, 'historico_material'), {
               materialId: id,
@@ -863,39 +863,40 @@ const CadastroMateriais = () => {
     }
   };
 
-  
-
-  const loadHistorico = async (materialId: string, materialNome: string) => {
-    setHistoricoLoading(true);
-    setHistoricoNomeMaterial(materialNome);
+  const loadHistorico = async (materialId: string, nomeMaterial: string) => {
+    setHistoricoNomeMaterial(nomeMaterial);
     setShowHistorico(true);
+    setHistoricoLoading(true);
     try {
-      const q = query(collection(db, 'historico_material'), where('materialId', '==', materialId));
+      const q = query(
+        collection(db, 'historico_material'),
+        where('materialId', '==', materialId),
+        orderBy('data', 'desc')
+      );
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(d => ({
+      const historico = snapshot.docs.map(d => ({
         id: d.id,
         ...d.data(),
         data: d.data().data?.toDate?.() || new Date()
       }));
-      data.sort((a: any, b: any) => b.data.getTime() - a.data.getTime());
-      setHistoricoMaterial(data);
+      setHistoricoMaterial(historico);
     } catch (error) {
       console.error('Erro ao carregar histórico:', error);
+      toast.error('Erro ao carregar histórico');
       setHistoricoMaterial([]);
     } finally {
       setHistoricoLoading(false);
     }
   };
 
-
   const getHistoricoIcon = (tipo: string) => {
     switch (tipo) {
-      case 'cautelado': return <ArrowUpCircle className="h-5 w-5 text-green-500" />;
-      case 'devolvido': return <ArrowDownCircle className="h-5 w-5 text-red-500" />;
-      case 'transferido': return <ArrowRightCircle className="h-5 w-5 text-blue-500" />;
-      case 'baixa': return <XCircle className="h-5 w-5 text-muted-foreground" />;
-      case 'removido': return <XCircle className="h-5 w-5 text-destructive" />;
-      default: return <History className="h-5 w-5 text-muted-foreground" />;
+      case 'cautelado': return <ArrowUpCircle className="h-4 w-4 text-blue-500" />;
+      case 'devolvido': return <ArrowDownCircle className="h-4 w-4 text-green-500" />;
+      case 'transferido': return <ArrowRightCircle className="h-4 w-4 text-yellow-500" />;
+      case 'baixa': return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'removido': return <XCircle className="h-4 w-4 text-red-500" />;
+      default: return <History className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -910,7 +911,6 @@ const CadastroMateriais = () => {
     }
   };
 
-  // Extrair modelos únicos dos materiais
   const modelosUnicos = useMemo(() => {
     const modelos = materiais
       .filter(m => m.modelo)
@@ -925,24 +925,20 @@ const CadastroMateriais = () => {
     const matchSerie = material.numeroSerie?.toLowerCase().includes(filtro.toLowerCase()) || false;
     const matchCategoria = categoriaFiltro === 'todas' || categoriaFiltro === '' || material.categoria === categoriaFiltro;
     
-    // Filtro por disponibilidade para cautela
     const matchDisponibilidade = 
       disponibilidadeFiltro === 'todos' ||
       (disponibilidadeFiltro === 'disponivel' && material.disponivel === true) ||
       (disponibilidadeFiltro === 'indisponivel' && material.disponivel === false);
     
-    // Filtro por tipo de arma
     const matchTipoArma = 
       tipoArmaFiltro === 'todos' ||
       material.tipoArma === tipoArmaFiltro;
     
-    // Filtro por status cautelado
     const matchCautelado = 
       cauteladoFiltro === 'todos' ||
       (cauteladoFiltro === 'cautelado' && material.cautelado === true) ||
       (cauteladoFiltro === 'nao_cautelado' && !material.cautelado);
     
-    // Filtro por modelo
     const matchModelo = 
       modeloFiltro === 'todos' ||
       material.modelo === modeloFiltro;
@@ -962,17 +958,14 @@ const CadastroMateriais = () => {
   const gerarHistoricoGlobal = async () => {
     setGerandoHistorico(true);
     try {
-      // 1. Buscar histórico existente para evitar duplicatas
       const historicoExistenteSnapshot = await getDocs(collection(db, 'historico_material'));
       const chavesExistentes = new Set<string>();
-      const idsHistoricoParaRemover: string[] = [];
       const historicosPorMaterial = new Map<string, any[]>();
 
       historicoExistenteSnapshot.docs.forEach(docSnap => {
         const d = docSnap.data();
         const chave = `${d.materialId}_${d.data?.seconds || ''}_${d.tipo || ''}`;
         chavesExistentes.add(chave);
-        // Agrupar por materialId para detectar duplicatas
         if (d.materialId) {
           const lista = historicosPorMaterial.get(d.materialId) || [];
           lista.push({ id: docSnap.id, ...d });
@@ -980,7 +973,6 @@ const CadastroMateriais = () => {
         }
       });
 
-      // 2. Remover registros duplicados no histórico (manter apenas o mais recente de cada tipo)
       let removidos = 0;
       for (const [materialId, registros] of historicosPorMaterial.entries()) {
         const porChave = new Map<string, any[]>();
@@ -992,7 +984,6 @@ const CadastroMateriais = () => {
         });
         for (const [chave, duplicados] of porChave.entries()) {
           if (duplicados.length > 1) {
-            // Manter o primeiro, remover os demais
             for (let i = 1; i < duplicados.length; i++) {
               await deleteDoc(doc(db, 'historico_material', duplicados[i].id));
               removidos++;
@@ -1001,7 +992,6 @@ const CadastroMateriais = () => {
         }
       }
 
-      // 3. Limpar nome do policial de materiais na reserva que ainda têm nome
       const materiaisSnapshot = await getDocs(collection(db, 'materiais_belicos'));
       let limpos = 0;
       for (const matDoc of materiaisSnapshot.docs) {
@@ -1018,7 +1008,6 @@ const CadastroMateriais = () => {
         }
       }
 
-      // 4. Processar transferências e criar histórico faltante
       const transferenciasSnapshot = await getDocs(collection(db, 'materiais_transferidos'));
       let registros = 0;
 
@@ -1031,7 +1020,6 @@ const CadastroMateriais = () => {
           if (chavesExistentes.has(chaveUnica)) continue;
           chavesExistentes.add(chaveUnica);
 
-          // Se devolvido, limpar campos no material
           if (mat.subTipo === 'devolvido' && mat.materialId) {
             try {
               await updateDoc(doc(db, 'materiais_belicos', mat.materialId), {
@@ -1040,9 +1028,7 @@ const CadastroMateriais = () => {
                 cautelado: false,
                 disponivel: true
               });
-            } catch (e) {
-              // Material pode não existir mais
-            }
+            } catch (e) {}
           }
 
           await addDoc(collection(db, 'historico_material'), {
@@ -1073,6 +1059,505 @@ const CadastroMateriais = () => {
     }
   };
 
+  // Render do formulário (usado tanto no Dialog quanto inline)
+  const renderFormContent = () => (
+    <>
+      {!editingMaterial && (
+        <div className="flex items-center gap-3 mb-4 p-3 rounded-lg border bg-muted/30">
+          <Package className="h-4 w-4 text-muted-foreground" />
+          <Label htmlFor="modoLote" className="cursor-pointer font-medium">Cadastro em Lote</Label>
+          <Switch
+            id="modoLote"
+            checked={modoLote}
+            onCheckedChange={(checked) => {
+              setModoLote(checked);
+              if (!checked) {
+                setSeriesLote([]);
+                setSerieAtual('');
+              }
+            }}
+          />
+          {modoLote && (
+            <span className="text-xs text-muted-foreground">
+              Cadastre vários materiais com mesmo dados, apenas mudando o nº de série
+            </span>
+          )}
+        </div>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Categoria primeiro para condicionar os campos */}
+          <div>
+            <Label htmlFor="categoria">Categoria *</Label>
+            <Select value={formData.categoria} onValueChange={(value) => {
+              setFormData(prev => ({ ...prev, categoria: value }));
+              // Limpar modelo selecionado ao trocar de categoria
+              if (value !== 'Armamento') {
+                setModeloSelecionadoId('');
+              }
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {categorias.map(categoria => (
+                  <SelectItem key={categoria} value={categoria}>{categoria}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Seleção de Modelo - obrigatório para Armamento */}
+          {formData.categoria === 'Armamento' && (
+            <div className="md:col-span-2">
+              <Label>Modelo do Armamento *</Label>
+              {modelosArmamento.length === 0 ? (
+                <div className="p-3 rounded-lg border border-dashed border-yellow-500 bg-yellow-500/10 text-sm text-yellow-700 dark:text-yellow-400">
+                  Nenhum modelo cadastrado no acervo. 
+                  <Button type="button" variant="link" className="h-auto p-0 ml-1 text-yellow-700 dark:text-yellow-400 underline" onClick={() => setShowAcervo(true)}>
+                    Cadastre modelos primeiro
+                  </Button>
+                </div>
+              ) : (
+                <Select value={modeloSelecionadoId} onValueChange={handleSelectModelo}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o modelo do acervo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {modelosArmamento.map(m => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.nome} — {m.fabricante} {m.modelo} ({m.calibre}) [{m.tipoArma}]
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
+          {/* Nome - para Armamento fica readonly preenchido pelo modelo */}
+          {formData.categoria !== 'Colete Balístico' && (
+            <div>
+              <Label htmlFor="nome">Nome do Material *</Label>
+              <Input
+                id="nome"
+                value={formData.nome}
+                onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
+                placeholder="Ex: Pistola .40"
+                required
+                disabled={formData.categoria === 'Armamento' && !!modeloSelecionadoId}
+                className={formData.categoria === 'Armamento' && !!modeloSelecionadoId ? 'bg-muted' : ''}
+              />
+            </div>
+          )}
+
+          <div>
+            <Label htmlFor="local">Local *</Label>
+            <Select value={formData.local} onValueChange={(value) => setFormData(prev => ({ ...prev, local: value }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o local" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Fortaleza">Fortaleza</SelectItem>
+                <SelectItem value="Crato">Crato</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {formData.categoria !== 'Colete Balístico' && (
+            <div>
+              <Label htmlFor="calibre">Calibre</Label>
+              <Input
+                id="calibre"
+                value={formData.calibre}
+                onChange={(e) => setFormData(prev => ({ ...prev, calibre: e.target.value }))}
+                placeholder="Ex: .40, 12, 9mm"
+                disabled={formData.categoria === 'Armamento' && !!modeloSelecionadoId}
+                className={formData.categoria === 'Armamento' && !!modeloSelecionadoId ? 'bg-muted' : ''}
+              />
+            </div>
+          )}
+
+          {modoLote && !editingMaterial ? (
+            <div className="md:col-span-2 space-y-3">
+              <Label>Números de Série do Lote *</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={serieAtual}
+                  onChange={(e) => setSerieAtual(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      adicionarSerie();
+                    }
+                  }}
+                  placeholder="Digite o nº de série e pressione Enter (ou cole vários separados por vírgula)"
+                />
+                <Button type="button" variant="outline" onClick={adicionarSerie} className="shrink-0">
+                  <Plus className="h-4 w-4 mr-1" /> Adicionar
+                </Button>
+              </div>
+              {seriesLote.length > 0 && (
+                <>
+                  <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-2 rounded-lg border bg-muted/20">
+                    {seriesLote.map((serie, idx) => (
+                      <Badge key={idx} variant="secondary" className="gap-1 pr-1">
+                        {serie}
+                        <button
+                          type="button"
+                          onClick={() => removerSerie(idx)}
+                          className="ml-1 rounded-full hover:bg-destructive/20 p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Total: {seriesLote.length} materiais serão cadastrados
+                  </p>
+                </>
+              )}
+              {cadastrandoLote && (
+                <div className="space-y-2">
+                  <Progress value={(progressoLote / seriesLote.length) * 100} />
+                  <p className="text-xs text-muted-foreground text-center">
+                    Cadastrando {progressoLote} de {seriesLote.length}...
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <Label htmlFor="numeroSerie">Número de Série</Label>
+              <Input
+                id="numeroSerie"
+                value={formData.numeroSerie}
+                onChange={(e) => setFormData(prev => ({ ...prev, numeroSerie: e.target.value }))}
+                placeholder="Ex: BR001234"
+              />
+            </div>
+          )}
+
+          <div>
+            <Label htmlFor="fabricante">Fabricante</Label>
+            <Input
+              id="fabricante"
+              value={formData.fabricante}
+              onChange={(e) => setFormData(prev => ({ ...prev, fabricante: e.target.value }))}
+              placeholder="Ex: Taurus, CBC"
+              disabled={formData.categoria === 'Armamento' && !!modeloSelecionadoId}
+              className={formData.categoria === 'Armamento' && !!modeloSelecionadoId ? 'bg-muted' : ''}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="modelo">Modelo</Label>
+            <Input
+              id="modelo"
+              value={formData.modelo}
+              onChange={(e) => setFormData(prev => ({ ...prev, modelo: e.target.value }))}
+              placeholder="Ex: PT 100, MD2, MD6"
+              disabled={formData.categoria === 'Armamento' && !!modeloSelecionadoId}
+              className={formData.categoria === 'Armamento' && !!modeloSelecionadoId ? 'bg-muted' : ''}
+            />
+          </div>
+
+          {/* Subcategoria - apenas para munição */}
+          {formData.categoria === 'Munição' && (
+            <div>
+              <Label htmlFor="subcategoria">Subcategoria *</Label>
+              <Select value={formData.subcategoria} onValueChange={(value) => setFormData(prev => ({ ...prev, subcategoria: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a subcategoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Letal">Letal</SelectItem>
+                  <SelectItem value="IMPO">IMPO</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Quantidade - para munição e EPI */}
+          {(formData.categoria === 'Munição' || formData.categoria === 'EPI') && (
+            <div>
+              <Label htmlFor="quantidade">Quantidade *</Label>
+              <Input
+                id="quantidade"
+                type="number"
+                value={formData.quantidade}
+                onChange={(e) => setFormData(prev => ({ ...prev, quantidade: e.target.value }))}
+                placeholder="Ex: 500"
+                min="0"
+              />
+            </div>
+          )}
+
+          {/* Campos específicos para Colete Balístico */}
+          {formData.categoria === 'Colete Balístico' && (
+            <>
+              <div>
+                <Label htmlFor="tamanhoColete">Tamanho do Colete *</Label>
+                <Select value={formData.tamanhoColete} onValueChange={(value) => setFormData(prev => ({ ...prev, tamanhoColete: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tamanho" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="P">P</SelectItem>
+                    <SelectItem value="M">M</SelectItem>
+                    <SelectItem value="G">G</SelectItem>
+                    <SelectItem value="GG">GG</SelectItem>
+                    <SelectItem value="XG">XG</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="sexo">Sexo *</Label>
+                <Select value={formData.sexo} onValueChange={(value) => setFormData(prev => ({ ...prev, sexo: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o sexo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Masculino">Masculino</SelectItem>
+                    <SelectItem value="Feminino">Feminino</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="dataFabricacao">Data de Fabricação *</Label>
+                <Input
+                  id="dataFabricacao"
+                  type="date"
+                  value={formData.dataFabricacao}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dataFabricacao: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="anosValidade">Anos de Validade *</Label>
+                <Input
+                  id="anosValidade"
+                  type="number"
+                  value={formData.anosValidade}
+                  onChange={(e) => setFormData(prev => ({ ...prev, anosValidade: e.target.value }))}
+                  placeholder="Ex: 5"
+                  min="1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="termoEntrega">Termo de Entrega</Label>
+                <Input
+                  id="termoEntrega"
+                  value={formData.termoEntrega}
+                  onChange={(e) => setFormData(prev => ({ ...prev, termoEntrega: e.target.value }))}
+                  placeholder="Ex: Termo 2024/001"
+                />
+              </div>
+              <div>
+                <Label htmlFor="vencimento">Vencimento (calculado automaticamente)</Label>
+                <Input
+                  id="vencimento"
+                  type="date"
+                  value={
+                    formData.dataFabricacao && formData.anosValidade
+                      ? (() => {
+                          const dataFab = new Date(formData.dataFabricacao);
+                          const anosVal = parseInt(formData.anosValidade);
+                          const dataVenc = new Date(dataFab);
+                          dataVenc.setFullYear(dataVenc.getFullYear() + anosVal);
+                          return dataVenc.toISOString().split('T')[0];
+                        })()
+                      : ''
+                  }
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Campos específicos para Armamento */}
+          {formData.categoria === 'Armamento' && (
+            <>
+              <div>
+                <Label htmlFor="tipoArma">Tipo de Arma *</Label>
+                <Select 
+                  value={formData.tipoArma} 
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, tipoArma: value }))}
+                  disabled={!!modeloSelecionadoId}
+                >
+                  <SelectTrigger className={modeloSelecionadoId ? 'bg-muted' : ''}>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Arma Curta">Arma Curta</SelectItem>
+                    <SelectItem value="Arma Longa">Arma Longa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="quantidadeCarregadores">
+                  Quantidade de Carregadores {formData.policialAssociadoId && '*'}
+                  {!formData.policialAssociadoId && ' (Opcional - apenas para cautelas)'}
+                </Label>
+                <Input
+                  id="quantidadeCarregadores"
+                  type="number"
+                  value={formData.quantidadeCarregadores}
+                  onChange={(e) => setFormData(prev => ({ ...prev, quantidadeCarregadores: e.target.value }))}
+                  placeholder="Ex: 3"
+                  min="1"
+                  required={!!formData.policialAssociadoId}
+                />
+              </div>
+              <div>
+                <Label htmlFor="quantidadeMunicoes">
+                  Quantidade de Munições {formData.policialAssociadoId && '*'}
+                  {!formData.policialAssociadoId && ' (Opcional - apenas para cautelas)'}
+                </Label>
+                <Input
+                  id="quantidadeMunicoes"
+                  type="number"
+                  value={formData.quantidadeMunicoes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, quantidadeMunicoes: e.target.value }))}
+                  placeholder="Ex: 50"
+                  min="1"
+                  required={!!formData.policialAssociadoId}
+                />
+              </div>
+              <div>
+                <Label htmlFor="calibreMunicao">Calibre da Munição</Label>
+                <Input
+                  id="calibreMunicao"
+                  value={formData.calibreMunicao}
+                  onChange={(e) => setFormData(prev => ({ ...prev, calibreMunicao: e.target.value }))}
+                  placeholder="Ex: .40, 9mm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="numeroSIARM">Número da Cautela SIARM</Label>
+                <Input
+                  id="numeroSIARM"
+                  value={formData.numeroSIARM}
+                  onChange={(e) => setFormData(prev => ({ ...prev, numeroSIARM: e.target.value }))}
+                  placeholder="Ex: 2024/123"
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Seção de Associação ao Policial */}
+        <div className="border-t pt-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            <h4 className="font-semibold text-foreground">Associar ao Policial (Opcional)</h4>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Se este material será cautelado imediatamente a um policial, selecione abaixo. 
+            Caso contrário, ele ficará na reserva de armamento.
+          </p>
+          
+          <div className="space-y-2">
+            <Label htmlFor="buscaPolicial">Buscar Policial</Label>
+            <Input
+              id="buscaPolicial"
+              placeholder="Buscar por nome, matrícula ou numeral..."
+              value={buscaPolicial}
+              onChange={(e) => setBuscaPolicial(e.target.value)}
+            />
+          </div>
+
+          {buscaPolicial && (
+            <div className="space-y-2">
+              <Label>Selecionar Policial</Label>
+              <Select 
+                value={formData.policialAssociadoId} 
+                onValueChange={(value) => {
+                  const policial = policiais.find(p => p.id === value);
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    policialAssociadoId: value === 'none' ? '' : value,
+                    policialAssociadoNome: policial ? `${policial.patente} ${policial.nome}` : ''
+                  }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o policial" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum (Reserva de Armamento)</SelectItem>
+                  {policiais
+                    .filter(p => {
+                      const busca = buscaPolicial.toLowerCase();
+                      return (
+                        p.nome.toLowerCase().includes(busca) ||
+                        String(p.matricula).toLowerCase().includes(busca) ||
+                        String(p.numeral || '').toLowerCase().includes(busca)
+                      );
+                    })
+                    .map(policial => (
+                      <SelectItem key={policial.id} value={policial.id}>
+                        {policial.patente} {policial.nome} - Mat: {policial.matricula}
+                        {policial.numeral ? ` - ${policial.numeral}` : ''}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {formData.policialAssociadoNome && (
+            <Badge variant="default" className="text-sm">
+              Será cautelado para: {formData.policialAssociadoNome}
+            </Badge>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="observacoes">Observações</Label>
+          <Input
+            id="observacoes"
+            value={formData.observacoes}
+            onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
+            placeholder="Observações adicionais..."
+          />
+        </div>
+
+        <div className="flex items-center space-x-2 p-3 rounded-lg border" style={{
+          borderColor: formData.disponivel ? '#22c55e' : '#ef4444',
+          backgroundColor: formData.disponivel ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+        }}>
+          <Switch
+            id="disponivel"
+            checked={formData.disponivel}
+            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, disponivel: checked }))}
+            className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
+          />
+          <div className="flex flex-col">
+            <Label htmlFor="disponivel" className="cursor-pointer">
+              Material disponível para cautela
+            </Label>
+            <span className="text-xs" style={{ color: formData.disponivel ? '#22c55e' : '#ef4444' }}>
+              {formData.disponivel ? '✅ Disponível' : '❌ Indisponível'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-4">
+          <Button type="submit" className="flex items-center gap-2" disabled={cadastrandoLote}>
+            <Save className="h-4 w-4" />
+            {editingMaterial ? 'Atualizar' : modoLote && seriesLote.length > 0 ? `Cadastrar Lote (${seriesLote.length} itens)` : 'Cadastrar'}
+          </Button>
+          <Button type="button" variant="outline" onClick={resetForm} className="flex items-center gap-2" disabled={cadastrandoLote}>
+            <X className="h-4 w-4" />
+            Cancelar
+          </Button>
+        </div>
+      </form>
+    </>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1099,13 +1584,21 @@ const CadastroMateriais = () => {
           </Button>
           <Button 
             variant="outline" 
+            onClick={() => setShowAcervo(true)} 
+            className="flex items-center gap-2"
+          >
+            <BookOpen className="h-4 w-4" />
+            Acervo de Modelos
+          </Button>
+          <Button 
+            variant="outline" 
             onClick={() => setShowForm(true)} 
             className="flex items-center gap-2"
           >
             <Target className="h-4 w-4" />
             Gerenciar Categorias
           </Button>
-          <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+          <Button onClick={() => { resetForm(); setShowForm(true); }} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Novo Material
           </Button>
@@ -1115,7 +1608,6 @@ const CadastroMateriais = () => {
       {/* Filters */}
       <Card className="bg-card border-border">
         <CardContent className="p-4 space-y-4">
-          {/* Linha 1: Busca, Categoria, Disponibilidade */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1149,7 +1641,6 @@ const CadastroMateriais = () => {
             </Select>
           </div>
 
-          {/* Linha 2: Tipo Arma, Status Cautelado, Modelo, Badges */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Select value={tipoArmaFiltro} onValueChange={setTipoArmaFiltro}>
               <SelectTrigger>
@@ -1196,464 +1687,22 @@ const CadastroMateriais = () => {
         </CardContent>
       </Card>
 
-      {/* Form Modal */}
-      {showForm && (
-        <Card className="bg-primary/10 border-primary">
-          <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
+      {/* Form Dialog (Modal) */}
+      <Dialog open={showForm} onOpenChange={(open) => { if (!open) resetForm(); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
               {editingMaterial ? 'Editar Material' : modoLote ? 'Cadastro em Lote' : 'Novo Material'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!editingMaterial && (
-              <div className="flex items-center gap-3 mb-4 p-3 rounded-lg border bg-muted/30">
-                <Package className="h-4 w-4 text-muted-foreground" />
-                <Label htmlFor="modoLote" className="cursor-pointer font-medium">Cadastro em Lote</Label>
-                <Switch
-                  id="modoLote"
-                  checked={modoLote}
-                  onCheckedChange={(checked) => {
-                    setModoLote(checked);
-                    if (!checked) {
-                      setSeriesLote([]);
-                      setSerieAtual('');
-                    }
-                  }}
-                />
-                {modoLote && (
-                  <span className="text-xs text-muted-foreground">
-                    Cadastre vários materiais com mesmo dados, apenas mudando o nº de série
-                  </span>
-                )}
-              </div>
-            )}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {formData.categoria !== 'Colete Balístico' && (
-                  <div>
-                    <Label htmlFor="nome">Nome do Material *</Label>
-                    <Input
-                      id="nome"
-                      value={formData.nome}
-                      onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
-                      placeholder="Ex: Pistola .40"
-                      required
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <Label htmlFor="categoria">Categoria *</Label>
-                  <Select value={formData.categoria} onValueChange={(value) => setFormData(prev => ({ ...prev, categoria: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categorias.map(categoria => (
-                        <SelectItem key={categoria} value={categoria}>{categoria}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="local">Local *</Label>
-                  <Select value={formData.local} onValueChange={(value) => setFormData(prev => ({ ...prev, local: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o local" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Fortaleza">Fortaleza</SelectItem>
-                      <SelectItem value="Crato">Crato</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {formData.categoria !== 'Colete Balístico' && (
-                  <div>
-                    <Label htmlFor="calibre">Calibre</Label>
-                    <Input
-                      id="calibre"
-                      value={formData.calibre}
-                      onChange={(e) => setFormData(prev => ({ ...prev, calibre: e.target.value }))}
-                      placeholder="Ex: .40, 12, 9mm"
-                    />
-                  </div>
-                )}
-
-                {modoLote && !editingMaterial ? (
-                  <div className="md:col-span-2 space-y-3">
-                    <Label>Números de Série do Lote *</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={serieAtual}
-                        onChange={(e) => setSerieAtual(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            adicionarSerie();
-                          }
-                        }}
-                        placeholder="Digite o nº de série e pressione Enter (ou cole vários separados por vírgula)"
-                      />
-                      <Button type="button" variant="outline" onClick={adicionarSerie} className="shrink-0">
-                        <Plus className="h-4 w-4 mr-1" /> Adicionar
-                      </Button>
-                    </div>
-                    {seriesLote.length > 0 && (
-                      <>
-                        <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-2 rounded-lg border bg-muted/20">
-                          {seriesLote.map((serie, idx) => (
-                            <Badge key={idx} variant="secondary" className="gap-1 pr-1">
-                              {serie}
-                              <button
-                                type="button"
-                                onClick={() => removerSerie(idx)}
-                                className="ml-1 rounded-full hover:bg-destructive/20 p-0.5"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                        <p className="text-sm font-medium text-muted-foreground">
-                          Total: {seriesLote.length} materiais serão cadastrados
-                        </p>
-                      </>
-                    )}
-                    {cadastrandoLote && (
-                      <div className="space-y-2">
-                        <Progress value={(progressoLote / seriesLote.length) * 100} />
-                        <p className="text-xs text-muted-foreground text-center">
-                          Cadastrando {progressoLote} de {seriesLote.length}...
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <Label htmlFor="numeroSerie">Número de Série</Label>
-                    <Input
-                      id="numeroSerie"
-                      value={formData.numeroSerie}
-                      onChange={(e) => setFormData(prev => ({ ...prev, numeroSerie: e.target.value }))}
-                      placeholder="Ex: BR001234"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <Label htmlFor="fabricante">Fabricante</Label>
-                  <Input
-                    id="fabricante"
-                    value={formData.fabricante}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fabricante: e.target.value }))}
-                    placeholder="Ex: Taurus, CBC"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="modelo">Modelo</Label>
-                  <Input
-                    id="modelo"
-                    value={formData.modelo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, modelo: e.target.value }))}
-                    placeholder="Ex: PT 100, MD2, MD6"
-                  />
-                </div>
-
-                {/* Subcategoria - apenas para munição */}
-                {formData.categoria === 'Munição' && (
-                  <div>
-                    <Label htmlFor="subcategoria">Subcategoria *</Label>
-                    <Select value={formData.subcategoria} onValueChange={(value) => setFormData(prev => ({ ...prev, subcategoria: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a subcategoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Letal">Letal</SelectItem>
-                        <SelectItem value="IMPO">IMPO</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {/* Quantidade - para munição e EPI */}
-                {(formData.categoria === 'Munição' || formData.categoria === 'EPI') && (
-                  <div>
-                    <Label htmlFor="quantidade">Quantidade *</Label>
-                    <Input
-                      id="quantidade"
-                      type="number"
-                      value={formData.quantidade}
-                      onChange={(e) => setFormData(prev => ({ ...prev, quantidade: e.target.value }))}
-                      placeholder="Ex: 500"
-                      min="0"
-                    />
-                  </div>
-                )}
-
-                {/* Campos específicos para Colete Balístico */}
-                {formData.categoria === 'Colete Balístico' && (
-                  <>
-                    <div>
-                      <Label htmlFor="tamanhoColete">Tamanho do Colete *</Label>
-                      <Select value={formData.tamanhoColete} onValueChange={(value) => setFormData(prev => ({ ...prev, tamanhoColete: value }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o tamanho" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="P">P</SelectItem>
-                          <SelectItem value="M">M</SelectItem>
-                          <SelectItem value="G">G</SelectItem>
-                          <SelectItem value="GG">GG</SelectItem>
-                          <SelectItem value="XG">XG</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="sexo">Sexo *</Label>
-                      <Select value={formData.sexo} onValueChange={(value) => setFormData(prev => ({ ...prev, sexo: value }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o sexo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Masculino">Masculino</SelectItem>
-                          <SelectItem value="Feminino">Feminino</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="dataFabricacao">Data de Fabricação *</Label>
-                      <Input
-                        id="dataFabricacao"
-                        type="date"
-                        value={formData.dataFabricacao}
-                        onChange={(e) => setFormData(prev => ({ ...prev, dataFabricacao: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="anosValidade">Anos de Validade *</Label>
-                      <Input
-                        id="anosValidade"
-                        type="number"
-                        value={formData.anosValidade}
-                        onChange={(e) => setFormData(prev => ({ ...prev, anosValidade: e.target.value }))}
-                        placeholder="Ex: 5"
-                        min="1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="termoEntrega">Termo de Entrega</Label>
-                      <Input
-                        id="termoEntrega"
-                        value={formData.termoEntrega}
-                        onChange={(e) => setFormData(prev => ({ ...prev, termoEntrega: e.target.value }))}
-                        placeholder="Ex: Termo 2024/001"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="vencimento">Vencimento (calculado automaticamente)</Label>
-                      <Input
-                        id="vencimento"
-                        type="date"
-                        value={
-                          formData.dataFabricacao && formData.anosValidade
-                            ? (() => {
-                                const dataFab = new Date(formData.dataFabricacao);
-                                const anosVal = parseInt(formData.anosValidade);
-                                const dataVenc = new Date(dataFab);
-                                dataVenc.setFullYear(dataVenc.getFullYear() + anosVal);
-                                return dataVenc.toISOString().split('T')[0];
-                              })()
-                            : ''
-                        }
-                        disabled
-                        className="bg-muted"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* Campos específicos para Armamento */}
-                {formData.categoria === 'Armamento' && (
-                  <>
-                    <div>
-                      <Label htmlFor="tipoArma">Tipo de Arma *</Label>
-                      <Select value={formData.tipoArma} onValueChange={(value) => setFormData(prev => ({ ...prev, tipoArma: value }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Arma Curta">Arma Curta</SelectItem>
-                          <SelectItem value="Arma Longa">Arma Longa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="quantidadeCarregadores">
-                        Quantidade de Carregadores {formData.policialAssociadoId && '*'}
-                        {!formData.policialAssociadoId && ' (Opcional - apenas para cautelas)'}
-                      </Label>
-                      <Input
-                        id="quantidadeCarregadores"
-                        type="number"
-                        value={formData.quantidadeCarregadores}
-                        onChange={(e) => setFormData(prev => ({ ...prev, quantidadeCarregadores: e.target.value }))}
-                        placeholder="Ex: 3"
-                        min="1"
-                        required={!!formData.policialAssociadoId}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="quantidadeMunicoes">
-                        Quantidade de Munições {formData.policialAssociadoId && '*'}
-                        {!formData.policialAssociadoId && ' (Opcional - apenas para cautelas)'}
-                      </Label>
-                      <Input
-                        id="quantidadeMunicoes"
-                        type="number"
-                        value={formData.quantidadeMunicoes}
-                        onChange={(e) => setFormData(prev => ({ ...prev, quantidadeMunicoes: e.target.value }))}
-                        placeholder="Ex: 50"
-                        min="1"
-                        required={!!formData.policialAssociadoId}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="calibreMunicao">Calibre da Munição</Label>
-                      <Input
-                        id="calibreMunicao"
-                        value={formData.calibreMunicao}
-                        onChange={(e) => setFormData(prev => ({ ...prev, calibreMunicao: e.target.value }))}
-                        placeholder="Ex: .40, 9mm"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="numeroSIARM">Número da Cautela SIARM</Label>
-                      <Input
-                        id="numeroSIARM"
-                        value={formData.numeroSIARM}
-                        onChange={(e) => setFormData(prev => ({ ...prev, numeroSIARM: e.target.value }))}
-                        placeholder="Ex: 2024/123"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Seção de Associação ao Policial */}
-              <div className="border-t pt-4 space-y-4">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <h4 className="font-semibold text-foreground">Associar ao Policial (Opcional)</h4>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Se este material será cautelado imediatamente a um policial, selecione abaixo. 
-                  Caso contrário, ele ficará na reserva de armamento.
-                </p>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="buscaPolicial">Buscar Policial</Label>
-                  <Input
-                    id="buscaPolicial"
-                    placeholder="Buscar por nome, matrícula ou numeral..."
-                    value={buscaPolicial}
-                    onChange={(e) => setBuscaPolicial(e.target.value)}
-                  />
-                </div>
-
-                {buscaPolicial && (
-                  <div className="space-y-2">
-                    <Label>Selecionar Policial</Label>
-                    <Select 
-                      value={formData.policialAssociadoId} 
-                      onValueChange={(value) => {
-                        const policial = policiais.find(p => p.id === value);
-                        setFormData(prev => ({ 
-                          ...prev, 
-                          policialAssociadoId: value === 'none' ? '' : value,
-                          policialAssociadoNome: policial ? `${policial.patente} ${policial.nome}` : ''
-                        }));
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o policial" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum (Reserva de Armamento)</SelectItem>
-                        {policiais
-                          .filter(p => {
-                            const busca = buscaPolicial.toLowerCase();
-                            return (
-                              p.nome.toLowerCase().includes(busca) ||
-                              String(p.matricula).toLowerCase().includes(busca) ||
-                              String(p.numeral || '').toLowerCase().includes(busca)
-                            );
-                          })
-                          .map(policial => (
-                            <SelectItem key={policial.id} value={policial.id}>
-                              {policial.patente} {policial.nome} - Mat: {policial.matricula}
-                              {policial.numeral ? ` - ${policial.numeral}` : ''}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {formData.policialAssociadoNome && (
-                  <Badge variant="default" className="text-sm">
-                    Será cautelado para: {formData.policialAssociadoNome}
-                  </Badge>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="observacoes">Observações</Label>
-                <Input
-                  id="observacoes"
-                  value={formData.observacoes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
-                  placeholder="Observações adicionais..."
-                />
-              </div>
-
-              <div className="flex items-center space-x-2 p-3 rounded-lg border" style={{
-                borderColor: formData.disponivel ? '#22c55e' : '#ef4444',
-                backgroundColor: formData.disponivel ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'
-              }}>
-                <Switch
-                  id="disponivel"
-                  checked={formData.disponivel}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, disponivel: checked }))}
-                  className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-600"
-                />
-                <div className="flex flex-col">
-                  <Label htmlFor="disponivel" className="cursor-pointer">
-                    Material disponível para cautela
-                  </Label>
-                  <span className="text-xs" style={{ color: formData.disponivel ? '#22c55e' : '#ef4444' }}>
-                    {formData.disponivel ? '✅ Disponível' : '❌ Indisponível'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex items-center gap-2" disabled={cadastrandoLote}>
-                  <Save className="h-4 w-4" />
-                  {editingMaterial ? 'Atualizar' : modoLote && seriesLote.length > 0 ? `Cadastrar Lote (${seriesLote.length} itens)` : 'Cadastrar'}
-                </Button>
-                <Button type="button" variant="outline" onClick={resetForm} className="flex items-center gap-2" disabled={cadastrandoLote}>
-                  <X className="h-4 w-4" />
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="flex-1 min-h-0 pr-2">
+            <div className="p-1">
+              {renderFormContent()}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Materials Table */}
       <Card className="bg-card border-border">
@@ -1766,6 +1815,13 @@ const CadastroMateriais = () => {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* Acervo de Modelos */}
+      <AcervoModelos 
+        open={showAcervo} 
+        onOpenChange={setShowAcervo} 
+        onModelosChange={carregarModelosArmamento}
+      />
     </div>
   );
 };
