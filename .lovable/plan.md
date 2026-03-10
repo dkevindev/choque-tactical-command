@@ -1,35 +1,51 @@
 
 
-# Bug: Aluna de Horário Especial não aparece na lista da Turma 3 (terça-feira)
+# Ajustes ao Plano: Acervo de Modelos para Materiais Bélicos
 
-## Causa raiz
+## Alterações solicitadas
 
-No arquivo `IniciarAulaWizard.tsx`, há uma contradição na lógica de filtragem:
+### 1. Sem cadastro manual para Armamento
+Quando a categoria for "Armamento", o único caminho será selecionar um modelo do acervo. Se o modelo não existir, o usuário primeiro cadastra no acervo e depois volta ao cadastro do material. Isso garante 100% de padronização.
 
-1. **Linha 187-188**: Alunos com `horarioEspecial: true` são **removidos** da lista normal da turma
-2. **Linha 218**: Alunos especiais que já estão no array `alunos` da turma são **removidos** da lista de especiais
+### 2. Edição de material em Modal
+Hoje o formulário de edição abre inline no topo da página (Card na linha 1200). Ao clicar "Editar" num material lá embaixo, o usuário precisa rolar toda a tela. A correção é: ao editar, abrir o formulário dentro de um `Dialog` (modal) ao invés de inline.
 
-Se a aluna está cadastrada como membro da Turma 3 (seu ID está no array `alunos` da turma) E tem `horarioEspecial: true`, ela é excluída dos dois lados:
-- Excluída da lista normal (porque tem horário especial)
-- Excluída da lista especial (porque seu ID já está no array `alunosIds` da turma)
+## Plano técnico completo
 
-Resultado: a aluna desaparece completamente.
-
-## Correção
-
-**Arquivo**: `src/components/projetos-sociais/instrutor/IniciarAulaWizard.tsx`
-
-Remover o filtro da linha 218 que exclui alunos especiais que já estão na lista da turma. A exclusão da lista normal (linha 187-188) já garante que não haverá duplicatas, pois alunos com `horarioEspecial` nunca entram em `alunosTurma`.
-
+### A. Coleção Firestore `modelos_armamento`
 ```text
-Antes (linha 217-218):
-  // Excluir se já está na lista da turma
-  .filter((aluno: any) => !alunosIds.includes(aluno.id));
-
-Depois:
-  // Removido filtro que excluía alunos especiais já cadastrados na turma
-  // pois eles já foram excluídos da lista normal (linha 187-188)
+{
+  nome: "Pistola P320",
+  fabricante: "SIG SAUER",
+  modelo: "P320",
+  calibre: ".40",
+  tipoArma: "Arma Curta",
+  categoria: "Armamento",
+  createdAt: Date
+}
 ```
 
-Isso é uma correção de uma única linha — remover o `.filter` da linha 218.
+### B. Novo componente `src/components/admin-belico/AcervoModelos.tsx`
+- CRUD completo de modelos (Dialog para criar/editar)
+- Tabela com nome, fabricante, modelo, calibre, tipo de arma
+- Botões editar/excluir
+- Acessível via botão "Acervo de Modelos" no header de CadastroMateriais
+
+### C. Alterar `src/components/admin-belico/CadastroMateriais.tsx`
+
+**Formulário em Modal para edição:**
+- Substituir o Card inline (linha 1200) por um `Dialog` que abre tanto para novo material quanto para edição
+- Isso resolve o problema de scroll ao editar materiais do final da lista
+
+**Seleção de modelo obrigatória para Armamento:**
+- Carregar modelos de `modelos_armamento` no useEffect
+- Quando `categoria === 'Armamento'`: mostrar Select "Selecionar Modelo" com os modelos cadastrados
+- Ao selecionar modelo: preencher automaticamente nome, fabricante, modelo, calibre, tipoArma
+- Esses campos ficam desabilitados (readonly) -- sem opção de digitação manual
+- Se não há modelos cadastrados, exibir mensagem orientando a cadastrar primeiro no Acervo
+- Campos restantes (nº série, nº SIARM, carregadores, munições) continuam editáveis
+- Cadastro em lote funciona igual: seleciona modelo + cola séries
+
+**Botão no header:**
+- Adicionar botão "Acervo de Modelos" ao lado de "Novo Material"
 
