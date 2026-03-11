@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Search, User, Clock, Package, BookOpen, Target, Plus, Minus, 
   CheckCircle, AlertCircle, Lock, Shield, Crosshair, MapPin, 
-  History, RotateCcw, Monitor 
+  History, RotateCcw, Monitor, AlertTriangle 
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { 
   collection, query, where, onSnapshot, addDoc, updateDoc, 
