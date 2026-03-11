@@ -1127,6 +1127,39 @@ const ArmeiroInterface = () => {
     return matchCategoria && (searchMaterial === '' || matchSearch);
   });
 
+  const handleRelatarProblema = async () => {
+    if (!problemaMaterialNome.trim() || !problemaDescricao.trim()) {
+      toast({ title: "Preencha o material e a descrição do problema", variant: "destructive" });
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'problemas_material'), {
+        materialId: problemaMaterialId,
+        materialNome: problemaMaterialNome,
+        materialNumeroSerie: problemaMaterialSerie,
+        problema: problemaDescricao,
+        relatadoPor: policialLogado?.['NOME DE GUERRA1'] || policialLogado?.NOME || 'Armeiro',
+        dataRelato: new Date(),
+        status: 'aguardando',
+      });
+      toast({ title: "Problema relatado com sucesso!" });
+      setModalProblema(false);
+      setProblemaMaterialNome('');
+      setProblemaMaterialSerie('');
+      setProblemaMaterialId('');
+      setProblemaDescricao('');
+      setSearchMaterialProblema('');
+    } catch (error) {
+      toast({ title: "Erro ao relatar problema", variant: "destructive" });
+    }
+  };
+
+  const materiaisParaProblema = materiaisDisponiveis.filter(m => {
+    if (!searchMaterialProblema) return true;
+    const s = searchMaterialProblema.toLowerCase();
+    return m.nome.toLowerCase().includes(s) || (m.numeroSerie || '').toLowerCase().includes(s);
+  }).slice(0, 10);
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Controle do Livro Diário */}
