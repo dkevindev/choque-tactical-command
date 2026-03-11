@@ -1689,18 +1689,18 @@ const CadastroMateriais = () => {
 
       {/* Form Dialog (Modal) */}
       <Dialog open={showForm} onOpenChange={(open) => { if (!open) resetForm(); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
               {editingMaterial ? 'Editar Material' : modoLote ? 'Cadastro em Lote' : 'Novo Material'}
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="flex-1 min-h-0 pr-2">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2 max-h-[calc(90vh-100px)]">
             <div className="p-1">
               {renderFormContent()}
             </div>
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
 

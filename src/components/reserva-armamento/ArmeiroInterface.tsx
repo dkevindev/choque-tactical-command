@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Search, User, Clock, Package, BookOpen, Target, Plus, Minus, 
   CheckCircle, AlertCircle, Lock, Shield, Crosshair, MapPin, 
-  History, RotateCcw, Monitor 
+  History, RotateCcw, Monitor, AlertTriangle 
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { 
   collection, query, where, onSnapshot, addDoc, updateDoc, 
@@ -161,6 +163,14 @@ const ArmeiroInterface = () => {
   const [modalTransferencia, setModalTransferencia] = useState(false);
   const [transferenciaCautela, setTransferenciaCautela] = useState<any>(null);
   const [transferenciaPolicialOrigem, setTransferenciaPolicialOrigem] = useState<any>(null);
+  
+  // Modal de relatar problema
+  const [modalProblema, setModalProblema] = useState(false);
+  const [problemaMaterialNome, setProblemaMaterialNome] = useState('');
+  const [problemaMaterialSerie, setProblemaMaterialSerie] = useState('');
+  const [problemaMaterialId, setProblemaMaterialId] = useState('');
+  const [problemaDescricao, setProblemaDescricao] = useState('');
+  const [searchMaterialProblema, setSearchMaterialProblema] = useState('');
   
   const { toast } = useToast();
 
@@ -1117,6 +1127,39 @@ const ArmeiroInterface = () => {
     return matchCategoria && (searchMaterial === '' || matchSearch);
   });
 
+  const handleRelatarProblema = async () => {
+    if (!problemaMaterialNome.trim() || !problemaDescricao.trim()) {
+      toast({ title: "Preencha o material e a descrição do problema", variant: "destructive" });
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'problemas_material'), {
+        materialId: problemaMaterialId,
+        materialNome: problemaMaterialNome,
+        materialNumeroSerie: problemaMaterialSerie,
+        problema: problemaDescricao,
+        relatadoPor: policialLogado?.['NOME DE GUERRA1'] || policialLogado?.NOME || 'Armeiro',
+        dataRelato: new Date(),
+        status: 'aguardando',
+      });
+      toast({ title: "Problema relatado com sucesso!" });
+      setModalProblema(false);
+      setProblemaMaterialNome('');
+      setProblemaMaterialSerie('');
+      setProblemaMaterialId('');
+      setProblemaDescricao('');
+      setSearchMaterialProblema('');
+    } catch (error) {
+      toast({ title: "Erro ao relatar problema", variant: "destructive" });
+    }
+  };
+
+  const materiaisParaProblema = materiaisDisponiveis.filter(m => {
+    if (!searchMaterialProblema) return true;
+    const s = searchMaterialProblema.toLowerCase();
+    return m.nome.toLowerCase().includes(s) || (m.numeroSerie || '').toLowerCase().includes(s);
+  }).slice(0, 10);
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Controle do Livro Diário */}
@@ -1170,6 +1213,15 @@ const ArmeiroInterface = () => {
                 >
                   <Monitor className="h-4 w-4" />
                   Abrir Totem
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => setModalProblema(true)}
+                  className="gap-2"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Relatar Problema
                 </Button>
               </>
             )}
@@ -1610,6 +1662,66 @@ const ArmeiroInterface = () => {
           }}
         />
       )}
+
+      {/* Modal Relatar Problema */}
+      <Dialog open={modalProblema} onOpenChange={setModalProblema}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Relatar Problema de Material
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Buscar Material:</label>
+              <Input
+                placeholder="Nome ou nº série..."
+                value={searchMaterialProblema}
+                onChange={(e) => setSearchMaterialProblema(e.target.value)}
+                className="mt-1"
+              />
+              {searchMaterialProblema && (
+                <div className="mt-2 max-h-40 overflow-y-auto space-y-1 border rounded-md p-2">
+                  {materiaisParaProblema.map((m) => (
+                    <button
+                      key={m.id}
+                      className="w-full text-left p-2 text-sm hover:bg-muted rounded-md"
+                      onClick={() => {
+                        setProblemaMaterialId(m.id);
+                        setProblemaMaterialNome(m.nome);
+                        setProblemaMaterialSerie(m.numeroSerie || '');
+                        setSearchMaterialProblema('');
+                      }}
+                    >
+                      {m.nome} {m.numeroSerie ? `- ${m.numeroSerie}` : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {problemaMaterialNome && (
+              <div className="p-2 bg-muted rounded-md text-sm">
+                <strong>Selecionado:</strong> {problemaMaterialNome} {problemaMaterialSerie ? `(${problemaMaterialSerie})` : ''}
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium">Descrição do problema:</label>
+              <Textarea
+                value={problemaDescricao}
+                onChange={(e) => setProblemaDescricao(e.target.value)}
+                placeholder="Descreva o problema encontrado..."
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalProblema(false)}>Cancelar</Button>
+            <Button onClick={handleRelatarProblema}>Relatar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
