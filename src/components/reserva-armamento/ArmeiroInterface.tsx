@@ -162,6 +162,14 @@ const ArmeiroInterface = () => {
   const [transferenciaCautela, setTransferenciaCautela] = useState<any>(null);
   const [transferenciaPolicialOrigem, setTransferenciaPolicialOrigem] = useState<any>(null);
   
+  // Modal de relatar problema
+  const [modalProblema, setModalProblema] = useState(false);
+  const [problemaMaterialNome, setProblemaMaterialNome] = useState('');
+  const [problemaMaterialSerie, setProblemaMaterialSerie] = useState('');
+  const [problemaMaterialId, setProblemaMaterialId] = useState('');
+  const [problemaDescricao, setProblemaDescricao] = useState('');
+  const [searchMaterialProblema, setSearchMaterialProblema] = useState('');
+  
   const { toast } = useToast();
 
   // Carregar movimentações do dia do Firebase
