@@ -1662,6 +1662,66 @@ const ArmeiroInterface = () => {
           }}
         />
       )}
+
+      {/* Modal Relatar Problema */}
+      <Dialog open={modalProblema} onOpenChange={setModalProblema}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Relatar Problema de Material
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Buscar Material:</label>
+              <Input
+                placeholder="Nome ou nº série..."
+                value={searchMaterialProblema}
+                onChange={(e) => setSearchMaterialProblema(e.target.value)}
+                className="mt-1"
+              />
+              {searchMaterialProblema && (
+                <div className="mt-2 max-h-40 overflow-y-auto space-y-1 border rounded-md p-2">
+                  {materiaisParaProblema.map((m) => (
+                    <button
+                      key={m.id}
+                      className="w-full text-left p-2 text-sm hover:bg-muted rounded-md"
+                      onClick={() => {
+                        setProblemaMaterialId(m.id);
+                        setProblemaMaterialNome(m.nome);
+                        setProblemaMaterialSerie(m.numeroSerie || '');
+                        setSearchMaterialProblema('');
+                      }}
+                    >
+                      {m.nome} {m.numeroSerie ? `- ${m.numeroSerie}` : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {problemaMaterialNome && (
+              <div className="p-2 bg-muted rounded-md text-sm">
+                <strong>Selecionado:</strong> {problemaMaterialNome} {problemaMaterialSerie ? `(${problemaMaterialSerie})` : ''}
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium">Descrição do problema:</label>
+              <Textarea
+                value={problemaDescricao}
+                onChange={(e) => setProblemaDescricao(e.target.value)}
+                placeholder="Descreva o problema encontrado..."
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalProblema(false)}>Cancelar</Button>
+            <Button onClick={handleRelatarProblema}>Relatar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
