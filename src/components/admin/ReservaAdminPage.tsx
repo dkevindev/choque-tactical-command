@@ -1,7 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Target, History } from "lucide-react";
+import { Target, History, AlertTriangle } from "lucide-react";
 import MaterialNaRuaSection from "@/components/reserva-armamento/MaterialNaRuaSection";
 import HistoricoLivrosSection from "@/components/reserva-armamento/HistoricoLivrosSection";
+import ProblemasMaterialSection from "@/components/reserva-armamento/ProblemasMaterialSection";
 
 const ReservaAdminPage = () => {
   return (
@@ -14,7 +15,7 @@ const ReservaAdminPage = () => {
       </div>
 
       <Tabs defaultValue="na-rua" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-3 max-w-lg">
           <TabsTrigger value="na-rua" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
             Material na Rua
@@ -22,6 +23,10 @@ const ReservaAdminPage = () => {
           <TabsTrigger value="historico" className="flex items-center gap-2">
             <History className="h-4 w-4" />
             Histórico de Livros
+          </TabsTrigger>
+          <TabsTrigger value="problemas" className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Problemas
           </TabsTrigger>
         </TabsList>
 
@@ -31,6 +36,10 @@ const ReservaAdminPage = () => {
 
         <TabsContent value="historico" className="mt-6">
           <HistoricoLivrosSection />
+        </TabsContent>
+
+        <TabsContent value="problemas" className="mt-6">
+          <ProblemasMaterialSection />
         </TabsContent>
       </Tabs>
     </div>
