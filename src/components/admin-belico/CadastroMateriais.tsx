@@ -26,8 +26,14 @@ import {
   ArrowRightCircle,
   XCircle,
   Package,
-  BookOpen
+  BookOpen,
+  Download,
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
