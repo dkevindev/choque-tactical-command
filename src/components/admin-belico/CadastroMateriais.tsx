@@ -26,8 +26,14 @@ import {
   ArrowRightCircle,
   XCircle,
   Package,
-  BookOpen
+  BookOpen,
+  Download,
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
@@ -1558,17 +1564,134 @@ const CadastroMateriais = () => {
     </>
   );
 
+  const exportarCargaExcel = () => {
+    const header = ['Categoria', 'Nome', 'Nº Série', 'Calibre', 'Fabricante', 'Modelo', 'Tipo Arma', 'Nº SIARM', 'Cautelado Para', 'Local', 'Situação'];
+    const rows = materiais.map(m => [
+      m.categoria || '',
+      m.nome || '',
+      m.numeroSerie || '',
+      m.calibre || '',
+      m.fabricante || '',
+      m.modelo || '',
+      m.tipoArma || '',
+      (m as any).numeroSIARM || '',
+      m.policialAssociadoNome ? resolverNome(m.policialAssociadoId, '', m.policialAssociadoNome) : 'Reserva',
+      m.local || '',
+      m.disponivel ? 'Disponível' : 'Cautelado'
+    ]);
+    const bom = '\uFEFF';
+    const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `carga-belica-cavalaria-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Carga exportada em Excel/CSV');
+  };
+
+  const exportarCargaPDF = () => {
+    const pdf = new jsPDF({ orientation: 'landscape' });
+    pdf.setFontSize(14);
+    pdf.text('CARGA DE MATERIAIS BÉLICOS — CAVALARIA / CPCHOQUE', 14, 15);
+    pdf.setFontSize(9);
+    pdf.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 22);
+
+    const categoriasAgrupadas = materiais.reduce((acc, m) => {
+      const cat = m.categoria || 'Sem Categoria';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(m);
+      return acc;
+    }, {} as Record<string, Material[]>);
+
+    let startY = 28;
+
+    Object.entries(categoriasAgrupadas).sort(([a], [b]) => a.localeCompare(b)).forEach(([cat, itens]) => {
+      if (startY > 180) {
+        pdf.addPage();
+        startY = 15;
+      }
+
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${cat} (${itens.length} itens)`, 14, startY);
+      startY += 2;
+
+      const head = [['Nome', 'Nº Série', 'Calibre', 'Fabricante', 'Modelo', 'Tipo', 'Nº SIARM', 'Cautelado Para', 'Local']];
+      const body = itens.map(m => [
+        m.nome || '',
+        m.numeroSerie || '',
+        m.calibre || '',
+        m.fabricante || '',
+        m.modelo || '',
+        m.tipoArma || '',
+        (m as any).numeroSIARM || '',
+        m.policialAssociadoNome ? resolverNome(m.policialAssociadoId, '', m.policialAssociadoNome) : 'Reserva',
+        m.local || ''
+      ]);
+
+      autoTable(pdf, {
+        startY,
+        head,
+        body,
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [41, 65, 94], fontSize: 7 },
+        margin: { left: 14, right: 14 },
+        didDrawPage: (data: any) => { startY = data.cursor?.y || 15; }
+      });
+
+      startY = (pdf as any).lastAutoTable?.finalY + 8 || startY + 10;
+    });
+
+    // Summary
+    if (startY > 170) { pdf.addPage(); startY = 15; }
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('RESUMO DA CARGA', 14, startY);
+    startY += 5;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.text(`Total de itens na carga: ${materiais.length}`, 14, startY);
+    startY += 5;
+    Object.entries(categoriasAgrupadas).sort(([a], [b]) => a.localeCompare(b)).forEach(([cat, itens]) => {
+      pdf.text(`• ${cat}: ${itens.length} itens`, 20, startY);
+      startY += 4;
+    });
+
+    pdf.save(`carga-belica-cavalaria-${new Date().toISOString().slice(0,10)}.pdf`);
+    toast.success('Carga exportada em PDF');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-2">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Cadastro de Materiais Bélicos</h3>
           <p className="text-sm text-muted-foreground">
             Cadastre armamentos, munições e equipamentos para cautelas permanentes
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                Exportar Carga
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportarCargaPDF} className="flex items-center gap-2 cursor-pointer">
+                <FileText className="h-4 w-4" />
+                Exportar PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportarCargaExcel} className="flex items-center gap-2 cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4" />
+                Exportar Excel (CSV)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button 
             variant="outline" 
             onClick={gerarHistoricoGlobal}
