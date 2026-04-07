@@ -46,6 +46,8 @@ interface Policial {
     gestaoLogistica?: boolean;
     gestaoPessoas?: boolean;
     cavbot?: boolean;
+    gestaoComandantes?: boolean;
+    [key: string]: boolean | undefined;
   };
 }
 
@@ -213,6 +215,9 @@ const LoginSistema = ({ sistema, onClose }: LoginSistemaProps) => {
     
     // Gestão de pessoas
     if (sistemaKey === 'gestaoPessoas') return policial.acessos?.gestaoPessoas || false;
+    
+    // Gestão comandantes
+    if (sistemaKey === 'gestaoComandantes') return policial.acessos?.gestaoComandantes || false;
     
     // Outros sistemas - verificar se acessos existe
     return policial.acessos?.[sistemaKey as keyof typeof policial.acessos] || false;

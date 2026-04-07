@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, MessageSquare, Truck, Target, Users, FileText, Bot, GraduationCap, UserCog } from 'lucide-react';
+import { Shield, MessageSquare, Truck, Target, Users, FileText, Bot, GraduationCap, UserCog, Crown } from 'lucide-react';
 import logoRegimento from '@/assets/logo-regimento.jpg';
 import LoginSistema from '@/components/LoginSistema';
 
@@ -89,6 +89,16 @@ const Home = () => {
       route: '/projetos-sociais/gestor',
       acessoKey: 'projetosSociais',
       cor: 'bg-teal-500',
+      requiresLogin: true
+    },
+    {
+      id: 'gestao-comandantes',
+      title: 'GESTÃO - COMANDANTES',
+      description: 'Painel de inteligência operacional',
+      icon: Crown,
+      route: '/gestao-comandantes',
+      acessoKey: 'gestaoComandantes',
+      cor: 'bg-indigo-600',
       requiresLogin: true
     }
   ];

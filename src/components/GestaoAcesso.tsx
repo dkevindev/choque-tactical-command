@@ -89,6 +89,13 @@ const GestaoAcesso = () => {
       descricao: 'Sistema de gerenciamento de recursos humanos',
       icon: Users,
       cor: 'bg-orange-500'
+    },
+    {
+      id: 'gestaoComandantes',
+      nome: 'GESTÃO - COMANDANTES',
+      descricao: 'Painel de inteligência operacional',
+      icon: Users,
+      cor: 'bg-indigo-600'
     }
   ];
 
