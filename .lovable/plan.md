@@ -1,93 +1,65 @@
 
+
 # Sistema GESTÃO - COMANDANTES
 
 ## Resumo
-Novo sistema na tela Home com login e controle de acesso (chave `gestaoComandantes`), apresentando um dashboard visual estilo Power BI (paleta diferente, mais cores e cards visuais) com dados somente-leitura do efetivo, armamentos e projetos sociais. Todas as seções exportam em PDF e Excel.
+Novo sistema na tela Home com login e controle de acesso (chave `gestaoComandantes`), apresentando um dashboard visual estilo Power BI (paleta diferente, cores vibrantes, cards grandes) com dados somente-leitura do efetivo, armamentos e projetos sociais. Todas as seções exportam em PDF e Excel.
 
-## Acesso
+## Acesso e Autenticação
 
-### Home (`src/pages/Home.tsx`)
-- Adicionar novo card "GESTÃO - COMANDANTES" com ícone `Crown` e cor distinta (ex: `bg-indigo-600`)
-- `acessoKey: 'gestaoComandantes'`
+- Novo card na Home: "GESTÃO - COMANDANTES" com ícone `Crown`, cor `bg-indigo-600`
+- `acessoKey: 'gestaoComandantes'` — mesmo padrão de login/acesso dos demais sistemas
+- Toggle de liberação na tela de Gestão de Acessos (dentro de Gestão e Logística)
+- Nova rota `/gestao-comandantes`
 
-### Login (`src/components/LoginSistema.tsx`)
-- Adicionar case `gestaoComandantes` no `verificarAcessoSistema`
+## Dashboard Principal
 
-### Gestão de Acessos (`src/components/GestaoAcesso.tsx`)
-- Adicionar sistema `gestaoComandantes` na lista de sistemas com toggle
+Componente `ComandanteDashboard.tsx` com navegação lateral/tabs entre 8 seções. Estilo visual diferenciado — paleta indigo/violet/slate com gradientes, cards com números grandes e ícones, badges coloridos. Visual parecido com Power BI, não com o padrão tático.
 
-### Rota (`src/App.tsx`)
-- Nova rota `/gestao-comandantes` → componente `ComandanteDashboard`
+## Seções
 
-## Componente Principal
-
-### `src/components/comandante/ComandanteDashboard.tsx`
-Dashboard com sidebar/tabs para navegar entre seções. Paleta visual diferenciada: fundo escuro com cards coloridos, gradientes, badges grandes — estilo BI.
-
-### Seções (cada uma como componente separado em `src/components/comandante/`):
-
-#### 1. `EfetivoSection.tsx` — Efetivo
+### 1. Efetivo
 - Cards grandes: Total Regimento, 1º ESQD, 2º ESQD, 3º PEL
-- Dados de `policiais` no Firestore
 - Filtros por unidade, posto/graduação, situação
 - Tabela consultável com busca
-- Exportar PDF e Excel
 
-#### 2. `FeriasSection.tsx` — Férias
+### 2. Férias
 - Cards: total em férias, por unidade
-- Tabela de policiais em férias com datas início/fim
-- Filtros por unidade
-- Exportar PDF e Excel
+- Tabela com datas início/fim
 
-#### 3. `TransferidosSection.tsx` — Transferidos
+### 3. Transferidos
 - Dados de `policiais_transferidos`
 - Tabela com destino, data, publicação
-- Exportar PDF e Excel
 
-#### 4. `AtestadosSection.tsx` — Atestados
-- Cards: total atestados ativos, ranking
+### 4. Atestados
+- Cards: total ativos, ranking
 - Filtros: dia, semana, mês, unidade
-- Ranking de policiais por quantidade de atestados
+- Ranking por quantidade de atestados
 - Tabela com CID, dias, datas
-- Exportar PDF e Excel
 
-#### 5. `EstatisticasSection.tsx` — Estatísticas Gerais
-- Cards visuais: disponíveis, indisponíveis, por situação
-- Resumo por posto/graduação (badges coloridos)
-- Resumo por função
-- Exportar PDF e Excel
+### 5. Estatísticas Gerais
+- Disponíveis vs indisponíveis
+- Resumo por posto/graduação e função (badges coloridos)
 
-#### 6. `ArmamentosSection.tsx` — Armamentos
-- Dados de `materiais_belicos`
-- Cards: total armas curtas, longas, coletes
+### 6. Armamentos
+- Cards: armas curtas, longas, coletes
 - Divisão: na reserva vs cauteladas
-- Por modelo (usando `modelos_armamento`)
-- Exportar PDF e Excel
+- Agrupado por modelo
 
-#### 7. `MaterialNaRuaSection.tsx` — Material na Rua
-- Dados do livro de cautela ativo
-- Tabela de materiais cautelados no momento
-- Exportar PDF e Excel
+### 7. Material na Rua
+- Materiais cautelados no momento (livro ativo)
 
-#### 8. `ProjetosSociaisSection.tsx` — Projetos Sociais (condicional)
-- Verifica se o policial logado é instrutor em algum projeto
-- Se sim: mostra horas do mês atual, frequência de alunos, aulas do dia com turno e quantidade
-- Dados de `aulas` e `projetos`
-- Exportar PDF e Excel
+### 8. Projetos Sociais (condicional)
+- Se for instrutor: horas no mês, frequência de alunos, aulas do dia/turno/quantidade
 
-## Exportação
-- **Excel**: CSV com BOM UTF-8 separado por `;` (padrão do sistema)
-- **PDF**: jsPDF + autoTable, paisagem, com cabeçalho "RPMONT - Relatório [Seção]"
-- Cada seção terá botões "Exportar PDF" e "Exportar Excel" no header
+## Exportação em todas as seções
+- **Excel**: CSV com BOM UTF-8 separado por `;`
+- **PDF**: jsPDF + autoTable, paisagem, cabeçalho "RPMONT"
+- Botões "Exportar PDF" e "Exportar Excel" em cada seção
 
-## Estilo Visual
-- Paleta: indigo, violet, slate, com gradientes nos cards
-- Cards com números grandes e ícones
-- Badges coloridos para status
-- Layout responsivo com grid
-- Diferente do padrão tático do resto do sistema — mais colorido e visual
+## Arquivos
 
-## Arquivos a criar
+**Criar (9 componentes):**
 - `src/components/comandante/ComandanteDashboard.tsx`
 - `src/components/comandante/EfetivoSection.tsx`
 - `src/components/comandante/FeriasSection.tsx`
@@ -98,8 +70,9 @@ Dashboard com sidebar/tabs para navegar entre seções. Paleta visual diferencia
 - `src/components/comandante/MaterialNaRuaSection.tsx`
 - `src/components/comandante/ProjetosSociaisSection.tsx`
 
-## Arquivos a editar
+**Editar (4 arquivos):**
 - `src/pages/Home.tsx` — novo card
 - `src/App.tsx` — nova rota
 - `src/components/LoginSistema.tsx` — novo acessoKey
 - `src/components/GestaoAcesso.tsx` — novo sistema no toggle
+
