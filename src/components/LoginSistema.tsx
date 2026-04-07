@@ -46,6 +46,8 @@ interface Policial {
     gestaoLogistica?: boolean;
     gestaoPessoas?: boolean;
     cavbot?: boolean;
+    gestaoComandantes?: boolean;
+    [key: string]: boolean | undefined;
   };
 }
 
