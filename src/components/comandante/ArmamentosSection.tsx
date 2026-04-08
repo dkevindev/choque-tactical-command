@@ -6,38 +6,56 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Crosshair, Shield, Download, FileText } from 'lucide-react';
 import { exportarCSV, exportarPDF } from './exportUtils';
 
-interface Props { materiais: any[]; cautelas: any[]; }
+interface Props { materiais: any[]; cautelasProvisoria: any[]; }
 
-const ArmamentosSection: React.FC<Props> = ({ materiais, cautelas }) => {
-  const armasCurtas = useMemo(() => materiais.filter(m => m.tipoArma?.toLowerCase().includes('curta') || m.categoria?.toLowerCase().includes('pistola')), [materiais]);
-  const armasLongas = useMemo(() => materiais.filter(m => m.tipoArma?.toLowerCase().includes('longa') || m.categoria?.toLowerCase().includes('fuzil') || m.categoria?.toLowerCase().includes('espingarda')), [materiais]);
-  const coletes = useMemo(() => materiais.filter(m => m.categoria?.toLowerCase().includes('colete')), [materiais]);
+const ArmamentosSection: React.FC<Props> = ({ materiais, cautelasProvisoria }) => {
+  // Filtrar apenas materiais ativos (não baixados/transferidos)
+  const materiaisAtivos = useMemo(() => materiais.filter(m => !m.baixado && !m.transferido), [materiais]);
 
+  const armasCurtas = useMemo(() => materiaisAtivos.filter(m => m.tipoArma?.toLowerCase().includes('curta') || m.categoria?.toLowerCase().includes('pistola')), [materiaisAtivos]);
+  const armasLongas = useMemo(() => materiaisAtivos.filter(m => m.tipoArma?.toLowerCase().includes('longa') || m.categoria?.toLowerCase().includes('fuzil') || m.categoria?.toLowerCase().includes('espingarda')), [materiaisAtivos]);
+  const coletes = useMemo(() => materiaisAtivos.filter(m => m.categoria?.toLowerCase().includes('colete')), [materiaisAtivos]);
+
+  // Cautelados: materiais com cautela provisória pendente
   const cautelados = useMemo(() => {
     const ids = new Set<string>();
-    cautelas.filter(c => c.status === 'ativa' || !c.dataDevolucao).forEach(c => {
-      (c.materiais || []).forEach((m: any) => { if (m.materialId) ids.add(m.materialId); });
-    });
+    cautelasProvisoria
+      .filter(c => c.status === 'pendente')
+      .forEach(c => {
+        (c.materiais || []).forEach((m: any) => {
+          if (m.materialId) ids.add(m.materialId);
+        });
+      });
     return ids;
-  }, [cautelas]);
+  }, [cautelasProvisoria]);
 
-  const naReserva = materiais.filter(m => !cautelados.has(m.id)).length;
-  const naCautela = cautelados.size;
+  // Também considerar materiais com policialAssociadoId (cautelas permanentes)
+  const cauteladosPermanente = useMemo(() => {
+    return new Set(materiaisAtivos.filter(m => m.policialAssociadoId).map(m => m.id));
+  }, [materiaisAtivos]);
+
+  const todosCautelados = useMemo(() => {
+    const all = new Set([...cautelados, ...cauteladosPermanente]);
+    return all;
+  }, [cautelados, cauteladosPermanente]);
+
+  const naReserva = materiaisAtivos.filter(m => !todosCautelados.has(m.id)).length;
+  const naCautela = todosCautelados.size;
 
   const porModelo = useMemo(() => {
     const map: Record<string, number> = {};
-    materiais.forEach(m => { const k = m.modelo || m.nome || 'N/I'; map[k] = (map[k] || 0) + 1; });
+    materiaisAtivos.forEach(m => { const k = m.modelo || m.nome || 'N/I'; map[k] = (map[k] || 0) + 1; });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [materiais]);
+  }, [materiaisAtivos]);
 
   const handleCSV = () => {
     const h = ['Nome', 'Nº Série', 'Calibre', 'Fabricante', 'Modelo', 'Tipo', 'Status'];
-    const r = materiais.map(m => [m.nome || '', m.numeroSerie || '', m.calibre || '', m.fabricante || '', m.modelo || '', m.tipoArma || m.categoria || '', cautelados.has(m.id) ? 'Cautelado' : 'Na Reserva']);
+    const r = materiaisAtivos.map(m => [m.nome || '', m.numeroSerie || '', m.calibre || '', m.fabricante || '', m.modelo || '', m.tipoArma || m.categoria || '', todosCautelados.has(m.id) ? 'Cautelado' : 'Na Reserva']);
     exportarCSV(h, r, 'armamentos_rpmont');
   };
   const handlePDF = () => {
     const h = ['Nome', 'Nº Série', 'Calibre', 'Fabricante', 'Modelo', 'Tipo', 'Status'];
-    const r = materiais.map(m => [m.nome || '', m.numeroSerie || '', m.calibre || '', m.fabricante || '', m.modelo || '', m.tipoArma || m.categoria || '', cautelados.has(m.id) ? 'Cautelado' : 'Na Reserva']);
+    const r = materiaisAtivos.map(m => [m.nome || '', m.numeroSerie || '', m.calibre || '', m.fabricante || '', m.modelo || '', m.tipoArma || m.categoria || '', todosCautelados.has(m.id) ? 'Cautelado' : 'Na Reserva']);
     exportarPDF('Armamentos', h, r, 'armamentos_rpmont');
   };
 
@@ -47,7 +65,7 @@ const ArmamentosSection: React.FC<Props> = ({ materiais, cautelas }) => {
         <Card className="bg-gradient-to-br from-indigo-600 to-indigo-800 border-0 text-white">
           <CardContent className="p-6 text-center">
             <Crosshair className="h-8 w-8 mx-auto mb-2 opacity-80" />
-            <p className="text-4xl font-bold">{materiais.length}</p>
+            <p className="text-4xl font-bold">{materiaisAtivos.length}</p>
             <p className="text-white/70 text-sm mt-1">Total Materiais</p>
           </CardContent>
         </Card>
@@ -91,7 +109,7 @@ const ArmamentosSection: React.FC<Props> = ({ materiais, cautelas }) => {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {porModelo.map(([k, v], i) => (
+            {porModelo.map(([k, v]) => (
               <Badge key={k} className="text-sm py-1 px-3 bg-indigo-500/20 text-indigo-300">{k}: {v}</Badge>
             ))}
           </div>
@@ -113,7 +131,7 @@ const ArmamentosSection: React.FC<Props> = ({ materiais, cautelas }) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {materiais.map(m => (
+                {materiaisAtivos.map(m => (
                   <TableRow key={m.id} className="border-slate-700 hover:bg-slate-700/50">
                     <TableCell className="text-white font-medium">{m.nome}</TableCell>
                     <TableCell className="text-slate-300">{m.numeroSerie || '-'}</TableCell>
@@ -121,8 +139,8 @@ const ArmamentosSection: React.FC<Props> = ({ materiais, cautelas }) => {
                     <TableCell className="text-slate-300">{m.modelo || '-'}</TableCell>
                     <TableCell className="text-slate-300">{m.tipoArma || m.categoria || '-'}</TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${cautelados.has(m.id) ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                        {cautelados.has(m.id) ? 'Cautelado' : 'Na Reserva'}
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${todosCautelados.has(m.id) ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                        {todosCautelados.has(m.id) ? 'Cautelado' : 'Na Reserva'}
                       </span>
                     </TableCell>
                   </TableRow>
