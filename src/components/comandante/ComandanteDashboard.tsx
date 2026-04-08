@@ -20,33 +20,44 @@ const ComandanteDashboard = () => {
   const [transferidos, setTransferidos] = useState<any[]>([]);
   const [atestados, setAtestados] = useState<any[]>([]);
   const [materiais, setMateriais] = useState<any[]>([]);
-  const [cautelas, setCautelas] = useState<any[]>([]);
+  const [cautelasProvisoria, setCautelasProvisoria] = useState<any[]>([]);
   const [livros, setLivros] = useState<any[]>([]);
   const [aulas, setAulas] = useState<any[]>([]);
   const [projetos, setProjetos] = useState<any[]>([]);
+  const [instrutores, setInstrutores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const carregar = async () => {
       try {
-        const [polSnap, transSnap, atestSnap, matSnap, cautSnap, livroSnap, aulasSnap, projSnap] = await Promise.all([
+        const [polSnap, transSnap, atestSnap, matSnap, cautProvSnap, livroSnap, aulasSnap, projSnap, instrSnap] = await Promise.all([
           getDocs(collection(db, 'policiais')),
           getDocs(collection(db, 'policiais_transferidos')),
-          getDocs(collection(db, 'atestados')),
+          getDocs(collection(db, 'atestados_medicos')),
           getDocs(collection(db, 'materiais_belicos')),
-          getDocs(collection(db, 'cautelas')),
+          getDocs(collection(db, 'cautelas_provisorias')),
           getDocs(collection(db, 'livros_cautela')),
-          getDocs(collection(db, 'aulas')),
-          getDocs(collection(db, 'projetos')),
+          getDocs(collection(db, 'projetos_aulas')),
+          getDocs(collection(db, 'projetos_sociais')),
+          getDocs(collection(db, 'projetos_instrutores')),
         ]);
         setPoliciais(polSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setTransferidos(transSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAtestados(atestSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setMateriais(matSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setCautelas(cautSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setCautelasProvisoria(cautProvSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setLivros(livroSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAulas(aulasSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setAulas(aulasSnap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            // Normalizar data para string yyyy-MM-dd
+            dataStr: data.data?.toDate ? data.data.toDate().toISOString().slice(0, 10) : (typeof data.data === 'string' ? data.data : ''),
+          };
+        }));
         setProjetos(projSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setInstrutores(instrSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (e) {
         console.error('Erro ao carregar dados:', e);
       } finally {
@@ -66,7 +77,6 @@ const ComandanteDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
-      {/* Header */}
       <div className="bg-gradient-to-r from-indigo-800 to-violet-800 border-b border-indigo-600 px-6 py-4">
         <div className="flex items-center justify-between max-w-[1600px] mx-auto">
           <div className="flex items-center gap-4">
@@ -81,7 +91,6 @@ const ComandanteDashboard = () => {
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-[1600px] mx-auto p-6">
         <Tabs defaultValue="efetivo" className="space-y-6">
           <TabsList className="bg-slate-800/80 border border-indigo-500/30 p-1 flex flex-wrap gap-1 h-auto">
@@ -116,9 +125,9 @@ const ComandanteDashboard = () => {
           <TabsContent value="transferidos"><TransferidosSection transferidos={transferidos} /></TabsContent>
           <TabsContent value="atestados"><AtestadosSection policiais={policiais} atestados={atestados} /></TabsContent>
           <TabsContent value="estatisticas"><EstatisticasSection policiais={policiais} atestados={atestados} /></TabsContent>
-          <TabsContent value="armamentos"><ArmamentosSection materiais={materiais} cautelas={cautelas} /></TabsContent>
-          <TabsContent value="material-rua"><MaterialNaRuaSection livros={livros} cautelas={cautelas} materiais={materiais} /></TabsContent>
-          <TabsContent value="projetos"><ProjetosSociaisSection aulas={aulas} projetos={projetos} policiais={policiais} /></TabsContent>
+          <TabsContent value="armamentos"><ArmamentosSection materiais={materiais} cautelasProvisoria={cautelasProvisoria} /></TabsContent>
+          <TabsContent value="material-rua"><MaterialNaRuaSection cautelasProvisoria={cautelasProvisoria} /></TabsContent>
+          <TabsContent value="projetos"><ProjetosSociaisSection aulas={aulas} projetos={projetos} policiais={policiais} instrutores={instrutores} /></TabsContent>
         </Tabs>
       </div>
     </div>

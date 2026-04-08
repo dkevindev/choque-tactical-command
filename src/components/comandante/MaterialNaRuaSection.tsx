@@ -1,62 +1,121 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Shield, Download, FileText } from 'lucide-react';
 import { exportarCSV, exportarPDF } from './exportUtils';
 
-interface Props { livros: any[]; cautelas: any[]; materiais: any[]; }
+const getCategoriaEmoji = (categoria: string): string => {
+  const cat = (categoria || '').toLowerCase();
+  if (cat.includes('curta') || cat.includes('pistola')) return '🔫';
+  if (cat.includes('longa') || cat.includes('fuzil') || cat.includes('espingarda')) return '🎯';
+  if (cat.includes('munição') || cat.includes('municao')) return '💥';
+  if (cat.includes('colete')) return '🦺';
+  if (cat.includes('epi') || cat.includes('proteção')) return '🛡️';
+  return '⚙️';
+};
 
-const MaterialNaRuaSection: React.FC<Props> = ({ livros, cautelas, materiais }) => {
-  const livroAtivo = useMemo(() => livros.find(l => l.status === 'aberto' || !l.dataFechamento), [livros]);
+interface Props { cautelasProvisoria: any[]; }
 
-  const materiaisNaRua = useMemo(() => {
-    if (!livroAtivo) return [];
-    const cautelasAtivas = cautelas.filter(c => c.livroId === livroAtivo.id && (c.status === 'ativa' || !c.dataDevolucao));
-    const items: any[] = [];
-    cautelasAtivas.forEach(c => {
-      (c.materiais || []).forEach((m: any) => {
-        const mat = materiais.find(mt => mt.id === m.materialId);
-        items.push({
-          policial: c.policialNome || c.policial || 'N/I',
-          material: mat?.nome || m.nome || 'N/I',
-          serie: mat?.numeroSerie || m.numeroSerie || '-',
-          horaSaida: c.dataCriacao || c.horaSaida || '-',
+const MaterialNaRuaSection: React.FC<Props> = ({ cautelasProvisoria }) => {
+  // Agrupar cautelas pendentes por policial
+  const cautelasAgrupadas = useMemo(() => {
+    const pendentes = cautelasProvisoria.filter(c => c.status === 'pendente');
+    const mapa = new Map<string, { policialNome: string; policialNomeGuerra: string; postoGrad: string; matricula: string; materiais: any[]; dataCautela: any }>();
+
+    pendentes.forEach(c => {
+      const pid = c.policialId;
+      if (!pid) return;
+      const existing = mapa.get(pid);
+      if (existing) {
+        existing.materiais = [...existing.materiais, ...(c.materiais || [])];
+      } else {
+        mapa.set(pid, {
+          policialNome: c.policialNome || 'N/I',
+          policialNomeGuerra: c.policialNomeGuerra || '',
+          postoGrad: c.postoGrad || '',
+          matricula: c.policialMatricula || '',
+          materiais: [...(c.materiais || [])],
+          dataCautela: c.dataCautela,
         });
+      }
+    });
+    return Array.from(mapa.values());
+  }, [cautelasProvisoria]);
+
+  const totalMateriais = useMemo(() => cautelasAgrupadas.reduce((s, c) => s + c.materiais.length, 0), [cautelasAgrupadas]);
+
+  const totaisPorCategoria = useMemo(() => {
+    const t: Record<string, number> = {};
+    cautelasAgrupadas.forEach(c => {
+      c.materiais.forEach((m: any) => {
+        const cat = (m.categoria || '').toLowerCase();
+        t[cat] = (t[cat] || 0) + (m.quantidade || 1);
       });
     });
-    return items;
-  }, [livroAtivo, cautelas, materiais]);
+    return t;
+  }, [cautelasAgrupadas]);
 
   const handleCSV = () => {
-    const h = ['Policial', 'Material', 'Nº Série', 'Hora Saída'];
-    const r = materiaisNaRua.map(m => [m.policial, m.material, m.serie, m.horaSaida]);
-    exportarCSV(h, r, 'material_na_rua_rpmont');
+    const h = ['Policial', 'Matrícula', 'Material', 'Categoria', 'Nº Série', 'Qtd'];
+    const rows: string[][] = [];
+    cautelasAgrupadas.forEach(c => {
+      const nome = c.postoGrad ? `${c.postoGrad} ${c.policialNomeGuerra || c.policialNome}` : (c.policialNomeGuerra || c.policialNome);
+      c.materiais.forEach((m: any) => {
+        rows.push([nome, c.matricula, m.nome || '', m.categoria || '', m.numeroSerie || '-', String(m.quantidade || 1)]);
+      });
+    });
+    exportarCSV(h, rows, 'material_na_rua_rpmont');
   };
   const handlePDF = () => {
-    const h = ['Policial', 'Material', 'Nº Série', 'Hora Saída'];
-    const r = materiaisNaRua.map(m => [m.policial, m.material, m.serie, m.horaSaida]);
-    exportarPDF('Material na Rua', h, r, 'material_na_rua_rpmont');
+    const h = ['Policial', 'Matrícula', 'Material', 'Categoria', 'Nº Série', 'Qtd'];
+    const rows: string[][] = [];
+    cautelasAgrupadas.forEach(c => {
+      const nome = c.postoGrad ? `${c.postoGrad} ${c.policialNomeGuerra || c.policialNome}` : (c.policialNomeGuerra || c.policialNome);
+      c.materiais.forEach((m: any) => {
+        rows.push([nome, c.matricula, m.nome || '', m.categoria || '', m.numeroSerie || '-', String(m.quantidade || 1)]);
+      });
+    });
+    exportarPDF('Material na Rua', h, rows, 'material_na_rua_rpmont');
   };
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-violet-600 to-purple-800 border-0 text-white">
           <CardContent className="p-6 text-center">
-            <Shield className="h-8 w-8 mx-auto mb-2 opacity-80" />
-            <p className="text-4xl font-bold">{materiaisNaRua.length}</p>
-            <p className="text-white/70 text-sm mt-1">Materiais na Rua</p>
+            <p className="text-lg">👮</p>
+            <p className="text-4xl font-bold">{cautelasAgrupadas.length}</p>
+            <p className="text-white/70 text-sm mt-1">Policiais</p>
           </CardContent>
         </Card>
-        <Card className="bg-slate-800/60 border-indigo-500/20">
+        <Card className="bg-gradient-to-br from-red-600 to-red-800 border-0 text-white">
           <CardContent className="p-6 text-center">
-            <p className="text-slate-300 text-sm">Livro Ativo</p>
-            <p className="text-white font-bold text-lg mt-1">{livroAtivo ? `#${livroAtivo.numero || livroAtivo.id?.slice(0, 8)}` : 'Nenhum livro aberto'}</p>
+            <p className="text-lg">🔫</p>
+            <p className="text-4xl font-bold">{(totaisPorCategoria['arma curta'] || 0) + (totaisPorCategoria['arma longa'] || 0) + (totaisPorCategoria['armamento'] || 0)}</p>
+            <p className="text-white/70 text-sm mt-1">Armas</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-orange-600 to-orange-800 border-0 text-white">
+          <CardContent className="p-6 text-center">
+            <p className="text-lg">💥</p>
+            <p className="text-4xl font-bold">{totaisPorCategoria['munição'] || totaisPorCategoria['municao'] || 0}</p>
+            <p className="text-white/70 text-sm mt-1">Munições</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-emerald-600 to-green-800 border-0 text-white">
+          <CardContent className="p-6 text-center">
+            <p className="text-lg">🛡️</p>
+            <p className="text-4xl font-bold">{(totaisPorCategoria['epi'] || 0) + (totaisPorCategoria['colete'] || 0)}</p>
+            <p className="text-white/70 text-sm mt-1">EPIs/Coletes</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Export */}
       <Card className="bg-slate-800/60 border-indigo-500/20">
         <CardContent className="p-4 flex gap-3">
           <Button onClick={handleCSV} variant="outline" size="sm" className="border-emerald-500 text-emerald-400 hover:bg-emerald-500/20"><Download className="h-4 w-4 mr-1" /> Excel</Button>
@@ -64,35 +123,43 @@ const MaterialNaRuaSection: React.FC<Props> = ({ livros, cautelas, materiais }) 
         </CardContent>
       </Card>
 
-      <Card className="bg-slate-800/60 border-indigo-500/20">
-        <CardContent className="p-0">
-          <div className="max-h-[500px] overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-indigo-500/20">
-                  <TableHead className="text-indigo-300">Policial</TableHead>
-                  <TableHead className="text-indigo-300">Material</TableHead>
-                  <TableHead className="text-indigo-300">Nº Série</TableHead>
-                  <TableHead className="text-indigo-300">Hora Saída</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {materiaisNaRua.map((m, i) => (
-                  <TableRow key={i} className="border-slate-700 hover:bg-slate-700/50">
-                    <TableCell className="text-white font-medium">{m.policial}</TableCell>
-                    <TableCell className="text-slate-300">{m.material}</TableCell>
-                    <TableCell className="text-slate-300">{m.serie}</TableCell>
-                    <TableCell className="text-slate-300">{m.horaSaida}</TableCell>
-                  </TableRow>
-                ))}
-                {materiaisNaRua.length === 0 && (
-                  <TableRow><TableCell colSpan={4} className="text-center text-slate-400 py-8">Nenhum material na rua no momento</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Tabela por policial */}
+      {cautelasAgrupadas.length === 0 ? (
+        <Card className="bg-slate-800/60 border-indigo-500/20">
+          <CardContent className="p-8 text-center">
+            <div className="text-5xl mb-3">✅</div>
+            <p className="text-slate-300 text-lg font-medium">Nenhum material na rua!</p>
+            <p className="text-slate-500 text-sm">Todos os materiais foram devolvidos</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {cautelasAgrupadas.map((c, idx) => {
+            const nomeDisplay = c.postoGrad ? `${c.postoGrad} ${c.policialNomeGuerra || c.policialNome}` : (c.policialNomeGuerra || c.policialNome);
+            return (
+              <Card key={idx} className="bg-slate-800/60 border-indigo-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-2xl">👮‍♂️</span>
+                    <div>
+                      <p className="text-white font-semibold">{nomeDisplay}</p>
+                      <p className="text-slate-400 text-xs">Mat: {c.matricula}</p>
+                    </div>
+                    <Badge className="ml-auto bg-violet-500/20 text-violet-300">{c.materiais.length} itens</Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {c.materiais.map((m: any, i: number) => (
+                      <Badge key={i} variant="outline" className="text-sm py-1 px-2 border-slate-600 text-slate-300">
+                        {getCategoriaEmoji(m.categoria)} {m.quantidade > 1 ? `${m.quantidade}x ` : ''}{m.nome}{m.numeroSerie ? ` (${m.numeroSerie})` : ''}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
