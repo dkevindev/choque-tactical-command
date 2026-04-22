@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/firebase';
 import logo from '@/assets/cavalaria-triade.png';
+import PainelNoticias from './PainelNoticias';
 
 interface MaterialAguardando {
   materialId: string;
@@ -290,6 +291,33 @@ const TotemPolicialInterface = () => {
     );
   };
 
+  // Modo ocioso (sem cautela em andamento e sem mensagem) → painel de notícias em tela cheia
+  if (!cautelaAtual && !mensagemSucesso) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col p-4">
+        {/* Header reduzido com chip de status */}
+        <div className="flex items-center justify-between mb-3 px-2">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="Logo Cavalaria" className="h-10 w-auto" />
+            <div>
+              <h1 className="text-base font-bold text-foreground leading-tight">CAVALARIA PMCE - P4</h1>
+              <h2 className="text-xs font-semibold text-muted-foreground">RESERVA DE ARMAMENTO</h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border">
+            <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+            <span className="text-xs text-muted-foreground">Aguardando material</span>
+          </div>
+        </div>
+
+        {/* Painel de notícias ocupa o resto da tela */}
+        <div className="flex-1 min-h-0">
+          <PainelNoticias />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center py-16 px-4">
       <div className="w-full max-w-lg">
@@ -310,24 +338,6 @@ const TotemPolicialInterface = () => {
             <CardContent className="p-3 text-center">
               <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-1" />
               <p className="text-lg font-bold text-green-400">{mensagemSucesso}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Estado: Aguardando Material */}
-        {!cautelaAtual && !mensagemSucesso && (
-          <Card className="border-border">
-            <CardContent className="p-5 text-center">
-              <div className="mb-3">
-                <Loader2 className="h-10 w-10 text-primary mx-auto animate-spin" />
-              </div>
-              <p className="text-base font-semibold text-foreground mb-1">
-                Aguardando material...
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Quando o armeiro registrar uma cautela,<br />
-                ela aparecerá aqui automaticamente.
-              </p>
             </CardContent>
           </Card>
         )}
