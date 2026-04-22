@@ -20,6 +20,7 @@ import FuncaoTab from './gestao-pessoas/FuncaoTab';
 import TransferidosTab from './gestao-pessoas/TransferidosTab';
 import AtestadosMedicosTab from './gestao-pessoas/AtestadosMedicosTab';
 import EstatisticasTab from './gestao-pessoas/EstatisticasTab';
+import GerenciarNoticiasTotem from './painel-noticias/GerenciarNoticiasTotem';
 import logoRegimento from '@/assets/logo-regimento.jpg';
 
 interface Policial {
@@ -385,6 +386,7 @@ const GestãoPessoas: React.FC = () => {
             <BarChart3 className="h-4 w-4" />
             Estatísticas
           </TabsTrigger>
+          <TabsTrigger value="painel-totem">Painel Totem</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
