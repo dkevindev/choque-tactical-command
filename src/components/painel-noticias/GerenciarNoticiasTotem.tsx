@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Eye, Megaphone, AlertTriangle, Newspaper } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Megaphone, AlertTriangle, Newspaper, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
 
 type TipoNoticia = 'noticia' | 'determinacao' | 'aviso';
@@ -27,6 +28,8 @@ interface Noticia {
   dataExpiracao?: any;
   prioridade?: number;
   ativa?: boolean;
+  imagemUrl?: string;
+  imagemPath?: string;
 }
 
 interface Props {
@@ -63,6 +66,9 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
   const [dataExpiracao, setDataExpiracao] = useState(todayPlusDays(7));
   const [prioridade, setPrioridade] = useState(5);
   const [ativa, setAtiva] = useState(true);
+  const [imagemUrl, setImagemUrl] = useState<string>('');
+  const [imagemPath, setImagemPath] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'noticias_totem'), orderBy('dataPublicacao', 'desc'));
@@ -80,6 +86,8 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
     setDataExpiracao(todayPlusDays(7));
     setPrioridade(5);
     setAtiva(true);
+    setImagemUrl('');
+    setImagemPath('');
   };
 
   const handleOpenNew = () => {
@@ -94,9 +102,50 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
     setMensagem(n.mensagem);
     setPrioridade(n.prioridade ?? 5);
     setAtiva(n.ativa ?? true);
+    setImagemUrl(n.imagemUrl || '');
+    setImagemPath(n.imagemPath || '');
     const exp = n.dataExpiracao?.toDate ? n.dataExpiracao.toDate() : (n.dataExpiracao ? new Date(n.dataExpiracao) : new Date());
     setDataExpiracao(exp.toISOString().split('T')[0]);
     setOpen(true);
+  };
+
+  const handleUploadImagem = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Selecione uma imagem válida', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Imagem deve ter até 5MB', variant: 'destructive' });
+      return;
+    }
+    try {
+      setUploading(true);
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `noticias_totem/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const sref = storageRef(storage, path);
+      await uploadBytes(sref, file);
+      const url = await getDownloadURL(sref);
+      // Remover imagem anterior se houver
+      if (imagemPath) {
+        try { await deleteObject(storageRef(storage, imagemPath)); } catch {}
+      }
+      setImagemUrl(url);
+      setImagemPath(path);
+      toast({ title: 'Imagem carregada' });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao fazer upload', variant: 'destructive' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoverImagem = async () => {
+    if (imagemPath) {
+      try { await deleteObject(storageRef(storage, imagemPath)); } catch {}
+    }
+    setImagemUrl('');
+    setImagemPath('');
   };
 
   const handleSave = async () => {
@@ -117,6 +166,8 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
       dataExpiracao: Timestamp.fromDate(expDate),
       prioridade,
       ativa,
+      imagemUrl: imagemUrl || null,
+      imagemPath: imagemPath || null,
     };
 
     try {
@@ -138,6 +189,10 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir esta notícia?')) return;
+    const target = noticias.find(n => n.id === id);
+    if (target?.imagemPath) {
+      try { await deleteObject(storageRef(storage, target.imagemPath)); } catch {}
+    }
     await deleteDoc(doc(db, 'noticias_totem', id));
     toast({ title: 'Notícia excluída' });
   };
@@ -239,6 +294,45 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                 </div>
               </div>
 
+              {/* Upload de imagem */}
+              <div>
+                <Label>Imagem (opcional)</Label>
+                {imagemUrl ? (
+                  <div className="mt-2 relative inline-block">
+                    <img src={imagemUrl} alt="Preview" className="max-h-40 rounded-lg border border-border" />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="destructive"
+                      className="absolute -top-2 -right-2 h-7 w-7 rounded-full"
+                      onClick={handleRemoverImagem}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <label className="flex items-center justify-center gap-2 h-24 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/50 transition">
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {uploading ? 'Enviando...' : 'Clique para enviar imagem (até 5MB)'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUploadImagem(f);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
               {/* Preview */}
               <div>
                 <Label>Pré-visualização</Label>
@@ -247,14 +341,21 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                     <PreviewIcon className="h-6 w-6" />
                     <Badge className="bg-white/20 text-white border-white/30">{cfg.label}</Badge>
                   </div>
-                  <h3 className="text-2xl font-bold mb-2">{titulo || 'Título da notícia'}</h3>
-                  <p className="text-base opacity-90 whitespace-pre-wrap">{mensagem || 'Mensagem...'}</p>
+                  <div className={imagemUrl ? 'grid grid-cols-2 gap-4 items-center' : ''}>
+                    <div>
+                      <h3 className="text-2xl font-bold mb-2">{titulo || 'Título da notícia'}</h3>
+                      <p className="text-base opacity-90 whitespace-pre-wrap">{mensagem || 'Mensagem...'}</p>
+                    </div>
+                    {imagemUrl && (
+                      <img src={imagemUrl} alt="" className="rounded-lg max-h-48 w-full object-cover" />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button onClick={handleSave}>{editing ? 'Salvar' : 'Publicar'}</Button>
+              <Button onClick={handleSave} disabled={uploading}>{editing ? 'Salvar' : 'Publicar'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
