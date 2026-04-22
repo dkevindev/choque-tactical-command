@@ -66,6 +66,9 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
   const [dataExpiracao, setDataExpiracao] = useState(todayPlusDays(7));
   const [prioridade, setPrioridade] = useState(5);
   const [ativa, setAtiva] = useState(true);
+  const [imagemUrl, setImagemUrl] = useState<string>('');
+  const [imagemPath, setImagemPath] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'noticias_totem'), orderBy('dataPublicacao', 'desc'));
@@ -83,6 +86,8 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
     setDataExpiracao(todayPlusDays(7));
     setPrioridade(5);
     setAtiva(true);
+    setImagemUrl('');
+    setImagemPath('');
   };
 
   const handleOpenNew = () => {
@@ -97,9 +102,50 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
     setMensagem(n.mensagem);
     setPrioridade(n.prioridade ?? 5);
     setAtiva(n.ativa ?? true);
+    setImagemUrl(n.imagemUrl || '');
+    setImagemPath(n.imagemPath || '');
     const exp = n.dataExpiracao?.toDate ? n.dataExpiracao.toDate() : (n.dataExpiracao ? new Date(n.dataExpiracao) : new Date());
     setDataExpiracao(exp.toISOString().split('T')[0]);
     setOpen(true);
+  };
+
+  const handleUploadImagem = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Selecione uma imagem válida', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Imagem deve ter até 5MB', variant: 'destructive' });
+      return;
+    }
+    try {
+      setUploading(true);
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `noticias_totem/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const sref = storageRef(storage, path);
+      await uploadBytes(sref, file);
+      const url = await getDownloadURL(sref);
+      // Remover imagem anterior se houver
+      if (imagemPath) {
+        try { await deleteObject(storageRef(storage, imagemPath)); } catch {}
+      }
+      setImagemUrl(url);
+      setImagemPath(path);
+      toast({ title: 'Imagem carregada' });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao fazer upload', variant: 'destructive' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoverImagem = async () => {
+    if (imagemPath) {
+      try { await deleteObject(storageRef(storage, imagemPath)); } catch {}
+    }
+    setImagemUrl('');
+    setImagemPath('');
   };
 
   const handleSave = async () => {
