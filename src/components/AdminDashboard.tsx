@@ -42,6 +42,7 @@ import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/fire
 import { Button } from '@/components/ui/button';
 import { Car, Droplet } from 'lucide-react';
 import AlertasGestaoSection from '@/components/gestao/AlertasGestaoSection';
+import GerenciarNoticiasTotem from '@/components/painel-noticias/GerenciarNoticiasTotem';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -77,6 +78,8 @@ const AdminDashboard = () => {
         return <ServicosPage />;
       case 'projetos-sociais':
         return <AdminProjetosSociais />;
+      case 'painel-totem':
+        return <GerenciarNoticiasTotem origemPainel="gestao_logistica" />;
       default:
         return <DashboardOverview />;
     }

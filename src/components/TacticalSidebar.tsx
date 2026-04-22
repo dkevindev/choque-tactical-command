@@ -41,6 +41,7 @@ const TacticalSidebar = ({ activeSection, onSectionChange, isAdmin = false, aces
     { id: 'ordens-servico', label: 'OS\'s', icon: FileText, badge: null },
     { id: 'servicos', label: 'SERVIÇOS', icon: FileText, badge: null },
     { id: 'projetos-sociais', label: 'PROJETOS SOCIAIS', icon: GraduationCap, badge: null },
+    { id: 'painel-totem', label: 'PAINEL TOTEM', icon: AlertCircle, badge: null },
   ];
 
   const userMenuItems = [
