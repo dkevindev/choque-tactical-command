@@ -166,6 +166,8 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
       dataExpiracao: Timestamp.fromDate(expDate),
       prioridade,
       ativa,
+      imagemUrl: imagemUrl || null,
+      imagemPath: imagemPath || null,
     };
 
     try {
@@ -187,6 +189,10 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir esta notícia?')) return;
+    const target = noticias.find(n => n.id === id);
+    if (target?.imagemPath) {
+      try { await deleteObject(storageRef(storage, target.imagemPath)); } catch {}
+    }
     await deleteDoc(doc(db, 'noticias_totem', id));
     toast({ title: 'Notícia excluída' });
   };
@@ -288,6 +294,45 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                 </div>
               </div>
 
+              {/* Upload de imagem */}
+              <div>
+                <Label>Imagem (opcional)</Label>
+                {imagemUrl ? (
+                  <div className="mt-2 relative inline-block">
+                    <img src={imagemUrl} alt="Preview" className="max-h-40 rounded-lg border border-border" />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="destructive"
+                      className="absolute -top-2 -right-2 h-7 w-7 rounded-full"
+                      onClick={handleRemoverImagem}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <label className="flex items-center justify-center gap-2 h-24 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/50 transition">
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {uploading ? 'Enviando...' : 'Clique para enviar imagem (até 5MB)'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUploadImagem(f);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
               {/* Preview */}
               <div>
                 <Label>Pré-visualização</Label>
@@ -296,14 +341,21 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                     <PreviewIcon className="h-6 w-6" />
                     <Badge className="bg-white/20 text-white border-white/30">{cfg.label}</Badge>
                   </div>
-                  <h3 className="text-2xl font-bold mb-2">{titulo || 'Título da notícia'}</h3>
-                  <p className="text-base opacity-90 whitespace-pre-wrap">{mensagem || 'Mensagem...'}</p>
+                  <div className={imagemUrl ? 'grid grid-cols-2 gap-4 items-center' : ''}>
+                    <div>
+                      <h3 className="text-2xl font-bold mb-2">{titulo || 'Título da notícia'}</h3>
+                      <p className="text-base opacity-90 whitespace-pre-wrap">{mensagem || 'Mensagem...'}</p>
+                    </div>
+                    {imagemUrl && (
+                      <img src={imagemUrl} alt="" className="rounded-lg max-h-48 w-full object-cover" />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button onClick={handleSave}>{editing ? 'Salvar' : 'Publicar'}</Button>
+              <Button onClick={handleSave} disabled={uploading}>{editing ? 'Salvar' : 'Publicar'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
