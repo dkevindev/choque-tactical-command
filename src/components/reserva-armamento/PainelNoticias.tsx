@@ -87,6 +87,7 @@ const PainelNoticias = () => {
             autor: data.autor,
             dataPublicacao: pub,
             prioridade: data.prioridade ?? 5,
+            imagemUrl: data.imagemUrl || undefined,
           } as Slide;
         })
         .filter((x): x is Slide => x !== null)
