@@ -556,6 +556,9 @@ const GestãoPessoas: React.FC = () => {
         <TabsContent value="estatisticas">
           <EstatisticasTab policiais={policiais} />
         </TabsContent>
+        <TabsContent value="painel-totem">
+          <GerenciarNoticiasTotem origemPainel="gestao_pessoas" />
+        </TabsContent>
       </Tabs>
     </div>
   );
