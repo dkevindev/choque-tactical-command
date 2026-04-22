@@ -15,6 +15,7 @@ interface Slide {
   dataPublicacao?: Date;
   prioridade?: number;
   aniversariantes?: { nome: string; postoGrad: string }[];
+  imagemUrl?: string;
 }
 
 const tipoConfig: Record<TipoNoticia, { label: string; gradient: string; icon: any; tagBg: string }> = {
