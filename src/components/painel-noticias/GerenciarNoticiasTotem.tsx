@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Eye, Megaphone, AlertTriangle, Newspaper } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Megaphone, AlertTriangle, Newspaper, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
 
 type TipoNoticia = 'noticia' | 'determinacao' | 'aviso';
@@ -27,6 +28,8 @@ interface Noticia {
   dataExpiracao?: any;
   prioridade?: number;
   ativa?: boolean;
+  imagemUrl?: string;
+  imagemPath?: string;
 }
 
 interface Props {
