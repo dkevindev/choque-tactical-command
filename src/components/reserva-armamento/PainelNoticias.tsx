@@ -97,42 +97,50 @@ const PainelNoticias = () => {
     return () => unsub();
   }, []);
 
-  // Carregar aniversariantes (refresh diário)
+  // Carregar aniversariantes (refresh diário + manual via config_painel/aniversariantes)
+  const carregarAniversariantes = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'policiais'));
+      const hoje = new Date();
+      const dia = hoje.getDate();
+      const mes = hoje.getMonth();
+      const lista: { nome: string; postoGrad: string }[] = [];
+      snap.forEach(d => {
+        const p: any = d.data();
+        const raw = p['Data de Nascimento'] ?? p.dataNascimento ?? p.NASCIMENTO;
+        const dt = parseNascimento(raw);
+        if (dt && dt.getDate() === dia && dt.getMonth() === mes) {
+          const nome = p['NOME DE GUERRA1'] || p.NOME || 'Policial';
+          const postoGrad = p['Post/Grad'] || p.postoGrad || '';
+          lista.push({ nome, postoGrad });
+        }
+      });
+      setAniversariantes(lista);
+    } catch (e) {
+      console.error('[PainelNoticias] Erro ao carregar aniversariantes:', e);
+    }
+  };
+
   useEffect(() => {
-    let cancelled = false;
-    const carregar = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'policiais'));
-        const hoje = new Date();
-        const dia = hoje.getDate();
-        const mes = hoje.getMonth();
-        const lista: { nome: string; postoGrad: string }[] = [];
-        snap.forEach(d => {
-          const p: any = d.data();
-          const raw = p['Data de Nascimento'] ?? p.dataNascimento ?? p.NASCIMENTO;
-          const dt = parseNascimento(raw);
-          if (dt && dt.getDate() === dia && dt.getMonth() === mes) {
-            const nome = p['NOME DE GUERRA1'] || p.NOME || 'Policial';
-            const postoGrad = p['Post/Grad'] || p.postoGrad || '';
-            lista.push({ nome, postoGrad });
-          }
-        });
-        if (!cancelled) setAniversariantes(lista);
-      } catch (e) {
-        console.error('[PainelNoticias] Erro ao carregar aniversariantes:', e);
-      }
-    };
-    carregar();
+    carregarAniversariantes();
     // Recarregar quando o dia mudar
     const i = setInterval(() => {
       const k = new Date().toDateString();
       if (k !== hojeKey) {
         setHojeKey(k);
-        carregar();
+        carregarAniversariantes();
       }
     }, 60000);
-    return () => { cancelled = true; clearInterval(i); };
+    return () => { clearInterval(i); };
   }, [hojeKey]);
+
+  // Listener de refresh manual
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'config_painel', 'aniversariantes'), () => {
+      carregarAniversariantes();
+    });
+    return () => unsub();
+  }, []);
 
   // Relógio
   useEffect(() => {
