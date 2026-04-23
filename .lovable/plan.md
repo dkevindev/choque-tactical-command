@@ -1,48 +1,60 @@
 
+# Aniversariantes (NASCIMENTO Excel serial) + Modelo editável + Autor manual
 
-# Correções no Painel de Notícias do Totem
+## 1. Detecção correta da data de nascimento
 
-## 1. Botão "Atualizar aniversariantes" (refresh manual)
+**Arquivo**: `src/components/reserva-armamento/PainelNoticias.tsx`
+
+Confirmado: o campo é `NASCIMENTO` (int64, serial Excel — ex.: `34493` → 08/06/1994). A função `parseNascimento` atual já converte serial Excel via `(raw - 25569) * 86400 * 1000`, mas a leitura prioriza outros campos. Ajustes:
+
+- Ler **`p.NASCIMENTO`** como campo principal (depois fallback para `Data de Nascimento`, `dataNascimento`, `data_nascimento`)
+- Scan case-insensitive das chaves do doc (qualquer chave que contenha "nascimento")
+- Log no console: `[Aniversariantes] Encontrados: N | Hoje: dd/mm` listando matrícula + nome detectados, para diagnóstico
+- Calcular **idade** a partir do ano da data convertida
+
+## 2. Slide individual por aniversariante
+
+Hoje todos vão em UM slide. Alterar para gerar **um slide por policial**, cada um com seu próprio banner festivo (gradiente dourado/rosa, animação, ícone 🎂). Isso garante que o nome do policial específico apareça em destaque na rotação do carrossel.
+
+## 3. Modelo de mensagem editável (com variáveis)
+
+Novo documento Firestore: `config_painel/template_aniversario`
+```
+titulo: string    (default: "🎉 PARABÉNS {POSTO} {NOME DE GUERRA1} 🎉")
+mensagem: string  (default: "O RPMONT deseja muitas felicidades — que Deus abençoe sua jornada!")
+```
+
+Variáveis substituídas por slide:
+- `{NOME DE GUERRA1}` → nome de guerra
+- `{NOME}` → nome completo
+- `{POSTO}` ou `{POST/GRAD}` → posto/graduação
+- `{MATRICULA}` → matrícula
+- `{IDADE}` → idade calculada
+
+`PainelNoticias.tsx` adiciona `onSnapshot` no template para atualização em tempo real.
+
+## 4. Editor do modelo no Gerenciar
 
 **Arquivo**: `src/components/painel-noticias/GerenciarNoticiasTotem.tsx`
 
-- Adicionar botão no cabeçalho do card: "Atualizar aniversariantes" com ícone `RefreshCw`
-- Ao clicar, grava/atualiza um documento de controle em Firestore (`config_painel/aniversariantes` com campo `refreshAt: Timestamp.now()`)
-- Toast confirmando: "Atualização solicitada — totens serão atualizados em segundos"
+Junto ao botão "Atualizar aniversariantes", novo botão **"Editar modelo de parabéns"** abre Dialog com:
+- Input do Título + Textarea da Mensagem
+- Chips clicáveis das variáveis (insere no cursor)
+- Lista de variáveis com explicação
+- Pré-visualização ao vivo usando dados fictícios (`SD KEVIN`, matrícula 123456, idade 30)
+- Salvar → grava em `config_painel/template_aniversario` + atualiza `refreshAt` para forçar refresh imediato dos totens
 
-**Arquivo**: `src/components/reserva-armamento/PainelNoticias.tsx`
-
-- Extrair a função `carregar()` dos aniversariantes para escopo do componente
-- Adicionar `onSnapshot` em `config_painel/aniversariantes` — quando `refreshAt` mudar, executa `carregar()` imediatamente, antecipando o ciclo automático das 00h
-- Mantém o reload diário automático já existente
-
-## 2. Imagem não aparece no Totem após salvar
-
-**Arquivo**: `src/components/reserva-armamento/PainelNoticias.tsx`
-
-Causa: o layout `flex-row` do banner com imagem usa `flex-1` no bloco de texto sem `min-w-0`, e textos longos sem espaços (como `dsgd...\\\\`) empurram a imagem para fora da viewport, fazendo parecer que ela não foi enviada.
-
-Correção:
-- Adicionar `min-w-0` e `overflow-hidden` no container de texto
-- Garantir que a imagem use `flex-shrink-0` com largura mínima fixa (ex.: `w-2/5`)
-- Reduzir o `max-h` da imagem para `max-h-[60vh]` para não estourar verticalmente
-
-## 3. Quebra automática de texto (sem ultrapassar a tela e sem cobrir a imagem)
-
-**Arquivo**: `src/components/reserva-armamento/PainelNoticias.tsx`
-
-No bloco do título e da mensagem (tanto layout sem imagem quanto com imagem):
-- Adicionar classes Tailwind: `break-words` e `overflow-wrap-anywhere` (via `[overflow-wrap:anywhere]`)
-- No título: `break-words [overflow-wrap:anywhere]`
-- No parágrafo da mensagem: `whitespace-pre-wrap break-words [overflow-wrap:anywhere]`
-- Adicionar `max-h-[70vh] overflow-hidden` no wrapper para evitar transbordo vertical
+## 5. Autor manual ao criar notícia/determinação
 
 **Arquivo**: `src/components/painel-noticias/GerenciarNoticiasTotem.tsx`
 
-- Aplicar as mesmas classes de quebra no preview do dialog para fidelidade visual
+- Remover leitura automática do `localStorage`
+- Adicionar campo **"Autor / Responsável"** (Input obrigatório) no formulário
+- Placeholder sugerindo formato (`Ex.: CAP FULANO`), mas vazio por padrão
+- Validação no `handleSave`: se vazio, toast "Informe o autor" e bloqueia
+- Ao editar notícia existente, carregar o `autor` salvo no campo
 
 ## Arquivos editados
 
-- `src/components/painel-noticias/GerenciarNoticiasTotem.tsx` — botão de refresh + classes de quebra no preview
-- `src/components/reserva-armamento/PainelNoticias.tsx` — listener de refresh, layout da imagem com `min-w-0`/`flex-shrink-0`, quebra de texto
-
+- `src/components/reserva-armamento/PainelNoticias.tsx` — leitura priorizada de `NASCIMENTO`, slides individuais, listener do template, substituição de variáveis, log de diagnóstico
+- `src/components/painel-noticias/GerenciarNoticiasTotem.tsx` — campo autor manual obrigatório, Dialog "Editar modelo de parabéns" com chips de variáveis e preview
