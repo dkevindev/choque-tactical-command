@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Eye, Megaphone, AlertTriangle, Newspaper, Upload, X, Image as ImageIcon, RefreshCw, Cake } from 'lucide-react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp, setDoc } from 'firebase/firestore';
+import { Plus, Pencil, Trash2, Megaphone, AlertTriangle, Newspaper, Upload, X, RefreshCw, Cake, Settings } from 'lucide-react';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp, setDoc, getDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
@@ -42,6 +42,31 @@ const tipoConfig: Record<TipoNoticia, { label: string; bg: string; gradient: str
   aviso: { label: 'AVISO', bg: 'bg-amber-500', gradient: 'from-amber-500 to-amber-700', icon: AlertTriangle },
 };
 
+const DEFAULT_TEMPLATE = {
+  titulo: '🎉 PARABÉNS {POSTO} {NOME DE GUERRA1} 🎉',
+  mensagem: 'O RPMONT deseja muitas felicidades — que Deus abençoe sua jornada!',
+};
+
+const VARIAVEIS: { token: string; descricao: string }[] = [
+  { token: '{POSTO}', descricao: 'Posto/Graduação (ex.: SD, CB, SGT)' },
+  { token: '{NOME DE GUERRA1}', descricao: 'Nome de guerra do policial' },
+  { token: '{NOME}', descricao: 'Nome completo' },
+  { token: '{MATRICULA}', descricao: 'Matrícula' },
+  { token: '{IDADE}', descricao: 'Idade que está completando' },
+];
+
+const PREVIEW_DATA = { POSTO: 'SD', 'NOME DE GUERRA1': 'KEVIN', NOME: 'Kevin Silva', MATRICULA: '123456', IDADE: '30' };
+
+const aplicarPreview = (texto: string): string => {
+  return texto
+    .replace(/\{NOME DE GUERRA1\}/gi, PREVIEW_DATA['NOME DE GUERRA1'])
+    .replace(/\{NOME\}/gi, PREVIEW_DATA.NOME)
+    .replace(/\{POST\/GRAD\}/gi, PREVIEW_DATA.POSTO)
+    .replace(/\{POSTO\}/gi, PREVIEW_DATA.POSTO)
+    .replace(/\{MATRICULA\}/gi, PREVIEW_DATA.MATRICULA)
+    .replace(/\{IDADE\}/gi, PREVIEW_DATA.IDADE);
+};
+
 const formatDate = (d?: any) => {
   if (!d) return '-';
   const dt = d?.toDate ? d.toDate() : new Date(d);
@@ -57,18 +82,27 @@ const todayPlusDays = (n: number) => {
 const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
   const [noticias, setNoticias] = useState<Noticia[]>([]);
   const [open, setOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [editing, setEditing] = useState<Noticia | null>(null);
 
   const [tipo, setTipo] = useState<TipoNoticia>('noticia');
   const [titulo, setTitulo] = useState('');
   const [mensagem, setMensagem] = useState('');
+  const [autor, setAutor] = useState('');
   const [dataExpiracao, setDataExpiracao] = useState(todayPlusDays(7));
   const [prioridade, setPrioridade] = useState(5);
   const [ativa, setAtiva] = useState(true);
   const [imagemUrl, setImagemUrl] = useState<string>('');
   const [imagemPath, setImagemPath] = useState<string>('');
   const [uploading, setUploading] = useState(false);
+
+  // Template parabéns
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [templateTitulo, setTemplateTitulo] = useState(DEFAULT_TEMPLATE.titulo);
+  const [templateMensagem, setTemplateMensagem] = useState(DEFAULT_TEMPLATE.mensagem);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const tituloRef = useRef<HTMLInputElement>(null);
+  const mensagemRef = useRef<HTMLTextAreaElement>(null);
+  const [activeField, setActiveField] = useState<'titulo' | 'mensagem'>('mensagem');
 
   useEffect(() => {
     const q = query(collection(db, 'noticias_totem'), orderBy('dataPublicacao', 'desc'));
@@ -83,6 +117,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
     setTipo('noticia');
     setTitulo('');
     setMensagem('');
+    setAutor('');
     setDataExpiracao(todayPlusDays(7));
     setPrioridade(5);
     setAtiva(true);
@@ -100,6 +135,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
     setTipo(n.tipo);
     setTitulo(n.titulo);
     setMensagem(n.mensagem);
+    setAutor(n.autor || '');
     setPrioridade(n.prioridade ?? 5);
     setAtiva(n.ativa ?? true);
     setImagemUrl(n.imagemUrl || '');
@@ -125,7 +161,6 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
       const sref = storageRef(storage, path);
       await uploadBytes(sref, file);
       const url = await getDownloadURL(sref);
-      // Remover imagem anterior se houver
       if (imagemPath) {
         try { await deleteObject(storageRef(storage, imagemPath)); } catch {}
       }
@@ -153,15 +188,17 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
       toast({ title: 'Preencha título e mensagem', variant: 'destructive' });
       return;
     }
-    const userRaw = localStorage.getItem('user');
-    const autor = userRaw ? (JSON.parse(userRaw)['NOME DE GUERRA1'] || JSON.parse(userRaw).NOME || 'Sistema') : 'Sistema';
+    if (!autor.trim()) {
+      toast({ title: 'Informe o autor / responsável', variant: 'destructive' });
+      return;
+    }
     const expDate = new Date(dataExpiracao + 'T23:59:59');
 
     const payload: any = {
       tipo,
       titulo: titulo.trim(),
       mensagem: mensagem.trim(),
-      autor,
+      autor: autor.trim(),
       origemPainel,
       dataExpiracao: Timestamp.fromDate(expDate),
       prioridade,
@@ -201,6 +238,62 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
     await updateDoc(doc(db, 'noticias_totem', n.id), { ativa: !n.ativa });
   };
 
+  // Template
+  const abrirTemplate = async () => {
+    try {
+      const snap = await getDoc(doc(db, 'config_painel', 'template_aniversario'));
+      const data: any = snap.data();
+      setTemplateTitulo(data?.titulo || DEFAULT_TEMPLATE.titulo);
+      setTemplateMensagem(data?.mensagem || DEFAULT_TEMPLATE.mensagem);
+    } catch {
+      setTemplateTitulo(DEFAULT_TEMPLATE.titulo);
+      setTemplateMensagem(DEFAULT_TEMPLATE.mensagem);
+    }
+    setTemplateOpen(true);
+  };
+
+  const inserirVariavel = (token: string) => {
+    if (activeField === 'titulo') {
+      const el = tituloRef.current;
+      const start = el?.selectionStart ?? templateTitulo.length;
+      const end = el?.selectionEnd ?? templateTitulo.length;
+      const novo = templateTitulo.slice(0, start) + token + templateTitulo.slice(end);
+      setTemplateTitulo(novo);
+      setTimeout(() => { el?.focus(); el?.setSelectionRange(start + token.length, start + token.length); }, 0);
+    } else {
+      const el = mensagemRef.current;
+      const start = el?.selectionStart ?? templateMensagem.length;
+      const end = el?.selectionEnd ?? templateMensagem.length;
+      const novo = templateMensagem.slice(0, start) + token + templateMensagem.slice(end);
+      setTemplateMensagem(novo);
+      setTimeout(() => { el?.focus(); el?.setSelectionRange(start + token.length, start + token.length); }, 0);
+    }
+  };
+
+  const salvarTemplate = async () => {
+    if (!templateTitulo.trim() || !templateMensagem.trim()) {
+      toast({ title: 'Preencha título e mensagem do modelo', variant: 'destructive' });
+      return;
+    }
+    try {
+      setSavingTemplate(true);
+      await setDoc(doc(db, 'config_painel', 'template_aniversario'), {
+        titulo: templateTitulo.trim(),
+        mensagem: templateMensagem.trim(),
+        atualizadoEm: Timestamp.now(),
+      }, { merge: true });
+      // Forçar refresh dos totens
+      await setDoc(doc(db, 'config_painel', 'aniversariantes'), { refreshAt: Timestamp.now() }, { merge: true });
+      toast({ title: 'Modelo salvo', description: 'Os totens serão atualizados em segundos.' });
+      setTemplateOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao salvar modelo', variant: 'destructive' });
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   const cfg = tipoConfig[tipo];
   const PreviewIcon = cfg.icon;
 
@@ -211,7 +304,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
           <Megaphone className="h-5 w-5 text-primary" />
           Painel do Totem — Notícias e Determinações
         </CardTitle>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             onClick={async () => {
@@ -224,7 +317,10 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
               }
             }}
           >
-            <Cake className="h-4 w-4 mr-2" /> Atualizar aniversariantes
+            <RefreshCw className="h-4 w-4 mr-2" /> Atualizar aniversariantes
+          </Button>
+          <Button variant="outline" onClick={abrirTemplate}>
+            <Settings className="h-4 w-4 mr-2" /> Editar modelo de parabéns
           </Button>
           <Button onClick={handleOpenNew}>
             <Plus className="h-4 w-4 mr-2" /> Nova
@@ -268,8 +364,9 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
           </TableBody>
         </Table>
 
+        {/* Dialog Notícia */}
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editing ? 'Editar' : 'Nova'} notícia do totem</DialogTitle>
             </DialogHeader>
@@ -299,6 +396,11 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                 <Label>Mensagem</Label>
                 <Textarea rows={4} value={mensagem} onChange={e => setMensagem(e.target.value)} placeholder="Conteúdo da notícia ou determinação" />
               </div>
+              <div>
+                <Label>Autor / Responsável <span className="text-destructive">*</span></Label>
+                <Input value={autor} onChange={e => setAutor(e.target.value)} placeholder="Ex.: CAP FULANO" />
+                <p className="text-xs text-muted-foreground mt-1">Quem está publicando a notícia/determinação. Será exibido no totem.</p>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Validade até</Label>
@@ -310,7 +412,6 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                 </div>
               </div>
 
-              {/* Upload de imagem */}
               <div>
                 <Label>Imagem (opcional)</Label>
                 {imagemUrl ? (
@@ -349,7 +450,6 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                 )}
               </div>
 
-              {/* Preview */}
               <div>
                 <Label>Pré-visualização</Label>
                 <div className={`mt-2 rounded-xl bg-gradient-to-br ${cfg.gradient} p-6 text-white shadow-xl`}>
@@ -361,6 +461,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <h3 className="text-2xl font-bold mb-2 break-words [overflow-wrap:anywhere]">{titulo || 'Título da notícia'}</h3>
                       <p className="text-base opacity-90 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{mensagem || 'Mensagem...'}</p>
+                      {autor && <p className="text-xs opacity-75 mt-3">— {autor}</p>}
                     </div>
                     {imagemUrl && (
                       <img src={imagemUrl} alt="" className="rounded-lg max-h-48 w-2/5 flex-shrink-0 object-cover" />
@@ -372,6 +473,82 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button onClick={handleSave} disabled={uploading}>{editing ? 'Salvar' : 'Publicar'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog Template */}
+        <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Cake className="h-5 w-5 text-pink-500" /> Modelo de parabéns aos aniversariantes
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border p-3 bg-muted/30">
+                <p className="text-sm font-medium mb-2">Variáveis disponíveis (clique para inserir)</p>
+                <div className="flex flex-wrap gap-2">
+                  {VARIAVEIS.map(v => (
+                    <Button
+                      key={v.token}
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => inserirVariavel(v.token)}
+                      title={v.descricao}
+                    >
+                      {v.token}
+                    </Button>
+                  ))}
+                </div>
+                <ul className="text-xs text-muted-foreground mt-2 space-y-0.5">
+                  {VARIAVEIS.map(v => (
+                    <li key={v.token}><code className="font-mono">{v.token}</code> — {v.descricao}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <Label>Título</Label>
+                <Input
+                  ref={tituloRef}
+                  value={templateTitulo}
+                  onFocus={() => setActiveField('titulo')}
+                  onChange={e => setTemplateTitulo(e.target.value)}
+                  placeholder={DEFAULT_TEMPLATE.titulo}
+                />
+              </div>
+              <div>
+                <Label>Mensagem</Label>
+                <Textarea
+                  ref={mensagemRef}
+                  rows={3}
+                  value={templateMensagem}
+                  onFocus={() => setActiveField('mensagem')}
+                  onChange={e => setTemplateMensagem(e.target.value)}
+                  placeholder={DEFAULT_TEMPLATE.mensagem}
+                />
+              </div>
+
+              <div>
+                <Label>Pré-visualização (com dados de exemplo: SD KEVIN, 30 anos)</Label>
+                <div className="mt-2 rounded-xl bg-gradient-to-br from-yellow-400 via-amber-500 to-pink-600 p-8 text-white shadow-xl text-center">
+                  <div className="text-5xl mb-3">🎂</div>
+                  <h3 className="text-3xl font-extrabold mb-3 break-words [overflow-wrap:anywhere]">
+                    {aplicarPreview(templateTitulo) || 'Título...'}
+                  </h3>
+                  <p className="text-lg italic opacity-95 break-words [overflow-wrap:anywhere]">
+                    {aplicarPreview(templateMensagem) || 'Mensagem...'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTemplateOpen(false)}>Cancelar</Button>
+              <Button onClick={salvarTemplate} disabled={savingTemplate}>
+                {savingTemplate ? 'Salvando...' : 'Salvar modelo'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
