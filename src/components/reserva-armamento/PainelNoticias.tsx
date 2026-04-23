@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Megaphone, AlertTriangle, Newspaper, Cake, Sparkles } from 'lucide-react';
@@ -97,42 +97,50 @@ const PainelNoticias = () => {
     return () => unsub();
   }, []);
 
-  // Carregar aniversariantes (refresh diário)
+  // Carregar aniversariantes (refresh diário + manual via config_painel/aniversariantes)
+  const carregarAniversariantes = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'policiais'));
+      const hoje = new Date();
+      const dia = hoje.getDate();
+      const mes = hoje.getMonth();
+      const lista: { nome: string; postoGrad: string }[] = [];
+      snap.forEach(d => {
+        const p: any = d.data();
+        const raw = p['Data de Nascimento'] ?? p.dataNascimento ?? p.NASCIMENTO;
+        const dt = parseNascimento(raw);
+        if (dt && dt.getDate() === dia && dt.getMonth() === mes) {
+          const nome = p['NOME DE GUERRA1'] || p.NOME || 'Policial';
+          const postoGrad = p['Post/Grad'] || p.postoGrad || '';
+          lista.push({ nome, postoGrad });
+        }
+      });
+      setAniversariantes(lista);
+    } catch (e) {
+      console.error('[PainelNoticias] Erro ao carregar aniversariantes:', e);
+    }
+  };
+
   useEffect(() => {
-    let cancelled = false;
-    const carregar = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'policiais'));
-        const hoje = new Date();
-        const dia = hoje.getDate();
-        const mes = hoje.getMonth();
-        const lista: { nome: string; postoGrad: string }[] = [];
-        snap.forEach(d => {
-          const p: any = d.data();
-          const raw = p['Data de Nascimento'] ?? p.dataNascimento ?? p.NASCIMENTO;
-          const dt = parseNascimento(raw);
-          if (dt && dt.getDate() === dia && dt.getMonth() === mes) {
-            const nome = p['NOME DE GUERRA1'] || p.NOME || 'Policial';
-            const postoGrad = p['Post/Grad'] || p.postoGrad || '';
-            lista.push({ nome, postoGrad });
-          }
-        });
-        if (!cancelled) setAniversariantes(lista);
-      } catch (e) {
-        console.error('[PainelNoticias] Erro ao carregar aniversariantes:', e);
-      }
-    };
-    carregar();
+    carregarAniversariantes();
     // Recarregar quando o dia mudar
     const i = setInterval(() => {
       const k = new Date().toDateString();
       if (k !== hojeKey) {
         setHojeKey(k);
-        carregar();
+        carregarAniversariantes();
       }
     }, 60000);
-    return () => { cancelled = true; clearInterval(i); };
+    return () => { clearInterval(i); };
   }, [hojeKey]);
+
+  // Listener de refresh manual
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'config_painel', 'aniversariantes'), () => {
+      carregarAniversariantes();
+    });
+    return () => unsub();
+  }, []);
 
   // Relógio
   useEffect(() => {
@@ -238,24 +246,24 @@ const PainelNoticias = () => {
               </p>
             </div>
           ) : (
-            <div className={`flex-1 flex ${slide.imagemUrl ? 'flex-row gap-8 items-center' : 'flex-col justify-center'} text-white min-h-0`}>
-              <div className={slide.imagemUrl ? 'flex-1 flex flex-col justify-center' : 'flex flex-col justify-center'}>
-                <h2 className="text-4xl md:text-5xl font-extrabold mb-6 drop-shadow-lg leading-tight">
+            <div className={`flex-1 flex ${slide.imagemUrl ? 'flex-row gap-8 items-center' : 'flex-col justify-center'} text-white min-h-0 overflow-hidden`}>
+              <div className={`${slide.imagemUrl ? 'w-3/5' : 'w-full'} flex flex-col justify-center min-w-0 overflow-hidden max-h-full`}>
+                <h2 className="text-4xl md:text-5xl font-extrabold mb-6 drop-shadow-lg leading-tight break-words [overflow-wrap:anywhere]">
                   {slide.titulo}
                 </h2>
-                <p className="text-2xl md:text-3xl leading-relaxed opacity-95 whitespace-pre-wrap">
+                <p className="text-2xl md:text-3xl leading-relaxed opacity-95 whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-hidden">
                   {slide.mensagem}
                 </p>
                 {slide.autor && (
-                  <p className="mt-8 text-base opacity-75">— {slide.autor}</p>
+                  <p className="mt-8 text-base opacity-75 break-words">— {slide.autor}</p>
                 )}
               </div>
               {slide.imagemUrl && (
-                <div className="flex-1 flex items-center justify-center max-h-full">
+                <div className="w-2/5 flex-shrink-0 flex items-center justify-center max-h-full">
                   <img
                     src={slide.imagemUrl}
                     alt={slide.titulo}
-                    className="max-h-[70vh] max-w-full object-contain rounded-2xl shadow-2xl border-4 border-white/30"
+                    className="max-h-[60vh] max-w-full object-contain rounded-2xl shadow-2xl border-4 border-white/30"
                   />
                 </div>
               )}

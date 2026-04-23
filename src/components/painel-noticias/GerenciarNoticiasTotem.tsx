@@ -9,8 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Eye, Megaphone, AlertTriangle, Newspaper, Upload, X, Image as ImageIcon } from 'lucide-react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
+import { Plus, Pencil, Trash2, Eye, Megaphone, AlertTriangle, Newspaper, Upload, X, Image as ImageIcon, RefreshCw, Cake } from 'lucide-react';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp, setDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
@@ -206,14 +206,30 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
         <CardTitle className="flex items-center gap-2">
           <Megaphone className="h-5 w-5 text-primary" />
           Painel do Totem — Notícias e Determinações
         </CardTitle>
-        <Button onClick={handleOpenNew}>
-          <Plus className="h-4 w-4 mr-2" /> Nova
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                await setDoc(doc(db, 'config_painel', 'aniversariantes'), { refreshAt: Timestamp.now() }, { merge: true });
+                toast({ title: 'Atualização solicitada', description: 'Os totens serão atualizados em segundos.' });
+              } catch (e) {
+                console.error(e);
+                toast({ title: 'Erro ao solicitar atualização', variant: 'destructive' });
+              }
+            }}
+          >
+            <Cake className="h-4 w-4 mr-2" /> Atualizar aniversariantes
+          </Button>
+          <Button onClick={handleOpenNew}>
+            <Plus className="h-4 w-4 mr-2" /> Nova
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
@@ -341,13 +357,13 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                     <PreviewIcon className="h-6 w-6" />
                     <Badge className="bg-white/20 text-white border-white/30">{cfg.label}</Badge>
                   </div>
-                  <div className={imagemUrl ? 'grid grid-cols-2 gap-4 items-center' : ''}>
-                    <div>
-                      <h3 className="text-2xl font-bold mb-2">{titulo || 'Título da notícia'}</h3>
-                      <p className="text-base opacity-90 whitespace-pre-wrap">{mensagem || 'Mensagem...'}</p>
+                  <div className={imagemUrl ? 'flex gap-4 items-center' : ''}>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <h3 className="text-2xl font-bold mb-2 break-words [overflow-wrap:anywhere]">{titulo || 'Título da notícia'}</h3>
+                      <p className="text-base opacity-90 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{mensagem || 'Mensagem...'}</p>
                     </div>
                     {imagemUrl && (
-                      <img src={imagemUrl} alt="" className="rounded-lg max-h-48 w-full object-cover" />
+                      <img src={imagemUrl} alt="" className="rounded-lg max-h-48 w-2/5 flex-shrink-0 object-cover" />
                     )}
                   </div>
                 </div>
