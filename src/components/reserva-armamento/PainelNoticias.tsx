@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Badge } from '@/components/ui/badge';
 import { Megaphone, AlertTriangle, Newspaper, Cake, Sparkles } from 'lucide-react';
