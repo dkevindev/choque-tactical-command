@@ -246,24 +246,24 @@ const PainelNoticias = () => {
               </p>
             </div>
           ) : (
-            <div className={`flex-1 flex ${slide.imagemUrl ? 'flex-row gap-8 items-center' : 'flex-col justify-center'} text-white min-h-0`}>
-              <div className={slide.imagemUrl ? 'flex-1 flex flex-col justify-center' : 'flex flex-col justify-center'}>
-                <h2 className="text-4xl md:text-5xl font-extrabold mb-6 drop-shadow-lg leading-tight">
+            <div className={`flex-1 flex ${slide.imagemUrl ? 'flex-row gap-8 items-center' : 'flex-col justify-center'} text-white min-h-0 overflow-hidden`}>
+              <div className={`${slide.imagemUrl ? 'w-3/5' : 'w-full'} flex flex-col justify-center min-w-0 overflow-hidden max-h-full`}>
+                <h2 className="text-4xl md:text-5xl font-extrabold mb-6 drop-shadow-lg leading-tight break-words [overflow-wrap:anywhere]">
                   {slide.titulo}
                 </h2>
-                <p className="text-2xl md:text-3xl leading-relaxed opacity-95 whitespace-pre-wrap">
+                <p className="text-2xl md:text-3xl leading-relaxed opacity-95 whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-hidden">
                   {slide.mensagem}
                 </p>
                 {slide.autor && (
-                  <p className="mt-8 text-base opacity-75">— {slide.autor}</p>
+                  <p className="mt-8 text-base opacity-75 break-words">— {slide.autor}</p>
                 )}
               </div>
               {slide.imagemUrl && (
-                <div className="flex-1 flex items-center justify-center max-h-full">
+                <div className="w-2/5 flex-shrink-0 flex items-center justify-center max-h-full">
                   <img
                     src={slide.imagemUrl}
                     alt={slide.titulo}
-                    className="max-h-[70vh] max-w-full object-contain rounded-2xl shadow-2xl border-4 border-white/30"
+                    className="max-h-[60vh] max-w-full object-contain rounded-2xl shadow-2xl border-4 border-white/30"
                   />
                 </div>
               )}
