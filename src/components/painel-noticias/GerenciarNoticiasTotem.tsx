@@ -206,14 +206,30 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
         <CardTitle className="flex items-center gap-2">
           <Megaphone className="h-5 w-5 text-primary" />
           Painel do Totem — Notícias e Determinações
         </CardTitle>
-        <Button onClick={handleOpenNew}>
-          <Plus className="h-4 w-4 mr-2" /> Nova
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              try {
+                await setDoc(doc(db, 'config_painel', 'aniversariantes'), { refreshAt: Timestamp.now() }, { merge: true });
+                toast({ title: 'Atualização solicitada', description: 'Os totens serão atualizados em segundos.' });
+              } catch (e) {
+                console.error(e);
+                toast({ title: 'Erro ao solicitar atualização', variant: 'destructive' });
+              }
+            }}
+          >
+            <Cake className="h-4 w-4 mr-2" /> Atualizar aniversariantes
+          </Button>
+          <Button onClick={handleOpenNew}>
+            <Plus className="h-4 w-4 mr-2" /> Nova
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
