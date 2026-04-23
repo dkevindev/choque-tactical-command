@@ -1,90 +1,48 @@
 
 
-# Painel de Notícias e Determinações no Totem da Reserva
+# Correções no Painel de Notícias do Totem
 
-## Resumo
-Reorganizar o Totem da Reserva de Armamento para que, quando estiver ocioso (sem cautela em andamento), exiba um grande painel de notícias/determinações em formato de banner em slideshow automático. O bloco "Aguardando material..." vira pequeno e discreto no canto. Inclui um banner fixo de aniversariantes do dia gerado automaticamente a partir das datas de nascimento dos policiais.
+## 1. Botão "Atualizar aniversariantes" (refresh manual)
 
-## 1. Nova estrutura visual do Totem (modo ocioso)
+**Arquivo**: `src/components/painel-noticias/GerenciarNoticiasTotem.tsx`
 
-**Arquivo**: `src/components/reserva-armamento/TotemPolicialInterface.tsx`
+- Adicionar botão no cabeçalho do card: "Atualizar aniversariantes" com ícone `RefreshCw`
+- Ao clicar, grava/atualiza um documento de controle em Firestore (`config_painel/aniversariantes` com campo `refreshAt: Timestamp.now()`)
+- Toast confirmando: "Atualização solicitada — totens serão atualizados em segundos"
 
-Layout em tela cheia dividido em duas regiões:
-- **Header reduzido** (topo): logo + título + um pequeno chip de status "Aguardando material" com `Loader2` discreto
-- **Área principal (≈85% da tela)**: carrossel de banners em rotação automática (8s por slide, transição fade/slide)
-- **Rodapé**: data/hora atual em destaque e indicadores de slide (bullets)
+**Arquivo**: `src/components/reserva-armamento/PainelNoticias.tsx`
 
-Quando uma cautela chega (`cautelaAtual !== null`), o painel some e a interface atual de cautela ocupa toda a tela como já é hoje.
+- Extrair a função `carregar()` dos aniversariantes para escopo do componente
+- Adicionar `onSnapshot` em `config_painel/aniversariantes` — quando `refreshAt` mudar, executa `carregar()` imediatamente, antecipando o ciclo automático das 00h
+- Mantém o reload diário automático já existente
 
-## 2. Carrossel de Notícias
+## 2. Imagem não aparece no Totem após salvar
 
-Novo componente: `src/components/reserva-armamento/PainelNoticias.tsx`
+**Arquivo**: `src/components/reserva-armamento/PainelNoticias.tsx`
 
-- Listener `onSnapshot` em nova coleção `noticias_totem` filtrando `ativa == true` e `dataExpiracao >= hoje`
-- Ordenação por `prioridade` desc + `dataPublicacao` desc
-- Auto-play 8s, pausa em erro, faz loop infinito
-- Banner full-bleed com:
-  - Tag de tipo (NOTÍCIA / DETERMINAÇÃO / AVISO) com cor distinta
-  - Título grande (text-6xl)
-  - Corpo da mensagem (text-3xl)
-  - Autor + data de publicação no canto
-- Banner especial de aniversariantes (sempre incluso quando houver) usa visual festivo: gradiente dourado/azul, ícone 🎂, animação `animate-pulse`/confete, lista os nomes dos aniversariantes do dia em destaque
+Causa: o layout `flex-row` do banner com imagem usa `flex-1` no bloco de texto sem `min-w-0`, e textos longos sem espaços (como `dsgd...\\\\`) empurram a imagem para fora da viewport, fazendo parecer que ela não foi enviada.
 
-## 3. Aniversariantes do dia (automático)
+Correção:
+- Adicionar `min-w-0` e `overflow-hidden` no container de texto
+- Garantir que a imagem use `flex-shrink-0` com largura mínima fixa (ex.: `w-2/5`)
+- Reduzir o `max-h` da imagem para `max-h-[60vh]` para não estourar verticalmente
 
-Função utilitária dentro do `PainelNoticias.tsx`:
-- Lê coleção `policiais` uma vez (com refresh diário)
-- Filtra por `dataNascimento` (suporta os formatos já em uso: string ISO, número Excel serial, e campo `NASCIMENTO`/`Data de Nascimento`)
-- Compara `dia` e `mês` com a data atual
-- Gera um slide virtual injetado no início do carrossel:
-  - "🎉 PARABÉNS AOS ANIVERSARIANTES DE HOJE 🎉"
-  - Lista: `POSTO/GRAD NOME DE GUERRA` (uma linha por policial em fonte grande)
-  - Subtítulo: "Que Deus abençoe sua jornada — RPMONT"
-- Se não houver aniversariantes, slide é omitido
+## 3. Quebra automática de texto (sem ultrapassar a tela e sem cobrir a imagem)
 
-## 4. Cadastro de notícias (Gestão)
+**Arquivo**: `src/components/reserva-armamento/PainelNoticias.tsx`
 
-Nova coleção Firestore `noticias_totem`:
-```text
-{
-  tipo: "noticia" | "determinacao" | "aviso",
-  titulo: string,
-  mensagem: string,
-  autor: string,
-  origemPainel: "gestao_logistica" | "gestao_pessoas",
-  dataPublicacao: Timestamp,
-  dataExpiracao: Timestamp,
-  prioridade: number (0-10),
-  ativa: boolean
-}
-```
+No bloco do título e da mensagem (tanto layout sem imagem quanto com imagem):
+- Adicionar classes Tailwind: `break-words` e `overflow-wrap-anywhere` (via `[overflow-wrap:anywhere]`)
+- No título: `break-words [overflow-wrap:anywhere]`
+- No parágrafo da mensagem: `whitespace-pre-wrap break-words [overflow-wrap:anywhere]`
+- Adicionar `max-h-[70vh] overflow-hidden` no wrapper para evitar transbordo vertical
 
-Novo componente compartilhado: `src/components/painel-noticias/GerenciarNoticiasTotem.tsx`
-- Tabela com notícias existentes (editar/desativar/excluir)
-- Formulário (Dialog) para criar nova: tipo, título, mensagem, validade (data de expiração), prioridade
-- Preview do banner antes de salvar
+**Arquivo**: `src/components/painel-noticias/GerenciarNoticiasTotem.tsx`
 
-Integração:
-- **Gestão e Logística** (`src/components/AdminDashboard.tsx`): nova aba/card "Painel Totem" → renderiza `GerenciarNoticiasTotem` com `origemPainel="gestao_logistica"`
-- **Gestão de Pessoas** (`src/components/GestãoPessoas.tsx`): nova aba "Painel Totem" → mesmo componente com `origemPainel="gestao_pessoas"`
+- Aplicar as mesmas classes de quebra no preview do dialog para fidelidade visual
 
-Ambos veem todas as notícias, mas a origem fica registrada para auditoria.
+## Arquivos editados
 
-## 5. Detalhes técnicos
-
-- Animação dos banners usa Tailwind keyframes existentes (`animate-fade-in`, `animate-scale-in`)
-- Aniversariantes recalculados automaticamente quando o relógio cruza a meia-noite (setInterval de 1 min checando data)
-- Toda a área do painel é `pointer-events-none` para evitar interação acidental no totem
-- Cores por tipo: NOTÍCIA (azul), DETERMINAÇÃO (vermelho), AVISO (âmbar), ANIVERSÁRIO (gradiente dourado/festivo)
-
-## Arquivos
-
-**Criar:**
-- `src/components/reserva-armamento/PainelNoticias.tsx`
-- `src/components/painel-noticias/GerenciarNoticiasTotem.tsx`
-
-**Editar:**
-- `src/components/reserva-armamento/TotemPolicialInterface.tsx` — substituir bloco "Aguardando material" pelo painel
-- `src/components/AdminDashboard.tsx` — nova aba "Painel Totem"
-- `src/components/GestãoPessoas.tsx` — nova aba "Painel Totem"
+- `src/components/painel-noticias/GerenciarNoticiasTotem.tsx` — botão de refresh + classes de quebra no preview
+- `src/components/reserva-armamento/PainelNoticias.tsx` — listener de refresh, layout da imagem com `min-w-0`/`flex-shrink-0`, quebra de texto
 
