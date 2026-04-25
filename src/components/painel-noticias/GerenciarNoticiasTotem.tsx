@@ -531,6 +531,9 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
           >
             <RefreshCw className="h-4 w-4 mr-2" /> Atualizar aniversariantes
           </Button>
+          <Button variant="outline" onClick={abrirAniv}>
+            <Cake className="h-4 w-4 mr-2" /> Aniversariantes
+          </Button>
           <Button variant="outline" onClick={abrirTemplate}>
             <Settings className="h-4 w-4 mr-2" /> Editar modelo de parabéns
           </Button>
