@@ -138,7 +138,6 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
   const [anivOpen, setAnivOpen] = useState(false);
   const [policiais, setPoliciais] = useState<any[]>([]);
   const [loadingPoliciais, setLoadingPoliciais] = useState(false);
-  const [reformatando, setReformatando] = useState(false);
   const [busca, setBusca] = useState('');
   const [editDataOpen, setEditDataOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any | null>(null);
@@ -221,10 +220,13 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
       setSavingData(true);
       const [y, m, d] = editDataValue.split('-').map(Number);
       const date = new Date(y, m - 1, d);
-      const serial = dateToExcelSerial(date);
-      await updateDoc(doc(db, 'policiais', editTarget.id), { NASCIMENTO: serial });
+      if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) {
+        toast({ title: 'Data inválida', variant: 'destructive' });
+        return;
+      }
+      await updateDoc(doc(db, 'policiais', editTarget.id), { [CAMPO_NASCIMENTO_PAINEL]: editDataValue });
       // Atualizar local
-      setPoliciais(prev => prev.map(p => p.id === editTarget.id ? { ...p, NASCIMENTO: serial } : p));
+      setPoliciais(prev => prev.map(p => p.id === editTarget.id ? { ...p, [CAMPO_NASCIMENTO_PAINEL]: editDataValue } : p));
       await solicitarRefreshTotens();
       toast({ title: 'Data atualizada', description: 'Os totens serão atualizados em segundos.' });
       setEditDataOpen(false);
@@ -234,55 +236,6 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
       toast({ title: 'Erro ao salvar data', variant: 'destructive' });
     } finally {
       setSavingData(false);
-    }
-  };
-
-  const reformatarTodas = async () => {
-    if (!confirm('Padronizar o campo NASCIMENTO de TODOS os policiais para o formato Excel serial (int)? Esta ação atualiza o banco.')) return;
-    if (!confirm('Confirmar novamente: esta operação modificará registros no Firestore.')) return;
-    try {
-      setReformatando(true);
-      let convertidos = 0, jaOk = 0, semData = 0, invalidos = 0;
-      const lote: { id: string; serial: number }[] = [];
-      for (const p of policiais) {
-        const { raw, campoUsado } = lerCampoNascimento(p);
-        if (raw === null || raw === undefined || raw === '') { semData++; continue; }
-        const dt = parseNascimento(raw);
-        if (!dt) {
-          invalidos++;
-          console.warn('[Reformatar] Inválido:', p.MATRICULA || p.id, raw);
-          continue;
-        }
-        const serial = dateToExcelSerial(dt);
-        // Já está no formato correto?
-        if (typeof raw === 'number' && raw === serial && campoUsado === 'NASCIMENTO') {
-          jaOk++;
-          continue;
-        }
-        lote.push({ id: p.id, serial });
-      }
-      // Commits em batches de 400
-      for (let i = 0; i < lote.length; i += 400) {
-        const batch = writeBatch(db);
-        lote.slice(i, i + 400).forEach(item => {
-          batch.update(doc(db, 'policiais', item.id), { NASCIMENTO: item.serial });
-        });
-        await batch.commit();
-        convertidos += Math.min(400, lote.length - i);
-      }
-      // Atualiza estado local
-      const map = new Map(lote.map(l => [l.id, l.serial]));
-      setPoliciais(prev => prev.map(p => map.has(p.id) ? { ...p, NASCIMENTO: map.get(p.id) } : p));
-      await solicitarRefreshTotens();
-      toast({
-        title: 'Reformatação concluída',
-        description: `Convertidos: ${convertidos} · Já no formato: ${jaOk} · Sem data: ${semData} · Inválidos: ${invalidos}`,
-      });
-    } catch (e) {
-      console.error(e);
-      toast({ title: 'Erro ao reformatar', variant: 'destructive' });
-    } finally {
-      setReformatando(false);
     }
   };
 
