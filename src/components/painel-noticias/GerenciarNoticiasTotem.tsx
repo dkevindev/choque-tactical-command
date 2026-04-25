@@ -164,6 +164,158 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
   const mensagemRef = useRef<HTMLTextAreaElement>(null);
   const [activeField, setActiveField] = useState<'titulo' | 'mensagem'>('mensagem');
 
+  // Aniversariantes / policiais
+  const [anivOpen, setAnivOpen] = useState(false);
+  const [policiais, setPoliciais] = useState<any[]>([]);
+  const [loadingPoliciais, setLoadingPoliciais] = useState(false);
+  const [reformatando, setReformatando] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [editDataOpen, setEditDataOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<any | null>(null);
+  const [editDataValue, setEditDataValue] = useState('');
+  const [savingData, setSavingData] = useState(false);
+
+  const carregarPoliciais = async () => {
+    try {
+      setLoadingPoliciais(true);
+      const snap = await getDocs(collection(db, 'policiais'));
+      const list: any[] = [];
+      snap.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
+      setPoliciais(list);
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao carregar policiais', variant: 'destructive' });
+    } finally {
+      setLoadingPoliciais(false);
+    }
+  };
+
+  const abrirAniv = async () => {
+    setAnivOpen(true);
+    if (policiais.length === 0) await carregarPoliciais();
+  };
+
+  const solicitarRefreshTotens = async () => {
+    try {
+      await setDoc(doc(db, 'config_painel', 'aniversariantes'), { refreshAt: Timestamp.now() }, { merge: true });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const aniversariantesHoje = useMemo(() => {
+    const hoje = new Date();
+    const dia = hoje.getDate();
+    const mes = hoje.getMonth();
+    const ano = hoje.getFullYear();
+    return policiais
+      .map(p => {
+        const { raw, campoUsado } = lerCampoNascimento(p);
+        const dt = parseNascimento(raw);
+        if (!dt) return null;
+        if (dt.getDate() !== dia || dt.getMonth() !== mes) return null;
+        const anoNasc = dt.getFullYear();
+        const idade = anoNasc > 1900 ? ano - anoNasc - (
+          (hoje.getMonth() < dt.getMonth() || (hoje.getMonth() === dt.getMonth() && hoje.getDate() < dt.getDate())) ? 1 : 0
+        ) : null;
+        return { policial: p, dt, raw, campoUsado, idade };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+  }, [policiais]);
+
+  const policiaisFiltrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    const lista = q
+      ? policiais.filter(p => {
+          const blob = `${p.NOME || ''} ${p['NOME DE GUERRA1'] || p['NOME DE GUERRA'] || ''} ${p.MATRICULA || p.matricula || ''} ${p.NUMERAL || ''}`.toLowerCase();
+          return blob.includes(q);
+        })
+      : policiais;
+    return lista.slice(0, 200);
+  }, [policiais, busca]);
+
+  const abrirEditarData = (p: any) => {
+    setEditTarget(p);
+    const { raw } = lerCampoNascimento(p);
+    const dt = parseNascimento(raw);
+    setEditDataValue(dt ? `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}` : '');
+    setEditDataOpen(true);
+  };
+
+  const salvarData = async () => {
+    if (!editTarget || !editDataValue) {
+      toast({ title: 'Selecione uma data', variant: 'destructive' });
+      return;
+    }
+    try {
+      setSavingData(true);
+      const [y, m, d] = editDataValue.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      const serial = dateToExcelSerial(date);
+      await updateDoc(doc(db, 'policiais', editTarget.id), { NASCIMENTO: serial });
+      // Atualizar local
+      setPoliciais(prev => prev.map(p => p.id === editTarget.id ? { ...p, NASCIMENTO: serial } : p));
+      await solicitarRefreshTotens();
+      toast({ title: 'Data atualizada', description: 'Os totens serão atualizados em segundos.' });
+      setEditDataOpen(false);
+      setEditTarget(null);
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao salvar data', variant: 'destructive' });
+    } finally {
+      setSavingData(false);
+    }
+  };
+
+  const reformatarTodas = async () => {
+    if (!confirm('Padronizar o campo NASCIMENTO de TODOS os policiais para o formato Excel serial (int)? Esta ação atualiza o banco.')) return;
+    if (!confirm('Confirmar novamente: esta operação modificará registros no Firestore.')) return;
+    try {
+      setReformatando(true);
+      let convertidos = 0, jaOk = 0, semData = 0, invalidos = 0;
+      const lote: { id: string; serial: number }[] = [];
+      for (const p of policiais) {
+        const { raw, campoUsado } = lerCampoNascimento(p);
+        if (raw === null || raw === undefined || raw === '') { semData++; continue; }
+        const dt = parseNascimento(raw);
+        if (!dt) {
+          invalidos++;
+          console.warn('[Reformatar] Inválido:', p.MATRICULA || p.id, raw);
+          continue;
+        }
+        const serial = dateToExcelSerial(dt);
+        // Já está no formato correto?
+        if (typeof raw === 'number' && raw === serial && campoUsado === 'NASCIMENTO') {
+          jaOk++;
+          continue;
+        }
+        lote.push({ id: p.id, serial });
+      }
+      // Commits em batches de 400
+      for (let i = 0; i < lote.length; i += 400) {
+        const batch = writeBatch(db);
+        lote.slice(i, i + 400).forEach(item => {
+          batch.update(doc(db, 'policiais', item.id), { NASCIMENTO: item.serial });
+        });
+        await batch.commit();
+        convertidos += Math.min(400, lote.length - i);
+      }
+      // Atualiza estado local
+      const map = new Map(lote.map(l => [l.id, l.serial]));
+      setPoliciais(prev => prev.map(p => map.has(p.id) ? { ...p, NASCIMENTO: map.get(p.id) } : p));
+      await solicitarRefreshTotens();
+      toast({
+        title: 'Reformatação concluída',
+        description: `Convertidos: ${convertidos} · Já no formato: ${jaOk} · Sem data: ${semData} · Inválidos: ${invalidos}`,
+      });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro ao reformatar', variant: 'destructive' });
+    } finally {
+      setReformatando(false);
+    }
+  };
+
   useEffect(() => {
     const q = query(collection(db, 'noticias_totem'), orderBy('dataPublicacao', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
