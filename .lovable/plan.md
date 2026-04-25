@@ -1,60 +1,47 @@
 
-# Aniversariantes (NASCIMENTO Excel serial) + Modelo editável + Autor manual
+# Lista de Aniversariantes + Reformatador de Datas + Edição manual
 
-## 1. Detecção correta da data de nascimento
+## 1. Aba "Aniversariantes" no `GerenciarNoticiasTotem.tsx`
 
-**Arquivo**: `src/components/reserva-armamento/PainelNoticias.tsx`
+Adicionar um Dialog acionado por botão **"Aniversariantes do dia"** (ícone `Cake`) no cabeçalho, que mostra:
 
-Confirmado: o campo é `NASCIMENTO` (int64, serial Excel — ex.: `34493` → 08/06/1994). A função `parseNascimento` atual já converte serial Excel via `(raw - 25569) * 86400 * 1000`, mas a leitura prioriza outros campos. Ajustes:
+### Tabela com TODOS os policiais aniversariantes de hoje
+- Colunas: Posto/Grad · Nome de Guerra · Nome Completo · Matrícula · Idade · Data (formatada `dd/MM/yyyy`) · Valor bruto do campo `NASCIMENTO` (para diagnóstico) · Ações
+- Reutiliza a função `parseNascimento` (extraída para arquivo compartilhado ou duplicada localmente) que aceita: int64 Excel serial (`34493` → 08/06/1994), strings ISO, strings numéricas, Timestamps Firestore
+- Botão **"Atualizar"** no topo do dialog → re-executa a varredura e atualiza `config_painel/aniversariantes.refreshAt` (sincroniza todos os totens em tempo real)
 
-- Ler **`p.NASCIMENTO`** como campo principal (depois fallback para `Data de Nascimento`, `dataNascimento`, `data_nascimento`)
-- Scan case-insensitive das chaves do doc (qualquer chave que contenha "nascimento")
-- Log no console: `[Aniversariantes] Encontrados: N | Hoje: dd/mm` listando matrícula + nome detectados, para diagnóstico
-- Calcular **idade** a partir do ano da data convertida
+### Ação por linha: "Corrigir data de nascimento"
+- Abre sub-dialog com Input tipo `date` (formato pt-BR)
+- Ao salvar: grava no documento do policial em `policiais/{id}` o campo `NASCIMENTO` como **Excel serial int** (mantém compatibilidade com o formato existente — fórmula inversa: `Math.floor(date.getTime() / 86400000) + 25569`)
+- Após salvar: atualiza `refreshAt` para refletir nos totens em segundos
 
-## 2. Slide individual por aniversariante
+## 2. Botão "Reformatar todas as datas de nascimento"
 
-Hoje todos vão em UM slide. Alterar para gerar **um slide por policial**, cada um com seu próprio banner festivo (gradiente dourado/rosa, animação, ícone 🎂). Isso garante que o nome do policial específico apareça em destaque na rotação do carrossel.
+Botão de ação em massa **"Padronizar formato NASCIMENTO"** dentro do dialog de aniversariantes (com confirmação dupla). Para cada policial:
 
-## 3. Modelo de mensagem editável (com variáveis)
+- Lê todos os possíveis campos de nascimento (`NASCIMENTO`, `Data de Nascimento`, `dataNascimento`, `data_nascimento`, scan case-insensitive de qualquer chave que contenha "nascimento")
+- Detecta o formato (Excel serial / string ISO / string `dd/MM/yyyy` / Timestamp / Date)
+- Converte tudo para **Excel serial int64** e grava em `NASCIMENTO`
+- Pula registros sem data ou com data inválida (loga no console com matrícula)
+- Mostra toast com totais: `Convertidos: X | Já no formato: Y | Sem data: Z | Inválidos: W`
+- Ao final, atualiza `refreshAt` para forçar refresh nos totens
 
-Novo documento Firestore: `config_painel/template_aniversario`
-```
-titulo: string    (default: "🎉 PARABÉNS {POSTO} {NOME DE GUERRA1} 🎉")
-mensagem: string  (default: "O RPMONT deseja muitas felicidades — que Deus abençoe sua jornada!")
-```
+### Aba complementar: "Listar todos os policiais (busca)"
+Dentro do mesmo dialog, segunda aba **"Buscar policial"** com Input de busca (por nome, nome de guerra ou matrícula) listando os policiais encontrados com:
+- Data de nascimento atual formatada
+- Botão "Editar data" (mesmo sub-dialog do item 1)
 
-Variáveis substituídas por slide:
-- `{NOME DE GUERRA1}` → nome de guerra
-- `{NOME}` → nome completo
-- `{POSTO}` ou `{POST/GRAD}` → posto/graduação
-- `{MATRICULA}` → matrícula
-- `{IDADE}` → idade calculada
+Isso permite corrigir manualmente a data de qualquer policial — não apenas dos aniversariantes do dia.
 
-`PainelNoticias.tsx` adiciona `onSnapshot` no template para atualização em tempo real.
+## 3. Visual e UX
 
-## 4. Editor do modelo no Gerenciar
-
-**Arquivo**: `src/components/painel-noticias/GerenciarNoticiasTotem.tsx`
-
-Junto ao botão "Atualizar aniversariantes", novo botão **"Editar modelo de parabéns"** abre Dialog com:
-- Input do Título + Textarea da Mensagem
-- Chips clicáveis das variáveis (insere no cursor)
-- Lista de variáveis com explicação
-- Pré-visualização ao vivo usando dados fictícios (`SD KEVIN`, matrícula 123456, idade 30)
-- Salvar → grava em `config_painel/template_aniversario` + atualiza `refreshAt` para forçar refresh imediato dos totens
-
-## 5. Autor manual ao criar notícia/determinação
-
-**Arquivo**: `src/components/painel-noticias/GerenciarNoticiasTotem.tsx`
-
-- Remover leitura automática do `localStorage`
-- Adicionar campo **"Autor / Responsável"** (Input obrigatório) no formulário
-- Placeholder sugerindo formato (`Ex.: CAP FULANO`), mas vazio por padrão
-- Validação no `handleSave`: se vazio, toast "Informe o autor" e bloqueia
-- Ao editar notícia existente, carregar o `autor` salvo no campo
+- Usar `Tabs` (Radix) no Dialog: aba 1 = "Aniversariantes hoje" · aba 2 = "Buscar policial"
+- Linhas de aniversariantes destacadas com fundo `bg-pink-50`
+- Tabela com `ScrollArea` (max altura para caber em telas menores)
+- Datas exibidas em `dd/MM/yyyy` (padrão sistema)
 
 ## Arquivos editados
 
-- `src/components/reserva-armamento/PainelNoticias.tsx` — leitura priorizada de `NASCIMENTO`, slides individuais, listener do template, substituição de variáveis, log de diagnóstico
-- `src/components/painel-noticias/GerenciarNoticiasTotem.tsx` — campo autor manual obrigatório, Dialog "Editar modelo de parabéns" com chips de variáveis e preview
+- `src/components/painel-noticias/GerenciarNoticiasTotem.tsx` — novo Dialog "Aniversariantes" com tabela, botão de reformatação em massa, aba de busca, e sub-dialog de edição de data
+
+Nenhum outro arquivo precisa ser tocado — `PainelNoticias.tsx` já reage automaticamente via `onSnapshot` em `config_painel/aniversariantes` quando `refreshAt` muda.
