@@ -6,6 +6,8 @@ import { Megaphone, AlertTriangle, Newspaper, Cake, Sparkles } from 'lucide-reac
 
 type TipoNoticia = 'noticia' | 'determinacao' | 'aviso' | 'aniversario';
 
+const CAMPO_NASCIMENTO_PAINEL = 'NASCIMENTO_NOV';
+
 interface Aniversariante {
   nome: string;
   nomeGuerra: string;
@@ -68,6 +70,12 @@ const parseNascimento = (raw: any): Date | null => {
     if (typeof raw === 'string' && /^\d+$/.test(raw.trim())) {
       const n = Number(raw.trim());
       return new Date((n - 25569) * 86400 * 1000);
+    }
+    if (typeof raw === 'string') {
+      const iso = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (iso) {
+        return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+      }
     }
     if (raw?.toDate) return raw.toDate();
     const d = new Date(raw);
@@ -136,17 +144,8 @@ const PainelNoticias = () => {
       const lista: Aniversariante[] = [];
       snap.forEach(d => {
         const p: any = d.data();
-        // Buscar campo de nascimento — prioridade NASCIMENTO (int64 Excel serial)
-        let raw = p.NASCIMENTO ?? p['Data de Nascimento'] ?? p.dataNascimento ?? p.data_nascimento;
-        if (raw === undefined || raw === null || raw === '') {
-          // Scan case-insensitive de qualquer chave contendo "nascimento"
-          for (const k of Object.keys(p)) {
-            if (k.toLowerCase().includes('nascimento')) {
-              raw = p[k];
-              if (raw !== undefined && raw !== null && raw !== '') break;
-            }
-          }
-        }
+        // Usa apenas o novo campo preenchido manualmente no painel, sem tocar nos dados antigos
+        const raw = p[CAMPO_NASCIMENTO_PAINEL];
         const dt = parseNascimento(raw);
         if (dt && dt.getDate() === dia && dt.getMonth() === mes) {
           const nomeGuerra = p['NOME DE GUERRA1'] || p.nomeGuerra || '';

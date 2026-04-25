@@ -11,47 +11,27 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Pencil, Trash2, Megaphone, AlertTriangle, Newspaper, Upload, X, RefreshCw, Cake, Settings, Wand2, Search, Users } from 'lucide-react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp, setDoc, getDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { Plus, Pencil, Trash2, Megaphone, AlertTriangle, Newspaper, Upload, X, RefreshCw, Cake, Settings, Search, Users } from 'lucide-react';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp, setDoc, getDoc, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
 
-// ============ Helpers de data de nascimento ============
-const EXCEL_EPOCH_OFFSET = 25569; // dias entre 1899-12-30 e 1970-01-01
-
-const dateToExcelSerial = (d: Date): number => {
-  // Usa UTC para evitar drift por timezone
-  const utc = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-  return Math.floor(utc / 86400000) + EXCEL_EPOCH_OFFSET;
-};
-
-const excelSerialToDate = (n: number): Date => {
-  return new Date((n - EXCEL_EPOCH_OFFSET) * 86400 * 1000);
-};
+// ============ Helpers de data de nascimento do painel ============
+const CAMPO_NASCIMENTO_PAINEL = 'NASCIMENTO_NOV';
 
 const parseNascimento = (raw: any): Date | null => {
   if (raw === null || raw === undefined || raw === '') return null;
   try {
-    if (typeof raw === 'number') return excelSerialToDate(raw);
     if (raw?.toDate) return raw.toDate();
     if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
     if (typeof raw === 'string') {
       const s = raw.trim();
       if (!s) return null;
-      if (/^\d+$/.test(s)) return excelSerialToDate(Number(s));
-      // dd/mm/yyyy ou dd-mm-yyyy
-      const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-      if (m) {
-        const dia = Number(m[1]);
-        const mes = Number(m[2]) - 1;
-        let ano = Number(m[3]);
-        if (ano < 100) ano += ano < 30 ? 2000 : 1900;
-        const d = new Date(ano, mes, dia);
-        return isNaN(d.getTime()) ? null : d;
-      }
-      const d = new Date(s);
-      return isNaN(d.getTime()) ? null : d;
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!iso) return null;
+      const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+      return d.getFullYear() === Number(iso[1]) && d.getMonth() === Number(iso[2]) - 1 && d.getDate() === Number(iso[3]) ? d : null;
     }
     return null;
   } catch {
@@ -60,18 +40,8 @@ const parseNascimento = (raw: any): Date | null => {
 };
 
 const lerCampoNascimento = (p: any): { raw: any; campoUsado: string | null } => {
-  const candidatos = ['NASCIMENTO', 'Data de Nascimento', 'dataNascimento', 'data_nascimento'];
-  for (const c of candidatos) {
-    if (p[c] !== undefined && p[c] !== null && p[c] !== '') {
-      return { raw: p[c], campoUsado: c };
-    }
-  }
-  for (const k of Object.keys(p)) {
-    if (k.toLowerCase().includes('nascimento') && p[k] !== undefined && p[k] !== null && p[k] !== '') {
-      return { raw: p[k], campoUsado: k };
-    }
-  }
-  return { raw: null, campoUsado: null };
+  const raw = p[CAMPO_NASCIMENTO_PAINEL];
+  return { raw: raw ?? null, campoUsado: raw ? CAMPO_NASCIMENTO_PAINEL : null };
 };
 
 
@@ -168,7 +138,6 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
   const [anivOpen, setAnivOpen] = useState(false);
   const [policiais, setPoliciais] = useState<any[]>([]);
   const [loadingPoliciais, setLoadingPoliciais] = useState(false);
-  const [reformatando, setReformatando] = useState(false);
   const [busca, setBusca] = useState('');
   const [editDataOpen, setEditDataOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any | null>(null);
@@ -251,10 +220,13 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
       setSavingData(true);
       const [y, m, d] = editDataValue.split('-').map(Number);
       const date = new Date(y, m - 1, d);
-      const serial = dateToExcelSerial(date);
-      await updateDoc(doc(db, 'policiais', editTarget.id), { NASCIMENTO: serial });
+      if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) {
+        toast({ title: 'Data inválida', variant: 'destructive' });
+        return;
+      }
+      await updateDoc(doc(db, 'policiais', editTarget.id), { [CAMPO_NASCIMENTO_PAINEL]: editDataValue });
       // Atualizar local
-      setPoliciais(prev => prev.map(p => p.id === editTarget.id ? { ...p, NASCIMENTO: serial } : p));
+      setPoliciais(prev => prev.map(p => p.id === editTarget.id ? { ...p, [CAMPO_NASCIMENTO_PAINEL]: editDataValue } : p));
       await solicitarRefreshTotens();
       toast({ title: 'Data atualizada', description: 'Os totens serão atualizados em segundos.' });
       setEditDataOpen(false);
@@ -264,55 +236,6 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
       toast({ title: 'Erro ao salvar data', variant: 'destructive' });
     } finally {
       setSavingData(false);
-    }
-  };
-
-  const reformatarTodas = async () => {
-    if (!confirm('Padronizar o campo NASCIMENTO de TODOS os policiais para o formato Excel serial (int)? Esta ação atualiza o banco.')) return;
-    if (!confirm('Confirmar novamente: esta operação modificará registros no Firestore.')) return;
-    try {
-      setReformatando(true);
-      let convertidos = 0, jaOk = 0, semData = 0, invalidos = 0;
-      const lote: { id: string; serial: number }[] = [];
-      for (const p of policiais) {
-        const { raw, campoUsado } = lerCampoNascimento(p);
-        if (raw === null || raw === undefined || raw === '') { semData++; continue; }
-        const dt = parseNascimento(raw);
-        if (!dt) {
-          invalidos++;
-          console.warn('[Reformatar] Inválido:', p.MATRICULA || p.id, raw);
-          continue;
-        }
-        const serial = dateToExcelSerial(dt);
-        // Já está no formato correto?
-        if (typeof raw === 'number' && raw === serial && campoUsado === 'NASCIMENTO') {
-          jaOk++;
-          continue;
-        }
-        lote.push({ id: p.id, serial });
-      }
-      // Commits em batches de 400
-      for (let i = 0; i < lote.length; i += 400) {
-        const batch = writeBatch(db);
-        lote.slice(i, i + 400).forEach(item => {
-          batch.update(doc(db, 'policiais', item.id), { NASCIMENTO: item.serial });
-        });
-        await batch.commit();
-        convertidos += Math.min(400, lote.length - i);
-      }
-      // Atualiza estado local
-      const map = new Map(lote.map(l => [l.id, l.serial]));
-      setPoliciais(prev => prev.map(p => map.has(p.id) ? { ...p, NASCIMENTO: map.get(p.id) } : p));
-      await solicitarRefreshTotens();
-      toast({
-        title: 'Reformatação concluída',
-        description: `Convertidos: ${convertidos} · Já no formato: ${jaOk} · Sem data: ${semData} · Inválidos: ${invalidos}`,
-      });
-    } catch (e) {
-      console.error(e);
-      toast({ title: 'Erro ao reformatar', variant: 'destructive' });
-    } finally {
-      setReformatando(false);
     }
   };
 
@@ -781,10 +704,6 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
               <Button size="sm" variant="outline" onClick={async () => { await carregarPoliciais(); await solicitarRefreshTotens(); toast({ title: 'Lista atualizada' }); }} disabled={loadingPoliciais}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${loadingPoliciais ? 'animate-spin' : ''}`} /> Atualizar lista
               </Button>
-              <Button size="sm" variant="destructive" onClick={reformatarTodas} disabled={reformatando || policiais.length === 0}>
-                <Wand2 className={`h-4 w-4 mr-2 ${reformatando ? 'animate-pulse' : ''}`} />
-                {reformatando ? 'Reformatando...' : 'Padronizar formato NASCIMENTO'}
-              </Button>
               <span className="text-xs text-muted-foreground ml-auto">
                 Total: {policiais.length} policiais · Aniversariantes hoje: {aniversariantesHoje.length}
               </span>
@@ -802,7 +721,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                     <div className="text-center text-muted-foreground py-12">
                       Nenhum aniversariante detectado hoje.
                       <br />
-                      <span className="text-xs">Verifique as datas em Gestão de Pessoas ou clique em "Padronizar formato".</span>
+                      <span className="text-xs">Preencha o novo campo de nascimento pelo botão "Editar data".</span>
                     </div>
                   ) : (
                     <Table>
@@ -851,8 +770,8 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                         <TableHead>Posto/Grad</TableHead>
                         <TableHead>Nome de Guerra</TableHead>
                         <TableHead>Matrícula</TableHead>
-                        <TableHead>Nascimento</TableHead>
-                        <TableHead>Bruto</TableHead>
+                        <TableHead>Nascimento novo</TableHead>
+                        <TableHead>Campo</TableHead>
                         <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -868,7 +787,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                             <TableCell>{p['Post/Grad'] || '-'}</TableCell>
                             <TableCell className="font-medium">{p['NOME DE GUERRA1'] || p['NOME DE GUERRA'] || p.NOME || '-'}</TableCell>
                             <TableCell>{p.MATRICULA || p.matricula || '-'}</TableCell>
-                            <TableCell>{dt ? dt.toLocaleDateString('pt-BR') : <span className="text-destructive">inválida</span>}</TableCell>
+                            <TableCell>{dt ? dt.toLocaleDateString('pt-BR') : <span className="text-muted-foreground">não cadastrado</span>}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{raw === null || raw === undefined ? '—' : String(raw)}</TableCell>
                             <TableCell className="text-right">
                               <Button size="sm" variant="ghost" onClick={() => abrirEditarData(p)}>
@@ -910,7 +829,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                 <Label>Nova data de nascimento</Label>
                 <Input type="date" value={editDataValue} onChange={e => setEditDataValue(e.target.value)} />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Será gravada como número Excel serial em <code>NASCIMENTO</code>.
+                  Será gravada no novo campo <code>NASCIMENTO_NOV</code>, sem alterar o campo antigo.
                 </p>
               </div>
             </div>
