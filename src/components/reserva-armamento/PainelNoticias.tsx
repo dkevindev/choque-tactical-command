@@ -71,6 +71,12 @@ const parseNascimento = (raw: any): Date | null => {
       const n = Number(raw.trim());
       return new Date((n - 25569) * 86400 * 1000);
     }
+    if (typeof raw === 'string') {
+      const iso = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (iso) {
+        return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+      }
+    }
     if (raw?.toDate) return raw.toDate();
     const d = new Date(raw);
     if (isNaN(d.getTime())) return null;
