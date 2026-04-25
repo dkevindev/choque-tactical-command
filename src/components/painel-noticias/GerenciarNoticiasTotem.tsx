@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,11 +9,71 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Megaphone, AlertTriangle, Newspaper, Upload, X, RefreshCw, Cake, Settings } from 'lucide-react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp, setDoc, getDoc } from 'firebase/firestore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Plus, Pencil, Trash2, Megaphone, AlertTriangle, Newspaper, Upload, X, RefreshCw, Cake, Settings, Wand2, Search, Users } from 'lucide-react';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp, setDoc, getDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
+
+// ============ Helpers de data de nascimento ============
+const EXCEL_EPOCH_OFFSET = 25569; // dias entre 1899-12-30 e 1970-01-01
+
+const dateToExcelSerial = (d: Date): number => {
+  // Usa UTC para evitar drift por timezone
+  const utc = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.floor(utc / 86400000) + EXCEL_EPOCH_OFFSET;
+};
+
+const excelSerialToDate = (n: number): Date => {
+  return new Date((n - EXCEL_EPOCH_OFFSET) * 86400 * 1000);
+};
+
+const parseNascimento = (raw: any): Date | null => {
+  if (raw === null || raw === undefined || raw === '') return null;
+  try {
+    if (typeof raw === 'number') return excelSerialToDate(raw);
+    if (raw?.toDate) return raw.toDate();
+    if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
+    if (typeof raw === 'string') {
+      const s = raw.trim();
+      if (!s) return null;
+      if (/^\d+$/.test(s)) return excelSerialToDate(Number(s));
+      // dd/mm/yyyy ou dd-mm-yyyy
+      const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+      if (m) {
+        const dia = Number(m[1]);
+        const mes = Number(m[2]) - 1;
+        let ano = Number(m[3]);
+        if (ano < 100) ano += ano < 30 ? 2000 : 1900;
+        const d = new Date(ano, mes, dia);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const lerCampoNascimento = (p: any): { raw: any; campoUsado: string | null } => {
+  const candidatos = ['NASCIMENTO', 'Data de Nascimento', 'dataNascimento', 'data_nascimento'];
+  for (const c of candidatos) {
+    if (p[c] !== undefined && p[c] !== null && p[c] !== '') {
+      return { raw: p[c], campoUsado: c };
+    }
+  }
+  for (const k of Object.keys(p)) {
+    if (k.toLowerCase().includes('nascimento') && p[k] !== undefined && p[k] !== null && p[k] !== '') {
+      return { raw: p[k], campoUsado: k };
+    }
+  }
+  return { raw: null, campoUsado: null };
+};
+
 
 type TipoNoticia = 'noticia' | 'determinacao' | 'aviso';
 
