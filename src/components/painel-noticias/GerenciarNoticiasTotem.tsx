@@ -767,6 +767,159 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Dialog Aniversariantes / Policiais */}
+        <Dialog open={anivOpen} onOpenChange={setAnivOpen}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Cake className="h-5 w-5 text-pink-500" /> Aniversariantes & Policiais
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="flex items-center gap-2 flex-wrap pb-2 border-b">
+              <Button size="sm" variant="outline" onClick={async () => { await carregarPoliciais(); await solicitarRefreshTotens(); toast({ title: 'Lista atualizada' }); }} disabled={loadingPoliciais}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loadingPoliciais ? 'animate-spin' : ''}`} /> Atualizar lista
+              </Button>
+              <Button size="sm" variant="destructive" onClick={reformatarTodas} disabled={reformatando || policiais.length === 0}>
+                <Wand2 className={`h-4 w-4 mr-2 ${reformatando ? 'animate-pulse' : ''}`} />
+                {reformatando ? 'Reformatando...' : 'Padronizar formato NASCIMENTO'}
+              </Button>
+              <span className="text-xs text-muted-foreground ml-auto">
+                Total: {policiais.length} policiais · Aniversariantes hoje: {aniversariantesHoje.length}
+              </span>
+            </div>
+
+            <Tabs defaultValue="hoje" className="flex-1 flex flex-col min-h-0 mt-2">
+              <TabsList>
+                <TabsTrigger value="hoje"><Cake className="h-4 w-4 mr-2" /> Hoje ({aniversariantesHoje.length})</TabsTrigger>
+                <TabsTrigger value="todos"><Users className="h-4 w-4 mr-2" /> Buscar policial</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="hoje" className="flex-1 min-h-0 overflow-hidden">
+                <ScrollArea className="h-[55vh]">
+                  {aniversariantesHoje.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-12">
+                      Nenhum aniversariante detectado hoje.
+                      <br />
+                      <span className="text-xs">Verifique as datas em Gestão de Pessoas ou clique em "Padronizar formato".</span>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Posto/Grad</TableHead>
+                          <TableHead>Nome de Guerra</TableHead>
+                          <TableHead>Nome Completo</TableHead>
+                          <TableHead>Matrícula</TableHead>
+                          <TableHead>Idade</TableHead>
+                          <TableHead>Data</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {aniversariantesHoje.map(({ policial: p, dt, idade }) => (
+                          <TableRow key={p.id} className="bg-pink-50 dark:bg-pink-950/20">
+                            <TableCell>{p['Post/Grad'] || '-'}</TableCell>
+                            <TableCell className="font-semibold">{p['NOME DE GUERRA1'] || p['NOME DE GUERRA'] || '-'}</TableCell>
+                            <TableCell className="text-xs">{p.NOME || '-'}</TableCell>
+                            <TableCell>{p.MATRICULA || p.matricula || '-'}</TableCell>
+                            <TableCell>{idade ?? '-'}</TableCell>
+                            <TableCell>{dt.toLocaleDateString('pt-BR')}</TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="ghost" onClick={() => abrirEditarData(p)}>
+                                <Pencil className="h-4 w-4 mr-1" /> Corrigir
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="todos" className="flex-1 min-h-0 overflow-hidden">
+                <div className="relative mb-2">
+                  <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input className="pl-9" placeholder="Buscar por nome, nome de guerra, matrícula..." value={busca} onChange={e => setBusca(e.target.value)} />
+                </div>
+                <ScrollArea className="h-[50vh]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Posto/Grad</TableHead>
+                        <TableHead>Nome de Guerra</TableHead>
+                        <TableHead>Matrícula</TableHead>
+                        <TableHead>Nascimento</TableHead>
+                        <TableHead>Bruto</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {policiaisFiltrados.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhum policial encontrado</TableCell></TableRow>
+                      )}
+                      {policiaisFiltrados.map(p => {
+                        const { raw } = lerCampoNascimento(p);
+                        const dt = parseNascimento(raw);
+                        return (
+                          <TableRow key={p.id}>
+                            <TableCell>{p['Post/Grad'] || '-'}</TableCell>
+                            <TableCell className="font-medium">{p['NOME DE GUERRA1'] || p['NOME DE GUERRA'] || p.NOME || '-'}</TableCell>
+                            <TableCell>{p.MATRICULA || p.matricula || '-'}</TableCell>
+                            <TableCell>{dt ? dt.toLocaleDateString('pt-BR') : <span className="text-destructive">inválida</span>}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{raw === null || raw === undefined ? '—' : String(raw)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="ghost" onClick={() => abrirEditarData(p)}>
+                                <Pencil className="h-4 w-4 mr-1" /> Editar data
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  {policiais.length > 200 && busca.trim() === '' && (
+                    <p className="text-xs text-center text-muted-foreground py-2">Exibindo 200 primeiros — use a busca para refinar.</p>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAnivOpen(false)}>Fechar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Sub-dialog: Editar data de nascimento */}
+        <Dialog open={editDataOpen} onOpenChange={setEditDataOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Corrigir data de nascimento</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              {editTarget && (
+                <div className="rounded-lg bg-muted/50 p-3 text-sm">
+                  <div className="font-semibold">{editTarget['Post/Grad']} {editTarget['NOME DE GUERRA1'] || editTarget['NOME DE GUERRA']}</div>
+                  <div className="text-xs text-muted-foreground">{editTarget.NOME} · Mat. {editTarget.MATRICULA || editTarget.matricula}</div>
+                </div>
+              )}
+              <div>
+                <Label>Nova data de nascimento</Label>
+                <Input type="date" value={editDataValue} onChange={e => setEditDataValue(e.target.value)} />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Será gravada como número Excel serial em <code>NASCIMENTO</code>.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditDataOpen(false)} disabled={savingData}>Cancelar</Button>
+              <Button onClick={salvarData} disabled={savingData}>{savingData ? 'Salvando...' : 'Salvar'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
