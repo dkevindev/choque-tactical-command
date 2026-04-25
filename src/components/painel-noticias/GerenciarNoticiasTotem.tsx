@@ -704,10 +704,6 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
               <Button size="sm" variant="outline" onClick={async () => { await carregarPoliciais(); await solicitarRefreshTotens(); toast({ title: 'Lista atualizada' }); }} disabled={loadingPoliciais}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${loadingPoliciais ? 'animate-spin' : ''}`} /> Atualizar lista
               </Button>
-              <Button size="sm" variant="destructive" onClick={reformatarTodas} disabled={reformatando || policiais.length === 0}>
-                <Wand2 className={`h-4 w-4 mr-2 ${reformatando ? 'animate-pulse' : ''}`} />
-                {reformatando ? 'Reformatando...' : 'Padronizar formato NASCIMENTO'}
-              </Button>
               <span className="text-xs text-muted-foreground ml-auto">
                 Total: {policiais.length} policiais · Aniversariantes hoje: {aniversariantesHoje.length}
               </span>
@@ -725,7 +721,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                     <div className="text-center text-muted-foreground py-12">
                       Nenhum aniversariante detectado hoje.
                       <br />
-                      <span className="text-xs">Verifique as datas em Gestão de Pessoas ou clique em "Padronizar formato".</span>
+                      <span className="text-xs">Preencha o novo campo de nascimento pelo botão "Editar data".</span>
                     </div>
                   ) : (
                     <Table>
@@ -774,8 +770,8 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                         <TableHead>Posto/Grad</TableHead>
                         <TableHead>Nome de Guerra</TableHead>
                         <TableHead>Matrícula</TableHead>
-                        <TableHead>Nascimento</TableHead>
-                        <TableHead>Bruto</TableHead>
+                        <TableHead>Nascimento novo</TableHead>
+                        <TableHead>Campo</TableHead>
                         <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -791,7 +787,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                             <TableCell>{p['Post/Grad'] || '-'}</TableCell>
                             <TableCell className="font-medium">{p['NOME DE GUERRA1'] || p['NOME DE GUERRA'] || p.NOME || '-'}</TableCell>
                             <TableCell>{p.MATRICULA || p.matricula || '-'}</TableCell>
-                            <TableCell>{dt ? dt.toLocaleDateString('pt-BR') : <span className="text-destructive">inválida</span>}</TableCell>
+                            <TableCell>{dt ? dt.toLocaleDateString('pt-BR') : <span className="text-muted-foreground">não cadastrado</span>}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{raw === null || raw === undefined ? '—' : String(raw)}</TableCell>
                             <TableCell className="text-right">
                               <Button size="sm" variant="ghost" onClick={() => abrirEditarData(p)}>
@@ -833,7 +829,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
                 <Label>Nova data de nascimento</Label>
                 <Input type="date" value={editDataValue} onChange={e => setEditDataValue(e.target.value)} />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Será gravada como número Excel serial em <code>NASCIMENTO</code>.
+                  Será gravada no novo campo <code>NASCIMENTO_NOV</code>, sem alterar o campo antigo.
                 </p>
               </div>
             </div>
