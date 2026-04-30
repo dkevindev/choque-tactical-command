@@ -1398,20 +1398,54 @@ const CAVBot = () => {
               <div style={{ display: 'grid', gap: 10 }}>
                 <div style={{ color: '#9ca3af' }}>Informe o KM final da VTR ({servicoSelecionado.cadastro || servicoSelecionado.placa})</div>
                 <input inputMode="numeric" value={kmFinalInput} onChange={e => setKmFinalInput(e.target.value)} placeholder="KM final" style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151', borderRadius: 8, padding: '0.5rem 0.75rem' }} />
+
+                <div style={{ display: 'grid', gap: 6, padding: '0.5rem', border: '1px solid #374151', borderRadius: 8 }}>
+                  <div style={{ color: '#e5e7eb', fontWeight: 600 }}>Constatou alguma avaria durante o serviço?</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="quick-button"
+                      style={{ flex: 1, background: constatouAvariaFim === false ? '#065f46' : undefined }}
+                      onClick={() => { setConstatouAvariaFim(false); setDescricaoAvariaFim(''); }}
+                    >Não</button>
+                    <button
+                      type="button"
+                      className="quick-button"
+                      style={{ flex: 1, background: constatouAvariaFim === true ? '#7f1d1d' : undefined }}
+                      onClick={() => setConstatouAvariaFim(true)}
+                    >Sim</button>
+                  </div>
+                  {constatouAvariaFim === true && (
+                    <textarea
+                      value={descricaoAvariaFim}
+                      onChange={e => setDescricaoAvariaFim(e.target.value)}
+                      placeholder="Descreva a avaria observada (opcional)"
+                      rows={3}
+                      style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151', borderRadius: 8, padding: '0.5rem 0.75rem', resize: 'vertical' }}
+                    />
+                  )}
+                </div>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <button className="quick-button" onClick={() => { setEncerrarStep('senha'); }}>{'⬅️ Voltar'}</button>
                   <button className="quick-button" onClick={async () => {
                     const kmf = parseInt(kmFinalInput.replace(/\D/g,'') || '');
                     if (isNaN(kmf)) { setEncerrarMsg('KM inválido.'); return; }
+                    if (constatouAvariaFim === null) { setEncerrarMsg('Informe se houve avaria.'); return; }
                     try {
+                      const kmIni = Number(servicoSelecionado.kmInicial) || 0;
+                      const kmRodada = kmf - kmIni;
                       // Atualizar serviço
                       await updateDoc(doc(db, 'servicosDiarios', servicoSelecionado.id), {
                         kmFinal: kmf,
+                        kmRodada,
                         status: 'encerrado',
                         encerradoEm: new Date().toISOString(),
                         encerradoPorId: policialEncerrar?.id || null,
                         encerradoPorNome: policialEncerrar?.NOME || null,
                         encerradoPorNomeGuerra1: policialEncerrar?.nomeGuerra1 || null,
+                        constatouAvaria: constatouAvariaFim === true,
+                        descricaoAvariaFim: constatouAvariaFim === true ? (descricaoAvariaFim.trim() || null) : null,
                       });
                       // Atualizar KM da frota
                       if (servicoSelecionado.viaturaId) {
@@ -1425,6 +1459,8 @@ const CAVBot = () => {
                         setServicosAbertos([]);
                         setSenhaMotorista('');
                         setKmFinalInput('');
+                        setConstatouAvariaFim(null);
+                        setDescricaoAvariaFim('');
                         setEncerrarMsg('');
                       }, 1000);
                     } catch (e) {
