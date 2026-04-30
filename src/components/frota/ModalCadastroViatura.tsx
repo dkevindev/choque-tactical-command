@@ -269,6 +269,27 @@ const ModalCadastroViatura = ({ open, onOpenChange, onSuccess }: ModalCadastroVi
             </Select>
           </div>
 
+          {formData.tipo === 'leve' && (
+            <div className="space-y-2">
+              <Label htmlFor="operacional">Uso da viatura</Label>
+              <div className="flex items-center justify-between rounded-md border px-3 py-2 h-10">
+                <span className="text-sm">
+                  {formData.operacional ? 'Operacional' : 'Administrativa'}
+                </span>
+                <Switch
+                  id="operacional"
+                  checked={formData.operacional}
+                  onCheckedChange={(checked) =>
+                    setFormData(prev => ({ ...prev, operacional: checked }))
+                  }
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Marque como Operacional para a viatura aparecer no CAVBot → Iniciar serviço → Operacional.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="chassi">Chassi</Label>
             <Input
