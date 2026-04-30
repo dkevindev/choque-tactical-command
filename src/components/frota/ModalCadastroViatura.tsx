@@ -74,6 +74,7 @@ const ModalCadastroViatura = ({ open, onOpenChange, onSuccess }: ModalCadastroVi
       RADIO: '',
       ORD: '',
       OBS: '',
+      operacional: false,
     });
   };
 
