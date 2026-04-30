@@ -54,7 +54,14 @@ const ModalCadastroViatura = ({ open, onOpenChange, onSuccess }: ModalCadastroVi
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      // Sugestão automática apenas quando o usuário digita o CADASTRO e ainda não alterou o switch manualmente
+      if (field === 'CADASTRO') {
+        next.operacional = sugereOperacional(value);
+      }
+      return next;
+    });
   };
 
   const resetForm = () => {
@@ -144,6 +151,7 @@ const ModalCadastroViatura = ({ open, onOpenChange, onSuccess }: ModalCadastroVi
         RADIO: formData.RADIO ? Number(formData.RADIO) : null,
         ORD: formData.ORD ? Number(formData.ORD) : null,
         OBS: formData.OBS.trim() || null,
+        operacional: !!formData.operacional,
         SALDO: 0,
         avarias: [],
       };
