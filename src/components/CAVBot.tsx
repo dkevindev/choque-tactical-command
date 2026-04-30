@@ -97,6 +97,8 @@ const CAVBot = () => {
   const [senhaMotorista, setSenhaMotorista] = useState('');
   const [kmFinalInput, setKmFinalInput] = useState('');
   const [encerrarMsg, setEncerrarMsg] = useState<string>('');
+  const [constatouAvariaFim, setConstatouAvariaFim] = useState<boolean | null>(null);
+  const [descricaoAvariaFim, setDescricaoAvariaFim] = useState<string>('');
   const [policialEncerrar, setPolicialEncerrar] = useState<{ id: string; NOME: string; nomeGuerra1?: string } | null>(null);
 
   // Troca de senha no primeiro acesso
