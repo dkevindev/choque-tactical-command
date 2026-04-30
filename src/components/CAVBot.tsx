@@ -391,7 +391,7 @@ const CAVBot = () => {
     setLoadingVtrs(true);
     try {
       const leves = await buscarViaturasLeves();
-      const ops = leves.filter(v => isOperacionalCadastro(v.CADASTRO));
+      const ops = leves.filter(isOperacional);
       setListaViaturas(ops);
       setVtrStep('leve-operacional');
     } finally {
@@ -403,7 +403,7 @@ const CAVBot = () => {
     setLoadingVtrs(true);
     try {
       const leves = await buscarViaturasLeves();
-      const outros = leves.filter(v => !isOperacionalCadastro(v.CADASTRO));
+      const outros = leves.filter(v => !isOperacional(v));
       setListaViaturas(outros);
       setVtrStep('leve-adm');
     } finally {
