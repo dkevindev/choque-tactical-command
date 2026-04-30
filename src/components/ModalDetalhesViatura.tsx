@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -96,6 +97,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   const [dadosEdicao, setDadosEdicao] = useState({
     CADASTRO: '', PLACA: '', MODELO: '', PREFIXO: '', CHASSI: '', RENAVAM: '',
     GOODCARD: '', RADIO: '', ORD: '', SITUACAO: '', UTILIZACAO: '', OBS: '', tipo: '' as string,
+    operacional: false,
   });
   const [salvandoKm, setSalvandoKm] = useState(false);
   
@@ -321,6 +323,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         UTILIZACAO: viatura.UTILIZACAO || '',
         OBS: viatura.OBS || '',
         tipo: viatura.tipo || '',
+        operacional: (viatura as any).operacional === true,
       });
       setEditandoDados(true);
     }
@@ -345,6 +348,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         UTILIZACAO: dadosEdicao.UTILIZACAO,
         OBS: dadosEdicao.OBS,
         tipo: dadosEdicao.tipo || null,
+        operacional: !!dadosEdicao.operacional,
       });
       toast({ title: "Dados atualizados", description: "Os dados da viatura foram salvos com sucesso." });
       setEditandoDados(false);
@@ -363,7 +367,8 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         UTILIZACAO: dadosEdicao.UTILIZACAO,
         OBS: dadosEdicao.OBS,
         tipo: dadosEdicao.tipo || viatura.tipo,
-      });
+        operacional: !!dadosEdicao.operacional,
+      } as any);
     } catch (error) {
       console.error('Erro ao salvar dados:', error);
       toast({ title: "Erro", description: "Erro ao salvar os dados da viatura.", variant: "destructive" });
