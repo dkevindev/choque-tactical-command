@@ -131,11 +131,14 @@ const CAVBot = () => {
   const [checklistStep, setChecklistStep] = useState<number>(0); // 0-9 steps
   const [showChecklist, setShowChecklist] = useState(false);
 
-  const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
-  const isOperacionalCadastro = (cad?: string): boolean => {
-    const c = String(cad || '');
+  // Viatura operacional agora é determinada pelo campo `operacional` salvo no cadastro (coleção `frota`).
+  // Fallback: se ainda não foi marcada, usa a heurística antiga por cadastro para manter compatibilidade.
+  const allowedOperacionaisLegacy = ['05', '06', '08', '11', '12', '13'];
+  const isOperacional = (v: ViaturaBasica): boolean => {
+    if (typeof v.operacional === 'boolean') return v.operacional;
+    const c = String(v.CADASTRO || '');
     const digits = (c.match(/\d+/g) || []).join('');
-    return allowedOperacionais.some(n => digits.includes(n));
+    return allowedOperacionaisLegacy.some(n => digits.includes(n));
   };
 
   const startVtrSelection = () => {
@@ -388,7 +391,7 @@ const CAVBot = () => {
     setLoadingVtrs(true);
     try {
       const leves = await buscarViaturasLeves();
-      const ops = leves.filter(v => isOperacionalCadastro(v.CADASTRO));
+      const ops = leves.filter(isOperacional);
       setListaViaturas(ops);
       setVtrStep('leve-operacional');
     } finally {
@@ -400,7 +403,7 @@ const CAVBot = () => {
     setLoadingVtrs(true);
     try {
       const leves = await buscarViaturasLeves();
-      const outros = leves.filter(v => !isOperacionalCadastro(v.CADASTRO));
+      const outros = leves.filter(v => !isOperacional(v));
       setListaViaturas(outros);
       setVtrStep('leve-adm');
     } finally {

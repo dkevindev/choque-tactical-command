@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Car, Plus, Loader2 } from 'lucide-react';
 
@@ -42,10 +43,25 @@ const ModalCadastroViatura = ({ open, onOpenChange, onSuccess }: ModalCadastroVi
     RADIO: '',
     ORD: '',
     OBS: '',
+    operacional: false,
   });
 
+  // Sugestão automática (não trava): se o CADASTRO contiver números operacionais conhecidos, marca.
+  const legacyOperacionais = ['05', '06', '08', '11', '12', '13'];
+  const sugereOperacional = (cadastro: string): boolean => {
+    const digits = (String(cadastro).match(/\d+/g) || []).join('');
+    return legacyOperacionais.some(n => digits.includes(n));
+  };
+
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      // Sugestão automática apenas quando o usuário digita o CADASTRO e ainda não alterou o switch manualmente
+      if (field === 'CADASTRO') {
+        next.operacional = sugereOperacional(value);
+      }
+      return next;
+    });
   };
 
   const resetForm = () => {
@@ -65,6 +81,7 @@ const ModalCadastroViatura = ({ open, onOpenChange, onSuccess }: ModalCadastroVi
       RADIO: '',
       ORD: '',
       OBS: '',
+      operacional: false,
     });
   };
 
@@ -134,6 +151,7 @@ const ModalCadastroViatura = ({ open, onOpenChange, onSuccess }: ModalCadastroVi
         RADIO: formData.RADIO ? Number(formData.RADIO) : null,
         ORD: formData.ORD ? Number(formData.ORD) : null,
         OBS: formData.OBS.trim() || null,
+        operacional: !!formData.operacional,
         SALDO: 0,
         avarias: [],
       };
@@ -250,6 +268,27 @@ const ModalCadastroViatura = ({ open, onOpenChange, onSuccess }: ModalCadastroVi
               </SelectContent>
             </Select>
           </div>
+
+          {formData.tipo === 'leve' && (
+            <div className="space-y-2">
+              <Label htmlFor="operacional">Uso da viatura</Label>
+              <div className="flex items-center justify-between rounded-md border px-3 py-2 h-10">
+                <span className="text-sm">
+                  {formData.operacional ? 'Operacional' : 'Administrativa'}
+                </span>
+                <Switch
+                  id="operacional"
+                  checked={formData.operacional}
+                  onCheckedChange={(checked) =>
+                    setFormData(prev => ({ ...prev, operacional: checked }))
+                  }
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Marque como Operacional para a viatura aparecer no CAVBot → Iniciar serviço → Operacional.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="chassi">Chassi</Label>

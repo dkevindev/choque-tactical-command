@@ -32,6 +32,7 @@ export interface Viatura {
   SITUACAO: string;
   UTILIZACAO: string;
   tipo?: 'leve' | 'pesada';
+  operacional?: boolean;
   avarias?: Avaria[];
 }
 

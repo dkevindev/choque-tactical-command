@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -96,6 +97,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
   const [dadosEdicao, setDadosEdicao] = useState({
     CADASTRO: '', PLACA: '', MODELO: '', PREFIXO: '', CHASSI: '', RENAVAM: '',
     GOODCARD: '', RADIO: '', ORD: '', SITUACAO: '', UTILIZACAO: '', OBS: '', tipo: '' as string,
+    operacional: false,
   });
   const [salvandoKm, setSalvandoKm] = useState(false);
   
@@ -321,6 +323,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         UTILIZACAO: viatura.UTILIZACAO || '',
         OBS: viatura.OBS || '',
         tipo: viatura.tipo || '',
+        operacional: (viatura as any).operacional === true,
       });
       setEditandoDados(true);
     }
@@ -345,6 +348,7 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         UTILIZACAO: dadosEdicao.UTILIZACAO,
         OBS: dadosEdicao.OBS,
         tipo: dadosEdicao.tipo || null,
+        operacional: !!dadosEdicao.operacional,
       });
       toast({ title: "Dados atualizados", description: "Os dados da viatura foram salvos com sucesso." });
       setEditandoDados(false);
@@ -363,7 +367,8 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
         UTILIZACAO: dadosEdicao.UTILIZACAO,
         OBS: dadosEdicao.OBS,
         tipo: dadosEdicao.tipo || viatura.tipo,
-      });
+        operacional: !!dadosEdicao.operacional,
+      } as any);
     } catch (error) {
       console.error('Erro ao salvar dados:', error);
       toast({ title: "Erro", description: "Erro ao salvar os dados da viatura.", variant: "destructive" });
@@ -764,6 +769,22 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                       </SelectContent>
                     </Select>
                   </div>
+                  {dadosEdicao.tipo === 'leve' && (
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium text-muted-foreground">Uso (CAVBot)</Label>
+                      <div className="flex items-center justify-between rounded-md border px-3 h-8">
+                        <span className="text-xs">
+                          {dadosEdicao.operacional ? 'Operacional' : 'Administrativa'}
+                        </span>
+                        <Switch
+                          checked={dadosEdicao.operacional}
+                          onCheckedChange={(checked) =>
+                            setDadosEdicao(p => ({ ...p, operacional: checked }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-1 md:col-span-2 lg:col-span-3">
                     <Label className="text-sm font-medium text-muted-foreground">Observações</Label>
                     <Input value={dadosEdicao.OBS} onChange={e => setDadosEdicao(p => ({ ...p, OBS: e.target.value }))} className="h-8" />
@@ -856,6 +877,14 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                     {viatura.tipo === 'leve' ? 'Frota Leve' : viatura.tipo === 'pesada' ? 'Frota Pesada' : 'Não Definido'}
                   </Badge>
                 </div>
+                {viatura.tipo === 'leve' && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">Uso (CAVBot)</p>
+                    <Badge variant={(viatura as any).operacional === true ? 'default' : 'secondary'}>
+                      {(viatura as any).operacional === true ? 'Operacional' : 'Administrativa'}
+                    </Badge>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">GoodCard</p>
                   <p className="text-sm font-semibold">{viatura.GOODCARD || 'N/A'}</p>

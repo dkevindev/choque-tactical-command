@@ -1,47 +1,68 @@
+# Viaturas operacionais dinâmicas no CAVBot
 
-# Lista de Aniversariantes + Reformatador de Datas + Edição manual
+## Problema identificado
 
-## 1. Aba "Aniversariantes" no `GerenciarNoticiasTotem.tsx`
+No `CAVBot` (tela "Iniciar serviço"), a separação entre viaturas Operacionais e Administrativas usa uma lista fixa no código:
 
-Adicionar um Dialog acionado por botão **"Aniversariantes do dia"** (ícone `Cake`) no cabeçalho, que mostra:
+```ts
+// src/components/CAVBot.tsx (linha 134)
+const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
+```
 
-### Tabela com TODOS os policiais aniversariantes de hoje
-- Colunas: Posto/Grad · Nome de Guerra · Nome Completo · Matrícula · Idade · Data (formatada `dd/MM/yyyy`) · Valor bruto do campo `NASCIMENTO` (para diagnóstico) · Ações
-- Reutiliza a função `parseNascimento` (extraída para arquivo compartilhado ou duplicada localmente) que aceita: int64 Excel serial (`34493` → 08/06/1994), strings ISO, strings numéricas, Timestamps Firestore
-- Botão **"Atualizar"** no topo do dialog → re-executa a varredura e atualiza `config_painel/aniversariantes.refreshAt` (sincroniza todos os totens em tempo real)
+Por isso a **CAV15** (e qualquer viatura nova que não contenha esses dígitos no cadastro) nunca aparece na lista "Operacional". A solução é migrar essa marcação para um campo no próprio cadastro da viatura (coleção `frota`), que pode ser alterado livremente.
 
-### Ação por linha: "Corrigir data de nascimento"
-- Abre sub-dialog com Input tipo `date` (formato pt-BR)
-- Ao salvar: grava no documento do policial em `policiais/{id}` o campo `NASCIMENTO` como **Excel serial int** (mantém compatibilidade com o formato existente — fórmula inversa: `Math.floor(date.getTime() / 86400000) + 25569`)
-- Após salvar: atualiza `refreshAt` para refletir nos totens em segundos
+## Mudanças
 
-## 2. Botão "Reformatar todas as datas de nascimento"
+### 1. Novo campo `operacional` (boolean) na coleção `frota`
 
-Botão de ação em massa **"Padronizar formato NASCIMENTO"** dentro do dialog de aniversariantes (com confirmação dupla). Para cada policial:
+- Tipo: `boolean` — `true` = Operacional, `false`/ausente = Administrativa.
+- Não trava nada: pode ser alternado a qualquer momento na edição da viatura.
+- Aplica-se apenas à Frota Leve (pesadas continuam como hoje, sem essa distinção).
 
-- Lê todos os possíveis campos de nascimento (`NASCIMENTO`, `Data de Nascimento`, `dataNascimento`, `data_nascimento`, scan case-insensitive de qualquer chave que contenha "nascimento")
-- Detecta o formato (Excel serial / string ISO / string `dd/MM/yyyy` / Timestamp / Date)
-- Converte tudo para **Excel serial int64** e grava em `NASCIMENTO`
-- Pula registros sem data ou com data inválida (loga no console com matrícula)
-- Mostra toast com totais: `Convertidos: X | Já no formato: Y | Sem data: Z | Inválidos: W`
-- Ao final, atualiza `refreshAt` para forçar refresh nos totens
+### 2. Cadastro de viatura — `src/components/frota/ModalCadastroViatura.tsx`
 
-### Aba complementar: "Listar todos os policiais (busca)"
-Dentro do mesmo dialog, segunda aba **"Buscar policial"** com Input de busca (por nome, nome de guerra ou matrícula) listando os policiais encontrados com:
-- Data de nascimento atual formatada
-- Botão "Editar data" (mesmo sub-dialog do item 1)
+- Adicionar no `formData` o campo `operacional: false`.
+- Adicionar um **Switch** "Viatura operacional" na seção de tipo, visível quando `tipo === 'leve'`.
+- Enviar `operacional` no `addDoc` para `frota`.
+- Pré-preenchimento inteligente (sugestão automática, sem travar): ao digitar o CADASTRO, se os dígitos contiverem `05/06/08/11/12/13`, o switch liga automaticamente — mas o usuário pode desligar/ligar livremente.
 
-Isso permite corrigir manualmente a data de qualquer policial — não apenas dos aniversariantes do dia.
+### 3. Edição de viatura — `src/components/ModalDetalhesViatura.tsx`
 
-## 3. Visual e UX
+- Incluir `operacional` em `dadosEdicao` (carregar o valor atual da viatura).
+- Adicionar o mesmo **Switch** "Viatura operacional" ao lado do select de tipo (linha ~759), visível quando `tipo === 'leve'`.
+- Salvar `operacional` no `updateDoc` (linhas ~347 e ~365).
+- Exibir badge "Operacional" / "Administrativa" na visualização (perto de "Frota Leve/Pesada", linha ~856).
 
-- Usar `Tabs` (Radix) no Dialog: aba 1 = "Aniversariantes hoje" · aba 2 = "Buscar policial"
-- Linhas de aniversariantes destacadas com fundo `bg-pink-50`
-- Tabela com `ScrollArea` (max altura para caber em telas menores)
-- Datas exibidas em `dd/MM/yyyy` (padrão sistema)
+### 4. CAVBot — `src/components/CAVBot.tsx`
+
+- Remover `allowedOperacionais` e `isOperacionalCadastro` (linhas 134-139).
+- Novo helper:
+
+```ts
+const isOperacional = (v: ViaturaBasica): boolean => v.operacional === true;
+```
+
+- Atualizar os filtros:
+  - `loadLevesOperacional` (linha ~387): `leves.filter(isOperacional)`.
+  - `loadLevesAdministrativa` (linha ~399): `leves.filter(v => !isOperacional(v))`.
+
+### 5. Tipagem — `src/lib/viaturaUtils.ts` e `src/bot/types.ts`
+
+- Adicionar `operacional?: boolean` em `ViaturaBasica` e em `Viatura`.
+
+## Migração de dados existentes (opcional, sem impacto)
+
+Nenhuma migração é obrigatória: as viaturas legadas com cadastro `05/06/08/11/12/13` podem ser marcadas manualmente como operacionais na tela de edição. Se o usuário preferir um utilitário em lote, é possível adicionar depois um botão "Marcar como operacional" na lista de viaturas, mas não está incluído agora para evitar repetir o problema anterior (atualizações em massa que bagunçam dados).
 
 ## Arquivos editados
 
-- `src/components/painel-noticias/GerenciarNoticiasTotem.tsx` — novo Dialog "Aniversariantes" com tabela, botão de reformatação em massa, aba de busca, e sub-dialog de edição de data
+- `src/components/CAVBot.tsx` — usar `operacional` do banco em vez da lista fixa
+- `src/components/frota/ModalCadastroViatura.tsx` — Switch "Operacional" + sugestão automática
+- `src/components/ModalDetalhesViatura.tsx` — Switch "Operacional" na edição + badge na visualização
+- `src/lib/viaturaUtils.ts` — adicionar `operacional?: boolean` em `ViaturaBasica`
+- `src/bot/types.ts` — adicionar `operacional?: boolean` em `Viatura`
 
-Nenhum outro arquivo precisa ser tocado — `PainelNoticias.tsx` já reage automaticamente via `onSnapshot` em `config_painel/aniversariantes` quando `refreshAt` muda.
+## Resultado esperado
+
+- CAV15 (e qualquer nova viatura) aparecerá em **Operacional** assim que for marcada no cadastro/edição.
+- A marcação é livre: nenhum automatismo trava a escolha do usuário — o switch pode ser alternado a qualquer momento.

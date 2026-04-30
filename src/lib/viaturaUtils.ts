@@ -9,6 +9,7 @@ export interface ViaturaBasica {
   MODELO?: string;
   tipo?: 'leve' | 'pesada';
   UTILIZACAO?: string;
+  operacional?: boolean;
 }
 
 // Cache para evitar múltiplas consultas
