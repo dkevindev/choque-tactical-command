@@ -877,6 +877,14 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                     {viatura.tipo === 'leve' ? 'Frota Leve' : viatura.tipo === 'pesada' ? 'Frota Pesada' : 'Não Definido'}
                   </Badge>
                 </div>
+                {viatura.tipo === 'leve' && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">Uso (CAVBot)</p>
+                    <Badge variant={(viatura as any).operacional === true ? 'default' : 'secondary'}>
+                      {(viatura as any).operacional === true ? 'Operacional' : 'Administrativa'}
+                    </Badge>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">GoodCard</p>
                   <p className="text-sm font-semibold">{viatura.GOODCARD || 'N/A'}</p>
