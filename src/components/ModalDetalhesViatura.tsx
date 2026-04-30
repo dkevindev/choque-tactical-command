@@ -769,6 +769,22 @@ const ModalDetalhesViatura = ({ isOpen, onClose, viatura }: ModalDetalhesViatura
                       </SelectContent>
                     </Select>
                   </div>
+                  {dadosEdicao.tipo === 'leve' && (
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium text-muted-foreground">Uso (CAVBot)</Label>
+                      <div className="flex items-center justify-between rounded-md border px-3 h-8">
+                        <span className="text-xs">
+                          {dadosEdicao.operacional ? 'Operacional' : 'Administrativa'}
+                        </span>
+                        <Switch
+                          checked={dadosEdicao.operacional}
+                          onCheckedChange={(checked) =>
+                            setDadosEdicao(p => ({ ...p, operacional: checked }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-1 md:col-span-2 lg:col-span-3">
                     <Label className="text-sm font-medium text-muted-foreground">Observações</Label>
                     <Input value={dadosEdicao.OBS} onChange={e => setDadosEdicao(p => ({ ...p, OBS: e.target.value }))} className="h-8" />
