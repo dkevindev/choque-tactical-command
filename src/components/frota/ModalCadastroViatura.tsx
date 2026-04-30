@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Car, Plus, Loader2 } from 'lucide-react';
 
@@ -42,7 +43,15 @@ const ModalCadastroViatura = ({ open, onOpenChange, onSuccess }: ModalCadastroVi
     RADIO: '',
     ORD: '',
     OBS: '',
+    operacional: false,
   });
+
+  // Sugestão automática (não trava): se o CADASTRO contiver números operacionais conhecidos, marca.
+  const legacyOperacionais = ['05', '06', '08', '11', '12', '13'];
+  const sugereOperacional = (cadastro: string): boolean => {
+    const digits = (String(cadastro).match(/\d+/g) || []).join('');
+    return legacyOperacionais.some(n => digits.includes(n));
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
