@@ -1,68 +1,61 @@
-# Viaturas operacionais dinâmicas no CAVBot
+## Nova aba "Análise" em Controle Bélico
 
-## Problema identificado
+Adicionar uma aba **Análise** dentro do Controle Bélico (Gestão e Logística → Bélico), focada em armamentos, com agrupamentos, totais por unidade (Sede/Crato), por modelo, por calibre e exportação rápida em PDF.
 
-No `CAVBot` (tela "Iniciar serviço"), a separação entre viaturas Operacionais e Administrativas usa uma lista fixa no código:
+### Onde aparece
+- `AdminDashboard.tsx` → `BelicoContent` → adiciona `TabsTrigger "analise"` (8 colunas) + `TabsContent` que renderiza o novo componente `AnaliseArmamentos`.
+- Novo arquivo: `src/components/admin-belico/AnaliseArmamentos.tsx`.
 
-```ts
-// src/components/CAVBot.tsx (linha 134)
-const allowedOperacionais = ['05', '06', '08', '11', '12', '13'];
-```
+### Fonte de dados
+- Coleção `materiais` do Firestore (mesma que `CadastroMateriais` usa).
+- Filtra `categoria === 'Armamento'` e ignora `baixado` ou `transferido` (regra Core já adotada no projeto).
+- Campos usados: `nome`, `modelo`, `calibre`, `tipoArma` (Curta/Longa), `fabricante`, `numeroSerie`, `local` (Fortaleza/Crato), `policialAssociadoId`.
 
-Por isso a **CAV15** (e qualquer viatura nova que não contenha esses dígitos no cadastro) nunca aparece na lista "Operacional". A solução é migrar essa marcação para um campo no próprio cadastro da viatura (coleção `frota`), que pode ser alterado livremente.
+### Layout da aba
 
-## Mudanças
+1. **Filtros no topo**
+   - Tipo: Todos / Curtas / Longas (default Longas, já que é o caso de uso principal).
+   - Unidade: Todas / Fortaleza (Sede) / Crato.
+   - Busca por modelo / nº série.
+   - Botão **Exportar PDF** (jsPDF + autotable, padrão do projeto) e **Exportar CSV** (UTF-8 BOM).
 
-### 1. Novo campo `operacional` (boolean) na coleção `frota`
+2. **Cards de totais** (grid responsivo)
+   - Total geral (com filtro aplicado).
+   - Total Sede (Fortaleza).
+   - Total Crato.
+   - Cauteladas vs Na Reserva.
 
-- Tipo: `boolean` — `true` = Operacional, `false`/ausente = Administrativa.
-- Não trava nada: pode ser alternado a qualquer momento na edição da viatura.
-- Aplica-se apenas à Frota Leve (pesadas continuam como hoje, sem essa distinção).
+3. **Agrupamento por Modelo** (principal)
+   - Tabela: Modelo | Calibre | Fabricante | Tipo | Sede | Crato | Total | Cauteladas | Reserva.
+   - Cada linha expansível mostrando os números de série pertencentes àquele modelo, separados por unidade.
+   - Ex.: ARAD aparece como uma linha com totais; expandindo, lista os nº de série em Sede e em Crato.
 
-### 2. Cadastro de viatura — `src/components/frota/ModalCadastroViatura.tsx`
+4. **Agrupamento por Calibre**
+   - Tabela compacta: Calibre | Sede | Crato | Total.
 
-- Adicionar no `formData` o campo `operacional: false`.
-- Adicionar um **Switch** "Viatura operacional" na seção de tipo, visível quando `tipo === 'leve'`.
-- Enviar `operacional` no `addDoc` para `frota`.
-- Pré-preenchimento inteligente (sugestão automática, sem travar): ao digitar o CADASTRO, se os dígitos contiverem `05/06/08/11/12/13`, o switch liga automaticamente — mas o usuário pode desligar/ligar livremente.
+5. **Agrupamento por Tipo** (Curta x Longa) por unidade
+   - Mini tabela: Tipo | Sede | Crato | Total.
 
-### 3. Edição de viatura — `src/components/ModalDetalhesViatura.tsx`
+### Exportação PDF
+- Usa `jspdf` + `jspdf-autotable` (já presentes no projeto).
+- Conteúdo do PDF respeita o filtro ativo:
+  - Cabeçalho "RPMONT - Análise de Armamentos" + filtros aplicados + data.
+  - Tabela 1: Resumo por Modelo (com Sede/Crato/Total/Cauteladas/Reserva).
+  - Tabela 2: Resumo por Calibre.
+  - Tabela 3: Resumo por Tipo.
+  - Tabela 4 (opcional, ligada por checkbox "Incluir nº de série"): listagem detalhada agrupada por modelo e unidade.
+- Orientação Landscape, nome `analise_armamentos_AAAA-MM-DD.pdf`.
 
-- Incluir `operacional` em `dadosEdicao` (carregar o valor atual da viatura).
-- Adicionar o mesmo **Switch** "Viatura operacional" ao lado do select de tipo (linha ~759), visível quando `tipo === 'leve'`.
-- Salvar `operacional` no `updateDoc` (linhas ~347 e ~365).
-- Exibir badge "Operacional" / "Administrativa" na visualização (perto de "Frota Leve/Pesada", linha ~856).
+### Detalhes técnicos
+- Componente client-side puro, faz `getDocs(collection(db,'materiais'))` em `useEffect`.
+- Cálculos memorizados (`useMemo`) por filtro.
+- Cautelados: usa `policialAssociadoId` truthy (cautelas permanentes). Provisórias podem ser ignoradas neste recorte (foco é "carga" da unidade), mantendo a regra usada em `ArmamentosSection.tsx` apenas para cautelas permanentes — confirmar se quer incluir provisórias depois.
+- Componentes shadcn já existentes: `Card`, `Tabs` interna não necessária, `Table`, `Badge`, `Select`, `Input`, `Button`, `Collapsible` para expandir nº de série.
 
-### 4. CAVBot — `src/components/CAVBot.tsx`
+### Arquivos alterados/criados
+- **Criar** `src/components/admin-belico/AnaliseArmamentos.tsx`.
+- **Editar** `src/components/AdminDashboard.tsx` (importar e adicionar aba "Análise" no `BelicoContent`, mudar grid para `grid-cols-8`).
 
-- Remover `allowedOperacionais` e `isOperacionalCadastro` (linhas 134-139).
-- Novo helper:
-
-```ts
-const isOperacional = (v: ViaturaBasica): boolean => v.operacional === true;
-```
-
-- Atualizar os filtros:
-  - `loadLevesOperacional` (linha ~387): `leves.filter(isOperacional)`.
-  - `loadLevesAdministrativa` (linha ~399): `leves.filter(v => !isOperacional(v))`.
-
-### 5. Tipagem — `src/lib/viaturaUtils.ts` e `src/bot/types.ts`
-
-- Adicionar `operacional?: boolean` em `ViaturaBasica` e em `Viatura`.
-
-## Migração de dados existentes (opcional, sem impacto)
-
-Nenhuma migração é obrigatória: as viaturas legadas com cadastro `05/06/08/11/12/13` podem ser marcadas manualmente como operacionais na tela de edição. Se o usuário preferir um utilitário em lote, é possível adicionar depois um botão "Marcar como operacional" na lista de viaturas, mas não está incluído agora para evitar repetir o problema anterior (atualizações em massa que bagunçam dados).
-
-## Arquivos editados
-
-- `src/components/CAVBot.tsx` — usar `operacional` do banco em vez da lista fixa
-- `src/components/frota/ModalCadastroViatura.tsx` — Switch "Operacional" + sugestão automática
-- `src/components/ModalDetalhesViatura.tsx` — Switch "Operacional" na edição + badge na visualização
-- `src/lib/viaturaUtils.ts` — adicionar `operacional?: boolean` em `ViaturaBasica`
-- `src/bot/types.ts` — adicionar `operacional?: boolean` em `Viatura`
-
-## Resultado esperado
-
-- CAV15 (e qualquer nova viatura) aparecerá em **Operacional** assim que for marcada no cadastro/edição.
-- A marcação é livre: nenhum automatismo trava a escolha do usuário — o switch pode ser alternado a qualquer momento.
+### Fora de escopo
+- Não altera schema de materiais.
+- Não toca em coletes/munição (só armamento), conforme pedido.
