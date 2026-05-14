@@ -33,6 +33,7 @@ import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferidos';
 import ColetesTab from '@/components/admin-belico/ColetesTab';
 import SaiuDaCarga from '@/components/admin-belico/SaiuDaCarga';
+import AnaliseArmamentos from '@/components/admin-belico/AnaliseArmamentos';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import ReservaAdminPage from '@/components/admin/ReservaAdminPage';
 import PatrimonioPage from '@/components/patrimonio/PatrimonioPage';
@@ -757,12 +758,13 @@ const BelicoContent = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="cautelas" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="cautelas">Cautelas</TabsTrigger>
               <TabsTrigger value="coletes">Coletes</TabsTrigger>
               <TabsTrigger value="saiu-carga">Saiu da Carga</TabsTrigger>
               <TabsTrigger value="materiais">Materiais</TabsTrigger>
               <TabsTrigger value="estoque">Carga</TabsTrigger>
+              <TabsTrigger value="analise">Análise</TabsTrigger>
               <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
               <TabsTrigger value="transferencias">Transferências</TabsTrigger>
             </TabsList>
@@ -785,6 +787,10 @@ const BelicoContent = () => {
 
             <TabsContent value="estoque">
               <ControleEstoque />
+            </TabsContent>
+
+            <TabsContent value="analise">
+              <AnaliseArmamentos />
             </TabsContent>
 
             <TabsContent value="relatorios">
