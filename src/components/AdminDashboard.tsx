@@ -33,6 +33,7 @@ import RelatoriosBelico from '@/components/admin-belico/RelatoriosBelico';
 import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferidos';
 import ColetesTab from '@/components/admin-belico/ColetesTab';
 import SaiuDaCarga from '@/components/admin-belico/SaiuDaCarga';
+import AnaliseArmamentos from '@/components/admin-belico/AnaliseArmamentos';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import ReservaAdminPage from '@/components/admin/ReservaAdminPage';
 import PatrimonioPage from '@/components/patrimonio/PatrimonioPage';
