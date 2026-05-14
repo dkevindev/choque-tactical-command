@@ -49,7 +49,7 @@ const AnaliseArmamentos: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        const snap = await getDocs(collection(db, 'materiais'));
+        const snap = await getDocs(collection(db, 'materiais_belicos'));
         const lista: Material[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
         setMateriais(lista);
       } finally {
