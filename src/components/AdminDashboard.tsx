@@ -789,6 +789,10 @@ const BelicoContent = () => {
               <ControleEstoque />
             </TabsContent>
 
+            <TabsContent value="analise">
+              <AnaliseArmamentos />
+            </TabsContent>
+
             <TabsContent value="relatorios">
               <RelatoriosBelico />
             </TabsContent>
