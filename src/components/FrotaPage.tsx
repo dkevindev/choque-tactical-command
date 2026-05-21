@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Car, Activity, AlertTriangle, Wrench, Tags, FileText } from 'lucide-react';
+import { Car, Activity, AlertTriangle, Wrench, Tags, FileText, Disc } from 'lucide-react';
 import FrotaDashboard from './frota/FrotaDashboard';
 import KmSaldoPage from './frota/KmSaldoPage';
 import AvariasPage from './frota/AvariasPage';
 import OficinaPage from './frota/OficinaPage';
 import CategoriaPage from './frota/CategoriaPage';
 import FichasServicoPage from './frota/FichasServicoPage';
+import PneusPage from './frota/PneusPage';
 
 const FrotaPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
