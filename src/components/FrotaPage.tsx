@@ -67,6 +67,10 @@ const FrotaPage = () => {
             <FichasServicoPage />
           </TabsContent>
 
+          <TabsContent value="pneus">
+            <PneusPage />
+          </TabsContent>
+
           <TabsContent value="avarias">
             <AvariasPage />
           </TabsContent>
