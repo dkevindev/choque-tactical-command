@@ -1,61 +1,44 @@
-## Nova aba "Análise" em Controle Bélico
+## Submenu "Pneus" em Frota
 
-Adicionar uma aba **Análise** dentro do Controle Bélico (Gestão e Logística → Bélico), focada em armamentos, com agrupamentos, totais por unidade (Sede/Crato), por modelo, por calibre e exportação rápida em PDF.
+Nova aba em **Gestão e Logística → Frota** chamada **"Pneus"**, exibindo uma tabela consolidada com a última troca de pneus registrada de cada viatura, com base nos processos finalizados em `frota/{viaturaId}/processos_pneus`.
 
-### Onde aparece
-- `AdminDashboard.tsx` → `BelicoContent` → adiciona `TabsTrigger "analise"` (8 colunas) + `TabsContent` que renderiza o novo componente `AnaliseArmamentos`.
-- Novo arquivo: `src/components/admin-belico/AnaliseArmamentos.tsx`.
+### Localização
+- Arquivo novo: `src/components/frota/PneusPage.tsx`
+- Editar: `src/components/frota/FrotaPage.tsx` — adicionar `TabsTrigger` "Pneus" (ícone `Disc` do lucide), alterar grid para `grid-cols-7`.
 
-### Fonte de dados
-- Coleção `materiais` do Firestore (mesma que `CadastroMateriais` usa).
-- Filtra `categoria === 'Armamento'` e ignora `baixado` ou `transferido` (regra Core já adotada no projeto).
-- Campos usados: `nome`, `modelo`, `calibre`, `tipoArma` (Curta/Longa), `fabricante`, `numeroSerie`, `local` (Fortaleza/Crato), `policialAssociadoId`.
+### Ordenação das linhas
+1. **VTRs Operacionais** primeiro, depois **ADMs**
+   - Operacional = `operacional === true` (ou `UTILIZACAO` indicando uso operacional, conforme já usado em outras telas — confirmar pelo campo `operacional`)
+2. Dentro de cada grupo, ordenar por **PREFIXO** (numeral) **crescente** (menor → maior)
+3. Linhas separadoras visuais entre os dois grupos
 
-### Layout da aba
+### Colunas da tabela
+| Coluna | Origem |
+|---|---|
+| Prefixo | `viatura.PREFIXO` |
+| Placa | `viatura.PLACA` |
+| Modelo | `viatura.MODELO` |
+| Tipo | Operacional / ADM (badge) |
+| Última troca | `dataConclusao` do último processo finalizado (`dd/MM/yy`) |
+| KM na troca | `kmAtual` do mesmo processo |
+| Referência | `referenciaPneus` |
+| Origem | OS nº `numeroOS` (se OFICINA, com link para `anexoOS_url` se houver) ou "COLOG" (se origem COLOG) |
+| Qtd pneus | `quantidadePneus` |
 
-1. **Filtros no topo**
-   - Tipo: Todos / Curtas / Longas (default Longas, já que é o caso de uso principal).
-   - Unidade: Todas / Fortaleza (Sede) / Crato.
-   - Busca por modelo / nº série.
-   - Botão **Exportar PDF** (jsPDF + autotable, padrão do projeto) e **Exportar CSV** (UTF-8 BOM).
+Viaturas sem nenhum processo finalizado aparecem com "—" nos campos de troca (para visibilidade do que falta registrar).
 
-2. **Cards de totais** (grid responsivo)
-   - Total geral (com filtro aplicado).
-   - Total Sede (Fortaleza).
-   - Total Crato.
-   - Cauteladas vs Na Reserva.
+### Lógica de carregamento
+1. Buscar todas as viaturas via `buscarTodasViaturas()` (cache existente em `viaturaUtils.ts`).
+2. Para cada viatura, buscar `collection(db, 'frota', viaturaId, 'processos_pneus')` filtrando `status === 'finalizado'`, ordenar por `dataConclusao desc`, pegar o primeiro.
+   - Executar em paralelo com `Promise.all`.
+3. Montar linhas, separar em operacionais/adms, sortear por `PREFIXO` numérico.
 
-3. **Agrupamento por Modelo** (principal)
-   - Tabela: Modelo | Calibre | Fabricante | Tipo | Sede | Crato | Total | Cauteladas | Reserva.
-   - Cada linha expansível mostrando os números de série pertencentes àquele modelo, separados por unidade.
-   - Ex.: ARAD aparece como uma linha com totais; expandindo, lista os nº de série em Sede e em Crato.
-
-4. **Agrupamento por Calibre**
-   - Tabela compacta: Calibre | Sede | Crato | Total.
-
-5. **Agrupamento por Tipo** (Curta x Longa) por unidade
-   - Mini tabela: Tipo | Sede | Crato | Total.
-
-### Exportação PDF
-- Usa `jspdf` + `jspdf-autotable` (já presentes no projeto).
-- Conteúdo do PDF respeita o filtro ativo:
-  - Cabeçalho "RPMONT - Análise de Armamentos" + filtros aplicados + data.
-  - Tabela 1: Resumo por Modelo (com Sede/Crato/Total/Cauteladas/Reserva).
-  - Tabela 2: Resumo por Calibre.
-  - Tabela 3: Resumo por Tipo.
-  - Tabela 4 (opcional, ligada por checkbox "Incluir nº de série"): listagem detalhada agrupada por modelo e unidade.
-- Orientação Landscape, nome `analise_armamentos_AAAA-MM-DD.pdf`.
-
-### Detalhes técnicos
-- Componente client-side puro, faz `getDocs(collection(db,'materiais'))` em `useEffect`.
-- Cálculos memorizados (`useMemo`) por filtro.
-- Cautelados: usa `policialAssociadoId` truthy (cautelas permanentes). Provisórias podem ser ignoradas neste recorte (foco é "carga" da unidade), mantendo a regra usada em `ArmamentosSection.tsx` apenas para cautelas permanentes — confirmar se quer incluir provisórias depois.
-- Componentes shadcn já existentes: `Card`, `Tabs` interna não necessária, `Table`, `Badge`, `Select`, `Input`, `Button`, `Collapsible` para expandir nº de série.
-
-### Arquivos alterados/criados
-- **Criar** `src/components/admin-belico/AnaliseArmamentos.tsx`.
-- **Editar** `src/components/AdminDashboard.tsx` (importar e adicionar aba "Análise" no `BelicoContent`, mudar grid para `grid-cols-8`).
+### Filtros / extras (leves, não alteram o escopo)
+- Busca por prefixo/placa/modelo (input).
+- Contador no topo: total de VTRs, com troca registrada, sem registro.
+- Botão **"Ver processo"** abre dialog com detalhes do último processo (reaproveita visual do `ProcessosPneusSection`).
 
 ### Fora de escopo
-- Não altera schema de materiais.
-- Não toca em coletes/munição (só armamento), conforme pedido.
+- Não altera o fluxo de cadastro/aprovação de processos.
+- Não exporta PDF/CSV nesta entrega (pode ser adicionado depois se pedido).
+- Sem alterações em Firestore/schema.
