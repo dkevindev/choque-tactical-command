@@ -20,7 +20,7 @@ const FrotaPage = () => {
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6 mb-6">
+          <TabsList className="grid w-full grid-cols-7 mb-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Dashboard
@@ -36,6 +36,10 @@ const FrotaPage = () => {
             <TabsTrigger value="fichas" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Fichas
+            </TabsTrigger>
+            <TabsTrigger value="pneus" className="flex items-center gap-2">
+              <Disc className="h-4 w-4" />
+              Pneus
             </TabsTrigger>
             <TabsTrigger value="avarias" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
