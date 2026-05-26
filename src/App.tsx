@@ -8,6 +8,11 @@ import AluguelCarrinhos from "./pages/AluguelCarrinhos";
 import LoginGestao from "./components/LoginGestao";
 import GestãoPessoas from "./components/GestãoPessoas";
 import CAVBot from "./components/CAVBot";
+import SistemaUsuarioHome from "./components/sistema-usuario/SistemaUsuarioHome";
+import IniciarServicoWizard from "./components/sistema-usuario/IniciarServicoWizard";
+import EntradaOficinaWizard from "./components/sistema-usuario/EntradaOficinaWizard";
+import SaidaOficinaWizard from "./components/sistema-usuario/SaidaOficinaWizard";
+import EncerrarServicoWizard from "./components/sistema-usuario/EncerrarServicoWizard";
 import AdminDashboard from "./components/AdminDashboard";
 import UserDashboard from "./components/UserDashboard";
 import ReservaArmamentoSystem from "./components/reserva-armamento/ReservaArmamentoSystem";
@@ -36,7 +41,13 @@ const App = () => (
           <Route path="/alugueis" element={<AluguelCarrinhos />} />
           <Route path="/login-gestao" element={<LoginGestao />} />
           <Route path="/login-policial" element={<LoginGestao />} />
-          <Route path="/cavbot" element={<CAVBot />} />
+          <Route path="/cavbot" element={<SistemaUsuarioHome />} />
+          <Route path="/cavbot-legacy" element={<CAVBot />} />
+          <Route path="/sistema" element={<SistemaUsuarioHome />} />
+          <Route path="/sistema/iniciar-servico" element={<IniciarServicoWizard />} />
+          <Route path="/sistema/entrada-oficina" element={<EntradaOficinaWizard />} />
+          <Route path="/sistema/saida-oficina" element={<SaidaOficinaWizard />} />
+          <Route path="/sistema/encerrar-servico" element={<EncerrarServicoWizard />} />
           <Route path="/gestao-pessoas" element={<GestãoPessoas />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/user-dashboard" element={<UserDashboard />} />
