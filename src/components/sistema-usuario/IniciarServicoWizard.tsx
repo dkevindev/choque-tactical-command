@@ -436,7 +436,7 @@ const IniciarServicoWizard = () => {
           <div className="space-y-2">
             {cur.choices.map(([val, label]) => (
               <Button key={val} onClick={() => handle(val)} variant="outline"
-                size="lg" className="w-full h-14 text-base">
+                size="lg" className="w-full h-14 text-base bg-white hover:bg-sky-50 text-slate-900 border-2 border-slate-300 hover:border-sky-400">
                 {label}
               </Button>
             ))}
