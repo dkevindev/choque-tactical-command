@@ -42,7 +42,7 @@ const StepWizard = ({
       </div>
 
       <main className="px-4">
-        <div className="bg-white rounded-3xl shadow-xl p-5 text-slate-900 min-h-[60dvh] [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:!border-slate-300 [&_input::placeholder]:!text-slate-400 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea::placeholder]:!text-slate-400 [&_select]:!bg-white [&_select]:!text-slate-900 [&_select]:!border-slate-300 [&_label]:!text-slate-700">
+        <div className="bg-white rounded-3xl shadow-xl p-5 text-slate-900 min-h-[60dvh] [&_input]:!bg-white [&_input]:!text-slate-900 [&_input]:!border-slate-300 [&_input::placeholder]:!text-slate-400 [&_textarea]:!bg-white [&_textarea]:!text-slate-900 [&_textarea]:!border-slate-300 [&_textarea::placeholder]:!text-slate-400 [&_select]:!bg-white [&_select]:!text-slate-900 [&_select]:!border-slate-300 [&_label]:!text-slate-700 [&_button.bg-background]:!bg-white [&_button.bg-background]:!text-slate-900 [&_button.border-input]:!border-slate-300">
           {children}
         </div>
       </main>
