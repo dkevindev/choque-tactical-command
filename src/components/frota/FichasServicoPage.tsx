@@ -79,6 +79,7 @@ const FichasServicoPage = () => {
   const [loading, setLoading] = useState(true);
   const [diaIdx, setDiaIdx] = useState(0);
   const [busca, setBusca] = useState('');
+  const [fichaSel, setFichaSel] = useState<FichaServico | null>(null);
 
   useEffect(() => {
     const carregar = async () => {
