@@ -127,7 +127,7 @@ const IniciarServicoWizard = () => {
     const km = parseInt(kmInicial.replace(/\D/g, ''));
     if (isNaN(km) || !area.trim()) { toast({ title: 'Preencha KM e área', variant: 'destructive' }); return; }
     try {
-      await addDoc(collection(db, 'servicosDiarios'), {
+      const ref = await addDoc(collection(db, 'servicosDiarios'), {
         viaturaId: viatura.id,
         cadastro: viatura.CADASTRO || null,
         placa: viatura.PLACA,
@@ -141,7 +141,9 @@ const IniciarServicoWizard = () => {
         policialId: pol.id,
         policialNome: pol.NOME,
         policialNomeGuerra1: pol.nomeGuerra1 || null,
+        avariasIniciais: avariasLista.map(a => ({ ...a })),
       });
+      setServicoDocId(ref.id);
       setStep(7);
     } catch (e) {
       console.error(e);
