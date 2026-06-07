@@ -15,6 +15,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+import DetalheFichaModal from './DetalheFichaModal';
+
 interface FichaServico {
   id: string;
   viaturaId?: string;
@@ -35,6 +37,9 @@ interface FichaServico {
   encerradoPorNome?: string;
   constatouAvaria?: boolean;
   descricaoAvariaFim?: string | null;
+  checklistInicial?: any;
+  avariasIniciais?: any[];
+  problemasChecklist?: string[];
 }
 
 const fmtHora = (iso?: string) => {
