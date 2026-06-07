@@ -204,8 +204,9 @@ const FichasServicoPage = () => {
                         : typeof f.kmFinal === 'number' && typeof f.kmInicial === 'number'
                         ? f.kmFinal - f.kmInicial
                         : null;
+                    const qtdEntrada = Array.isArray(f.avariasIniciais) ? f.avariasIniciais.length : 0;
                     return (
-                      <TableRow key={f.id}>
+                      <TableRow key={f.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setFichaSel(f)}>
                         <TableCell className="font-medium">
                           {f.cadastro || f.placa || '-'}
                         </TableCell>
@@ -219,22 +220,31 @@ const FichasServicoPage = () => {
                           {kmRod !== null ? kmRod : '-'}
                         </TableCell>
                         <TableCell>
-                          {f.status !== 'encerrado' ? (
-                            <span className="text-muted-foreground">-</span>
-                          ) : f.constatouAvaria ? (
-                            <div className="flex items-start gap-1">
-                              <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                              <span className="text-xs" title={f.descricaoAvariaFim || ''}>
-                                {f.descricaoAvariaFim
-                                  ? f.descricaoAvariaFim.length > 40
-                                    ? f.descricaoAvariaFim.slice(0, 40) + '…'
-                                    : f.descricaoAvariaFim
-                                  : 'Sim'}
+                          <div className="flex flex-col gap-1">
+                            {qtdEntrada > 0 && (
+                              <div className="flex items-center gap-1">
+                                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                                <span className="text-xs">Entrada: {qtdEntrada}</span>
+                              </div>
+                            )}
+                            {f.status === 'encerrado' && f.constatouAvaria && (
+                              <div className="flex items-start gap-1">
+                                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                                <span className="text-xs" title={f.descricaoAvariaFim || ''}>
+                                  {f.descricaoAvariaFim
+                                    ? f.descricaoAvariaFim.length > 30
+                                      ? f.descricaoAvariaFim.slice(0, 30) + '…'
+                                      : f.descricaoAvariaFim
+                                    : 'Fim: Sim'}
+                                </span>
+                              </div>
+                            )}
+                            {qtdEntrada === 0 && !(f.status === 'encerrado' && f.constatouAvaria) && (
+                              <span className="text-xs text-muted-foreground">
+                                {f.status === 'encerrado' ? 'Não' : '—'}
                               </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Não</span>
-                          )}
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {f.status === 'encerrado' ? (
