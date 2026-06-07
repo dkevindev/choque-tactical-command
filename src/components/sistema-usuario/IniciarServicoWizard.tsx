@@ -183,6 +183,14 @@ const IniciarServicoWizard = () => {
       const data: any = snap.exists() ? snap.data() : {};
       const hist = Array.isArray(data.historicoChecklists) ? data.historicoChecklists : [];
       await updateDoc(ref, { ultimoChecklist: completo, historicoChecklists: [...hist, completo] });
+      if (servicoDocId) {
+        try {
+          await updateDoc(doc(db, 'servicosDiarios', servicoDocId), {
+            checklistInicial: completo,
+            problemasChecklist: problemas,
+          });
+        } catch (err) { console.error('Erro ao salvar checklist na ficha:', err); }
+      }
       toast({ title: '✅ Serviço iniciado e checklist salvo' });
       navigate('/sistema');
     } catch (e) {
