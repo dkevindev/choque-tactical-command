@@ -20,6 +20,7 @@ type Angulo = 'frontal' | 'traseira' | 'esquerdo' | 'direito' | 'mecanico' | 'in
 const IniciarServicoWizard = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  const [servicoDocId, setServicoDocId] = useState<string | null>(null);
   const [pol, setPol] = useState<PolicialAuth | null>(null);
   const [tipo, setTipo] = useState<Tipo | null>(null);
   const [categoria, setCategoria] = useState<Categoria | null>(null);
@@ -126,7 +127,7 @@ const IniciarServicoWizard = () => {
     const km = parseInt(kmInicial.replace(/\D/g, ''));
     if (isNaN(km) || !area.trim()) { toast({ title: 'Preencha KM e área', variant: 'destructive' }); return; }
     try {
-      await addDoc(collection(db, 'servicosDiarios'), {
+      const ref = await addDoc(collection(db, 'servicosDiarios'), {
         viaturaId: viatura.id,
         cadastro: viatura.CADASTRO || null,
         placa: viatura.PLACA,
@@ -140,7 +141,9 @@ const IniciarServicoWizard = () => {
         policialId: pol.id,
         policialNome: pol.NOME,
         policialNomeGuerra1: pol.nomeGuerra1 || null,
+        avariasIniciais: avariasLista.map(a => ({ ...a })),
       });
+      setServicoDocId(ref.id);
       setStep(7);
     } catch (e) {
       console.error(e);
@@ -180,6 +183,14 @@ const IniciarServicoWizard = () => {
       const data: any = snap.exists() ? snap.data() : {};
       const hist = Array.isArray(data.historicoChecklists) ? data.historicoChecklists : [];
       await updateDoc(ref, { ultimoChecklist: completo, historicoChecklists: [...hist, completo] });
+      if (servicoDocId) {
+        try {
+          await updateDoc(doc(db, 'servicosDiarios', servicoDocId), {
+            checklistInicial: completo,
+            problemasChecklist: problemas,
+          });
+        } catch (err) { console.error('Erro ao salvar checklist na ficha:', err); }
+      }
       toast({ title: '✅ Serviço iniciado e checklist salvo' });
       navigate('/sistema');
     } catch (e) {
