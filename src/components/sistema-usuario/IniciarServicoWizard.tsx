@@ -20,6 +20,7 @@ type Angulo = 'frontal' | 'traseira' | 'esquerdo' | 'direito' | 'mecanico' | 'in
 const IniciarServicoWizard = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  const [servicoDocId, setServicoDocId] = useState<string | null>(null);
   const [pol, setPol] = useState<PolicialAuth | null>(null);
   const [tipo, setTipo] = useState<Tipo | null>(null);
   const [categoria, setCategoria] = useState<Categoria | null>(null);
