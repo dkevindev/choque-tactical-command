@@ -269,6 +269,7 @@ const FichasServicoPage = () => {
           </>
         )}
       </CardContent>
+      <DetalheFichaModal ficha={fichaSel} open={!!fichaSel} onClose={() => setFichaSel(null)} />
     </Card>
   );
 };
