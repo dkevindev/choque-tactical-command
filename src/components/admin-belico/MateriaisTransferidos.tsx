@@ -79,10 +79,11 @@ const MateriaisTransferidos = () => {
   const locaisUnicos = [...new Set(transferencias.map(t => t.localDestino).filter(Boolean))];
 
   const transferenciasFiltradas = transferencias.filter((t) => {
+    const f = filtro.toLowerCase();
     const matchTexto =
-      t.policialNome?.toLowerCase().includes(filtro.toLowerCase()) ||
-      t.policialMatricula?.toLowerCase().includes(filtro.toLowerCase()) ||
-      t.publicacao?.toLowerCase().includes(filtro.toLowerCase());
+      String(t.policialNome ?? '').toLowerCase().includes(f) ||
+      String(t.policialMatricula ?? '').toLowerCase().includes(f) ||
+      String(t.publicacao ?? '').toLowerCase().includes(f);
     const matchLocal = filtroLocal === 'todos' || t.localDestino === filtroLocal;
     return matchTexto && matchLocal;
   });
