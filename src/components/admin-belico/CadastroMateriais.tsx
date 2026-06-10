@@ -86,6 +86,8 @@ const CadastroMateriais = () => {
   const [cadastrandoLote, setCadastrandoLote] = useState(false);
   const [progressoLote, setProgressoLote] = useState(0);
   const [gerandoHistorico, setGerandoHistorico] = useState(false);
+  const [sincronizandoCautelas, setSincronizandoCautelas] = useState(false);
+
   
   // Acervo de modelos
   const [showAcervo, setShowAcervo] = useState(false);
