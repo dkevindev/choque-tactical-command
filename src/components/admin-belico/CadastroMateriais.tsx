@@ -1853,6 +1853,20 @@ const CadastroMateriais = () => {
             )}
             {gerandoHistorico ? 'Gerando...' : 'Gerar Histórico'}
           </Button>
+          <Button
+            variant="outline"
+            onClick={sincronizarCautelasComMateriais}
+            disabled={sincronizandoCautelas}
+            className="flex items-center gap-2"
+            title="Atualiza as cautelas permanentes com os dados atuais dos materiais e remove itens órfãos/baixados"
+          >
+            {sincronizandoCautelas ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <History className="h-4 w-4" />
+            )}
+            {sincronizandoCautelas ? 'Sincronizando...' : 'Sincronizar Cautelas'}
+
           <Button 
             variant="outline" 
             onClick={() => setShowAcervo(true)} 
