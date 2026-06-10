@@ -59,50 +59,41 @@ const PolicialTable = () => {
         // Carregar policiais
         const querySnapshot = await getDocs(collection(db, 'policiais'));
         const policiaisData: Policial[] = [];
-        
+
         querySnapshot.forEach((doc) => {
           policiaisData.push({
             id: doc.id,
             ...doc.data()
           } as Policial);
         });
-        
+
         setPoliciais(policiaisData);
-        
-        // Carregar cautelas ativas
-        const cautelasSnapshot = await getDocs(collection(db, 'cautelas_permanentes'));
+
+        // Fonte da verdade: materiais_belicos (ignora baixados/transferidos)
+        const materiaisSnapshot = await getDocs(collection(db, 'materiais_belicos'));
         const cautelasData = new Map<string, CautelaData>();
-        
-        cautelasSnapshot.forEach((doc) => {
-          const cautela = doc.data();
-          if (cautela.status === 'ativa' && cautela.policialId) {
-            const materiais = cautela.materiais || [];
-            const data: CautelaData = {};
-            
-            // Buscar armamento (Pistola, Fuzil, Carabina, etc)
-            const armamento = materiais.find((m: any) => 
-              m.categoria === 'Armamento' && m.numeroSerie
-            );
-            if (armamento) {
-              data.armamento = armamento.numeroSerie;
-            }
-            
-            // Buscar colete
-            const colete = materiais.find((m: any) => 
-              m.categoria === 'Colete Balístico' && m.numeroSerie
-            );
-            if (colete) {
-              data.colete = colete.numeroSerie;
-            }
-            
-            if (data.armamento || data.colete) {
-              cautelasData.set(cautela.policialId, data);
-            }
+
+        materiaisSnapshot.forEach((docSnap) => {
+          const m: any = docSnap.data();
+          if (m.baixado || m.transferido) return;
+          const policialId = m.policialAssociadoId;
+          if (!policialId) return;
+          const numeroSerie = m.numeroSerie;
+          if (!numeroSerie) return;
+
+          const atual = cautelasData.get(policialId) || {};
+          if (m.categoria === 'Armamento' && !atual.armamento) {
+            atual.armamento = numeroSerie;
+          } else if (m.categoria === 'Colete Balístico' && !atual.colete) {
+            atual.colete = numeroSerie;
+          }
+          if (atual.armamento || atual.colete) {
+            cautelasData.set(policialId, atual);
           }
         });
-        
+
         setCautelasMap(cautelasData);
-        console.log('Policiais e cautelas carregados');
+        console.log('Policiais e materiais carregados');
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
       } finally {
@@ -112,6 +103,7 @@ const PolicialTable = () => {
 
     loadData();
   }, []);
+
 
   const filteredPoliciais = policiais.filter(policial => {
     const cautelaData = cautelasMap.get(policial.id);

@@ -1,75 +1,57 @@
 ## Problema
 
-Na página **Fichas de Serviço** a coluna "Avaria" mostra sempre `-` para fichas ainda abertas e não há como ver os detalhes de cada serviço. Hoje o checklist e as avarias da viatura são gravados apenas no documento da `frota/{viaturaId}` (campos `ultimoChecklist` e `avarias[]`), e não dentro do `servicosDiarios`. Por isso a ficha não consegue mostrar:
-- as avarias que o motorista marcou ao iniciar o serviço,
-- como o motorista preencheu o checklist da viatura,
-- a descrição da avaria do encerramento (se houver),
-- demais dados da ficha em formato legível.
+Hoje a tabela de Policial (colunas COLETE/ARMAMENTO) e as cautelas permanentes guardam um **snapshot** do material (numeroSerie, nome, etc.). Quando o material é editado, apagado ou tem baixa, esses snapshots ficam desatualizados:
 
-## Objetivo
+- `PolicialTable.tsx` lê `cautelas_permanentes.materiais[].numeroSerie` (snapshot antigo) em vez do material vivo.
+- `CadastroMateriais.handleSubmit` (linha 416-417) só sincroniza o array `materiais` da cautela quando **muda o policial** — se você só corrigiu o número de série, a cautela continua com o número antigo.
+- A baixa e a exclusão já removem o item da cautela, mas se algum registro antigo tiver ficado órfão (material `baixado/transferido` ainda referenciado), a coluna do policial continua mostrando.
 
-1. Gravar um **snapshot por ficha** dos dados marcados pelo motorista, para que cada ficha tenha histórico próprio (não depender do "último checklist" da viatura, que muda a cada serviço).
-2. Tornar cada linha da tabela **clicável**, abrindo um **modal de detalhes** com todas as informações do serviço.
-3. Mostrar corretamente a coluna **Avaria** também em serviços abertos (quantas avarias o motorista registrou na entrada).
+## Solução
 
-## Mudanças
+Tornar o documento em `materiais_belicos` a **única fonte de verdade**. A cautela passa a guardar apenas a referência (`materialId`) e — em tempo de leitura/edição — busca os dados atuais do material. Em paralelo, manter o snapshot da cautela "vivo" via sincronização automática a cada mudança no material.
 
-### 1. `IniciarServicoWizard.tsx` — salvar snapshot na ficha
-Ao criar o documento em `servicosDiarios` (função `iniciarServicoSalvar`), incluir o id do serviço para uso posterior. Em `salvarChecklistFinal`, além de atualizar `frota/{id}`, atualizar **também** o documento de `servicosDiarios` recém-criado adicionando:
-- `checklistInicial`: o objeto `completo` (mesmo conteúdo gravado em `ultimoChecklist`).
-- `avariasIniciais`: snapshot das avarias da viatura no momento do início (cópia de `avariasLista`, já filtrado/clonado).
-- `problemasChecklist`: array `problemas` resumido (para badge rápido).
+### 1. `src/components/PolicialTable.tsx` — derivar COLETE/ARMAMENTO do material
 
-### 2. `EncerrarServicoWizard.tsx` — já grava `constatouAvaria` e `descricaoAvariaFim`
-Sem mudança lógica; garantir apenas que `encerradoPorId` e `encerradoPorNome` continuem sendo gravados (já estão).
+Substituir a leitura de `cautelas_permanentes` pela leitura de `materiais_belicos`:
 
-### 3. `FichasServicoPage.tsx` — modal de detalhes + coluna Avaria melhorada
+- Carregar `materiais_belicos` filtrando `!baixado && !transferido && policialAssociadoId`.
+- Construir `Map<policialId, { armamento?, colete? }>` usando o `numeroSerie` **atual** do material.
+- Critério de categoria: `categoria === 'Armamento'` → coluna ARMAMENTO; `categoria === 'Colete Balístico'` (e equivalentes já usados no projeto) → coluna COLETE.
+- Manter busca por número de série usando os valores atuais.
 
-- Adicionar estado `fichaSelecionada` e abrir `<Dialog>` ao clicar na linha.
-- Linha com `cursor-pointer hover:bg-muted/50`.
-- Coluna "Avaria":
-  - Se ficha tem `avariasIniciais.length > 0` ou `constatouAvaria === true`, exibir badge vermelho com contagem (entrada) e ícone de alerta para encerramento.
-  - Se ficha aberta sem avarias iniciais → "—".
-  - Se encerrada sem avaria → "Não".
-- Para fichas antigas (sem `checklistInicial` salvo), o modal busca `frota/{viaturaId}.ultimoChecklist` como fallback.
+Resultado: qualquer alteração no material reflete imediatamente; material baixado/transferido some da coluna.
 
-### 4. Modal `DetalheFichaModal` (novo, dentro do mesmo arquivo ou em `frota/DetalheFichaModal.tsx`)
+### 2. `src/components/admin-belico/CadastroMateriais.tsx` — sincronizar cautela em toda edição
 
-Layout em seções:
+No bloco `if (editingMaterial)` (linha ~416), **antes** do `if (policialAntigoId !== policialNovoId)`, adicionar uma sincronização incondicional: para toda cautela ativa que contenha `materiais[].materialId === editingMaterial.id` (ou `${id}_carregadores` / `${id}_municoes`), atualizar in-place os campos do snapshot (`numeroSerie`, `nome`, `categoria`, `fabricante`, `modelo`, `calibre`, `tamanhoColete`, `sexo`, `numeroSIARM`, `quantidadeCarregadores`, `quantidadeMunicoes`) a partir dos novos `materialData`. Persistir com `updateDoc` apenas as cautelas que realmente mudaram.
 
-```
-[Cabeçalho]
-VTR <CADASTRO> • <PLACA>          [Badge status]
-Motorista: <nomeGuerra1>           Área: <area>
-Início: dd/MM/yy HH:mm             Fim:   dd/MM/yy HH:mm
-KM inicial / final / rodada
-Encerrada por: <nomeGuerra1>
+Assim a cautela permanente reflete o material atualizado mesmo quando o policial não muda.
 
-[Avarias registradas na entrada]
-- ângulo, descrição, foto (se houver) — lista vinda de avariasIniciais
-- se vazio: "Nenhuma avaria registrada na entrada."
+### 3. `handleDelete` (linha ~830) — já está correto
 
-[Checklist da viatura]
-Tabela de chave → valor (Óleo motor, Água radiador, Step, Macaco, Chave de roda,
-Triângulo, Smartphone estado/conexão, Rádio fixo, Cartão abastecimento).
-Itens com problema marcados em vermelho.
+Continua removendo os itens cuja `materialId` casa com o id (e variantes `_carregadores`/`_municoes`). Apenas garantir que também trate as variantes (hoje filtra só `m.materialId !== id`). Adicionar o filtro das duas variantes para limpar acessórios/munições deixados para trás.
 
-[Avaria no encerramento]
-"Constatou avaria: Sim/Não"
-Descrição (se houver).
-```
+### 4. `BaixaMaterialCargaModal.tsx` — já está correto
 
-Estilo: usar `Dialog` do shadcn com classes light já padronizadas (`bg-white text-slate-900`) para manter consistência com o portal mobile, mas como esta tela é desktop (Gestão e Logística), seguir o tema escuro do app (`bg-card text-foreground`).
+Já marca `baixado=true`, `cautelado=false` e remove da cautela. Sem alteração além de incluir também a remoção das variantes `_carregadores`/`_municoes` (mesmo ajuste do item 3) para não deixar lixo.
 
-## Detalhes técnicos
+### 5. Botão de reparo "Sincronizar cautelas com materiais"
 
-- Tipo `FichaServico` ganha `checklistInicial?`, `avariasIniciais?: any[]`, `problemasChecklist?: string[]`.
-- Função utilitária `labelChecklist(key, value)` para mostrar nomes amigáveis.
-- Fallback de busca em `frota/{viaturaId}` apenas se o snapshot não estiver na ficha (compatibilidade com fichas antigas).
-- Nenhuma alteração no schema/Firestore além dos novos campos opcionais — sem migrations.
+Adicionar em `CadastroMateriais.tsx` (junto aos outros utilitários existentes) uma ação única que percorre `cautelas_permanentes` ativas e:
 
-## Arquivos
+1. Atualiza cada item para refletir o estado atual do material (`numeroSerie`, etc.).
+2. Remove itens cujo `materialId` não exista mais ou cujo material esteja `baixado/transferido`.
+3. Reporta o total de cautelas corrigidas via toast.
 
-- `src/components/sistema-usuario/IniciarServicoWizard.tsx` — gravar snapshot no `servicosDiarios`.
-- `src/components/frota/FichasServicoPage.tsx` — linha clicável, coluna Avaria com contagem da entrada, integração com modal.
-- `src/components/frota/DetalheFichaModal.tsx` (novo) — modal de detalhes.
+Isso conserta os dados legados que já estão divergentes.
+
+## Arquivos alterados
+
+- `src/components/PolicialTable.tsx`
+- `src/components/admin-belico/CadastroMateriais.tsx`
+- `src/components/admin-belico/BaixaMaterialCargaModal.tsx` (ajuste mínimo)
+
+## Fora do escopo
+
+- Não mexer no fluxo de cautelas temporárias da Reserva de Armamento.
+- Não criar triggers/regras no backend (projeto usa Firestore, não Postgres).

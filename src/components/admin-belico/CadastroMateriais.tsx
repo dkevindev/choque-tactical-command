@@ -86,6 +86,8 @@ const CadastroMateriais = () => {
   const [cadastrandoLote, setCadastrandoLote] = useState(false);
   const [progressoLote, setProgressoLote] = useState(0);
   const [gerandoHistorico, setGerandoHistorico] = useState(false);
+  const [sincronizandoCautelas, setSincronizandoCautelas] = useState(false);
+
   
   // Acervo de modelos
   const [showAcervo, setShowAcervo] = useState(false);
@@ -417,8 +419,64 @@ const CadastroMateriais = () => {
         await updateDoc(doc(db, 'materiais_belicos', editingMaterial.id), materialData);
         materialId = editingMaterial.id;
 
+        // ✨ Sincroniza snapshot do material em TODAS as cautelas ativas que o referenciam,
+        // independentemente de troca de policial. Garante que numeroSerie/nome/etc. sempre
+        // reflitam o material atual.
+        try {
+          const cautelasAtivasSnap = await getDocs(
+            query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
+          );
+          const idsRelacionados = new Set([
+            editingMaterial.id,
+            `${editingMaterial.id}_carregadores`,
+            `${editingMaterial.id}_municoes`,
+          ]);
+          for (const cautelaDoc of cautelasAtivasSnap.docs) {
+            const cautela = cautelaDoc.data();
+            const lista = cautela.materiais || [];
+            let mudou = false;
+            const novaLista = lista.map((item: any) => {
+              if (!item?.materialId || !idsRelacionados.has(item.materialId)) return item;
+              const atualizado = { ...item };
+              if (item.materialId === editingMaterial.id) {
+                if (materialData.numeroSerie !== undefined) atualizado.numeroSerie = materialData.numeroSerie || atualizado.numeroSerie;
+                if (materialData.nome !== undefined) atualizado.nome = materialData.nome;
+                if (materialData.categoria !== undefined) atualizado.categoria = materialData.categoria;
+                if (materialData.fabricante !== undefined) atualizado.fabricante = materialData.fabricante;
+                if (materialData.modelo !== undefined) atualizado.modelo = materialData.modelo;
+                if (materialData.calibre !== undefined) atualizado.calibre = materialData.calibre;
+                if (materialData.tamanhoColete !== undefined) atualizado.tamanhoColete = materialData.tamanhoColete;
+                if (materialData.sexo !== undefined) atualizado.sexo = materialData.sexo;
+                if (materialData.numeroSIARM !== undefined) atualizado.numeroSIARM = materialData.numeroSIARM;
+                if (materialData.quantidadeCarregadores !== undefined) atualizado.quantidadeCarregadores = parseInt(materialData.quantidadeCarregadores) || 0;
+                if (materialData.quantidadeMunicoes !== undefined) atualizado.quantidadeMunicoes = parseInt(materialData.quantidadeMunicoes) || 0;
+              } else if (item.materialId === `${editingMaterial.id}_carregadores`) {
+                if (materialData.fabricante !== undefined) atualizado.fabricante = materialData.fabricante || 'N/D';
+                if (materialData.modelo !== undefined) atualizado.modelo = materialData.modelo || 'N/D';
+                if (materialData.calibre !== undefined) atualizado.calibre = materialData.calibre;
+                if (materialData.nome !== undefined) atualizado.nome = `Carregadores - ${materialData.nome}`;
+                if (materialData.quantidadeCarregadores !== undefined) atualizado.quantidade = parseInt(materialData.quantidadeCarregadores) || atualizado.quantidade;
+              } else if (item.materialId === `${editingMaterial.id}_municoes`) {
+                if (materialData.calibre !== undefined) {
+                  atualizado.calibre = materialData.calibre;
+                  atualizado.nome = `Munição ${materialData.calibre}`;
+                }
+                if (materialData.quantidadeMunicoes !== undefined) atualizado.quantidade = parseInt(materialData.quantidadeMunicoes) || atualizado.quantidade;
+              }
+              if (JSON.stringify(atualizado) !== JSON.stringify(item)) mudou = true;
+              return atualizado;
+            });
+            if (mudou) {
+              await updateDoc(doc(db, 'cautelas_permanentes', cautelaDoc.id), { materiais: novaLista });
+            }
+          }
+        } catch (syncErr) {
+          console.error('Erro ao sincronizar cautelas com material editado:', syncErr);
+        }
+
         const policialAntigoId = editingMaterial.policialAssociadoId || '';
         const policialNovoId = formData.policialAssociadoId || '';
+
 
         if (policialAntigoId !== policialNovoId) {
           if (policialAntigoId) {
@@ -839,8 +897,12 @@ const CadastroMateriais = () => {
       for (const cautelaDoc of cautelasSnapshot.docs) {
         const cautela = cautelaDoc.data();
         const materiaisAtualizados = cautela.materiais?.filter(
-          (m: any) => m.materialId !== id
+          (m: any) =>
+            m.materialId !== id &&
+            m.materialId !== `${id}_carregadores` &&
+            m.materialId !== `${id}_municoes`
         );
+
         if (materiaisAtualizados?.length !== cautela.materiais?.length) {
           if (material) {
             await addDoc(collection(db, 'historico_material'), {
@@ -961,7 +1023,93 @@ const CadastroMateriais = () => {
     setModeloFiltro('todos');
   };
 
+  const sincronizarCautelasComMateriais = async () => {
+    if (!confirm('Sincronizar todas as cautelas permanentes ativas com o estado atual dos materiais? Itens cujo material foi baixado, transferido ou excluído serão removidos da cautela.')) return;
+    setSincronizandoCautelas(true);
+    try {
+      const materiaisSnap = await getDocs(collection(db, 'materiais_belicos'));
+      const materiaisMap = new Map<string, any>();
+      materiaisSnap.docs.forEach(d => materiaisMap.set(d.id, { id: d.id, ...d.data() }));
+
+      const cautelasSnap = await getDocs(
+        query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
+      );
+
+      let cautelasAtualizadas = 0;
+      let itensRemovidos = 0;
+      let itensSincronizados = 0;
+
+      for (const cautelaDoc of cautelasSnap.docs) {
+        const cautela = cautelaDoc.data();
+        const lista = cautela.materiais || [];
+        const novaLista: any[] = [];
+        let mudou = false;
+
+        for (const item of lista) {
+          if (!item?.materialId) { novaLista.push(item); continue; }
+
+          // Itens derivados (carregadores/munições) seguem o material principal
+          const idBase = item.materialId.replace(/_(carregadores|municoes)$/, '');
+          const material = materiaisMap.get(idBase);
+
+          if (!material || material.baixado || material.transferido) {
+            mudou = true;
+            itensRemovidos++;
+            continue;
+          }
+
+          const atualizado = { ...item };
+          if (item.materialId === idBase) {
+            if (material.numeroSerie) atualizado.numeroSerie = material.numeroSerie;
+            if (material.nome) atualizado.nome = material.nome;
+            if (material.categoria) atualizado.categoria = material.categoria;
+            if (material.fabricante !== undefined) atualizado.fabricante = material.fabricante;
+            if (material.modelo !== undefined) atualizado.modelo = material.modelo;
+            if (material.calibre !== undefined) atualizado.calibre = material.calibre;
+            if (material.tamanhoColete !== undefined) atualizado.tamanhoColete = material.tamanhoColete;
+            if (material.sexo !== undefined) atualizado.sexo = material.sexo;
+            if (material.numeroSIARM !== undefined) atualizado.numeroSIARM = material.numeroSIARM;
+          } else if (item.materialId.endsWith('_carregadores')) {
+            if (material.nome) atualizado.nome = `Carregadores - ${material.nome}`;
+            if (material.calibre) atualizado.calibre = material.calibre;
+            if (material.fabricante) atualizado.fabricante = material.fabricante;
+            if (material.modelo) atualizado.modelo = material.modelo;
+          } else if (item.materialId.endsWith('_municoes')) {
+            if (material.calibre) {
+              atualizado.calibre = material.calibre;
+              atualizado.nome = `Munição ${material.calibre}`;
+            }
+          }
+
+          if (JSON.stringify(atualizado) !== JSON.stringify(item)) {
+            mudou = true;
+            itensSincronizados++;
+          }
+          novaLista.push(atualizado);
+        }
+
+        if (mudou) {
+          await updateDoc(doc(db, 'cautelas_permanentes', cautelaDoc.id), { materiais: novaLista });
+          cautelasAtualizadas++;
+        }
+      }
+
+      const partes: string[] = [];
+      if (cautelasAtualizadas > 0) partes.push(`${cautelasAtualizadas} cautela(s) atualizada(s)`);
+      if (itensSincronizados > 0) partes.push(`${itensSincronizados} item(ns) sincronizado(s)`);
+      if (itensRemovidos > 0) partes.push(`${itensRemovidos} item(ns) órfão(s) removido(s)`);
+      toast.success(partes.length > 0 ? `Concluído: ${partes.join(', ')}.` : 'Tudo já estava sincronizado.');
+      loadMateriais();
+    } catch (error) {
+      console.error('Erro ao sincronizar cautelas:', error);
+      toast.error('Erro ao sincronizar cautelas com materiais');
+    } finally {
+      setSincronizandoCautelas(false);
+    }
+  };
+
   const gerarHistoricoGlobal = async () => {
+
     setGerandoHistorico(true);
     try {
       const historicoExistenteSnapshot = await getDocs(collection(db, 'historico_material'));
@@ -1705,6 +1853,23 @@ const CadastroMateriais = () => {
             )}
             {gerandoHistorico ? 'Gerando...' : 'Gerar Histórico'}
           </Button>
+          <Button
+            variant="outline"
+            onClick={sincronizarCautelasComMateriais}
+            disabled={sincronizandoCautelas}
+            className="flex items-center gap-2"
+            title="Atualiza as cautelas permanentes com os dados atuais dos materiais e remove itens órfãos/baixados"
+          >
+            {sincronizandoCautelas ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <History className="h-4 w-4" />
+            )}
+            {sincronizandoCautelas ? 'Sincronizando...' : 'Sincronizar Cautelas'}
+          </Button>
+
+
+
           <Button 
             variant="outline" 
             onClick={() => setShowAcervo(true)} 
