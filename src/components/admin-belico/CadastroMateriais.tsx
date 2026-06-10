@@ -417,8 +417,64 @@ const CadastroMateriais = () => {
         await updateDoc(doc(db, 'materiais_belicos', editingMaterial.id), materialData);
         materialId = editingMaterial.id;
 
+        // ✨ Sincroniza snapshot do material em TODAS as cautelas ativas que o referenciam,
+        // independentemente de troca de policial. Garante que numeroSerie/nome/etc. sempre
+        // reflitam o material atual.
+        try {
+          const cautelasAtivasSnap = await getDocs(
+            query(collection(db, 'cautelas_permanentes'), where('status', '==', 'ativa'))
+          );
+          const idsRelacionados = new Set([
+            editingMaterial.id,
+            `${editingMaterial.id}_carregadores`,
+            `${editingMaterial.id}_municoes`,
+          ]);
+          for (const cautelaDoc of cautelasAtivasSnap.docs) {
+            const cautela = cautelaDoc.data();
+            const lista = cautela.materiais || [];
+            let mudou = false;
+            const novaLista = lista.map((item: any) => {
+              if (!item?.materialId || !idsRelacionados.has(item.materialId)) return item;
+              const atualizado = { ...item };
+              if (item.materialId === editingMaterial.id) {
+                if (materialData.numeroSerie !== undefined) atualizado.numeroSerie = materialData.numeroSerie || atualizado.numeroSerie;
+                if (materialData.nome !== undefined) atualizado.nome = materialData.nome;
+                if (materialData.categoria !== undefined) atualizado.categoria = materialData.categoria;
+                if (materialData.fabricante !== undefined) atualizado.fabricante = materialData.fabricante;
+                if (materialData.modelo !== undefined) atualizado.modelo = materialData.modelo;
+                if (materialData.calibre !== undefined) atualizado.calibre = materialData.calibre;
+                if (materialData.tamanhoColete !== undefined) atualizado.tamanhoColete = materialData.tamanhoColete;
+                if (materialData.sexo !== undefined) atualizado.sexo = materialData.sexo;
+                if (materialData.numeroSIARM !== undefined) atualizado.numeroSIARM = materialData.numeroSIARM;
+                if (materialData.quantidadeCarregadores !== undefined) atualizado.quantidadeCarregadores = parseInt(materialData.quantidadeCarregadores) || 0;
+                if (materialData.quantidadeMunicoes !== undefined) atualizado.quantidadeMunicoes = parseInt(materialData.quantidadeMunicoes) || 0;
+              } else if (item.materialId === `${editingMaterial.id}_carregadores`) {
+                if (materialData.fabricante !== undefined) atualizado.fabricante = materialData.fabricante || 'N/D';
+                if (materialData.modelo !== undefined) atualizado.modelo = materialData.modelo || 'N/D';
+                if (materialData.calibre !== undefined) atualizado.calibre = materialData.calibre;
+                if (materialData.nome !== undefined) atualizado.nome = `Carregadores - ${materialData.nome}`;
+                if (materialData.quantidadeCarregadores !== undefined) atualizado.quantidade = parseInt(materialData.quantidadeCarregadores) || atualizado.quantidade;
+              } else if (item.materialId === `${editingMaterial.id}_municoes`) {
+                if (materialData.calibre !== undefined) {
+                  atualizado.calibre = materialData.calibre;
+                  atualizado.nome = `Munição ${materialData.calibre}`;
+                }
+                if (materialData.quantidadeMunicoes !== undefined) atualizado.quantidade = parseInt(materialData.quantidadeMunicoes) || atualizado.quantidade;
+              }
+              if (JSON.stringify(atualizado) !== JSON.stringify(item)) mudou = true;
+              return atualizado;
+            });
+            if (mudou) {
+              await updateDoc(doc(db, 'cautelas_permanentes', cautelaDoc.id), { materiais: novaLista });
+            }
+          }
+        } catch (syncErr) {
+          console.error('Erro ao sincronizar cautelas com material editado:', syncErr);
+        }
+
         const policialAntigoId = editingMaterial.policialAssociadoId || '';
         const policialNovoId = formData.policialAssociadoId || '';
+
 
         if (policialAntigoId !== policialNovoId) {
           if (policialAntigoId) {
