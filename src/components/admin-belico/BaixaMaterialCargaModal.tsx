@@ -208,8 +208,12 @@ const BaixaMaterialCargaModal = ({ open, onClose, onSuccess }: Props) => {
           const cautela = cautelaDoc.data();
           const materiaisAtuais = cautela.materiais || [];
           const materiaisAtualizados = materiaisAtuais.filter(
-            (m: any) => m.materialId !== material.id
+            (m: any) =>
+              m.materialId !== material.id &&
+              m.materialId !== `${material.id}_carregadores` &&
+              m.materialId !== `${material.id}_municoes`
           );
+
           if (materiaisAtualizados.length !== materiaisAtuais.length) {
             await updateDoc(doc(db, 'cautelas_permanentes', cautelaDoc.id), {
               materiais: materiaisAtualizados
