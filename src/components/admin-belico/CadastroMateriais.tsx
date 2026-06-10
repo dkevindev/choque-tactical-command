@@ -895,8 +895,12 @@ const CadastroMateriais = () => {
       for (const cautelaDoc of cautelasSnapshot.docs) {
         const cautela = cautelaDoc.data();
         const materiaisAtualizados = cautela.materiais?.filter(
-          (m: any) => m.materialId !== id
+          (m: any) =>
+            m.materialId !== id &&
+            m.materialId !== `${id}_carregadores` &&
+            m.materialId !== `${id}_municoes`
         );
+
         if (materiaisAtualizados?.length !== cautela.materiais?.length) {
           if (material) {
             await addDoc(collection(db, 'historico_material'), {
