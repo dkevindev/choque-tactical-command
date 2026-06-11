@@ -69,26 +69,45 @@ const PolicialTable = () => {
 
         setPoliciais(policiaisData);
 
-        // Fonte da verdade: materiais_belicos (ignora baixados/transferidos)
+        // Carregar materiais_belicos (fonte da verdade dos dados atuais)
         const materiaisSnapshot = await getDocs(collection(db, 'materiais_belicos'));
+        const materiaisById = new Map<string, any>();
+        materiaisSnapshot.forEach((d) => {
+          const m: any = d.data();
+          if (m.baixado || m.transferido) return;
+          materiaisById.set(d.id, m);
+        });
+
         const cautelasData = new Map<string, CautelaData>();
 
-        materiaisSnapshot.forEach((docSnap) => {
-          const m: any = docSnap.data();
-          if (m.baixado || m.transferido) return;
-          const policialId = m.n || m.policialAssociadoId;
+        // 1) Vínculo direto no material (policialAssociadoId)
+        materiaisById.forEach((m) => {
+          const policialId = m.policialAssociadoId;
           if (!policialId) return;
           const numeroSerie = m.numeroSerie || 'S/N';
-
           const atual = cautelasData.get(policialId) || {};
-          if (m.categoria === 'Armamento' && !atual.armamento) {
-            atual.armamento = numeroSerie;
-          } else if (m.categoria === 'Colete Balístico' && !atual.colete) {
-            atual.colete = numeroSerie;
-          }
-          if (atual.armamento || atual.colete) {
-            cautelasData.set(policialId, atual);
-          }
+          if (m.categoria === 'Armamento' && !atual.armamento) atual.armamento = numeroSerie;
+          else if (m.categoria === 'Colete Balístico' && !atual.colete) atual.colete = numeroSerie;
+          if (atual.armamento || atual.colete) cautelasData.set(policialId, atual);
+        });
+
+        // 2) Vínculo via cautelas_permanentes ativas (resolvendo dados atuais do material)
+        const cautelasSnap = await getDocs(collection(db, 'cautelas_permanentes'));
+        cautelasSnap.forEach((d) => {
+          const c: any = d.data();
+          if (c.status && c.status !== 'ativa') return;
+          const policialId = c.policialId;
+          if (!policialId) return;
+          const itens: any[] = Array.isArray(c.materiais) ? c.materiais : [];
+          const atual = cautelasData.get(policialId) || {};
+          itens.forEach((it) => {
+            const mat = it?.materialId ? materiaisById.get(it.materialId) : null;
+            if (!mat) return; // material foi baixado/transferido/excluído
+            const numeroSerie = mat.numeroSerie || it.numeroSerie || 'S/N';
+            if (mat.categoria === 'Armamento' && !atual.armamento) atual.armamento = numeroSerie;
+            else if (mat.categoria === 'Colete Balístico' && !atual.colete) atual.colete = numeroSerie;
+          });
+          if (atual.armamento || atual.colete) cautelasData.set(policialId, atual);
         });
 
         setCautelasMap(cautelasData);
