@@ -76,10 +76,9 @@ const PolicialTable = () => {
         materiaisSnapshot.forEach((docSnap) => {
           const m: any = docSnap.data();
           if (m.baixado || m.transferido) return;
-          const policialId = m.policialAssociadoId;
+          const policialId = m.n || m.policialAssociadoId;
           if (!policialId) return;
-          const numeroSerie = m.numeroSerie;
-          if (!numeroSerie) return;
+          const numeroSerie = m.numeroSerie || 'S/N';
 
           const atual = cautelasData.get(policialId) || {};
           if (m.categoria === 'Armamento' && !atual.armamento) {

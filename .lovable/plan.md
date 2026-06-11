@@ -1,57 +1,40 @@
 ## Problema
 
-Hoje a tabela de Policial (colunas COLETE/ARMAMENTO) e as cautelas permanentes guardam um **snapshot** do material (numeroSerie, nome, etc.). Quando o material é editado, apagado ou tem baixa, esses snapshots ficam desatualizados:
+Em **Gestão e Logística > Policial**, as colunas **COLETE** e **ARMAMENTO** mostram `-` mesmo quando o policial possui materiais cautelados.
 
-- `PolicialTable.tsx` lê `cautelas_permanentes.materiais[].numeroSerie` (snapshot antigo) em vez do material vivo.
-- `CadastroMateriais.handleSubmit` (linha 416-417) só sincroniza o array `materiais` da cautela quando **muda o policial** — se você só corrigiu o número de série, a cautela continua com o número antigo.
-- A baixa e a exclusão já removem o item da cautela, mas se algum registro antigo tiver ficado órfão (material `baixado/transferido` ainda referenciado), a coluna do policial continua mostrando.
+## Causa raiz
 
-## Solução
+`src/components/PolicialTable.tsx` (linhas 76–93) deriva as colunas a partir de `materiais_belicos`, mas lê o campo errado:
 
-Tornar o documento em `materiais_belicos` a **única fonte de verdade**. A cautela passa a guardar apenas a referência (`materialId`) e — em tempo de leitura/edição — busca os dados atuais do material. Em paralelo, manter o snapshot da cautela "vivo" via sincronização automática a cada mudança no material.
+```ts
+const policialId = m.policialAssociadoId; // ❌ esse campo não existe no documento
+```
 
-### 1. `src/components/PolicialTable.tsx` — derivar COLETE/ARMAMENTO do material
+No restante do sistema (`CadastroMateriais.tsx`, `BaixaMaterialCargaModal.tsx`, `AnaliseArmamentos.tsx`, `ArmamentosSection.tsx`) o vínculo material → policial é gravado no campo **`n`** (id do policial), com `cautelado: true` e `policialAssociadoNome`/`policialAssociadoMatricula` apenas para exibição. Como `m.policialAssociadoId` é sempre `undefined`, o loop faz `return` e nenhum material entra no `cautelasMap` → todas as linhas exibem `-`.
 
-Substituir a leitura de `cautelas_permanentes` pela leitura de `materiais_belicos`:
+## Correção
 
-- Carregar `materiais_belicos` filtrando `!baixado && !transferido && policialAssociadoId`.
-- Construir `Map<policialId, { armamento?, colete? }>` usando o `numeroSerie` **atual** do material.
-- Critério de categoria: `categoria === 'Armamento'` → coluna ARMAMENTO; `categoria === 'Colete Balístico'` (e equivalentes já usados no projeto) → coluna COLETE.
-- Manter busca por número de série usando os valores atuais.
+Editar **apenas** `src/components/PolicialTable.tsx`, no bloco de carga (≈ linhas 76–93):
 
-Resultado: qualquer alteração no material reflete imediatamente; material baixado/transferido some da coluna.
+1. Trocar `const policialId = m.policialAssociadoId;` por:
+   ```ts
+   const policialId = m.n || m.policialAssociadoId;
+   ```
+   (mantém compatibilidade caso exista algum registro legado).
 
-### 2. `src/components/admin-belico/CadastroMateriais.tsx` — sincronizar cautela em toda edição
+2. Considerar também o flag `m.cautelado` como gatilho válido — se `!policialId` mas `m.cautelado`, ignorar como hoje (sem id não dá pra mapear), porém **não** descartar materiais por `numeroSerie` vazio quando for `Colete Balístico` (alguns coletes antigos podem não ter série); nesse caso, exibir `S/N` em vez de bloquear a linha:
+   ```ts
+   const numeroSerie = m.numeroSerie || 'S/N';
+   ```
 
-No bloco `if (editingMaterial)` (linha ~416), **antes** do `if (policialAntigoId !== policialNovoId)`, adicionar uma sincronização incondicional: para toda cautela ativa que contenha `materiais[].materialId === editingMaterial.id` (ou `${id}_carregadores` / `${id}_municoes`), atualizar in-place os campos do snapshot (`numeroSerie`, `nome`, `categoria`, `fabricante`, `modelo`, `calibre`, `tamanhoColete`, `sexo`, `numeroSIARM`, `quantidadeCarregadores`, `quantidadeMunicoes`) a partir dos novos `materialData`. Persistir com `updateDoc` apenas as cautelas que realmente mudaram.
+3. Nenhuma outra mudança: a lógica de `baixado`/`transferido`, ordenação e filtros permanece igual; assim, baixas/transferências continuam removendo o item da coluna automaticamente, como já foi implementado na rodada anterior.
 
-Assim a cautela permanente reflete o material atualizado mesmo quando o policial não muda.
+## Validação
 
-### 3. `handleDelete` (linha ~830) — já está correto
+- Abrir Gestão e Logística > Policial e verificar que o policial do exemplo (WEMERSON JARDEL) passa a exibir **PISTOLA .40 — 58H171292** em ARMAMENTO e **348570087** em COLETE.
+- Confirmar que policiais sem cautela continuam com `-`.
+- Confirmar que ao dar baixa/transferir o material, a coluna volta a `-` no próximo refresh (comportamento já existente).
 
-Continua removendo os itens cuja `materialId` casa com o id (e variantes `_carregadores`/`_municoes`). Apenas garantir que também trate as variantes (hoje filtra só `m.materialId !== id`). Adicionar o filtro das duas variantes para limpar acessórios/munições deixados para trás.
+## Arquivos
 
-### 4. `BaixaMaterialCargaModal.tsx` — já está correto
-
-Já marca `baixado=true`, `cautelado=false` e remove da cautela. Sem alteração além de incluir também a remoção das variantes `_carregadores`/`_municoes` (mesmo ajuste do item 3) para não deixar lixo.
-
-### 5. Botão de reparo "Sincronizar cautelas com materiais"
-
-Adicionar em `CadastroMateriais.tsx` (junto aos outros utilitários existentes) uma ação única que percorre `cautelas_permanentes` ativas e:
-
-1. Atualiza cada item para refletir o estado atual do material (`numeroSerie`, etc.).
-2. Remove itens cujo `materialId` não exista mais ou cujo material esteja `baixado/transferido`.
-3. Reporta o total de cautelas corrigidas via toast.
-
-Isso conserta os dados legados que já estão divergentes.
-
-## Arquivos alterados
-
-- `src/components/PolicialTable.tsx`
-- `src/components/admin-belico/CadastroMateriais.tsx`
-- `src/components/admin-belico/BaixaMaterialCargaModal.tsx` (ajuste mínimo)
-
-## Fora do escopo
-
-- Não mexer no fluxo de cautelas temporárias da Reserva de Armamento.
-- Não criar triggers/regras no backend (projeto usa Firestore, não Postgres).
+- `src/components/PolicialTable.tsx` (edição pontual, ~3 linhas).
