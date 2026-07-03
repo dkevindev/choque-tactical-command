@@ -133,6 +133,7 @@ const PolicialTable = () => {
   const filteredPoliciais = policiais.filter(policial => {
     const cautelaData = cautelasMap.get(policial.id);
     const armamentoSerie = cautelaData?.armamento || '';
+    const armamentoSIARM = cautelaData?.armamentoSIARM || '';
     const coleteSerie = cautelaData?.colete || '';
     
     return (
@@ -141,6 +142,7 @@ const PolicialTable = () => {
       (policial['Post/Grad'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (policial.NUMERAL?.toString() || '').includes(searchTerm) ||
       armamentoSerie.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      armamentoSIARM.toLowerCase().includes(searchTerm.toLowerCase()) ||
       coleteSerie.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }).sort(sortByHierarquia);
