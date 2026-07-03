@@ -87,7 +87,10 @@ const PolicialTable = () => {
           if (!policialId) return;
           const numeroSerie = m.numeroSerie || 'S/N';
           const atual = cautelasData.get(policialId) || {};
-          if (m.categoria === 'Armamento' && !atual.armamento) atual.armamento = numeroSerie;
+          if (m.categoria === 'Armamento' && !atual.armamento) {
+            atual.armamento = numeroSerie;
+            atual.armamentoSIARM = m.numeroSIARM || '';
+          }
           else if (m.categoria === 'Colete Balístico' && !atual.colete) atual.colete = numeroSerie;
           if (atual.armamento || atual.colete) cautelasData.set(policialId, atual);
         });
