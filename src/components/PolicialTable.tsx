@@ -210,7 +210,12 @@ const PolicialTable = () => {
                 <TableCell>{policial['Post/Grad'] || 'N/A'}</TableCell>
                 <TableCell className="font-mono text-sm">
                   {cautelaData?.armamento ? (
-                    <Badge variant="default">{cautelaData.armamento}</Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge variant="default" className="w-fit">{cautelaData.armamento}</Badge>
+                      <span className={`text-xs ${cautelaData.armamentoSIARM ? 'text-muted-foreground' : 'text-destructive font-semibold'}`}>
+                        SIARM: {cautelaData.armamentoSIARM || '—'}
+                      </span>
+                    </div>
                   ) : (
                     <span className="text-muted-foreground">-</span>
                   )}
