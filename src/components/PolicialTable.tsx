@@ -43,6 +43,7 @@ interface Policial {
 
 interface CautelaData {
   armamento?: string; // Número de série da arma
+  armamentoSIARM?: string; // Número da Cautela SIARM
   colete?: string; // Número de série do colete
 }
 
@@ -86,7 +87,10 @@ const PolicialTable = () => {
           if (!policialId) return;
           const numeroSerie = m.numeroSerie || 'S/N';
           const atual = cautelasData.get(policialId) || {};
-          if (m.categoria === 'Armamento' && !atual.armamento) atual.armamento = numeroSerie;
+          if (m.categoria === 'Armamento' && !atual.armamento) {
+            atual.armamento = numeroSerie;
+            atual.armamentoSIARM = m.numeroSIARM || '';
+          }
           else if (m.categoria === 'Colete Balístico' && !atual.colete) atual.colete = numeroSerie;
           if (atual.armamento || atual.colete) cautelasData.set(policialId, atual);
         });
@@ -104,7 +108,10 @@ const PolicialTable = () => {
             const mat = it?.materialId ? materiaisById.get(it.materialId) : null;
             if (!mat) return; // material foi baixado/transferido/excluído
             const numeroSerie = mat.numeroSerie || it.numeroSerie || 'S/N';
-            if (mat.categoria === 'Armamento' && !atual.armamento) atual.armamento = numeroSerie;
+            if (mat.categoria === 'Armamento' && !atual.armamento) {
+              atual.armamento = numeroSerie;
+              atual.armamentoSIARM = mat.numeroSIARM || it.numeroSIARM || '';
+            }
             else if (mat.categoria === 'Colete Balístico' && !atual.colete) atual.colete = numeroSerie;
           });
           if (atual.armamento || atual.colete) cautelasData.set(policialId, atual);
@@ -126,6 +133,7 @@ const PolicialTable = () => {
   const filteredPoliciais = policiais.filter(policial => {
     const cautelaData = cautelasMap.get(policial.id);
     const armamentoSerie = cautelaData?.armamento || '';
+    const armamentoSIARM = cautelaData?.armamentoSIARM || '';
     const coleteSerie = cautelaData?.colete || '';
     
     return (
@@ -134,6 +142,7 @@ const PolicialTable = () => {
       (policial['Post/Grad'] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (policial.NUMERAL?.toString() || '').includes(searchTerm) ||
       armamentoSerie.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      armamentoSIARM.toLowerCase().includes(searchTerm.toLowerCase()) ||
       coleteSerie.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }).sort(sortByHierarquia);
@@ -201,7 +210,12 @@ const PolicialTable = () => {
                 <TableCell>{policial['Post/Grad'] || 'N/A'}</TableCell>
                 <TableCell className="font-mono text-sm">
                   {cautelaData?.armamento ? (
-                    <Badge variant="default">{cautelaData.armamento}</Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge variant="default" className="w-fit">{cautelaData.armamento}</Badge>
+                      <span className={`text-xs ${cautelaData.armamentoSIARM ? 'text-muted-foreground' : 'text-destructive font-semibold'}`}>
+                        SIARM: {cautelaData.armamentoSIARM || '—'}
+                      </span>
+                    </div>
                   ) : (
                     <span className="text-muted-foreground">-</span>
                   )}
