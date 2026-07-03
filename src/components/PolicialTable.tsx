@@ -43,6 +43,7 @@ interface Policial {
 
 interface CautelaData {
   armamento?: string; // Número de série da arma
+  armamentoSIARM?: string; // Número da Cautela SIARM
   colete?: string; // Número de série do colete
 }
 
