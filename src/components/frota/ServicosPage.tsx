@@ -40,7 +40,13 @@ export default function ServicosPage() {
   const [showEncerrarAdmin, setShowEncerrarAdmin] = useState(false);
   const [servicoParaEncerrar, setServicoParaEncerrar] = useState<ServicoDiario | null>(null);
   const [kmFinalAdmin, setKmFinalAdmin] = useState('');
+  const [manterKmAtual, setManterKmAtual] = useState(false);
+  const [kmAtualVtr, setKmAtualVtr] = useState<number | null>(null);
   const [msgEncerrarAdmin, setMsgEncerrarAdmin] = useState('');
+
+  // Paginação
+  const [pagina, setPagina] = useState(1);
+  const porPagina = 50;
 
   useEffect(() => {
     const fetchServicos = async () => {
@@ -117,6 +123,16 @@ export default function ServicosPage() {
     });
   }, [servicos, filtroData, filtroPolicial, filtroViatura]);
 
+  // Reset página quando filtros mudam
+  useEffect(() => { setPagina(1); }, [filtroData, filtroPolicial, filtroViatura]);
+
+  const totalPaginas = Math.max(1, Math.ceil(rowsFiltrados.length / porPagina));
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const rowsPagina = useMemo(() => {
+    const ini = (paginaAtual - 1) * porPagina;
+    return rowsFiltrados.slice(ini, ini + porPagina);
+  }, [rowsFiltrados, paginaAtual]);
+
   const getTeveAvaria = (row: ServicoDiario): boolean => {
     const avs = avariasPorVtr[row.viaturaId] || [];
     // Se houver avaria na mesma data com o mesmo responsável (Nome de Guerra 1 gravado em motorista)
@@ -126,13 +142,35 @@ export default function ServicosPage() {
     ));
   };
 
+  // Abre modal e busca KM atual da viatura
+  const abrirEncerrarAdmin = async (r: ServicoDiario) => {
+    setServicoParaEncerrar(r);
+    setKmFinalAdmin('');
+    setManterKmAtual(false);
+    setKmAtualVtr(null);
+    setMsgEncerrarAdmin('');
+    setShowEncerrarAdmin(true);
+    if (r.viaturaId) {
+      try {
+        const vSnap = await getDoc(doc(db, 'frota', r.viaturaId));
+        if (vSnap.exists()) {
+          const km = Number((vSnap.data() as any).KM);
+          if (!isNaN(km)) setKmAtualVtr(km);
+        }
+      } catch (e) { console.error(e); }
+    }
+  };
+
   // Função para encerrar serviço administrativamente (sem senha)
   const encerrarServicoAdministrativo = async () => {
     if (!servicoParaEncerrar) return;
-    const kmf = parseInt(kmFinalAdmin.replace(/\D/g, '') || '');
-    if (isNaN(kmf)) {
-      setMsgEncerrarAdmin('KM inválido.');
-      return;
+    let kmf: number;
+    if (manterKmAtual) {
+      if (kmAtualVtr === null) { setMsgEncerrarAdmin('KM atual da viatura indisponível.'); return; }
+      kmf = kmAtualVtr;
+    } else {
+      kmf = parseInt(kmFinalAdmin.replace(/\D/g, '') || '');
+      if (isNaN(kmf)) { setMsgEncerrarAdmin('KM inválido.'); return; }
     }
     try {
       await updateDoc(doc(db, 'servicosDiarios', servicoParaEncerrar.id), {
@@ -141,20 +179,22 @@ export default function ServicosPage() {
         encerradoEm: new Date().toISOString(),
         encerradoPorId: 'ADMIN',
         encerradoPorNome: 'Encerramento Administrativo',
+        kmMantidoDaViatura: manterKmAtual,
       });
-      
-      // Atualizar KM da viatura
-      if (servicoParaEncerrar.viaturaId) {
+
+      // Atualizar KM da viatura apenas se não for manter (senão já é o valor atual)
+      if (!manterKmAtual && servicoParaEncerrar.viaturaId) {
         await updateDoc(doc(db, 'frota', servicoParaEncerrar.viaturaId), { KM: kmf });
       }
-      
+
       setMsgEncerrarAdmin('✅ Serviço encerrado com sucesso.');
       setTimeout(() => {
         setShowEncerrarAdmin(false);
         setServicoParaEncerrar(null);
         setKmFinalAdmin('');
+        setManterKmAtual(false);
+        setKmAtualVtr(null);
         setMsgEncerrarAdmin('');
-        // Recarregar serviços
         window.location.reload();
       }, 1000);
     } catch (e) {
