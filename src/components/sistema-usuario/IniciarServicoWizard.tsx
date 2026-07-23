@@ -9,7 +9,7 @@ import { Truck, Car, Shield, Building2 } from 'lucide-react';
 import { buscarViaturasLeves, buscarViaturasPesadas, type ViaturaBasica } from '@/lib/viaturaUtils';
 import { isViaturaOperacional, type PolicialAuth } from '@/lib/policialAuth';
 import { db } from '@/firebase';
-import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -27,6 +27,8 @@ const IniciarServicoWizard = () => {
   const [lista, setLista] = useState<ViaturaBasica[]>([]);
   const [viatura, setViatura] = useState<ViaturaBasica | null>(null);
   const [loadingVtr, setLoadingVtr] = useState(false);
+  const [servicosAbertos, setServicosAbertos] = useState<Record<string, { motorista?: string; iniciadoEm?: string; id: string }>>({});
+  const [bloqueioInfo, setBloqueioInfo] = useState<{ vtr: string; motorista: string; data: string } | null>(null);
 
   // Avarias
   const [angulo, setAngulo] = useState<Angulo>('frontal');
@@ -59,6 +61,16 @@ const IniciarServicoWizard = () => {
           ? arr.filter(v => categoria === 'operacional' ? isViaturaOperacional(v) : !isViaturaOperacional(v))
           : arr;
         setLista(filtrada);
+        // Carrega serviços em aberto para bloquear VTRs
+        try {
+          const snap = await getDocs(query(collection(db, 'servicosDiarios'), where('status', '==', 'aberto')));
+          const map: Record<string, { motorista?: string; iniciadoEm?: string; id: string }> = {};
+          snap.docs.forEach(d => {
+            const data: any = d.data();
+            if (data.viaturaId) map[data.viaturaId] = { motorista: data.motorista, iniciadoEm: data.iniciadoEm, id: d.id };
+          });
+          setServicosAbertos(map);
+        } catch (e) { console.error('Erro ao carregar serviços abertos:', e); }
       } finally { setLoadingVtr(false); }
     })();
   }, [step, tipo, categoria]);
@@ -273,14 +285,55 @@ const IniciarServicoWizard = () => {
           <div className="text-center text-slate-500 py-8">Carregando viaturas...</div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {lista.map(v => (
-              <button key={v.id} onClick={() => { setViatura(v); setStep(4); }}
-                className="p-4 rounded-xl bg-sky-50 hover:bg-sky-100 border-2 border-sky-200 text-center">
-                <div className="text-lg font-bold text-sky-800">{v.CADASTRO || v.PLACA}</div>
-                <div className="text-xs text-slate-500">{v.PLACA}</div>
-              </button>
-            ))}
+            {lista.map(v => {
+              const aberto = servicosAbertos[v.id];
+              const bloqueada = !!aberto;
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => {
+                    if (bloqueada) {
+                      setBloqueioInfo({
+                        vtr: v.CADASTRO || v.PLACA || '-',
+                        motorista: aberto?.motorista || 'não identificado',
+                        data: aberto?.iniciadoEm ? new Date(aberto.iniciadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-',
+                      });
+                      return;
+                    }
+                    setViatura(v); setStep(4);
+                  }}
+                  className={`p-4 rounded-xl border-2 text-center relative ${
+                    bloqueada
+                      ? 'bg-red-50 border-red-300 cursor-not-allowed'
+                      : 'bg-sky-50 hover:bg-sky-100 border-sky-200'
+                  }`}
+                >
+                  <div className={`text-lg font-bold ${bloqueada ? 'text-red-700' : 'text-sky-800'}`}>{v.CADASTRO || v.PLACA}</div>
+                  <div className="text-xs text-slate-500">{v.PLACA}</div>
+                  {bloqueada && (
+                    <div className="mt-1 text-[10px] font-bold text-red-700 uppercase tracking-wide">⛔ Serviço em aberto</div>
+                  )}
+                </button>
+              );
+            })}
             {lista.length === 0 && <div className="col-span-2 text-center text-slate-500 py-6">Nenhuma viatura encontrada.</div>}
+          </div>
+        )}
+
+        {bloqueioInfo && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-5 w-full max-w-md space-y-3">
+              <h3 className="font-bold text-lg text-red-700">⛔ Viatura com serviço em aberto</h3>
+              <div className="text-sm text-slate-700 space-y-2">
+                <p>A viatura <strong>{bloqueioInfo.vtr}</strong> está com um serviço em aberto desde <strong>{bloqueioInfo.data}</strong>, iniciado pelo motorista <strong>{bloqueioInfo.motorista}</strong>, e ainda não foi encerrado.</p>
+                <p className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900">
+                  Entre em contato com o <strong>P4</strong> ou com o motorista <strong>{bloqueioInfo.motorista}</strong> para regularizar antes de iniciar um novo serviço nesta viatura.
+                </p>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={() => setBloqueioInfo(null)} className="bg-slate-800 hover:bg-slate-900">Entendi</Button>
+              </div>
+            </div>
           </div>
         )}
       </StepWizard>
