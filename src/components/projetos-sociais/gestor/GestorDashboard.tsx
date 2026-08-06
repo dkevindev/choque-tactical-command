@@ -23,6 +23,7 @@ interface GestorDashboardProps {
 
 const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialLogado, onVoltarSelecao }: GestorDashboardProps) => {
   const [projetoSelecionado, setProjetoSelecionado] = useState(projetoInicial);
+  const [abaAtiva, setAbaAtiva] = useState('overview');
   const [stats, setStats] = useState({
     totalAlunos: 0,
     totalInstrutores: 0,
@@ -132,7 +133,7 @@ const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialL
           </p>
         </header>
 
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="space-y-6">
           <TabsList className={`grid w-full ${projetoSelecionado?.configuracao?.usaFrequencia !== false ? 'grid-cols-9' : 'grid-cols-8'}`}>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="configuracao">Configuração</TabsTrigger>
@@ -231,7 +232,12 @@ const GestorDashboard = ({ projetos: projetosIniciais, projetoInicial, policialL
           </TabsContent>
 
           <TabsContent value="aulas">
-            <VisualizarAulasTab projeto={projetoSelecionado} />
+            <VisualizarAulasTab
+              projeto={projetoSelecionado}
+              policialLogado={policialLogado}
+              onIrParaLancarAula={() => setAbaAtiva('lancar-aula')}
+              onChange={carregarEstatisticas}
+            />
           </TabsContent>
 
           <TabsContent value="lancar-aula">

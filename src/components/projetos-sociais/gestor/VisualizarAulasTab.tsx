@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, FileText, Loader2 } from 'lucide-react';
+import { Users, FileText, Loader2, Pencil, Trash2, CalendarPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -12,23 +12,49 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '@/firebase';
 import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import EditarAulaGestorDialog from './EditarAulaGestorDialog';
 
 interface VisualizarAulasTabProps {
   projeto: any;
+  policialLogado?: any;
+  onIrParaLancarAula?: () => void;
+  onChange?: () => void;
 }
 
-const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
+const VisualizarAulasTab = ({ projeto, policialLogado, onIrParaLancarAula, onChange }: VisualizarAulasTabProps) => {
   const [aulas, setAulas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [gerando, setGerando] = useState<string | null>(null);
   const [aulaModal, setAulaModal] = useState<any | null>(null);
   const [dadosModal, setDadosModal] = useState<{ instrutores: any[]; alunos: any[] } | null>(null);
   const [carregandoModal, setCarregandoModal] = useState(false);
+  const [aulaEditar, setAulaEditar] = useState<any | null>(null);
+  const [aulaApagar, setAulaApagar] = useState<any | null>(null);
+  const [apagando, setApagando] = useState(false);
 
   useEffect(() => {
     carregarAulas();
   }, [projeto]);
+
+  const apagarAula = async () => {
+    if (!aulaApagar) return;
+    setApagando(true);
+    try {
+      await deleteDoc(doc(db, 'projetos_aulas', aulaApagar.id));
+      toast.success('Aula apagada com sucesso!');
+      setAulaApagar(null);
+      await carregarAulas();
+      onChange?.();
+    } catch (error) {
+      console.error('Erro ao apagar aula:', error);
+      toast.error('Erro ao apagar aula');
+    } finally {
+      setApagando(false);
+    }
+  };
+
 
   const carregarAulas = async () => {
     try {
@@ -196,17 +222,31 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
     );
   }
 
+  const atalhoLancar = onIrParaLancarAula ? (
+    <div className="flex justify-end mb-4">
+      <Button variant="outline" size="sm" onClick={onIrParaLancarAula}>
+        <CalendarPlus className="h-4 w-4 mr-2" />
+        Lançar aula em dia esquecido
+      </Button>
+    </div>
+  ) : null;
+
   if (aulas.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        Nenhuma aula registrada ainda
+      <div>
+        {atalhoLancar}
+        <div className="text-center py-8 text-muted-foreground">
+          Nenhuma aula registrada ainda
+        </div>
       </div>
     );
   }
 
   return (
     <>
+    {atalhoLancar}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
       {aulas.map((aula) => (
         <Card key={aula.id} className="hover:border-primary transition-all">
           <CardHeader className="pb-3">
@@ -276,10 +316,22 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
                 </Button>
               </>
             )}
+
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+              <Button size="sm" variant="secondary" onClick={() => setAulaEditar(aula)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Editar
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => setAulaApagar(aula)}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Apagar
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ))}
     </div>
+
 
     <Dialog open={!!aulaModal} onOpenChange={(open) => { if (!open) { setAulaModal(null); setDadosModal(null); } }}>
       <DialogContent className="max-w-lg">
@@ -319,7 +371,42 @@ const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
 
       </DialogContent>
     </Dialog>
+
+    {aulaEditar && (
+      <EditarAulaGestorDialog
+        aula={aulaEditar}
+        projeto={projeto}
+        policialLogado={policialLogado}
+        open={!!aulaEditar}
+        onOpenChange={(open) => { if (!open) setAulaEditar(null); }}
+        onSuccess={async () => { await carregarAulas(); onChange?.(); }}
+      />
+    )}
+
+    <AlertDialog open={!!aulaApagar} onOpenChange={(open) => { if (!open) setAulaApagar(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Apagar aula?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {aulaApagar && (
+              <>
+                Aula de <strong>{formatarData(aulaApagar.data)}</strong> — {aulaApagar.turnoNome || `Turno ${aulaApagar.turno}`} com{' '}
+                {aulaApagar.alunosPresentes?.length || 0} presentes. Esta ação não pode ser desfeita e as horas dos instrutores
+                deixarão de contar.
+              </>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={apagando}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={(e) => { e.preventDefault(); apagarAula(); }} disabled={apagando}>
+            {apagando ? 'Apagando...' : 'Apagar aula'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
+
   );
 };
 
