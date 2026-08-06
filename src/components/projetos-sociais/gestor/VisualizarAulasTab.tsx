@@ -371,7 +371,42 @@ const VisualizarAulasTab = ({ projeto, policialLogado, onIrParaLancarAula, onCha
 
       </DialogContent>
     </Dialog>
+
+    {aulaEditar && (
+      <EditarAulaGestorDialog
+        aula={aulaEditar}
+        projeto={projeto}
+        policialLogado={policialLogado}
+        open={!!aulaEditar}
+        onOpenChange={(open) => { if (!open) setAulaEditar(null); }}
+        onSuccess={async () => { await carregarAulas(); onChange?.(); }}
+      />
+    )}
+
+    <AlertDialog open={!!aulaApagar} onOpenChange={(open) => { if (!open) setAulaApagar(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Apagar aula?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {aulaApagar && (
+              <>
+                Aula de <strong>{formatarData(aulaApagar.data)}</strong> — {aulaApagar.turnoNome || `Turno ${aulaApagar.turno}`} com{' '}
+                {aulaApagar.alunosPresentes?.length || 0} presentes. Esta ação não pode ser desfeita e as horas dos instrutores
+                deixarão de contar.
+              </>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={apagando}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={(e) => { e.preventDefault(); apagarAula(); }} disabled={apagando}>
+            {apagando ? 'Apagando...' : 'Apagar aula'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
+
   );
 };
 
