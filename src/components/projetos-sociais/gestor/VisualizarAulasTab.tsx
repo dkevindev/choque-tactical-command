@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, FileText, Loader2 } from 'lucide-react';
+import { Users, FileText, Loader2, Pencil, Trash2, CalendarPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -12,23 +12,49 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '@/firebase';
 import { buscarPolicialPorId, formatarNomePolicial } from '@/lib/policialUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import EditarAulaGestorDialog from './EditarAulaGestorDialog';
 
 interface VisualizarAulasTabProps {
   projeto: any;
+  policialLogado?: any;
+  onIrParaLancarAula?: () => void;
+  onChange?: () => void;
 }
 
-const VisualizarAulasTab = ({ projeto }: VisualizarAulasTabProps) => {
+const VisualizarAulasTab = ({ projeto, policialLogado, onIrParaLancarAula, onChange }: VisualizarAulasTabProps) => {
   const [aulas, setAulas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [gerando, setGerando] = useState<string | null>(null);
   const [aulaModal, setAulaModal] = useState<any | null>(null);
   const [dadosModal, setDadosModal] = useState<{ instrutores: any[]; alunos: any[] } | null>(null);
   const [carregandoModal, setCarregandoModal] = useState(false);
+  const [aulaEditar, setAulaEditar] = useState<any | null>(null);
+  const [aulaApagar, setAulaApagar] = useState<any | null>(null);
+  const [apagando, setApagando] = useState(false);
 
   useEffect(() => {
     carregarAulas();
   }, [projeto]);
+
+  const apagarAula = async () => {
+    if (!aulaApagar) return;
+    setApagando(true);
+    try {
+      await deleteDoc(doc(db, 'projetos_aulas', aulaApagar.id));
+      toast.success('Aula apagada com sucesso!');
+      setAulaApagar(null);
+      await carregarAulas();
+      onChange?.();
+    } catch (error) {
+      console.error('Erro ao apagar aula:', error);
+      toast.error('Erro ao apagar aula');
+    } finally {
+      setApagando(false);
+    }
+  };
+
 
   const carregarAulas = async () => {
     try {
