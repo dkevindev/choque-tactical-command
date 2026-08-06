@@ -1,14 +1,27 @@
-## Objetivo
-Na tabela de Gestão e Logística > Policial, exibir o Número da Cautela SIARM logo abaixo do número de série do armamento na coluna ARMAMENTO.
+# Editar e apagar aulas lançadas (Gestor de Projetos Sociais)
 
-## Alteração
-Arquivo único: `src/components/PolicialTable.tsx`
+Hoje o gestor só consegue visualizar as aulas (aba "Aulas") e lançar aulas retroativas (aba "Lançar Aula Retroativa", que já cobre os dias esquecidos). Falta poder corrigir e apagar aulas lançadas erradas.
 
-1. Estender a interface `CautelaData` para incluir `armamentoSIARM?: string`.
-2. Ao montar `cautelasData` (nos dois blocos — vínculo direto por `policialAssociadoId` e via `cautelas_permanentes`), quando o material for `Armamento`, também guardar `mat.numeroSIARM` em `atual.armamentoSIARM`.
-3. Na célula da coluna ARMAMENTO, abaixo do Badge com o nº de série, renderizar uma segunda linha pequena:
-   - `SIARM: {armamentoSIARM}` em `text-xs text-muted-foreground` quando existir
-   - `SIARM: —` quando estiver vazio (para facilitar identificar armas sem SIARM)
-4. Incluir `armamentoSIARM` no filtro de busca, para permitir procurar por número SIARM.
+## O que será feito
 
-Nenhuma outra tela ou lógica de backend é alterada — apenas apresentação na tabela de policiais.
+### 1. Editar aula já lançada
+Novo botão "Editar" em cada card de aula na aba Aulas, abrindo um diálogo onde o gestor pode alterar:
+- Data da aula (calendário)
+- Turno/horário (conforme nomenclatura configurada no projeto)
+- Turma (quando o projeto usa turmas)
+- Instrutores (marcar/desmarcar entre os instrutores do projeto, mínimo 1)
+
+Ao salvar, a aula é atualizada e um registro é adicionado ao histórico da aula (o que mudou, quem alterou e quando), seguindo o padrão de histórico já usado nas aulas.
+
+### 2. Apagar aula lançada errada
+Botão "Apagar" no card da aula, com diálogo de confirmação mostrando data, turno e número de presentes, exigindo confirmação explícita. A aula é removida da coleção de aulas e as horas dos instrutores deixam de contar automaticamente (as horas são derivadas das aulas, não armazenadas).
+
+### 3. Lançar aula em dia esquecido
+Já existe na aba "Lançar Aula Retroativa" — será apenas destacada com um atalho ("Lançar aula em dia esquecido") no topo da aba Aulas, para o gestor encontrar a função com facilidade.
+
+## Detalhes técnicos
+
+- `src/components/projetos-sociais/gestor/VisualizarAulasTab.tsx`: adiciona botões Editar/Apagar por card, estados de diálogo, `deleteDoc` em `projetos_aulas` e recarga da lista após alteração; aceita callback opcional para navegar até a aba de lançamento retroativo.
+- Novo `src/components/projetos-sociais/gestor/EditarAulaGestorDialog.tsx`: carrega instrutores de `projetos_instrutores` e turmas de `projetos_turmas` do projeto, monta o formulário (data, turno, turma, instrutores) e faz `updateDoc` com `data` como `Timestamp`, `turno`, `turnoNome`, `turmaId`/`turmaNome`, `instrutores`, `instrutoresCompleto` e `arrayUnion` no `historico`.
+- `src/components/projetos-sociais/gestor/GestorDashboard.tsx`: passa o controle de aba ativa para permitir o atalho e o refresh das estatísticas após editar/apagar.
+- Nenhuma alteração nos fluxos do instrutor nem nos relatórios/frequência mensal, que continuam derivando os dados das aulas.
