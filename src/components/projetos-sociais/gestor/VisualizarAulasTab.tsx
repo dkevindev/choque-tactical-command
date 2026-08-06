@@ -302,10 +302,22 @@ const VisualizarAulasTab = ({ projeto, policialLogado, onIrParaLancarAula, onCha
                 </Button>
               </>
             )}
+
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+              <Button size="sm" variant="secondary" onClick={() => setAulaEditar(aula)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Editar
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => setAulaApagar(aula)}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Apagar
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ))}
     </div>
+
 
     <Dialog open={!!aulaModal} onOpenChange={(open) => { if (!open) { setAulaModal(null); setDadosModal(null); } }}>
       <DialogContent className="max-w-lg">
