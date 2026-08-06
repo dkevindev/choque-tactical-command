@@ -222,17 +222,31 @@ const VisualizarAulasTab = ({ projeto, policialLogado, onIrParaLancarAula, onCha
     );
   }
 
+  const atalhoLancar = onIrParaLancarAula ? (
+    <div className="flex justify-end mb-4">
+      <Button variant="outline" size="sm" onClick={onIrParaLancarAula}>
+        <CalendarPlus className="h-4 w-4 mr-2" />
+        Lançar aula em dia esquecido
+      </Button>
+    </div>
+  ) : null;
+
   if (aulas.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        Nenhuma aula registrada ainda
+      <div>
+        {atalhoLancar}
+        <div className="text-center py-8 text-muted-foreground">
+          Nenhuma aula registrada ainda
+        </div>
       </div>
     );
   }
 
   return (
     <>
+    {atalhoLancar}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
       {aulas.map((aula) => (
         <Card key={aula.id} className="hover:border-primary transition-all">
           <CardHeader className="pb-3">
