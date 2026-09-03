@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, uploadBytes } from 'firebase/storage';
 import { addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '@/firebase';
 import { Image as ImageIcon, Video, Loader2 } from 'lucide-react';
@@ -35,6 +35,51 @@ const contentTypePadrao = (file: File, tipo: Tipo) => {
   if (e === 'jpg' || !e) return 'image/jpeg';
   return `image/${e}`;
 };
+
+/** Captura o primeiro quadro do vídeo como JPEG (poster leve para a grade). */
+const gerarCapa = (file: File): Promise<Blob | null> =>
+  new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      (video as any).playsInline = true;
+      video.src = url;
+
+      const limpar = () => URL.revokeObjectURL(url);
+      const falhar = () => { limpar(); resolve(null); };
+
+      const timeout = setTimeout(falhar, 12000);
+
+      video.onloadeddata = () => {
+        try { video.currentTime = Math.min(0.1, (video.duration || 1) / 2); } catch { /* ignore */ }
+      };
+      video.onseeked = () => {
+        try {
+          const largura = 640;
+          const escala = video.videoWidth ? largura / video.videoWidth : 1;
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round((video.videoWidth || largura) * Math.min(1, escala)));
+          canvas.height = Math.max(1, Math.round((video.videoHeight || 360) * Math.min(1, escala)));
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return falhar();
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            clearTimeout(timeout);
+            limpar();
+            resolve(blob);
+          }, 'image/jpeg', 0.7);
+        } catch {
+          clearTimeout(timeout);
+          falhar();
+        }
+      };
+      video.onerror = () => { clearTimeout(timeout); falhar(); };
+    } catch {
+      resolve(null);
+    }
+  });
 
 interface Progresso {
   nome: string;
@@ -135,6 +180,24 @@ const GaleriaUpload = () => {
         async () => {
           try {
             const url = await getDownloadURL(task!.snapshot.ref);
+
+            let thumbUrl: string | undefined;
+            let thumbPath: string | undefined;
+            if (tipo === 'video') {
+              const capa = await gerarCapa(file);
+              if (capa) {
+                try {
+                  thumbPath = `${path}.thumb.jpg`;
+                  const r = storageRef(storage, thumbPath);
+                  await uploadBytes(r, capa, { contentType: 'image/jpeg' });
+                  thumbUrl = await getDownloadURL(r);
+                } catch (e) {
+                  console.warn('galeria capa:', e);
+                  thumbPath = undefined;
+                }
+              }
+            }
+
             await addDoc(collection(db, 'galeria_privada'), {
               nome: nomeBase,
               tipo,
@@ -142,6 +205,7 @@ const GaleriaUpload = () => {
               storagePath: path,
               contentType,
               tamanho: file.size,
+              ...(thumbUrl ? { thumbUrl, thumbPath } : {}),
               criadoEm: new Date(),
             });
             setProgressos(prev => prev.map((p, i) => (i === idx ? { ...p, pct: 100 } : p)));
@@ -241,6 +305,8 @@ const GaleriaUpload = () => {
       <p className="text-[11px] text-zinc-500 leading-snug">
         No iPhone, se o vídeo não for enviado: Ajustes &gt; Fotos &gt; "Transferir para Mac ou PC" &gt; <b>Manter Originais</b>.
         Vídeos longos funcionam melhor enviados um por vez.
+        <br />
+        Vídeos gravados em <b>4K</b> podem travar na reprodução: grave ou exporte em 1080p para uma visualização mais fluida.
       </p>
 
       {progressos.length > 0 && (

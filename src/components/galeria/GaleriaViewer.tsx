@@ -7,6 +7,8 @@ export interface ItemGaleria {
   tipo: 'image' | 'video';
   url: string;
   storagePath: string;
+  thumbUrl?: string;
+  thumbPath?: string;
   tamanho?: number;
   criadoEm?: any;
 }
@@ -68,9 +70,11 @@ const GaleriaViewer = ({ itens, index, onIndex, onClose }: Props) => {
           <video
             key={item.id}
             src={item.url}
+            poster={item.thumbUrl}
             controls
             autoPlay
             playsInline
+            preload="auto"
             className="max-h-full max-w-full rounded-lg"
           />
         ) : (
