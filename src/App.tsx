@@ -25,6 +25,7 @@ import InstrutorSystem from "./components/projetos-sociais/InstrutorSystem";
 import GestorSystem from "./components/projetos-sociais/GestorSystem";
 import TotemViaturas from "./components/frota/TotemViaturas";
 import ComandanteDashboard from "./components/comandante/ComandanteDashboard";
+import GaleriaPrivada from "./pages/GaleriaPrivada";
 
 import NotFound from "./pages/NotFound";
 
