@@ -2,8 +2,7 @@ import { useRef, useState } from 'react';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '@/firebase';
-import { Button } from '@/components/ui/button';
-import { Upload, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, Video, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
@@ -13,20 +12,28 @@ const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', '
 
 const ext = (nome: string) => (nome.split('.').pop() || '').toLowerCase();
 
-const detectarTipo = (file: File): 'image' | 'video' | null => {
+type Tipo = 'image' | 'video';
+
+const detectarTipo = (file: File, sugerido: Tipo): Tipo | null => {
   if (file.type.startsWith('video')) return 'video';
   if (file.type.startsWith('image')) return 'image';
   const e = ext(file.name);
   if (VIDEO_EXT.includes(e)) return 'video';
   if (IMAGE_EXT.includes(e)) return 'image';
-  return null;
+  // iOS às vezes entrega sem type e sem extensão reconhecível — confia no botão usado
+  return sugerido;
 };
 
-const contentTypePadrao = (file: File, tipo: 'image' | 'video') => {
+const contentTypePadrao = (file: File, tipo: Tipo) => {
   if (file.type) return file.type;
   const e = ext(file.name);
-  if (tipo === 'video') return e === 'mov' ? 'video/quicktime' : `video/${e || 'mp4'}`;
-  return `image/${e === 'jpg' ? 'jpeg' : e || 'jpeg'}`;
+  if (tipo === 'video') {
+    if (e === 'mov' || e === 'hevc' || !e) return 'video/quicktime';
+    if (e === 'm4v') return 'video/mp4';
+    return `video/${e}`;
+  }
+  if (e === 'jpg' || !e) return 'image/jpeg';
+  return `image/${e}`;
 };
 
 interface Progresso {
@@ -35,17 +42,71 @@ interface Progresso {
   erro?: string;
 }
 
+interface BotaoSelecaoProps {
+  accept: string;
+  label: string;
+  icone: React.ReactNode;
+  disabled: boolean;
+  onFiles: (files: File[]) => void;
+  onAbrir?: () => void;
+  className?: string;
+}
+
+const BotaoSelecao = ({ accept, label, icone, disabled, onFiles, onAbrir, className }: BotaoSelecaoProps) => {
+  const ultimoLote = useRef<{ assinatura: string; em: number }>({ assinatura: '', em: 0 });
+
+  const tratar = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const files = Array.from(input.files || []);
+    const assinatura = files.map(f => `${f.name}|${f.size}|${f.lastModified}`).join(';');
+    const agora = Date.now();
+    if (assinatura && assinatura === ultimoLote.current.assinatura && agora - ultimoLote.current.em < 2000) {
+      return; // mesmo lote disparado por 'input' e 'change'
+    }
+    ultimoLote.current = { assinatura, em: agora };
+    onFiles(files);
+    // limpa depois de ler
+    setTimeout(() => {
+      try { input.value = ''; } catch { /* ignore */ }
+    }, 0);
+  };
+
+  return (
+    <label
+      onClick={() => !disabled && onAbrir?.()}
+      className={`relative inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md text-sm font-medium text-white select-none ${
+        disabled ? 'opacity-60 pointer-events-none' : 'cursor-pointer'
+      } ${className || ''}`}
+    >
+      {icone}
+      {label}
+      <input
+        type="file"
+        multiple
+        accept={accept}
+        disabled={disabled}
+        onChange={tratar}
+        onInput={tratar}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        style={{ fontSize: 0 }}
+      />
+    </label>
+  );
+};
+
 const GaleriaUpload = () => {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
+  const [aguardandoPicker, setAguardandoPicker] = useState(false);
   const [progressos, setProgressos] = useState<Progresso[]>([]);
+  const timeoutPicker = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const marcarErro = (idx: number, msg: string) =>
     setProgressos(prev => prev.map((p, i) => (i === idx ? { ...p, erro: msg } : p)));
 
-  const enviarArquivo = (file: File, tipo: 'image' | 'video', idx: number) =>
+  const enviarArquivo = (file: File, tipo: Tipo, idx: number) =>
     new Promise<void>((resolve) => {
-      const path = `galeria-privada/${Date.now()}-${idx}-${file.name.replace(/[^\w.\-]/g, '_')}`;
+      const nomeBase = file.name || `video-${Date.now()}.mov`;
+      const path = `galeria-privada/${Date.now()}-${idx}-${nomeBase.replace(/[^\w.\-]/g, '_')}`;
       const contentType = contentTypePadrao(file, tipo);
 
       let task;
@@ -54,7 +115,7 @@ const GaleriaUpload = () => {
       } catch (e: any) {
         console.error('galeria upload init:', e);
         marcarErro(idx, e?.message || 'falha ao iniciar');
-        toast.error(`${file.name}: ${e?.code || e?.message || 'falha ao iniciar envio'}`);
+        toast.error(`${nomeBase}: ${e?.code || e?.message || 'falha ao iniciar envio'}`);
         resolve();
         return;
       }
@@ -68,14 +129,14 @@ const GaleriaUpload = () => {
         (err: any) => {
           console.error('galeria upload erro:', err?.code, err);
           marcarErro(idx, err?.code || err?.message || 'erro');
-          toast.error(`${file.name}: ${err?.code || 'erro no envio'}`);
+          toast.error(`${nomeBase}: ${err?.code || 'erro no envio'}`);
           resolve();
         },
         async () => {
           try {
             const url = await getDownloadURL(task!.snapshot.ref);
             await addDoc(collection(db, 'galeria_privada'), {
-              nome: file.name,
+              nome: nomeBase,
               tipo,
               url,
               storagePath: path,
@@ -87,27 +148,51 @@ const GaleriaUpload = () => {
           } catch (e: any) {
             console.error('galeria salvar doc:', e);
             marcarErro(idx, e?.code || 'erro ao registrar');
-            toast.error(`${file.name}: erro ao registrar`);
+            toast.error(`${nomeBase}: erro ao registrar`);
           }
           resolve();
         }
       );
     });
 
-  const onSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (inputRef.current) inputRef.current.value = '';
-    if (!files.length) return;
+  const pararEspera = () => {
+    if (timeoutPicker.current) clearTimeout(timeoutPicker.current);
+    timeoutPicker.current = null;
+    setAguardandoPicker(false);
+  };
 
-    const validos: { file: File; tipo: 'image' | 'video' }[] = [];
+  const iniciarEspera = () => {
+    setAguardandoPicker(true);
+    if (timeoutPicker.current) clearTimeout(timeoutPicker.current);
+    timeoutPicker.current = setTimeout(() => setAguardandoPicker(false), 15000);
+  };
+
+  const processar = async (files: File[], sugerido: Tipo) => {
+    pararEspera();
+
+    if (!files.length) {
+      toast.error(
+        sugerido === 'video'
+          ? 'O iPhone não entregou o vídeo. Tente enviar um vídeo por vez ou selecione pelo app Arquivos.'
+          : 'Nenhum arquivo recebido. Tente novamente.'
+      );
+      return;
+    }
+
+    const validos: { file: File; tipo: Tipo }[] = [];
     for (const f of files) {
-      const tipo = detectarTipo(f);
+      const nome = f.name || '(sem nome)';
+      if (f.size === 0) {
+        toast.error(`${nome}: arquivo veio vazio (falha na exportação do iPhone). Tente novamente ou um por vez.`);
+        continue;
+      }
+      const tipo = detectarTipo(f, sugerido);
       if (!tipo) {
-        toast.error(`${f.name}: formato não suportado`);
+        toast.error(`${nome}: formato não suportado`);
         continue;
       }
       if (f.size > MAX_BYTES) {
-        toast.error(`${f.name}: acima de 2 GB`);
+        toast.error(`${nome}: acima de 2 GB`);
         continue;
       }
       validos.push({ file: f, tipo });
@@ -116,35 +201,47 @@ const GaleriaUpload = () => {
     if (!validos.length) return;
 
     setEnviando(true);
-    setProgressos(validos.map(v => ({ nome: v.file.name, pct: 0 })));
+    setProgressos(validos.map(v => ({ nome: v.file.name || 'vídeo', pct: 0 })));
     for (let i = 0; i < validos.length; i++) {
       await enviarArquivo(validos[i].file, validos[i].tipo, i);
     }
     setEnviando(false);
-
-    const falhas = validos.length;
     toast.success('Envio finalizado');
-    void falhas;
   };
 
   return (
     <div className="space-y-3">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*,video/*,.mov,.mp4,.m4v,.3gp,.mkv,.avi,.heic"
-        multiple
-        className="hidden"
-        onChange={onSelect}
-      />
-      <Button
-        onClick={() => inputRef.current?.click()}
-        disabled={enviando}
-        className="bg-emerald-600 hover:bg-emerald-700 text-white"
-      >
-        {enviando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-        {enviando ? 'Enviando...' : 'Enviar fotos / vídeos'}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <BotaoSelecao
+          accept="image/*"
+          label={enviando ? 'Enviando...' : 'Enviar fotos'}
+          icone={enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+          disabled={enviando}
+          onFiles={(files) => processar(files, 'image')}
+          className="bg-emerald-600 hover:bg-emerald-700"
+        />
+        <BotaoSelecao
+          accept="video/*"
+          label={enviando ? 'Enviando...' : 'Enviar vídeos'}
+          icone={enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+          disabled={enviando}
+          onAbrir={iniciarEspera}
+          onFiles={(files) => processar(files, 'video')}
+          className="bg-sky-600 hover:bg-sky-700"
+        />
+      </div>
+
+      {aguardandoPicker && !enviando && (
+        <div className="flex items-center gap-2 text-xs text-sky-300">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Aguardando o iPhone preparar o vídeo...
+        </div>
+      )}
+
+      <p className="text-[11px] text-zinc-500 leading-snug">
+        No iPhone, se o vídeo não for enviado: Ajustes &gt; Fotos &gt; "Transferir para Mac ou PC" &gt; <b>Manter Originais</b>.
+        Vídeos longos funcionam melhor enviados um por vez.
+      </p>
 
       {progressos.length > 0 && (
         <div className="space-y-2">
