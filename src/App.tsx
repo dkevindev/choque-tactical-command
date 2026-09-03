@@ -25,6 +25,7 @@ import InstrutorSystem from "./components/projetos-sociais/InstrutorSystem";
 import GestorSystem from "./components/projetos-sociais/GestorSystem";
 import TotemViaturas from "./components/frota/TotemViaturas";
 import ComandanteDashboard from "./components/comandante/ComandanteDashboard";
+import GaleriaPrivada from "./pages/GaleriaPrivada";
 
 import NotFound from "./pages/NotFound";
 
@@ -61,6 +62,7 @@ const App = () => (
           <Route path="/projetos-sociais/*" element={<ProjetosSociaisSystem />} />
           <Route path="/totem-viaturas" element={<TotemViaturas />} />
           <Route path="/gestao-comandantes" element={<ComandanteDashboard />} />
+          <Route path="/galeria" element={<GaleriaPrivada />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
