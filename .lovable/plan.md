@@ -1,40 +1,32 @@
-# Bloquear acesso por link direto na Galeria privada
+# Corrigir envio de vídeos HEVC pelo iPhone na Galeria
 
-Sim, é possível — mas exige mudar como os arquivos são lidos. Hoje o app guarda a URL pública de download do Firebase; qualquer pessoa com essa URL abre o arquivo sem senha. Para fechar isso, o acesso ao arquivo precisa depender de um login real do Firebase, não só da senha na tela.
+## Diagnóstico
 
-## Como vai funcionar
+O código atual só reage ao evento `change` de um único `<input>` escondido com `accept="image/*,video/*,.mov,.mp4,..."` e `multiple`. Quando o iPhone (Safari iOS) seleciona vídeos HEVC da galeria de Fotos, ele precisa **exportar/transcodificar** o vídeo antes de entregar ao site. Nesse cenário é comum que:
 
-1. A tela de senha continua igual para você. Por trás, ao acertar a senha, o app faz login numa **conta técnica do Firebase Auth** (e-mail/senha, criada só para a galeria).
-2. Os arquivos deixam de ter URL pública. A galeria baixa cada foto/vídeo pelo SDK autenticado e monta a exibição na hora.
-3. As regras do Firebase Storage passam a exigir esse login: quem colar um link direto (ou tentar a URL antiga) recebe erro de permissão.
-4. Mesmo comportamento visual: grade, envio múltiplo, tela cheia com player, apagar.
+- o evento `change` não dispare ou chegue com lista vazia (o código atual apenas faz `return` em silêncio — por isso "não acontece nada", sem nenhuma mensagem);
+- o arquivo chegue com `size = 0` ou `type = ""` quando a exportação falha;
+- a combinação `image/*,video/*` + lista de extensões + `multiple` faça o iOS abrir o seletor em modo que não entrega vídeos corretamente.
 
-## Pontos importantes
+A verificação exata no aparelho não é possível daqui, então o plano remove todas essas causas conhecidas de uma vez e adiciona feedback visível para qualquer caso que sobrar.
 
-- **Arquivos já enviados**: as URLs antigas continuam válidas enquanto o token delas existir. Para invalidá-las, o plano inclui um botão de "revogar links antigos" que reenvia/renomeia os arquivos existentes para novos caminhos protegidos e remove as URLs salvas.
-- **Vídeos**: com acesso protegido, o vídeo é baixado por inteiro antes de tocar (não há streaming por faixa). Para vídeos grandes isso significa alguns segundos de espera; o app mostra progresso.
-- **Regras do Storage**: preciso que você cole as regras no console do Firebase (Storage > Rules) — o Lovable não tem acesso ao console. Eu forneço o texto exato pronto para colar.
-- A senha de tela continua existindo como camada extra e é ela que dispara o login técnico; você não precisa lembrar de outra credencial.
+## O que será feito
+
+1. **Dois botões separados**: "Enviar fotos" (`accept="image/*"`) e "Enviar vídeos" (`accept="video/*"`, sem lista de extensões). Seletores puros são os que o iOS trata de forma mais confiável para vídeo.
+2. **Input real em vez de `display:none`**: o input fica sobreposto ao botão com opacidade zero (dentro de um `<label>`), evitando o clique programático em elemento oculto, que o Safari iOS às vezes ignora para vídeos.
+3. **Feedback em todo caminho**:
+   - evento `change` com 0 arquivos -> aviso "O iPhone não entregou o arquivo. Tente enviar um vídeo por vez ou pelo app Arquivos".
+   - arquivo com `size = 0` -> aviso "Vídeo veio vazio (falha na exportação do iPhone)".
+   - indicador "Aguardando o iPhone preparar o vídeo..." exibido ao clicar no botão de vídeo até o `change` chegar (ou desaparecer após alguns segundos), para o usuário saber que o aparelho está processando.
+4. **Escutar também o evento `input`** além de `change` (alguns builds do iOS disparam só um deles), com proteção contra processar o mesmo lote duas vezes.
+5. **Tipo de conteúdo**: para HEVC sem `type`, gravar `video/quicktime` (`.mov`) ou `video/mp4`, garantindo que o player do visualizador consiga reproduzir.
+6. **Dica na tela** (texto pequeno abaixo dos botões): no iPhone, em Ajustes > Fotos > "Transferir para Mac ou PC" escolher **Manter Originais** evita a transcodificação que trava o envio de HEVC; e vídeos longos funcionam melhor um por vez.
 
 ## Detalhes técnicos
 
-- Firebase Auth: habilitar provedor E-mail/Senha e criar uma conta única (ex.: `galeria@dkcode.local`). O par e-mail/senha dessa conta fica em `galeria_config/acesso` só depois de validado o hash da senha da tela — a senha digitada é usada para derivar/liberar o login via `signInWithEmailAndPassword`.
-- `src/lib/galeriaAuth.ts`: após `validarSenha`, chamar `signInWithEmailAndPassword`; `sair()` chama `signOut`. Guardar sessão pelo próprio `onAuthStateChanged` em vez de `localStorage`.
-- `GaleriaUpload.tsx`: parar de chamar `getDownloadURL`; salvar no Firestore apenas `storagePath` (sem `url`).
-- Novo hook `useArquivoProtegido`: `getBlob(ref(storage, storagePath))` → `URL.createObjectURL`, com cache em memória e `revokeObjectURL` ao desmontar. Usado na grade (miniaturas) e no `GaleriaViewer`.
-- Regras a colar no console:
-
-```text
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /galeria-privada/{arquivo=**} {
-      allow read, write: if request.auth != null
-        && request.auth.token.email == 'galeria@dkcode.local';
-    }
-  }
-}
-```
-
-- Regras equivalentes para a coleção `galeria_privada` no Firestore (leitura/escrita só para esse usuário autenticado).
-- Migração: função de manutenção na própria página que percorre os docs com `url` salva, recopia o arquivo para `galeria-privada-protegida/…`, apaga o original e limpa o campo `url`.
+- Arquivo alterado: `src/components/galeria/GaleriaUpload.tsx` (apenas este).
+- Estrutura: componente interno `BotaoSelecao({ accept, label, icone, onFiles })` renderizando `<label>` com `<input type="file" multiple accept={accept} className="absolute inset-0 opacity-0 cursor-pointer" />`.
+- `onFiles` centraliza validação (`detectarTipo`, `size === 0`, limite 2 GB) e chama o `enviarArquivo` já existente (upload resumable para `galeria-privada/` + doc em `galeria_privada`) sem mudanças na lógica de envio.
+- Guard de duplicidade: ref com assinatura `nome+tamanho+lastModified` do último lote processado nos últimos 2 s.
+- Estado `aguardandoPicker` ligado no `onClick` do label de vídeo e desligado no `change`/`input` ou por timeout de 15 s.
+- Nenhuma mudança em regras do Firebase, banco ou visualizador.
