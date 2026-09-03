@@ -88,6 +88,9 @@ const GaleriaPrivada = () => {
       if (item.storagePath) {
         await deleteObject(storageRef(storage, item.storagePath)).catch(() => {});
       }
+      if (item.thumbPath) {
+        await deleteObject(storageRef(storage, item.thumbPath)).catch(() => {});
+      }
       await deleteDoc(doc(db, 'galeria_privada', item.id));
       toast.success('Arquivo apagado');
     } catch (e) {
