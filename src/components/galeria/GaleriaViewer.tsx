@@ -7,6 +7,8 @@ export interface ItemGaleria {
   tipo: 'image' | 'video';
   url: string;
   storagePath: string;
+  thumbUrl?: string;
+  thumbPath?: string;
   tamanho?: number;
   criadoEm?: any;
 }
