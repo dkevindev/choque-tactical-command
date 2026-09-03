@@ -204,7 +204,11 @@ const GaleriaPrivada = () => {
                 <button onClick={() => setViewIndex(i)} className="w-full h-full">
                   {item.tipo === 'video' ? (
                     <>
-                      <video src={item.url} muted preload="metadata" className="w-full h-full object-cover" />
+                      {item.thumbUrl ? (
+                        <img src={item.thumbUrl} alt={item.nome} loading="lazy" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-zinc-800" />
+                      )}
                       <span className="absolute inset-0 flex items-center justify-center bg-black/30">
                         <Play className="h-8 w-8 text-white" />
                       </span>
