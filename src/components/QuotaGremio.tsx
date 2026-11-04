@@ -17,7 +17,7 @@ const QuotaGremio = () => {
     const carregar = async () => {
       try {
         const snap = await getDocs(collection(db, 'policiais'));
-        const todos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const todos = snap.docs.filter(d => !d.data().aDisposicao).map(doc => ({ id: doc.id, ...doc.data() }));
 
         // Filtrar CBs e SDs do 1ESQ e 2ESQ
         const filtrados = todos.filter((p: any) => {

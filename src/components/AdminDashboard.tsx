@@ -198,7 +198,7 @@ const DashboardOverview = () => {
 
       // Buscar policiais
       const policiaisSnapshot = await getDocs(collection(db, 'policiais'));
-      const totalPoliciais = policiaisSnapshot.size;
+      const totalPoliciais = policiaisSnapshot.docs.filter(d => !d.data().aDisposicao).length;
 
       // Buscar viaturas
       const viaturasSnapshot = await getDocs(collection(db, 'frota'));

@@ -62,6 +62,7 @@ const PolicialTable = () => {
         const policiaisData: Policial[] = [];
 
         querySnapshot.forEach((doc) => {
+          if (doc.data().aDisposicao) return;
           policiaisData.push({
             id: doc.id,
             ...doc.data()
