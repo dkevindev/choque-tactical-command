@@ -141,6 +141,11 @@ const DisposicaoPage = () => {
     for (const m of c.materiais) if (m.materialId) await updateDoc(doc(db, 'materiais_disposicao', m.materialId), { disponivel: true, policialId: null }).catch(() => {});
     toast.success('Cautela baixada — pistola liberada'); carregar();
   };
+  const excluirCautela = async (c: CautelaD) => {
+    if (!confirm(`Excluir definitivamente a cautela ${c.numeroCautela}?`)) return;
+    await deleteDoc(doc(db, 'cautelas_disposicao', c.id));
+    toast.success('Cautela excluída'); carregar();
+  };
   const baixarDocumento = async (c: CautelaD) => {
     try {
       const r = recrutas.find(x => x.id === c.policialId);
@@ -150,7 +155,10 @@ const DisposicaoPage = () => {
         body: JSON.stringify({
           numeroCautela: c.numeroCautela,
           policial: { nome, matricula: c.policialMatricula, grad: r?.['Post/Grad'] || c.policialPatente || 'ALUNO SOLDADO', numeral: '' },
-          materiais: c.materiais.map(m => ({
+          materiais: c.materiais.flatMap(m => [m, ...(m.categoria === 'Armamento' ? [
+            ...(m.quantidadeCarregadores ? [{ nome: `CARREGADOR ${m.modelo || ''}`.trim(), categoria: 'Acessório', subcategoria: 'Carregador', fabricante: m.fabricante, modelo: m.modelo, calibre: m.calibre, quantidade: m.quantidadeCarregadores }] : []),
+            ...(m.quantidadeMunicoes ? [{ nome: `MUNIÇÃO ${m.calibre || ''}`.trim(), categoria: 'Munição', subcategoria: m.calibre, calibre: m.calibre, calibreMunicao: m.calibre, quantidade: m.quantidadeMunicoes }] : []),
+          ] : [])]).map(m => ({
             nome: m.nome || '', categoria: m.categoria || '', subcategoria: m.subcategoria || '', fabricante: m.fabricante || '',
             modelo: m.modelo || '', calibre: m.calibre || '', calibreMunicao: m.calibreMunicao || '', sexo: '', tamanhoColete: '',
             numeroSerie: m.numeroSerie || '', quantidade: m.quantidade || 1,
@@ -276,6 +284,7 @@ const DisposicaoPage = () => {
                     <TableCell className="whitespace-nowrap">
                       <Button size="icon" variant="ghost" title="Baixar documento" onClick={() => baixarDocumento(c)}><Download className="h-4 w-4" /></Button>
                       {c.status === 'ativa' && <Button size="icon" variant="ghost" title="Dar baixa" onClick={() => finalizar(c)}><CheckCircle className="h-4 w-4" /></Button>}
+                      {c.status === 'finalizada' && <Button size="icon" variant="ghost" title="Excluir cautela" onClick={() => excluirCautela(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
                     </TableCell>
                   </TableRow>
                 ))}
