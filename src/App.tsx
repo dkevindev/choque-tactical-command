@@ -1,3 +1,4 @@
+import CadastroDisposicao from "./pages/CadastroDisposicao";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -63,6 +64,7 @@ const App = () => (
           <Route path="/totem-viaturas" element={<TotemViaturas />} />
           <Route path="/gestao-comandantes" element={<ComandanteDashboard />} />
           <Route path="/galeria" element={<GaleriaPrivada />} />
+          <Route path="/cadastro-disposicao" element={<CadastroDisposicao />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

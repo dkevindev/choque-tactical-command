@@ -43,6 +43,7 @@ import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/fire
 import { Button } from '@/components/ui/button';
 import { Car, Droplet } from 'lucide-react';
 import AlertasGestaoSection from '@/components/gestao/AlertasGestaoSection';
+import DisposicaoPage from '@/components/disposicao/DisposicaoPage';
 import GerenciarNoticiasTotem from '@/components/painel-noticias/GerenciarNoticiasTotem';
 
 const AdminDashboard = () => {
@@ -816,6 +817,7 @@ const PolicialContent = () => (
     <TabsList>
       <TabsTrigger value="efetivo">Efetivo</TabsTrigger>
       <TabsTrigger value="quota-gremio">Quota Grêmio</TabsTrigger>
+      <TabsTrigger value="disposicao">À Disposição</TabsTrigger>
     </TabsList>
     <TabsContent value="efetivo">
       <Card className="bg-card border-border shadow-tactical">
@@ -826,6 +828,9 @@ const PolicialContent = () => (
           <PolicialTable />
         </CardContent>
       </Card>
+    </TabsContent>
+    <TabsContent value="disposicao">
+      <DisposicaoPage />
     </TabsContent>
     <TabsContent value="quota-gremio">
       <QuotaGremio />
