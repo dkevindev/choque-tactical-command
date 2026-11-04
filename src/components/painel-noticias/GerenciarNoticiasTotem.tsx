@@ -149,7 +149,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
       setLoadingPoliciais(true);
       const snap = await getDocs(collection(db, 'policiais'));
       const list: any[] = [];
-      snap.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
+      snap.forEach(d => { if (!(d.data() as any).aDisposicao) list.push({ id: d.id, ...(d.data() as any) }); });
       setPoliciais(list);
     } catch (e) {
       console.error(e);

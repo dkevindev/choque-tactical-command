@@ -99,7 +99,7 @@ const GestãoPessoas: React.FC = () => {
       const policiaisRef = collection(db, 'policiais');
       const q = query(policiaisRef, orderBy('NOME'));
       const querySnapshot = await getDocs(q);
-      const policiaisData = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Policial[];
+      const policiaisData = querySnapshot.docs.filter(d => !d.data().aDisposicao).map(d => ({ id: d.id, ...d.data() })) as Policial[];
       
       setProgressValue(40);
       setProgressText('Verificando atestados médicos...');
@@ -343,7 +343,7 @@ const GestãoPessoas: React.FC = () => {
       const policiaisRef = collection(db, 'policiais');
       const q = query(policiaisRef, orderBy('NOME'));
       const querySnapshot = await getDocs(q);
-      const policiaisData = querySnapshot.docs.map(doc => ({
+      const policiaisData = querySnapshot.docs.filter(d => !d.data().aDisposicao).map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Policial[];

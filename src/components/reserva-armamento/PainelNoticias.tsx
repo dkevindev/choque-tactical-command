@@ -144,6 +144,7 @@ const PainelNoticias = () => {
       const lista: Aniversariante[] = [];
       snap.forEach(d => {
         const p: any = d.data();
+        if (p.aDisposicao) return;
         // Usa apenas o novo campo preenchido manualmente no painel, sem tocar nos dados antigos
         const raw = p[CAMPO_NASCIMENTO_PAINEL];
         const dt = parseNascimento(raw);

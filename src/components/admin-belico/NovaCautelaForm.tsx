@@ -93,7 +93,7 @@ const NovaCautelaForm = ({ onClose, onSuccess }: NovaCautelaFormProps) => {
   const carregarPoliciais = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'policiais'));
-      const policiaisData: PolicialInterno[] = querySnapshot.docs.map(doc => {
+      const policiaisData: PolicialInterno[] = querySnapshot.docs.filter(d => !d.data().aDisposicao).map(doc => {
         const data = doc.data() as Policial;
         return {
           id: doc.id,

@@ -41,7 +41,7 @@ const ComandanteDashboard = () => {
           getDocs(collection(db, 'projetos_sociais')),
           getDocs(collection(db, 'projetos_instrutores')),
         ]);
-        setPoliciais(polSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setPoliciais(polSnap.docs.filter(d => !d.data().aDisposicao).map(d => ({ id: d.id, ...d.data() })));
         setTransferidos(transSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAtestados(atestSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setMateriais(matSnap.docs.map(d => ({ id: d.id, ...d.data() })));
