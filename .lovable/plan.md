@@ -11,7 +11,7 @@
 - Página pública `/cadastro-disposicao`, visual simples para celular.
 - Campos: Nome completo, Nome de guerra, Matrícula, Telefone, Endereço.
 - Bloqueia matrícula repetida. Mostra tela de "Cadastro enviado".
-- Grava em `policiais` com `aDisposicao: true`, situação "À DISPOSIÇÃO".
+- Grava em `policiais` com `aDisposicao: true`, situação "À DISPOSIÇÃO" e graduação fixa **ALUNO SOLDADO** (não aparece no formulário).
 - Botão "Copiar link" e QR Code na área de gestão.
 
 ## 2. Nova área "À Disposição" (Gestão e Logística)
