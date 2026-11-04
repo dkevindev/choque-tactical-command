@@ -100,7 +100,7 @@ const CadastroDisposicao = () => {
                   <span className="mb-1 block text-sm font-semibold text-slate-700">{c.label}</span>
                   <input
                     type={c.type}
-                    inputMode={c.key === 'matricula' ? 'numeric' : undefined}
+                    inputMode={c.key === 'matricula' || c.key === 'serie' ? 'text' : undefined}
                     value={form[c.key]}
                     readOnly={confirmando && c.key === 'serie'}
                     onChange={e => setForm(f => ({ ...f, [c.key]: e.target.value }))}
