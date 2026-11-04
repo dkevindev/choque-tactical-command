@@ -301,7 +301,7 @@ const DisposicaoPage = () => {
             <div className="space-y-3">
               {([['NOME', 'Nome completo'], ['NOME DE GUERRA', 'Nome de guerra'], ['Matrícula', 'Matrícula'], ['TELEFONE', 'Telefone'], ['ENDEREÇO', 'Endereço']] as const).map(([k, l]) => (
                 <div key={k}><label className="text-sm text-muted-foreground">{l}</label>
-                  <Input value={String(editando[k] ?? '')} onChange={e => setEditando({ ...editando, [k]: k === 'Matrícula' ? (parseInt(e.target.value) || e.target.value) : e.target.value })} /></div>
+                  <Input value={String(editando[k] ?? '')} onChange={e => setEditando({ ...editando, [k]: k === 'Matrícula' ? (/^\d+$/.test(e.target.value) ? parseInt(e.target.value) : e.target.value) : e.target.value })} /></div>
               ))}
             </div>
           )}

@@ -6,7 +6,7 @@ import { CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 const campos = [
   { key: 'nome', label: 'Nome completo', placeholder: 'Ex.: JOÃO DA SILVA SOUZA', type: 'text' },
   { key: 'nomeGuerra', label: 'Nome de guerra', placeholder: 'Ex.: SOUZA', type: 'text' },
-  { key: 'matricula', label: 'Matrícula', placeholder: 'Somente números', type: 'tel' },
+  { key: 'matricula', label: 'Matrícula', placeholder: 'Números e letras (ex.: 123456X)', type: 'text' },
   { key: 'telefone', label: 'Telefone de contato', placeholder: '(88) 9 9999-9999', type: 'tel' },
   { key: 'endereco', label: 'Endereço', placeholder: 'Rua, número, bairro, cidade', type: 'text' },
   { key: 'serie', label: 'Número de série da pistola (Taurus PT100 .40)', placeholder: 'Ex.: SFX12345', type: 'text' },
@@ -27,7 +27,7 @@ const CadastroDisposicao = () => {
     setErro('');
     const vazio = campos.find(c => !form[c.key].trim());
     if (vazio) { setErro(`Preencha: ${vazio.label}`); return; }
-    const mat = form.matricula.replace(/\D/g, '');
+    const mat = form.matricula.trim().toUpperCase();
     if (!mat) { setErro('Matrícula inválida'); return; }
     const serie = form.serie.trim().toUpperCase();
     if (!confirmando) { setConfirmando(true); setSerie2(''); return; }
@@ -38,14 +38,14 @@ const CadastroDisposicao = () => {
       const armaExistente = armaSnap.docs[0];
       if (armaExistente && armaExistente.data().disponivel === false) { setErro('Esta pistola já está cautelada para outro policial. Procure a reserva.'); setEnviando(false); return; }
       const [a, b] = await Promise.all([
-        getDocs(query(collection(db, 'policiais'), where('Matrícula', '==', parseInt(mat)))),
         getDocs(query(collection(db, 'policiais'), where('Matrícula', '==', mat))),
+        /^\d+$/.test(mat) ? getDocs(query(collection(db, 'policiais'), where('Matrícula', '==', parseInt(mat)))) : Promise.resolve({ empty: true } as any),
       ]);
       if (!a.empty || !b.empty) { setErro('Esta matrícula já está cadastrada.'); setEnviando(false); return; }
       const polRef = await addDoc(collection(db, 'policiais'), {
         NOME: form.nome.trim().toUpperCase(),
         'NOME DE GUERRA': form.nomeGuerra.trim().toUpperCase(),
-        'Matrícula': parseInt(mat),
+        'Matrícula': mat,
         TELEFONE: form.telefone.trim(),
         'ENDEREÇO': form.endereco.trim().toUpperCase(),
         'Post/Grad': 'ALUNO SOLDADO',
@@ -100,7 +100,7 @@ const CadastroDisposicao = () => {
                   <span className="mb-1 block text-sm font-semibold text-slate-700">{c.label}</span>
                   <input
                     type={c.type}
-                    inputMode={c.key === 'matricula' ? 'numeric' : undefined}
+                    inputMode={c.key === 'matricula' || c.key === 'serie' ? 'text' : undefined}
                     value={form[c.key]}
                     readOnly={confirmando && c.key === 'serie'}
                     onChange={e => setForm(f => ({ ...f, [c.key]: e.target.value }))}

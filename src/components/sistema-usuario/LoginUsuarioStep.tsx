@@ -41,7 +41,7 @@ const LoginUsuarioStep = ({ onLogin, titulo = 'Identificação', subtitulo = 'In
 
       <div>
         <Label htmlFor="mat">Matrícula</Label>
-        <Input id="mat" inputMode="numeric" autoFocus value={matricula}
+        <Input id="mat" autoFocus value={matricula}
           onChange={e => setMatricula(e.target.value)} className="h-12 text-base" placeholder="Ex: 12345" />
       </div>
 
