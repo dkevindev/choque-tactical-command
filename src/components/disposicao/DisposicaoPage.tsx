@@ -157,7 +157,7 @@ const DisposicaoPage = () => {
           policial: { nome, matricula: c.policialMatricula, grad: r?.['Post/Grad'] || c.policialPatente || 'ALUNO SOLDADO', numeral: '' },
           materiais: c.materiais.flatMap(m => [m, ...(m.categoria === 'Armamento' ? [
             ...(m.quantidadeCarregadores ? [{ nome: `CARREGADOR ${m.modelo || ''}`.trim(), categoria: 'Acessório', subcategoria: 'Carregador', fabricante: m.fabricante, modelo: m.modelo, calibre: m.calibre, quantidade: m.quantidadeCarregadores }] : []),
-            ...(m.quantidadeMunicoes ? [{ nome: `MUNIÇÃO ${m.calibre || ''}`.trim(), categoria: 'Munição', subcategoria: m.calibre, calibre: m.calibre, calibreMunicao: m.calibre, quantidade: m.quantidadeMunicoes }] : []),
+            ...(m.quantidadeMunicoes ? [{ nome: `Munição ${m.calibre || ''}`.trim(), categoria: 'Munição', subcategoria: 'Letal', calibre: m.calibre, calibreMunicao: m.calibre, fabricante: 'N/D', numeroSerie: 'N/D', quantidade: m.quantidadeMunicoes }] : []),
           ] : [])]).map(m => ({
             nome: m.nome || '', categoria: m.categoria || '', subcategoria: m.subcategoria || '', fabricante: m.fabricante || '',
             modelo: m.modelo || '', calibre: m.calibre || '', calibreMunicao: m.calibreMunicao || '', sexo: '', tamanhoColete: '',
