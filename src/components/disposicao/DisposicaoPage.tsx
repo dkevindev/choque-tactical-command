@@ -30,6 +30,7 @@ const DisposicaoPage = () => {
   const [lote, setLote] = useState({ fabricante: '', modelo: '', calibre: '9mm', series: '' });
   const [gerando, setGerando] = useState(false);
   const link = `${window.location.origin}/cadastro-disposicao`;
+  const linkComplemento = `${window.location.origin}/complemento-disposicao`;
 
   const carregar = async () => {
     const [p, m, c] = await Promise.all([
@@ -160,7 +161,7 @@ const DisposicaoPage = () => {
             ...(m.quantidadeMunicoes ? [{ nome: `Munição ${m.calibre || ''}`.trim(), categoria: 'Munição', subcategoria: 'Letal', calibre: m.calibre, calibreMunicao: m.calibre, fabricante: 'N/D', numeroSerie: 'N/D', quantidade: m.quantidadeMunicoes }] : []),
           ] : [])]).map(m => ({
             nome: m.nome || '', categoria: m.categoria || '', subcategoria: m.subcategoria || '', fabricante: m.fabricante || '',
-            modelo: m.modelo || '', calibre: m.calibre || '', calibreMunicao: m.calibreMunicao || '', sexo: '', tamanhoColete: '',
+            modelo: m.modelo || '', calibre: m.calibre || '', calibreMunicao: m.calibreMunicao || '', sexo: m.sexo || '', tamanhoColete: m.tamanhoColete || '',
             numeroSerie: m.numeroSerie || '', quantidade: m.quantidade || 1,
             quantidadeCarregadores: m.quantidadeCarregadores || 0, quantidadeMunicoes: m.quantidadeMunicoes || 0,
           })),
@@ -188,6 +189,14 @@ const DisposicaoPage = () => {
             <p className="text-sm font-medium text-foreground">Link de autocadastro (celular)</p>
             <code className="block break-all text-xs text-muted-foreground">{link}</code>
             <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(link); toast.success('Link copiado'); }}>
+              <Copy className="mr-2 h-4 w-4" />Copiar link
+            </Button>
+          </div>
+          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(linkComplemento)}`} alt="QR Code colete e algema" className="h-[110px] w-[110px] rounded bg-background" />
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Link colete e algema</p>
+            <code className="block break-all text-xs text-muted-foreground">{linkComplemento}</code>
+            <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(linkComplemento); toast.success('Link copiado'); }}>
               <Copy className="mr-2 h-4 w-4" />Copiar link
             </Button>
           </div>
