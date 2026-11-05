@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, addDoc, getDocs, query, where, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, updateDoc, deleteDoc, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -51,13 +51,47 @@ const DisposicaoPage = () => {
   const filtro = (s: string) => s.toLowerCase().includes(busca.toLowerCase());
 
   // ---------- Policiais ----------
+  const [eq, setEq] = useState({ colete: '', coleteMarca: '', tamanho: '', sexo: '', algema: '', algemaMarca: '' });
+  const [eqCautelaId, setEqCautelaId] = useState<string | null>(null);
+  const [eqTem, setEqTem] = useState({ colete: false, algema: false });
+  const abrirEdicao = (r: Recruta) => {
+    setEditando({ ...r });
+    const c = cautelas.find(c => c.policialId === r.id && c.status === 'ativa') || cautelas.find(c => c.policialId === r.id);
+    const col = c?.materiais.find((m: any) => m.categoria === 'Colete Balístico');
+    const alg = c?.materiais.find((m: any) => m.subcategoria === 'Algema');
+    setEqCautelaId(c && (col || alg) ? c.id : null);
+    setEqTem({ colete: !!col, algema: !!alg });
+    setEq({ colete: col?.numeroSerie || '', coleteMarca: col?.fabricante || '', tamanho: col?.tamanhoColete || '', sexo: col?.sexo || '', algema: alg?.numeroSerie || '', algemaMarca: alg?.fabricante || '' });
+  };
   const salvarEdicao = async () => {
     if (!editando) return;
-    const { id, ...rest } = editando;
-    const limpo = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
-    await updateDoc(doc(db, 'policiais', id), limpo);
-    toast.success('Dados atualizados');
-    setEditando(null); carregar();
+    try {
+      const id = editando.id;
+      const dados: Record<string, any> = {};
+      for (const k of ['NOME', 'NOME DE GUERRA', 'Matrícula', 'TELEFONE', 'ENDEREÇO'] as const) {
+        const v = (editando as any)[k];
+        if (v !== undefined) dados[k] = typeof v === 'string' ? v.trim() : v;
+      }
+      await setDoc(doc(db, 'policiais', id), dados, { merge: true });
+      // Atualiza matrícula/nome e colete/algema nas cautelas desse policial
+      const matricula = String(dados['Matrícula'] ?? '');
+      for (const c of cautelas.filter(c => c.policialId === id)) {
+        const upd: Record<string, any> = { policialMatricula: matricula, policialNome: dados.NOME || c.policialNome };
+        if (c.id === eqCautelaId) {
+          upd.materiais = c.materiais.map(m => {
+            if (m.categoria === 'Colete Balístico') return { ...m, numeroSerie: eq.colete.trim().toUpperCase(), fabricante: eq.coleteMarca.trim().toUpperCase(), tamanhoColete: eq.tamanho, sexo: eq.sexo };
+            if (m.subcategoria === 'Algema') return { ...m, numeroSerie: eq.algema.trim().toUpperCase(), fabricante: eq.algemaMarca.trim().toUpperCase() };
+            return m;
+          });
+        }
+        await setDoc(doc(db, 'cautelas_disposicao', c.id), upd, { merge: true });
+      }
+      toast.success('Dados atualizados (cautelas também)');
+      setEditando(null); carregar();
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Erro ao salvar: ' + (e?.message || e));
+    }
   };
   const excluirRecruta = async (r: Recruta) => {
     if (ativasPorPolicial.has(r.id)) { toast.error('Baixe a cautela antes de excluir'); return; }
@@ -230,7 +264,7 @@ const DisposicaoPage = () => {
                     <TableCell>{r.TELEFONE}</TableCell><TableCell className="max-w-[220px] truncate">{r['ENDEREÇO']}</TableCell>
                     <TableCell>{ativasPorPolicial.has(r.id) ? <Badge>Sim</Badge> : <Badge variant="outline">Não</Badge>}</TableCell>
                     <TableCell className="whitespace-nowrap">
-                      <Button size="icon" variant="ghost" title="Editar" onClick={() => setEditando({ ...r })}><Pencil className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" title="Editar" onClick={() => abrirEdicao(r)}><Pencil className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" title="Incluir no efetivo" onClick={() => efetivar(r)}><UserCheck className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" title="Excluir" onClick={() => excluirRecruta(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </TableCell>
@@ -312,6 +346,28 @@ const DisposicaoPage = () => {
                 <div key={k}><label className="text-sm text-muted-foreground">{l}</label>
                   <Input value={String(editando[k] ?? '')} onChange={e => setEditando({ ...editando, [k]: k === 'Matrícula' ? (/^\d+$/.test(e.target.value) ? parseInt(e.target.value) : e.target.value) : e.target.value })} /></div>
               ))}
+              {eqCautelaId && eqTem.colete && (
+                <div className="space-y-2 rounded-md border border-border p-3">
+                  <p className="text-sm font-medium text-foreground">Colete (na cautela)</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input placeholder="Número" value={eq.colete} onChange={e => setEq({ ...eq, colete: e.target.value })} />
+                    <Input placeholder="Marca" value={eq.coleteMarca} onChange={e => setEq({ ...eq, coleteMarca: e.target.value })} />
+                    <Input placeholder="Tamanho" value={eq.tamanho} onChange={e => setEq({ ...eq, tamanho: e.target.value })} />
+                    <select className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground" value={eq.sexo} onChange={e => setEq({ ...eq, sexo: e.target.value })}>
+                      <option value="">Sexo...</option><option value="MASCULINO">MASCULINO</option><option value="FEMININO">FEMININO</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+              {eqCautelaId && eqTem.algema && (
+                <div className="space-y-2 rounded-md border border-border p-3">
+                  <p className="text-sm font-medium text-foreground">Algema (na cautela)</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input placeholder="Número de série" value={eq.algema} onChange={e => setEq({ ...eq, algema: e.target.value })} />
+                    <Input placeholder="Marca" value={eq.algemaMarca} onChange={e => setEq({ ...eq, algemaMarca: e.target.value })} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter><Button onClick={salvarEdicao}>Salvar</Button></DialogFooter>
