@@ -193,8 +193,11 @@ const DisposicaoPage = () => {
           materiais: c.materiais.flatMap(m => [m, ...(m.categoria === 'Armamento' ? [
             ...(m.quantidadeCarregadores ? [{ nome: `CARREGADOR ${m.modelo || ''}`.trim(), categoria: 'Acessório', subcategoria: 'Carregador', fabricante: m.fabricante, modelo: m.modelo, calibre: m.calibre, quantidade: m.quantidadeCarregadores }] : []),
             ...(m.quantidadeMunicoes ? [{ nome: `Munição ${m.calibre || ''}`.trim(), categoria: 'Munição', subcategoria: 'Letal', calibre: m.calibre, calibreMunicao: m.calibre, fabricante: 'N/D', numeroSerie: 'N/D', quantidade: m.quantidadeMunicoes }] : []),
-          ] : [])]).map(m => ({
-            nome: m.nome || '', categoria: m.categoria || '', subcategoria: m.subcategoria || '', fabricante: m.fabricante || '',
+          ] : [])])
+          // Algema vai por último no quadro de armamento (o gerador só lista Armamento/Munição/Carregador/Colete)
+          .sort((a, b) => (a.subcategoria === 'Algema' ? 1 : 0) - (b.subcategoria === 'Algema' ? 1 : 0))
+          .map(m => ({
+            nome: m.nome || '', categoria: m.subcategoria === 'Algema' ? 'Armamento' : (m.categoria || ''), subcategoria: m.subcategoria || '', fabricante: m.fabricante || '',
             modelo: m.modelo || '', calibre: m.calibre || '', calibreMunicao: m.calibreMunicao || '', sexo: m.sexo || '', tamanhoColete: m.tamanhoColete || '',
             numeroSerie: m.numeroSerie || '', quantidade: m.quantidade || 1,
             quantidadeCarregadores: m.quantidadeCarregadores || 0, quantidadeMunicoes: m.quantidadeMunicoes || 0,
