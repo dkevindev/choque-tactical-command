@@ -13,7 +13,7 @@ const Campo = ({ label, children }: { label: string; children: React.ReactNode }
 const ComplementoDisposicao = () => {
   const [matricula, setMatricula] = useState('');
   const [cautela, setCautela] = useState<{ id: string; nome: string; numero: string; materiais: any[] } | null>(null);
-  const [f, setF] = useState({ colete: '', coleteMarca: '', tamanho: '', sexo: '', algema: '', algemaMarca: 'GERMAN' });
+  const [f, setF] = useState({ colete: '', coleteMarca: '', tamanho: '', sexo: '', algema: '', algemaMarca: 'ALGEMAS BRASIL' });
   const [confirmando, setConfirmando] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
@@ -36,7 +36,7 @@ const ComplementoDisposicao = () => {
       const mats = data.materiais || [];
       const col = mats.find((m: any) => m.categoria === 'Colete Balístico');
       const alg = mats.find((m: any) => m.subcategoria === 'Algema');
-      setF({ colete: col?.numeroSerie || '', coleteMarca: col?.fabricante || '', tamanho: col?.tamanhoColete || '', sexo: col?.sexo || '', algema: alg?.numeroSerie || '', algemaMarca: alg?.fabricante || 'GERMAN' });
+      setF({ colete: col?.numeroSerie || '', coleteMarca: col?.fabricante || '', tamanho: col?.tamanhoColete || '', sexo: col?.sexo || '', algema: alg?.numeroSerie || '', algemaMarca: alg?.fabricante || 'ALGEMAS BRASIL' });
       setCautela({ id: d.id, nome: data.policialNome, numero: data.numeroCautela, materiais: mats });
     } catch (err) { console.error(err); setErro('Erro ao buscar. Tente novamente.'); }
     finally { setCarregando(false); }
