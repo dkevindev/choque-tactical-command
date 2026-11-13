@@ -34,6 +34,7 @@ import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferid
 import ColetesTab from '@/components/admin-belico/ColetesTab';
 import SaiuDaCarga from '@/components/admin-belico/SaiuDaCarga';
 import AnaliseArmamentos from '@/components/admin-belico/AnaliseArmamentos';
+import ConsultaRapida from '@/components/consulta/ConsultaRapida';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import ReservaAdminPage from '@/components/admin/ReservaAdminPage';
 import PatrimonioPage from '@/components/patrimonio/PatrimonioPage';
@@ -759,7 +760,8 @@ const BelicoContent = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="cautelas" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-8">
+            <TabsList className="grid w-full grid-cols-9">
+              <TabsTrigger value="consulta">Consulta Rápida</TabsTrigger>
               <TabsTrigger value="cautelas">Cautelas</TabsTrigger>
               <TabsTrigger value="coletes">Coletes</TabsTrigger>
               <TabsTrigger value="saiu-carga">Saiu da Carga</TabsTrigger>
@@ -769,6 +771,10 @@ const BelicoContent = () => {
               <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
               <TabsTrigger value="transferencias">Transferências</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="consulta">
+              <ConsultaRapida />
+            </TabsContent>
 
             <TabsContent value="cautelas">
               <GerenciarCautelas />

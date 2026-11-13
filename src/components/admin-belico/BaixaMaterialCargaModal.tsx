@@ -1,3 +1,4 @@
+import { registrarEvento } from '@/lib/auditoria';
 import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -172,6 +173,8 @@ const BaixaMaterialCargaModal = ({ open, onClose, onSuccess }: Props) => {
           data: new Date(),
           observacoes: `Baixa: ${motivoBaixa} - Destino: ${destino}`
         });
+
+        registrarEvento({ tipo: 'material_baixa', descricao: `Baixa: ${motivoBaixa} - Destino: ${destino}`, numeroSerie: material.numeroSerie, materialId: material.id, policialId: material.policialAssociadoId || undefined, policialNome: material.policialAssociadoNome || undefined, origem: 'BaixaMaterialCargaModal' });
 
         // 2. Criar registro de baixa
         await addDoc(collection(db, 'baixas_materiais'), {
