@@ -34,6 +34,7 @@ import MateriaisTransferidos from '@/components/admin-belico/MateriaisTransferid
 import ColetesTab from '@/components/admin-belico/ColetesTab';
 import SaiuDaCarga from '@/components/admin-belico/SaiuDaCarga';
 import AnaliseArmamentos from '@/components/admin-belico/AnaliseArmamentos';
+import { exportarPDF, exportarExcel, exportarWord } from '@/lib/exportColetesVencidos';
 import ConsultaRapida from '@/components/consulta/ConsultaRapida';
 import AdminProjetosSociais from '@/components/projetos-sociais/admin/AdminProjetosSociais';
 import ReservaAdminPage from '@/components/admin/ReservaAdminPage';
@@ -368,6 +369,13 @@ const DashboardOverview = () => {
             <DialogDescription>
               Total de {coletesVencidos.length} colete(s) com validade vencida
             </DialogDescription>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {([['PDF', exportarPDF], ['Excel', exportarExcel], ['Word', exportarWord]] as const).map(([l, f]) => (
+                <Button key={l} size="sm" variant="outline" onClick={() => f(coletesVencidos).catch(e => { console.error(e); alert('Erro ao gerar ' + l); })}>
+                  Baixar {l}
+                </Button>
+              ))}
+            </div>
           </DialogHeader>
           <ScrollArea className="h-[500px] pr-4">
             <div className="space-y-3">
