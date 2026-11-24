@@ -33,7 +33,7 @@ export const Q5_CATEGORIAS_PADRAO: Q5Categoria[] = [
   { id: 'c04', titulo: '4. LICENÇAS DIVERSAS', sub: 'Paternidade, Luto, Dispensa, Núpcias', tipo: 'afastamento', prioridade: 3, situacoes: ['LICENÇA PATERNIDADE', 'LICENÇA MATERNIDADE', 'LUTO', 'NUPCIAS', 'RECOMPENSA MILITAR'], funcoes: [] },
   { id: 'c05', titulo: '5. SERVIÇOS LEVES', tipo: 'afastamento', prioridade: 6, situacoes: ['READAPTAÇÃO FUNCIONAL'], funcoes: [] },
   { id: 'c06', titulo: '6. À DISPOSIÇÃO', sub: 'De outras unidades / outros órgãos', tipo: 'afastamento', prioridade: 4, situacoes: ['A DISP. DE OUTROS ORGÃOS'], funcoes: ['A DISP DE OUTROS'] },
-  { id: 'c07', titulo: '7. CURSANDO / INSTRUÇÃO', sub: 'Instrutor ou discente', tipo: 'afastamento', prioridade: 5, situacoes: ['CURSANDO'], funcoes: [] },
+  { id: 'c07', titulo: '7. CURSANDO / INSTRUÇÃO', sub: 'Instrutor ou discente', tipo: 'afastamento', prioridade: 5, situacoes: ['CURSANDO', 'INSTRUTOR'], funcoes: [] },
   { id: 'c08', titulo: '8. RESPONDENDO PAD/CD/CJ', sub: 'Cumprindo expediente na unidade', tipo: 'afastamento', prioridade: 7, situacoes: ['RESP. PROCESSO'], funcoes: ['RESP A PROCESSO (PAD/CD...)'] },
   { id: 'c09', titulo: '9. AFASTADOS PREVENTIVAMENTE', sub: 'Afastado totalmente das funções', tipo: 'afastamento', prioridade: 4, situacoes: ['RECOLHIDO PRES. MILITAR', 'AFASTADO PREVENTIVAMENTE'], funcoes: [] },
   { id: 'c10', titulo: '10. AGREGADO REF/RR', sub: 'Ainda no efetivo da unidade', tipo: 'afastamento', prioridade: 4, situacoes: ['AGREGADO', 'AGREGADO - AGUARDANDO RESERVA'], funcoes: ['RR AGUARDANDO'] },
@@ -41,7 +41,7 @@ export const Q5_CATEGORIAS_PADRAO: Q5Categoria[] = [
   { id: 'c12', titulo: '12. ARMEIROS', sub: 'Escala 24/72', tipo: 'funcao', prioridade: 10, situacoes: [], funcoes: ['ARMEIRO'] },
   { id: 'c13', titulo: '13. RELATORISTA', sub: 'Escala 24/72', tipo: 'funcao', prioridade: 10, situacoes: [], funcoes: ['RELATORISTA'] },
   { id: 'c14', titulo: '14. MOTORISTAS ADM', sub: 'Comandante, Subcomandante, expediente', tipo: 'funcao', prioridade: 10, situacoes: [], funcoes: ['MOTORISTA ADM'] },
-  { id: 'c15', titulo: '15. SAI – RESERVADO', tipo: 'funcao', prioridade: 10, situacoes: [], funcoes: ['SAI', 'RESERVADO'] },
+  { id: 'c15', titulo: '15. SAI – RESERVADO', tipo: 'funcao', prioridade: 10, situacoes: [], funcoes: ['SAI - RESERVADO'] },
   { id: 'c16', titulo: '16. ATIVIDADE-MEIO', tipo: 'funcao', prioridade: 10, situacoes: [], funcoes: ['AUXILIAR 1ª SECAO', 'AUXILIAR 3ª SECAO', 'AUXILIAR 4ª SECAO', 'AUXILIAR 5ª SECAO', 'AUXILIAR 6ª SECAO', 'AUXILIAR DO DMV', 'AUXILIAR DE MEDICO VETERINARIO', 'FERRADOR', 'SELEIRO', 'CORREEIRO', 'TRATORISTA', 'FISCAL DE BAIA', 'PROJETOS SOCIAIS'] },
 ];
 

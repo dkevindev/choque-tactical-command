@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, onSnapshot, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, doc, setDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -41,10 +41,17 @@ const Q5Tab: React.FC = () => {
     const u3 = onSnapshot(collection(db, 'config_q5'), s => {
       if (s.empty) return;
       const saved = Object.fromEntries(s.docs.map(d => [d.id, d.data()]));
-      setCats(Q5_CATEGORIAS_PADRAO.map(c => saved[c.id] ? { ...c, situacoes: saved[c.id].situacoes ?? c.situacoes, funcoes: saved[c.id].funcoes ?? c.funcoes } : c));
+      setCats(Q5_CATEGORIAS_PADRAO.map(c => saved[c.id] ? { ...c, situacoes: [...new Set([...(saved[c.id].situacoes ?? []), ...c.situacoes])], funcoes: [...new Set([...(saved[c.id].funcoes ?? []), ...c.funcoes])] } : c));
     });
-    getDocs(collection(db, 'config_situacoes')).then(s => setOpSit(s.docs.map(d => d.data().nome).filter(Boolean).sort()));
-    getDocs(collection(db, 'config_funcoes')).then(s => setOpFun(s.docs.map(d => d.data().nome).filter(Boolean).sort()));
+    const garantir = async (col: string, nomes: string[], extra: Record<string, any>) => {
+      const s = await getDocs(collection(db, col));
+      const atuais = s.docs.map(d => d.data().nome).filter(Boolean) as string[];
+      const faltam = nomes.filter(n => !atuais.some(a => a.toUpperCase() === n));
+      for (const nome of faltam) await addDoc(collection(db, col), { nome, ...extra, criadoEm: new Date().toISOString(), origem: 'Q5' });
+      return [...atuais, ...faltam].sort();
+    };
+    garantir('config_situacoes', ['AFASTADO PREVENTIVAMENTE', 'INSTRUTOR'], { indisponivel: true }).then(setOpSit).catch(() => {});
+    garantir('config_funcoes', ['RELATORISTA', 'SAI - RESERVADO'], {}).then(setOpFun).catch(() => {});
     return () => { u1(); u2(); u3(); };
   }, []);
 
