@@ -28,6 +28,7 @@ import GestorSystem from "./components/projetos-sociais/GestorSystem";
 import TotemViaturas from "./components/frota/TotemViaturas";
 import ComandanteDashboard from "./components/comandante/ComandanteDashboard";
 import GaleriaPrivada from "./pages/GaleriaPrivada";
+import DmvSystem from "./components/dmv/DmvSystem";
 
 import RequireLogin from "./components/RequireLogin";
 import NotFound from "./pages/NotFound";
@@ -66,6 +67,7 @@ const App = () => (
           <Route path="/totem-viaturas" element={<TotemViaturas />} />
           <Route path="/gestao-comandantes" element={<RequireLogin acessoKey="gestaoComandantes"><ComandanteDashboard /></RequireLogin>} />
           <Route path="/galeria" element={<GaleriaPrivada />} />
+          <Route path="/dmv" element={<DmvSystem />} />
           <Route path="/cadastro-disposicao" element={<CadastroDisposicao />} />
           <Route path="/complemento-disposicao" element={<ComplementoDisposicao />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

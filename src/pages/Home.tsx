@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, MessageSquare, Truck, Target, Users, FileText, Bot, GraduationCap, UserCog, Crown } from 'lucide-react';
+import { Shield, MessageSquare, Truck, Target, Users, FileText, Bot, GraduationCap, UserCog, Crown, Stethoscope } from 'lucide-react';
 import logoRegimento from '@/assets/logo-regimento.jpg';
 import LoginSistema from '@/components/LoginSistema';
 
@@ -99,6 +99,16 @@ const Home = () => {
       route: '/gestao-comandantes',
       acessoKey: 'gestaoComandantes',
       cor: 'bg-indigo-600',
+      requiresLogin: true
+    },
+    {
+      id: 'dmv',
+      title: 'DMV',
+      description: 'Departamento Médico Veterinário',
+      icon: Stethoscope,
+      route: '/dmv',
+      acessoKey: 'dmv',
+      cor: 'bg-emerald-600',
       requiresLogin: true
     }
   ];
