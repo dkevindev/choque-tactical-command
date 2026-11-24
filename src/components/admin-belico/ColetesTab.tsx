@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Download, Search, Filter, Shield, AlertTriangle } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import { format, parseISO, isBefore, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import TrocaColeteModal from './TrocaColeteModal';
 
 interface Colete {
   id: string;
@@ -28,6 +29,18 @@ interface Colete {
 const ColetesTab = () => {
   const [coletes, setColetes] = useState<Colete[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trocando, setTrocando] = useState<Colete | null>(null);
+  const [podeTrocar, setPodeTrocar] = useState(false);
+
+  // shortcut: checagem só no cliente (regras do Firestore abertas); vira custom claim após migrar para Firebase Auth.
+  useEffect(() => {
+    // Home/LoginSistema grava 'usuarioId'; LoginGestao grava 'policialLogado'.
+    const id = localStorage.getItem('usuarioId') || JSON.parse(localStorage.getItem('policialLogado') || '{}').id;
+    if (!id) return;
+    getDoc(doc(db, 'policiais', id))
+      .then(s => setPodeTrocar(s.data()?.acessos?.gestaoLogistica === true))
+      .catch(() => setPodeTrocar(false));
+  }, []);
   const [filtros, setFiltros] = useState({
     numeroSerie: '',
     fabricante: 'todos',
@@ -356,18 +369,19 @@ const ColetesTab = () => {
                   <TableHead>Cautelado Para</TableHead>
                   <TableHead>Local</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={10} className="text-center py-8">
                       Carregando coletes...
                     </TableCell>
                   </TableRow>
                 ) : coletesFiltrados.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Nenhum colete encontrado com os filtros selecionados
                     </TableCell>
                   </TableRow>
@@ -385,6 +399,11 @@ const ColetesTab = () => {
                       </TableCell>
                       <TableCell>{colete.local || '-'}</TableCell>
                       <TableCell>{renderBadgeStatus(colete)}</TableCell>
+                      <TableCell>
+                        {podeTrocar && colete.cautelado && (
+                          <Button size="sm" variant="outline" onClick={() => setTrocando(colete)}>Trocar</Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -393,6 +412,7 @@ const ColetesTab = () => {
           </div>
         </CardContent>
       </Card>
+      <TrocaColeteModal colete={trocando} onClose={() => setTrocando(null)} onSuccess={buscarColetes} />
     </div>
   );
 };
