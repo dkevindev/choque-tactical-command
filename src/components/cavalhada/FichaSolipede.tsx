@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRightLeft, Loader2, PencilLine } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Loader2, LogOut, PencilLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  CATEGORIAS, LOCAIS, SEXOS, SITUACOES_CARGA, formatarNascimento, historicoDoSolipede, idade, pendencias,
+  CATEGORIAS, LOCAIS, SEXOS, SITUACOES_CARGA, formatarDataBR, formatarNascimento, historicoDoSolipede, idade, pendencias,
   type EventoHistorico, type Solipede,
 } from '@/lib/cavalhada';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -13,6 +13,7 @@ import { db } from '@/firebase';
 import LinhaDoTempo from './LinhaDoTempo';
 import FormSolipedeDialog from './FormSolipedeDialog';
 import MovimentarSolipedeDialog from './MovimentarSolipedeDialog';
+import DescargaSolipedeDialog from './DescargaSolipedeDialog';
 
 interface Props {
   animal: Solipede | null;
@@ -46,6 +47,7 @@ const FichaSolipede = ({ animal, aberto, onFechar, onAlterado, versao }: Props) 
   const [carregando, setCarregando] = useState(false);
   const [editando, setEditando] = useState(false);
   const [movimentando, setMovimentando] = useState(false);
+  const [descarregando, setDescarregando] = useState(false);
   const [atendimentos, setAtendimentos] = useState<RegistroDmv[]>([]);
   const [vacinas, setVacinas] = useState<RegistroDmv[]>([]);
 
@@ -72,7 +74,7 @@ const FichaSolipede = ({ animal, aberto, onFechar, onAlterado, versao }: Props) 
 
   return (
     <>
-      <Dialog open={aberto && !editando && !movimentando} onOpenChange={(o) => !o && onFechar()}>
+      <Dialog open={aberto && !editando && !movimentando && !descarregando} onOpenChange={(o) => !o && onFechar()}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex flex-wrap items-center gap-2">
@@ -92,19 +94,23 @@ const FichaSolipede = ({ animal, aberto, onFechar, onAlterado, versao }: Props) 
             <Campo rotulo="Sexo" valor={SEXOS[animal.sexo]} />
             <Campo rotulo="Pelagem" valor={animal.pelagem} />
             <Campo rotulo="Nascimento" valor={`${formatarNascimento(animal)} (${idade(animal)} anos)`} />
+            {animal.dataObito && <Campo rotulo="Óbito" valor={formatarDataBR(animal.dataObito)} />}
             <Campo rotulo="Categoria" valor={CATEGORIAS[animal.categoria]} />
             <Campo rotulo="Local" valor={LOCAIS[animal.local]} />
             <div>
               <p className="text-xs text-muted-foreground">Situação de carga</p>
               <Badge variant="outline">{SITUACOES_CARGA[animal.situacaoCarga]}</Badge>
             </div>
-            <Campo rotulo="Documento de carga" valor={animal.documentoCarga ?? ''} />
+            <Campo rotulo="Nº do tombo / documento de carga" valor={animal.documentoCarga ?? ''} />
           </div>
           {animal.observacoes && <Campo rotulo="Observações" valor={animal.observacoes} />}
 
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => setMovimentando(true)}><ArrowRightLeft className="h-4 w-4 mr-2" />Movimentar</Button>
-            <Button variant="outline" onClick={() => setEditando(true)}><PencilLine className="h-4 w-4 mr-2" />Corrigir dados</Button>
+            <Button variant="outline" onClick={() => setEditando(true)}><PencilLine className="h-4 w-4 mr-2" />Editar dados</Button>
+            {animal.categoria !== 'BAIXADO' && (
+              <Button variant="destructive" onClick={() => setDescarregando(true)}><LogOut className="h-4 w-4 mr-2" />Dar descarga</Button>
+            )}
           </div>
 
           <Separator />
@@ -148,6 +154,7 @@ const FichaSolipede = ({ animal, aberto, onFechar, onAlterado, versao }: Props) 
 
       <FormSolipedeDialog aberto={editando} animal={animal} onFechar={() => setEditando(false)} onSalvo={onAlterado} />
       <MovimentarSolipedeDialog aberto={movimentando} animal={animal} onFechar={() => setMovimentando(false)} onSalvo={onAlterado} />
+      <DescargaSolipedeDialog aberto={descarregando} animal={animal} onFechar={() => setDescarregando(false)} onSalvo={onAlterado} />
     </>
   );
 };

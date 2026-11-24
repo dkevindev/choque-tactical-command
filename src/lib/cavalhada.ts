@@ -72,6 +72,7 @@ export interface Solipede {
   pelagem: string;
   anoNascimento: number;
   dataNascimento?: string;   // YYYY-MM-DD quando se sabe o dia
+  dataObito?: string;        // YYYY-MM-DD
   categoria: Categoria;
   local: Local;
   situacaoCarga: SituacaoCarga;
@@ -110,8 +111,9 @@ export const normalizarRegistro = (registro: string) => {
   return m ? `${m[1]} ${m[2].padStart(3, '0')}` : registro.toUpperCase().trim();
 };
 
-export const idade = (s: Pick<Solipede, 'anoNascimento' | 'dataNascimento'>) => {
-  const hoje = new Date();
+/** Idade hoje, ou na data do óbito se o animal morreu. */
+export const idade = (s: Pick<Solipede, 'anoNascimento' | 'dataNascimento' | 'dataObito'>) => {
+  const hoje = s.dataObito ? new Date(`${s.dataObito}T00:00:00`) : new Date();
   if (s.dataNascimento) {
     const n = new Date(`${s.dataNascimento}T00:00:00`);
     let anos = hoje.getFullYear() - n.getFullYear();
@@ -170,7 +172,7 @@ const limpar = <T extends Record<string, unknown>>(o: T) =>
 
 const CAMPOS_LEGIVEIS: Record<string, string> = {
   nome: 'nome', raca: 'raça', sexo: 'sexo', pelagem: 'pelagem', anoNascimento: 'ano de nascimento',
-  dataNascimento: 'data de nascimento', categoria: 'categoria', local: 'local',
+  dataNascimento: 'data de nascimento', dataObito: 'data do óbito', categoria: 'categoria', local: 'local',
   situacaoCarga: 'situação de carga', documentoCarga: 'documento de carga', observacoes: 'observações',
   registro: 'registro',
 };
@@ -181,7 +183,7 @@ export const rotuloValor = (campo: string, valor: unknown) => {
   if (campo === 'local') return LOCAIS[valor as Local] ?? String(valor);
   if (campo === 'situacaoCarga') return SITUACOES_CARGA[valor as SituacaoCarga] ?? String(valor);
   if (campo === 'sexo') return SEXOS[valor as Sexo] ?? String(valor);
-  if (campo === 'dataNascimento') return formatarDataBR(String(valor));
+  if (campo === 'dataNascimento' || campo === 'dataObito') return formatarDataBR(String(valor));
   return String(valor);
 };
 
@@ -276,13 +278,24 @@ export interface DadosMovimentacao {
   documento?: string;        // BCG / ofício que autorizou a movimentação
   dataMovimentacao: string;  // YYYY-MM-DD
   observacao?: string;
+  dataObito?: string;        // só na descarga por óbito
 }
+
+export const MOTIVOS_DESCARGA = ['Óbito', 'Doação / cessão', 'Declarado inservível', 'Venda / leilão', 'Outro'];
+
+/** Descarga: o animal deixa de pertencer ao RPMont (vai para "Baixado" e situação "Descarga"). */
+export const descarregarSolipede = (atual: Solipede, d: Omit<DadosMovimentacao, 'categoria' | 'local' | 'situacaoCarga'>) =>
+  movimentarSolipede(atual, {
+    ...d, categoria: 'BAIXADO', local: atual.local, situacaoCarga: 'DESCARGA',
+    documentoCarga: d.documentoCarga ?? atual.documentoCarga,
+  });
 
 /** Mudança de categoria, local ou situação de carga — o que é "movimentação" do animal. */
 export async function movimentarSolipede(atual: Solipede, mov: DadosMovimentacao) {
   const novos = {
     categoria: mov.categoria, local: mov.local, situacaoCarga: mov.situacaoCarga,
     documentoCarga: mov.documentoCarga?.trim() || undefined,
+    ...(mov.dataObito ? { dataObito: mov.dataObito } : {}),
   };
   const { antes, depois } = diferencas(atual, { ...atual, ...novos });
   if (Object.keys(depois).length === 0) throw new Error('Nada mudou: escolha uma nova categoria, local ou situação.');

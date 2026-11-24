@@ -129,7 +129,9 @@ const ListaSolipedes = ({ animais, onAbrir, onAlterado }: Props) => {
                     <TableCell className="hidden lg:table-cell">{s.pelagem}</TableCell>
                     <TableCell className="text-sm">{CATEGORIAS[s.categoria]}</TableCell>
                     <TableCell className="hidden md:table-cell text-sm">{LOCAIS[s.local]}</TableCell>
-                    <TableCell><Badge variant="outline" className={`whitespace-nowrap ${corSituacao[s.situacaoCarga]}`}>{SITUACOES_CARGA[s.situacaoCarga]}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className={`whitespace-nowrap ${corSituacao[s.situacaoCarga]}`}>{SITUACOES_CARGA[s.situacaoCarga]}</Badge>
+                      {s.documentoCarga && <p className="mt-1 font-mono text-xs text-muted-foreground whitespace-nowrap">{s.documentoCarga}</p>}
+                    </TableCell>
                   </TableRow>
                 );
               })}
