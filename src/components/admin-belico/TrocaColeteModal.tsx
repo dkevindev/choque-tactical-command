@@ -6,11 +6,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-/** Colete novo só serve se for do mesmo tamanho/sexo, livre e dentro da validade. */
+/** Colete novo: qualquer colete livre na reserva e dentro da validade (tamanho/sexo livres). */
 export const coleteCompativel = (antigo: any, c: any, hoje = new Date()) =>
   c.id !== antigo.id &&
   c.disponivel === true && !c.cautelado && !c.baixado && !c.transferido &&
-  c.tamanhoColete === antigo.tamanhoColete && c.sexo === antigo.sexo &&
   !!c.vencimento && new Date(c.vencimento) > hoje;
 
 /** Item da cautela permanente para o colete novo (mesmo formato do CadastroMateriais). */
@@ -44,7 +43,11 @@ const TrocaColeteModal = ({ colete, onClose, onSuccess }: Props) => {
       .then(([mats, cauts]) => {
         const lista = mats.docs.map(d => ({ id: d.id, ...d.data() }))
           .filter(c => coleteCompativel(colete, c))
-          .sort((a: any, b: any) => String(b.vencimento).localeCompare(String(a.vencimento)));
+          .sort((a: any, b: any) => {
+            const pa = (a.tamanhoColete === colete.tamanhoColete ? 0 : 2) + (a.sexo === colete.sexo ? 0 : 1);
+            const pb = (b.tamanhoColete === colete.tamanhoColete ? 0 : 2) + (b.sexo === colete.sexo ? 0 : 1);
+            return pa - pb || String(b.vencimento).localeCompare(String(a.vencimento));
+          });
         setOpcoes(lista);
         if (lista[0]) setNovoId(lista[0].id);
         const c = cauts.docs.find(d => (d.data().materiais || []).some((m: any) => m.materialId === colete.id));
@@ -116,7 +119,7 @@ const TrocaColeteModal = ({ colete, onClose, onSuccess }: Props) => {
             {carregando ? <p>Carregando...</p> : !cautela ? (
               <p className="text-destructive">Cautela permanente ativa com este colete não encontrada.</p>
             ) : opcoes.length === 0 ? (
-              <p className="text-destructive">Sem colete disponível no estoque com tamanho {colete.tamanhoColete} / {colete.sexo} dentro da validade.</p>
+              <p className="text-destructive">Sem colete disponível na reserva dentro da validade.</p>
             ) : (
               <label className="block">
                 <b>Colete novo:</b>
