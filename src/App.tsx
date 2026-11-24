@@ -52,19 +52,19 @@ const App = () => (
           <Route path="/sistema/entrada-oficina" element={<EntradaOficinaWizard />} />
           <Route path="/sistema/saida-oficina" element={<SaidaOficinaWizard />} />
           <Route path="/sistema/encerrar-servico" element={<EncerrarServicoWizard />} />
-          <Route path="/gestao-pessoas" element={<RequireLogin perfis={["admin","gestor"]}><GestãoPessoas /></RequireLogin>} />
-          <Route path="/admin-dashboard" element={<RequireLogin perfis={["admin","gestor"]}><AdminDashboard /></RequireLogin>} />
-          <Route path="/user-dashboard" element={<RequireLogin><UserDashboard /></RequireLogin>} />
+          <Route path="/gestao-pessoas" element={<RequireLogin acessoKey="gestaoPessoas"><GestãoPessoas /></RequireLogin>} />
+          <Route path="/admin-dashboard" element={<RequireLogin acessoKey="gestaoLogistica"><AdminDashboard /></RequireLogin>} />
+          <Route path="/user-dashboard" element={<RequireLogin acessoKey="acessoPolicial"><UserDashboard /></RequireLogin>} />
           <Route path="/reserva-armamento/totem" element={<TotemPolicialInterface />} />
-          <Route path="/reserva-armamento/*" element={<ReservaArmamentoSystem />} />
-          <Route path="/guarda-quartel" element={<GuardaQuartelHome />} />
-          <Route path="/guarda-quartel/novo" element={<LivroGuardaPage />} />
-          <Route path="/guarda-quartel/historico" element={<HistoricoLivrosGuardaPage />} />
-          <Route path="/projetos-sociais/instrutor" element={<InstrutorSystem />} />
-          <Route path="/projetos-sociais/gestor" element={<GestorSystem />} />
-          <Route path="/projetos-sociais/*" element={<ProjetosSociaisSystem />} />
+          <Route path="/reserva-armamento/*" element={<RequireLogin acessoKey="reservaArmamento"><ReservaArmamentoSystem /></RequireLogin>} />
+          <Route path="/guarda-quartel" element={<RequireLogin acessoKey="guardaQuartel"><GuardaQuartelHome /></RequireLogin>} />
+          <Route path="/guarda-quartel/novo" element={<RequireLogin acessoKey="guardaQuartel"><LivroGuardaPage /></RequireLogin>} />
+          <Route path="/guarda-quartel/historico" element={<RequireLogin acessoKey="guardaQuartel"><HistoricoLivrosGuardaPage /></RequireLogin>} />
+          <Route path="/projetos-sociais/instrutor" element={<RequireLogin acessoKey="projetosSociais"><InstrutorSystem /></RequireLogin>} />
+          <Route path="/projetos-sociais/gestor" element={<RequireLogin acessoKey="projetosSociais"><GestorSystem /></RequireLogin>} />
+          <Route path="/projetos-sociais/*" element={<RequireLogin acessoKey="projetosSociais"><ProjetosSociaisSystem /></RequireLogin>} />
           <Route path="/totem-viaturas" element={<TotemViaturas />} />
-          <Route path="/gestao-comandantes" element={<RequireLogin><ComandanteDashboard /></RequireLogin>} />
+          <Route path="/gestao-comandantes" element={<RequireLogin acessoKey="gestaoComandantes"><ComandanteDashboard /></RequireLogin>} />
           <Route path="/galeria" element={<GaleriaPrivada />} />
           <Route path="/cadastro-disposicao" element={<CadastroDisposicao />} />
           <Route path="/complemento-disposicao" element={<ComplementoDisposicao />} />
