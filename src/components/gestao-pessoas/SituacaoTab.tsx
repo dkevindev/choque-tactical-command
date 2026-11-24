@@ -93,7 +93,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
   // Dialog retirada
   const [showRetiradaDialog, setShowRetiradaDialog] = useState(false);
   const [policialRetirada, setPolicialRetirada] = useState<Policial | null>(null);
-  const [retiradaNovaSituacao, setRetiradaNovaSituacao] = useState('MONTADO - POLICIAMENTO OSTENSIVO');
+  const [retiradaNovaSituacao, setRetiradaNovaSituacao] = useState('EM ATIVIDADE');
   const [retiradaNovaFuncao, setRetiradaNovaFuncao] = useState('');
   const [retiradaPublicacao, setRetiradaPublicacao] = useState('');
 
@@ -117,7 +117,12 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
           await batch.commit();
           setSituacoes(items);
         } else {
-          setSituacoes(sitSnap.docs.map(d => ({ id: d.id, nome: d.data().nome, indisponivel: d.data().indisponivel ?? true })));
+          const lista: ConfigSituacao[] = sitSnap.docs.map(d => ({ id: d.id, nome: d.data().nome, indisponivel: d.data().indisponivel ?? true }));
+          if (!lista.some(s => (s.nome || '').toUpperCase().replace('FERIAS', 'FÉRIAS') === 'FÉRIAS')) {
+            const ref = await addDoc(collection(db, 'config_situacoes'), { nome: 'FÉRIAS', indisponivel: true, criadoEm: new Date().toISOString() });
+            lista.push({ id: ref.id, nome: 'FÉRIAS', indisponivel: true });
+          }
+          setSituacoes(lista);
         }
 
         // Funções
@@ -129,6 +134,28 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
     };
     fetchConfigs();
   }, []);
+
+  // Migração automática: MONTADO - POLICIAMENTO OSTENSIVO -> EM ATIVIDADE
+  const [autoMigrado, setAutoMigrado] = useState(false);
+  useEffect(() => {
+    if (autoMigrado) return;
+    const alvos = policiais.filter(p => p.SITUAÇÃO === 'MONTADO - POLICIAMENTO OSTENSIVO');
+    if (alvos.length === 0) return;
+    setAutoMigrado(true);
+    (async () => {
+      try {
+        for (let i = 0; i < alvos.length; i += 400) {
+          const batch = writeBatch(db);
+          alvos.slice(i, i + 400).forEach(p => batch.update(doc(db, 'policiais', p.id), { SITUAÇÃO: 'EM ATIVIDADE' }));
+          await batch.commit();
+        }
+        toast({ title: 'Situação atualizada', description: `${alvos.length} policial(is) passaram de MONTADO para EM ATIVIDADE` });
+        onUpdate();
+      } catch (e) { console.error('Erro na migração automática:', e); }
+    })();
+  }, [policiais, autoMigrado]);
+
+  const [buscaColocar, setBuscaColocar] = useState('');
 
   const situacoesNomes = useMemo(() => situacoes.map(s => s.nome).sort(), [situacoes]);
 
@@ -244,7 +271,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
 
   const openRetiradaDialog = (policial?: Policial) => {
     setPolicialRetirada(policial || null);
-    setRetiradaNovaSituacao('MONTADO - POLICIAMENTO OSTENSIVO');
+    setRetiradaNovaSituacao('EM ATIVIDADE');
     setRetiradaNovaFuncao(policial?.funcaoOrigem || 'MONTADO - POLICIAMENTO OSTENSIVO');
     setRetiradaPublicacao('');
     setShowRetiradaDialog(true);
@@ -256,7 +283,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
       return;
     }
     setPolicialRetirada(null);
-    setRetiradaNovaSituacao('MONTADO - POLICIAMENTO OSTENSIVO');
+    setRetiradaNovaSituacao('EM ATIVIDADE');
     setRetiradaNovaFuncao('MONTADO - POLICIAMENTO OSTENSIVO');
     setRetiradaPublicacao('');
     setShowRetiradaDialog(true);
@@ -507,7 +534,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
                 <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as situações</SelectItem>
-                  <SelectItem value="MONTADO - POLICIAMENTO OSTENSIVO">Montado</SelectItem>
+                  <SelectItem value="EM ATIVIDADE">Em atividade</SelectItem>
                   {situacoesNomes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -559,7 +586,15 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
             </div>
             <div className="max-h-60 overflow-y-auto border rounded-lg p-4 space-y-2">
               <Label>Selecionar Policiais ({selectedPoliciais.length} selecionados)</Label>
-              {policiaisDisponiveisFiltrados.map(policial => (
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Localizar PM por nome, graduação ou matrícula..." value={buscaColocar} onChange={(e) => setBuscaColocar(e.target.value)} className="pl-10 h-9" />
+              </div>
+              {policiaisDisponiveisFiltrados.filter(p => {
+                const t = buscaColocar.trim().toLowerCase();
+                if (!t) return true;
+                return `${p['Post/Grad'] || ''} ${p.NOME || ''} ${(p as any)['NOME DE GUERRA'] || ''} ${p.Matrícula || ''}`.toLowerCase().includes(t);
+              }).map(policial => (
                 <div key={policial.id} className="flex items-center space-x-2">
                   <Checkbox
                     id={`policial-${policial.id}`}
@@ -778,7 +813,7 @@ const SituacaoTab: React.FC<SituacaoTabProps> = ({ policiais, onUpdate }) => {
               <Select value={retiradaNovaSituacao} onValueChange={setRetiradaNovaSituacao}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MONTADO - POLICIAMENTO OSTENSIVO">MONTADO - POLICIAMENTO OSTENSIVO</SelectItem>
+                  <SelectItem value="EM ATIVIDADE">EM ATIVIDADE</SelectItem>
                   {situacoesNomes.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
