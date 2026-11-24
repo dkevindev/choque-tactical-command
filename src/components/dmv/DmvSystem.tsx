@@ -12,7 +12,16 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Pencil, Plus, Stethoscope, Trash2 } from 'lucide-react';
+import { ArrowLeft, Download, History, LayoutDashboard, List, Loader2, Pencil, Plus, Stethoscope, Syringe, Trash2, ClipboardList } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  DATA_RELACAO_IMPORTADA, formatarDataBR, importarRelacao, listarSolipedes, type Solipede,
+} from '@/lib/cavalhada';
+import { RELACAO_CAVALHADA_2026_07_15 as relacao } from '@/data/cavalhada-2026-07-15';
+import PainelCavalhada from '@/components/cavalhada/PainelCavalhada';
+import ListaSolipedes from '@/components/cavalhada/ListaSolipedes';
+import HistoricoCavalhada from '@/components/cavalhada/HistoricoCavalhada';
+import FichaSolipede from '@/components/cavalhada/FichaSolipede';
 
 type Campo = {
   key: string;
@@ -24,16 +33,7 @@ type Campo = {
 
 type Registro = { id: string } & Record<string, string>;
 
-const ANIMAIS: Campo[] = [
-  { key: 'nome', label: 'Nome', obrigatorio: true },
-  { key: 'registro', label: 'Registro / Nº', obrigatorio: true },
-  { key: 'raca', label: 'Raça' },
-  { key: 'pelagem', label: 'Pelagem' },
-  { key: 'sexo', label: 'Sexo', tipo: 'opcoes', opcoes: ['Macho', 'Fêmea', 'Castrado'] },
-  { key: 'nascimento', label: 'Nascimento', tipo: 'data' },
-  { key: 'situacao', label: 'Situação', tipo: 'opcoes', opcoes: ['Ativo', 'Em tratamento', 'Baixado'], obrigatorio: true },
-  { key: 'observacoes', label: 'Observações', tipo: 'area' },
-];
+// O cadastro dos animais é o da Cavalhada (coleção "solipedes"), em src/lib/cavalhada.ts.
 
 const ATENDIMENTOS: Campo[] = [
   { key: 'animalId', label: 'Animal', tipo: 'animal', obrigatorio: true },
@@ -231,8 +231,13 @@ const ListaRegistros = ({
 
 const DmvSystem = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [usuarioId, setUsuarioId] = useState<string | null>(null);
-  const [animais, setAnimais] = useState<Registro[]>([]);
+  const [animais, setAnimais] = useState<Solipede[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [importando, setImportando] = useState(false);
+  const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
+  const [versaoHistorico, setVersaoHistorico] = useState(0);
 
   // Confere o acesso no cadastro atual do policial, não no localStorage (que o usuário pode editar).
   useEffect(() => {
@@ -244,11 +249,41 @@ const DmvSystem = () => {
   }, [navigate]);
 
   const carregarAnimais = async () => {
-    const snap = await getDocs(collection(db, 'dmv_animais'));
-    setAnimais(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Registro));
+    try {
+      setAnimais(await listarSolipedes());
+    } catch (e) {
+      console.error('Erro ao carregar animais:', e);
+      toast({ title: 'Erro ao carregar os animais', variant: 'destructive' });
+    } finally {
+      setCarregando(false);
+    }
   };
 
-  useEffect(() => { if (usuarioId) carregarAnimais().catch(e => console.error('Erro ao carregar animais:', e)); }, [usuarioId]);
+  useEffect(() => { if (usuarioId) carregarAnimais(); }, [usuarioId]);
+
+  const aposAlterar = async () => {
+    await carregarAnimais();
+    setVersaoHistorico(v => v + 1);
+  };
+
+  const importar = async () => {
+    setImportando(true);
+    try {
+      const r = await importarRelacao(relacao);
+      toast({ title: `${r.importados} animais importados${r.jaExistiam ? ` (${r.jaExistiam} já estavam cadastrados)` : ''}.` });
+      await aposAlterar();
+    } catch (e) {
+      console.error('Erro na importação:', e);
+      toast({ title: 'Falha na importação. Nada foi perdido; tente novamente.', variant: 'destructive' });
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  // Formato usado pelas listas de prontuário e vacinas (seleção do animal).
+  // Animais baixados continuam aparecendo para manter o histórico de atendimentos legível.
+  const opcoesAnimais: Registro[] = animais.map(a => ({ id: a.id, nome: a.nome, registro: a.registro }));
+  const selecionado = animais.find(a => a.id === selecionadoId) ?? null;
 
   if (!usuarioId) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Verificando acesso...</div>;
 
@@ -260,28 +295,67 @@ const DmvSystem = () => {
           <Stethoscope className="h-6 w-6" />
           <div>
             <h1 className="text-xl font-bold">DMV</h1>
-            <p className="text-sm text-muted-foreground">Departamento Médico Veterinário</p>
+            <p className="text-sm text-muted-foreground">Departamento Médico Veterinário · Cavalhada do RPMont</p>
           </div>
         </div>
       </header>
-      <main className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="animais">
-          <TabsList>
-            <TabsTrigger value="animais">Animais</TabsTrigger>
-            <TabsTrigger value="atendimentos">Prontuário</TabsTrigger>
-            <TabsTrigger value="vacinas">Vacinas e Vermifugação</TabsTrigger>
-          </TabsList>
-          <TabsContent value="animais">
-            <ListaRegistros colecao="dmv_animais" titulo="Animal" campos={ANIMAIS} colunas={['nome', 'registro', 'raca', 'sexo', 'situacao']} animais={animais} usuarioId={usuarioId} onChange={carregarAnimais} />
-          </TabsContent>
-          <TabsContent value="atendimentos">
-            <ListaRegistros colecao="dmv_atendimentos" titulo="Atendimento" campos={ATENDIMENTOS} colunas={['data', 'animalId', 'tipo', 'veterinario', 'diagnostico']} animais={animais} usuarioId={usuarioId} />
-          </TabsContent>
-          <TabsContent value="vacinas">
-            <ListaRegistros colecao="dmv_vacinas" titulo="Vacina / Vermifugação" campos={VACINAS} colunas={['dataAplicacao', 'animalId', 'tipo', 'produto', 'proximaDose']} animais={animais} usuarioId={usuarioId} />
-          </TabsContent>
-        </Tabs>
+      <main className="container mx-auto px-4 py-6 space-y-6">
+        {carregando ? (
+          <div className="flex justify-center py-20 text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" /> Carregando...
+          </div>
+        ) : (
+          <>
+            {animais.length === 0 && (
+              <Card className="border-dashed">
+                <CardContent className="py-8 text-center space-y-3">
+                  <p className="font-semibold text-foreground">Nenhum animal cadastrado ainda.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Importe a Relação Geral da Cavalhada de {formatarDataBR(DATA_RELACAO_IMPORTADA)} ({relacao.length} animais, dados já padronizados).
+                  </p>
+                  <Button onClick={importar} disabled={importando}>
+                    {importando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+                    Importar relação
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            <Tabs defaultValue="painel">
+              <TabsList className="flex-wrap h-auto">
+                <TabsTrigger value="painel"><LayoutDashboard className="h-4 w-4 mr-2" />Painel</TabsTrigger>
+                <TabsTrigger value="animais"><List className="h-4 w-4 mr-2" />Animais</TabsTrigger>
+                <TabsTrigger value="atendimentos"><ClipboardList className="h-4 w-4 mr-2" />Prontuário</TabsTrigger>
+                <TabsTrigger value="vacinas"><Syringe className="h-4 w-4 mr-2" />Vacinas e Vermifugação</TabsTrigger>
+                <TabsTrigger value="historico"><History className="h-4 w-4 mr-2" />Movimentações</TabsTrigger>
+              </TabsList>
+              <TabsContent value="painel" className="mt-4">
+                <PainelCavalhada animais={animais} onAbrir={setSelecionadoId} />
+              </TabsContent>
+              <TabsContent value="animais" className="mt-4">
+                <ListaSolipedes animais={animais} onAbrir={setSelecionadoId} onAlterado={aposAlterar} />
+              </TabsContent>
+              <TabsContent value="atendimentos" className="mt-4">
+                <ListaRegistros colecao="dmv_atendimentos" titulo="Atendimento" campos={ATENDIMENTOS} colunas={['data', 'animalId', 'tipo', 'veterinario', 'diagnostico']} animais={opcoesAnimais} usuarioId={usuarioId} />
+              </TabsContent>
+              <TabsContent value="vacinas" className="mt-4">
+                <ListaRegistros colecao="dmv_vacinas" titulo="Vacina / Vermifugação" campos={VACINAS} colunas={['dataAplicacao', 'animalId', 'tipo', 'produto', 'proximaDose']} animais={opcoesAnimais} usuarioId={usuarioId} />
+              </TabsContent>
+              <TabsContent value="historico" className="mt-4">
+                <HistoricoCavalhada versao={versaoHistorico} onAbrir={setSelecionadoId} />
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
       </main>
+
+      <FichaSolipede
+        animal={selecionado}
+        aberto={!!selecionado}
+        onFechar={() => setSelecionadoId(null)}
+        onAlterado={aposAlterar}
+        versao={versaoHistorico}
+      />
     </div>
   );
 };
