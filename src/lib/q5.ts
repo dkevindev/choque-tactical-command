@@ -19,6 +19,19 @@ export function normalizarPosto(raw?: string): Q5Posto | null {
   return null;
 }
 
+export const Q5_UNIDADES = ['RPMONT', '1ESQ', '2ESQ', '3PEL/2ESQ'] as const;
+export type Q5Unidade = typeof Q5_UNIDADES[number];
+export const lerUnidadeBruta = (p: any): string => String(p?.['UNIDADE"RPMONT"'] || p?.UNIDADE || p?.Unidade || p?.unidade || '').trim();
+export function normalizarUnidade(raw?: string): Q5Unidade | null {
+  const s = (raw || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[º°ª.\s\-_]/g, '');
+  if (!s) return null;
+  if (/3PEL/.test(s)) return '3PEL/2ESQ';
+  if (/^1ESQ/.test(s)) return '1ESQ';
+  if (/^2ESQ/.test(s)) return '2ESQ';
+  if (s === 'RPMONT') return 'RPMONT';
+  return null;
+}
+
 export const norm = (s?: string) => (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
 export interface Q5Categoria {
@@ -56,7 +69,7 @@ export interface Q5Registro {
   policial: Q5Policial; posto: Q5Posto; categoriaId: string; origem: string;
   inicio?: string | null; fim?: string | null; dias?: number | null; detalhe?: string;
 }
-export interface Q5Inconsistencia { policial: Q5Policial; motivo: string; }
+export interface Q5Inconsistencia { policial: Q5Policial; motivo: string; tipo?: 'unidade'; }
 export interface Q5Resultado {
   efetivo: Q5Registro[]; porCategoria: Record<string, Q5Registro[]>; inconsistencias: Q5Inconsistencia[];
 }
@@ -81,6 +94,7 @@ export function calcularQ5(policiais: Q5Policial[], atestados: Q5Atestado[], ref
     if (p.aDisposicao) continue;
     const posto = normalizarPosto(p['Post/Grad']);
     if (!posto) { inconsistencias.push({ policial: p, motivo: `Posto/graduação não reconhecido: "${p['Post/Grad'] || 'vazio'}"` }); continue; }
+    if (!normalizarUnidade(lerUnidadeBruta(p))) inconsistencias.push({ policial: p, tipo: 'unidade', motivo: `Unidade não reconhecida: "${lerUnidadeBruta(p) || 'vazia'}"` });
     const base = { policial: p, posto };
     efetivo.push({ ...base, categoriaId: 'efetivo', origem: 'Cadastro de policiais' });
     const sit = norm(p.SITUAÇÃO); const fun = norm(p['FUNÇÃO']);
@@ -118,10 +132,10 @@ export function calcularQ5(policiais: Q5Policial[], atestados: Q5Atestado[], ref
       if (f) porCategoria[f.id].push({ ...base, categoriaId: f.id, origem: `Função: ${p['FUNÇÃO']}${ehAtual ? '' : ' (cadastro atual)'}` });
     }
 
-    if (sit && sit !== 'MONTADO' && !todasSit.has(sit) && !sit.includes('DISPOSI')) inconsistencias.push({ policial: p, motivo: `Situação "${p.SITUAÇÃO}" não está ligada a nenhuma categoria do Q5` });
+    if (sit && sit !== 'MONTADO' && sit !== 'EM ATIVIDADE' && !sit.startsWith('MONTADO') && !todasSit.has(sit) && !sit.includes('DISPOSI')) inconsistencias.push({ policial: p, motivo: `Situação "${p.SITUAÇÃO}" não está ligada a nenhuma categoria do Q5` });
     if (sit && todasSit.has(sit) && !p.inicioSituacao && !sit.includes('FERIAS')) inconsistencias.push({ policial: p, motivo: `Situação "${p.SITUAÇÃO}" sem data de início` });
     if (sit.includes('FERIAS') && p.fimFerias && d(p.fimFerias) < hoje) inconsistencias.push({ policial: p, motivo: `Férias terminaram em ${d(p.fimFerias)} mas a situação continua FÉRIAS` });
-    if (p.fimSituacao && d(p.fimSituacao) < hoje && sit && sit !== 'MONTADO') inconsistencias.push({ policial: p, motivo: `Situação "${p.SITUAÇÃO}" com fim em ${d(p.fimSituacao)} ainda não retirada` });
+    if (p.fimSituacao && d(p.fimSituacao) < hoje && sit && sit !== 'MONTADO' && sit !== 'EM ATIVIDADE') inconsistencias.push({ policial: p, motivo: `Situação "${p.SITUAÇÃO}" com fim em ${d(p.fimSituacao)} ainda não retirada` });
   }
   return { efetivo, porCategoria, inconsistencias };
 }

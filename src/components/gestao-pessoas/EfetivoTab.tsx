@@ -848,11 +848,15 @@ const EditPolicialForm: React.FC<{
           )}
           <div>
             <Label htmlFor="unidade">Unidade (RPMONT)</Label>
-            <Input
-              id="unidade"
-              value={formData['UNIDADE"RPMONT"']}
-              onChange={(e) => setFormData(prev => ({ ...prev, 'UNIDADE"RPMONT"': e.target.value }))}
-            />
+            <Select
+              value={(['RPMONT', '1ESQ', '2ESQ', '3PEL/2ESQ'] as string[]).includes(formData['UNIDADE"RPMONT"']) ? formData['UNIDADE"RPMONT"'] : undefined}
+              onValueChange={(v) => setFormData(prev => ({ ...prev, 'UNIDADE"RPMONT"': v }))}
+            >
+              <SelectTrigger id="unidade"><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
+              <SelectContent>
+                {['RPMONT', '1ESQ', '2ESQ', '3PEL/2ESQ'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label htmlFor="previsaoFerias">Previsão Férias 2024</Label>

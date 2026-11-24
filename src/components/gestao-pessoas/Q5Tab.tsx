@@ -15,7 +15,17 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { AlertTriangle, Download, FileText, Settings, RefreshCw, Info } from 'lucide-react';
-import { Q5_POSTOS, Q5_CATEGORIAS_PADRAO, calcularQ5, Q5Categoria, Q5Policial, Q5Atestado, Q5Registro, Q5Posto } from '@/lib/q5';
+import { Q5_POSTOS, Q5_CATEGORIAS_PADRAO, calcularQ5, Q5Categoria, Q5Policial, Q5Atestado, Q5Registro, Q5Posto, Q5_UNIDADES, normalizarUnidade, lerUnidadeBruta } from '@/lib/q5';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+const ABAS_UNIDADE: { id: string; label: string; unidades: string[] | null }[] = [
+  { id: 'total', label: 'Q5 TOTAL', unidades: null },
+  { id: 'RPMONT', label: 'RPMONT', unidades: ['RPMONT'] },
+  { id: '1ESQ', label: '1ESQ', unidades: ['1ESQ'] },
+  { id: '2ESQ', label: '2ESQ', unidades: ['2ESQ'] },
+  { id: '3PEL', label: '3PEL/2ESQ', unidades: ['3PEL/2ESQ'] },
+  { id: '2ESQ3PEL', label: '2ESQ + 3PEL', unidades: ['2ESQ', '3PEL/2ESQ'] },
+];
 
 const fmt = (s?: string | null) => { if (!s) return '—'; const [y, m, d] = String(s).slice(0, 10).split('-'); return d && m && y ? `${d}/${m}/${y.slice(2)}` : String(s); };
 const mat = (p: Q5Policial) => String(p['Matrícula'] ?? p.matricula ?? '');
@@ -29,6 +39,8 @@ const Q5Tab: React.FC = () => {
   const [atualizado, setAtualizado] = useState<Date | null>(null);
   const [postoFiltro, setPostoFiltro] = useState<string>('__all__');
   const [busca, setBusca] = useState('');
+  const [aba, setAba] = useState('total');
+  const [correcao, setCorrecao] = useState<Record<string, string>>({});
   const [detalhe, setDetalhe] = useState<{ titulo: string; regs: Q5Registro[] } | null>(null);
   const [showConfig, setShowConfig] = useState(false);
   const [showInc, setShowInc] = useState(false);
@@ -55,7 +67,20 @@ const Q5Tab: React.FC = () => {
     return () => { u1(); u2(); u3(); };
   }, []);
 
-  const res = useMemo(() => calcularQ5(policiais, atestados, ref, cats), [policiais, atestados, ref, cats]);
+  const abaAtual = ABAS_UNIDADE.find(a => a.id === aba)!;
+  const resTotal = useMemo(() => calcularQ5(policiais, atestados, ref, cats), [policiais, atestados, ref, cats]);
+  const resUni = useMemo(() => {
+    if (!abaAtual.unidades) return resTotal;
+    const us = abaAtual.unidades;
+    return calcularQ5(policiais.filter(p => us.includes(normalizarUnidade(lerUnidadeBruta(p)) || '')), atestados, ref, cats);
+  }, [resTotal, abaAtual, policiais, atestados, ref, cats]);
+  const res = { ...resUni, inconsistencias: [...resTotal.inconsistencias.filter(i => i.tipo === 'unidade'), ...resUni.inconsistencias.filter(i => i.tipo !== 'unidade')] };
+  const nomeArq = abaAtual.label.replace(/[^A-Z0-9]+/gi, '_');
+  const corrigirUnidade = async (id: string) => {
+    const u = correcao[id]; if (!u) return;
+    try { await setDoc(doc(db, 'policiais', id), { 'UNIDADE"RPMONT"': u }, { merge: true }); toast({ title: `Unidade corrigida para ${u}` }); }
+    catch (e: any) { toast({ title: 'Erro ao corrigir unidade', description: e?.message, variant: 'destructive' }); }
+  };
   const passado = ref < format(new Date(), 'yyyy-MM-dd');
   const postos = postoFiltro === '__all__' ? [...Q5_POSTOS] : [postoFiltro as Q5Posto];
   const filtra = (regs: Q5Registro[]) => {
@@ -79,7 +104,7 @@ const Q5Tab: React.FC = () => {
   };
   const exportarExcel = async () => {
     const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Q5');
-    ws.addRow([`Q5 RPMONT – Quadro Quantitativo do Efetivo – Referência ${fmt(ref)}`]).font = { bold: true, size: 13 };
+    ws.addRow([`Q5 ${abaAtual.label} – Quadro Quantitativo do Efetivo – Referência ${fmt(ref)}`]).font = { bold: true, size: 13 };
     ws.addRow([]);
     linhasExport().forEach((r, i) => { const row = ws.addRow(r); if (i === 0 || r[0] === 'TOTAL') row.font = { bold: true }; row.eachCell(c => { c.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } }; c.alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' }; }); });
     ws.getColumn(1).width = 14; for (let i = 2; i <= cats.length + 2; i++) ws.getColumn(i).width = 13;
@@ -87,14 +112,14 @@ const Q5Tab: React.FC = () => {
     det.addRow(['Categoria', 'Posto', 'Nome', 'Matrícula', 'Origem', 'Início', 'Fim', 'Dias', 'Detalhe']).font = { bold: true };
     cats.forEach(c => filtra(res.porCategoria[c.id]).forEach(r => det.addRow([c.titulo, r.posto, r.policial.NOME, mat(r.policial), r.origem, fmt(r.inicio), fmt(r.fim), r.dias ?? '', r.detalhe ?? ''])));
     const buf = await wb.xlsx.writeBuffer();
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf])); a.download = `Q5_RPMONT_${fmt(ref).replace(/\//g, '-')}.xlsx`; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf])); a.download = `Q5_${nomeArq}_${fmt(ref).replace(/\//g, '-')}.xlsx`; a.click();
   };
   const exportarPdf = () => {
     const pdf = new jsPDF({ orientation: 'landscape' });
-    pdf.setFontSize(12); pdf.text(`Q5 RPMONT – Quadro Quantitativo do Efetivo – Ref. ${fmt(ref)}`, 10, 12);
+    pdf.setFontSize(12); pdf.text(`Q5 ${abaAtual.label} – Quadro Quantitativo do Efetivo – Ref. ${fmt(ref)}`, 10, 12);
     const [head, ...body] = linhasExport();
     autoTable(pdf, { head: [head.map(String)], body: body.map(r => r.map(String)), startY: 18, styles: { fontSize: 6, halign: 'center' }, headStyles: { fillColor: [40, 40, 40] } });
-    pdf.save(`Q5_RPMONT_${fmt(ref).replace(/\//g, '-')}.pdf`);
+    pdf.save(`Q5_${nomeArq}_${fmt(ref).replace(/\//g, '-')}.pdf`);
   };
 
   const salvarCat = async (c: Q5Categoria) => {
@@ -124,6 +149,9 @@ const Q5Tab: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Tabs value={aba} onValueChange={setAba}>
+            <TabsList className="flex h-auto flex-wrap">{ABAS_UNIDADE.map(a => <TabsTrigger key={a.id} value={a.id}>{a.label}</TabsTrigger>)}</TabsList>
+          </Tabs>
           {passado && <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm"><Info className="mt-0.5 h-4 w-4 shrink-0" />Data passada: férias, situações com período e atestados são reconstruídos pelas datas registradas. Funções e posto/graduação usam o cadastro atual, pois não guardam data.</div>}
           <div className="flex flex-wrap gap-2">
             <Select value={postoFiltro} onValueChange={setPostoFiltro}>
@@ -200,7 +228,15 @@ const Q5Tab: React.FC = () => {
       <Dialog open={showInc} onOpenChange={setShowInc}>
         <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
           <DialogHeader><DialogTitle>Inconsistências ({res.inconsistencias.length})</DialogTitle></DialogHeader>
-          {res.inconsistencias.map((x, i) => <div key={i} className="border-b py-2 text-sm"><b>{x.policial['Post/Grad']} {x.policial['NOME DE GUERRA1'] || x.policial.NOME}</b> ({mat(x.policial) || 's/ matr.'})<div className="text-muted-foreground">{x.motivo}</div></div>)}
+          {res.inconsistencias.map((x, i) => <div key={i} className="border-b py-2 text-sm"><b>{x.policial['Post/Grad']} {x.policial['NOME DE GUERRA1'] || x.policial.NOME}</b> ({mat(x.policial) || 's/ matr.'})<div className="text-muted-foreground">{x.motivo}</div>
+            {x.tipo === 'unidade' && <div className="mt-1 flex items-center gap-2">
+              <Select value={correcao[x.policial.id]} onValueChange={v => setCorrecao(c => ({ ...c, [x.policial.id]: v }))}>
+                <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Escolher unidade" /></SelectTrigger>
+                <SelectContent>{Q5_UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+              </Select>
+              <Button size="sm" disabled={!correcao[x.policial.id]} onClick={() => corrigirUnidade(x.policial.id)}>Corrigir</Button>
+            </div>}
+          </div>)}
           {!res.inconsistencias.length && <p className="text-sm text-muted-foreground">Nenhuma inconsistência encontrada.</p>}
         </DialogContent>
       </Dialog>
