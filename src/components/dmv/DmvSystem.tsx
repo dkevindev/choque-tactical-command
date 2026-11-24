@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Download, History, LayoutDashboard, List, Loader2, Pencil, Plus, Stethoscope, Syringe, Trash2, ClipboardList } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { registrarEvento } from '@/lib/auditoria';
 import {
-  DATA_RELACAO_IMPORTADA, formatarDataBR, importarRelacao, listarSolipedes, type Solipede,
+  autorAtual, DATA_RELACAO_IMPORTADA, formatarDataBR, importarRelacao, listarSolipedes, type Solipede,
 } from '@/lib/cavalhada';
 import { RELACAO_CAVALHADA_2026_07_15 as relacao } from '@/data/cavalhada-2026-07-15';
 import PainelCavalhada from '@/components/cavalhada/PainelCavalhada';
@@ -64,6 +65,21 @@ const diasAte = (data?: string, hoje = new Date()): number | null => {
   return Math.round((alvo.getTime() - base.getTime()) / 86400000);
 };
 
+// Mesma vacina/vermífugo do mesmo animal: só a aplicação mais recente vale para o alerta.
+const chaveDose = (r: Registro) =>
+  [r.animalId, r.tipo, String(r.produto ?? '').trim().toLowerCase()].join('|');
+
+/** Ids dos registros que já foram substituídos por uma aplicação mais nova do mesmo produto. */
+const dosesSubstituidas = (itens: Registro[]): Set<string> => {
+  const maisRecente = new Map<string, Registro>();
+  for (const r of itens) {
+    const k = chaveDose(r);
+    const atual = maisRecente.get(k);
+    if (!atual || String(r.dataAplicacao ?? '') > String(atual.dataAplicacao ?? '')) maisRecente.set(k, r);
+  }
+  return new Set(itens.filter(r => maisRecente.get(chaveDose(r))?.id !== r.id).map(r => r.id));
+};
+
 const StatusDose = ({ data }: { data?: string }) => {
   const dias = diasAte(data);
   if (dias === null) return <span>-</span>;
@@ -92,7 +108,8 @@ const ListaRegistros = ({
   const carregar = async () => {
     try {
       const snap = await getDocs(collection(db, colecao));
-      setItens(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Registro));
+      // Registros excluídos ficam guardados (com quem excluiu e quando), mas não aparecem.
+      setItens(snap.docs.filter(d => d.data().excluido !== true).map(d => ({ id: d.id, ...d.data() }) as Registro));
     } catch (e) {
       console.error(`Erro ao carregar ${colecao}:`, e);
       toast({ title: 'Erro ao carregar dados', variant: 'destructive' });
@@ -106,9 +123,16 @@ const ListaRegistros = ({
     return a ? `${a.nome} (${a.registro})` : '—';
   };
 
+  const temProximaDose = campos.some(c => c.key === 'proximaDose');
+  const substituidas = temProximaDose ? dosesSubstituidas(itens) : new Set<string>();
+
   const valorCelula = (item: Registro, key: string) => {
     const campo = campos.find(c => c.key === key)!;
-    if (key === 'proximaDose') return <StatusDose data={item[key]} />;
+    if (key === 'proximaDose') {
+      // Já houve aplicação mais nova do mesmo produto: esta dose não gera alerta.
+      if (substituidas.has(item.id)) return <span className="text-muted-foreground">{formatarData(item[key])} · aplicada</span>;
+      return <StatusDose data={item[key]} />;
+    }
     if (campo.tipo === 'animal') return nomeAnimal(item[key]);
     if (campo.tipo === 'data') return formatarData(item[key]);
     return item[key] || '-';
@@ -123,8 +147,14 @@ const ListaRegistros = ({
         toast({ title: `Preencha: ${c.label}`, variant: 'destructive' });
         return;
       }
-      if (c.tipo === 'opcoes' && v && !c.opcoes!.includes(v)) return;
-      if (c.tipo === 'animal' && v && !animais.some(a => a.id === v)) return;
+      if (c.tipo === 'opcoes' && v && !c.opcoes!.includes(v)) {
+        toast({ title: `Valor inválido em: ${c.label}`, variant: 'destructive' });
+        return;
+      }
+      if (c.tipo === 'animal' && v && !animais.some(a => a.id === v)) {
+        toast({ title: 'Escolha um animal do cadastro', variant: 'destructive' });
+        return;
+      }
       dados[c.key] = v;
     }
     setSalvando(true);
@@ -147,9 +177,19 @@ const ListaRegistros = ({
   };
 
   const excluir = async (item: Registro) => {
-    if (!window.confirm('Excluir este registro? Esta ação não pode ser desfeita.')) return;
+    if (!window.confirm('Excluir este registro? Ele deixa de aparecer, mas fica guardado no histórico.')) return;
+    const autor = autorAtual();
     try {
-      await deleteDoc(doc(db, colecao, item.id));
+      // Não apaga de verdade: registro médico precisa de rastro de quem excluiu.
+      await updateDoc(doc(db, colecao, item.id), {
+        excluido: true, excluidoPor: usuarioId, excluidoPorNome: autor, excluidoEm: serverTimestamp(),
+      });
+      const { id, ...dados } = item;
+      registrarEvento({
+        tipo: `${colecao}_exclusao`,
+        descricao: `Exclusão em ${titulo}: ${nomeAnimal(item.animalId)} (${item.data || item.dataAplicacao || 'sem data'})`,
+        antes: { id, ...dados }, origem: 'DMV', autor,
+      });
       await carregar();
       onChange?.();
     } catch (e) {

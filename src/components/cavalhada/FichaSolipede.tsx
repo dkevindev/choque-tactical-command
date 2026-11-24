@@ -35,7 +35,8 @@ type RegistroDmv = { id: string } & Record<string, string>;
 /** Atendimentos e vacinas do DMV ligados a este animal. */
 const buscarDmv = async (colecao: string, animalId: string): Promise<RegistroDmv[]> => {
   const snap = await getDocs(query(collection(db, colecao), where('animalId', '==', animalId)));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as RegistroDmv);
+  // Registros excluídos ficam guardados no banco (com quem excluiu), mas não aparecem.
+  return snap.docs.filter((d) => d.data().excluido !== true).map((d) => ({ id: d.id, ...d.data() }) as RegistroDmv);
 };
 
 const dataBR = (v?: string) => (v ? v.split('-').reverse().join('/') : '-');
