@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Edit, Trash2, Package, X, Loader2 } from 'lucide-react';
+import { Search, Edit, Trash2, Package, X, Loader2 } from 'lucide-react';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
@@ -89,10 +89,8 @@ export default function TabelaPatrimonio({ itens, secoes, categorias, onUpdate, 
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-foreground">Todos os Itens</h2>
-        <Button onClick={() => setShowCadastro(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Item
-        </Button>
+        {/* Item novo só entra pela aba Entrada. */}
+        <p className="text-sm text-muted-foreground">Para incluir um bem novo, use a aba Entrada.</p>
       </div>
 
       {/* Filtros */}
@@ -169,12 +167,6 @@ export default function TabelaPatrimonio({ itens, secoes, categorias, onUpdate, 
                 : 'Nenhum item encontrado com os filtros aplicados'
               }
             </p>
-            {itens.length === 0 && (
-              <Button onClick={() => setShowCadastro(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Cadastrar Primeiro Item
-              </Button>
-            )}
           </CardContent>
         </Card>
       ) : (

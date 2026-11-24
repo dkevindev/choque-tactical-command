@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Edit, Trash2, Package } from 'lucide-react';
+import { Search, Edit, Trash2, Package } from 'lucide-react';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from '@/hooks/use-toast';
@@ -86,10 +86,6 @@ export default function SecaoDetalhes({ secao, itens, categorias, secoes, onClos
                   className="pl-10"
                 />
               </div>
-              <Button onClick={() => setShowCadastro(true)} className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Novo Item
-              </Button>
             </div>
 
             {itensFiltrados.length === 0 ? (

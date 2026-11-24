@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Package, Tags, LayoutGrid } from 'lucide-react';
+import { Building2, Package, Tags, LayoutGrid, PackagePlus } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
 import SecoesGrid from './SecoesGrid';
 import TabelaPatrimonio from './TabelaPatrimonio';
 import CadastroCategoria from './CadastroCategoria';
+import EntradaPatrimonio from './EntradaPatrimonio';
 
 export interface Secao {
   id: string;
@@ -115,7 +116,7 @@ export default function PatrimonioPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-4 max-w-xl">
           <TabsTrigger value="secoes" className="flex items-center gap-2">
             <LayoutGrid className="h-4 w-4" />
             Seções
@@ -127,6 +128,10 @@ export default function PatrimonioPage() {
           <TabsTrigger value="categorias" className="flex items-center gap-2">
             <Tags className="h-4 w-4" />
             Categorias
+          </TabsTrigger>
+          <TabsTrigger value="entrada" className="flex items-center gap-2">
+            <PackagePlus className="h-4 w-4" />
+            Entrada
           </TabsTrigger>
         </TabsList>
 
@@ -156,6 +161,9 @@ export default function PatrimonioPage() {
             onUpdate={loadData}
             loading={loading}
           />
+        </TabsContent>
+        <TabsContent value="entrada" className="mt-6">
+          <EntradaPatrimonio />
         </TabsContent>
       </Tabs>
     </div>
