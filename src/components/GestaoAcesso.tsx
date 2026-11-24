@@ -15,7 +15,8 @@ import {
   Eye,
   EyeOff,
   Key,
-  UserCheck
+  UserCheck,
+  Stethoscope
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -36,6 +37,7 @@ interface Policial {
     gestaoLogistica?: boolean;
     cavbot?: boolean;
     gestaoPessoas?: boolean;
+    dmv?: boolean;
   };
 }
 
@@ -96,6 +98,13 @@ const GestaoAcesso = () => {
       descricao: 'Painel de inteligência operacional',
       icon: Users,
       cor: 'bg-indigo-600'
+    },
+    {
+      id: 'dmv',
+      nome: 'DMV',
+      descricao: 'Departamento Médico Veterinário',
+      icon: Stethoscope,
+      cor: 'bg-emerald-600'
     }
   ];
 
