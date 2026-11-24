@@ -20,6 +20,7 @@ import FuncaoTab from './gestao-pessoas/FuncaoTab';
 import TransferidosTab from './gestao-pessoas/TransferidosTab';
 import AtestadosMedicosTab from './gestao-pessoas/AtestadosMedicosTab';
 import EstatisticasTab from './gestao-pessoas/EstatisticasTab';
+import Q5Tab from './gestao-pessoas/Q5Tab';
 import GerenciarNoticiasTotem from './painel-noticias/GerenciarNoticiasTotem';
 import logoRegimento from '@/assets/logo-regimento.jpg';
 
@@ -386,6 +387,7 @@ const GestãoPessoas: React.FC = () => {
             <BarChart3 className="h-4 w-4" />
             Estatísticas
           </TabsTrigger>
+          <TabsTrigger value="q5">Q5</TabsTrigger>
           <TabsTrigger value="painel-totem">Painel Totem</TabsTrigger>
         </TabsList>
 
@@ -524,6 +526,10 @@ const GestãoPessoas: React.FC = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="q5">
+          <Q5Tab />
         </TabsContent>
 
         <TabsContent value="ferias">
