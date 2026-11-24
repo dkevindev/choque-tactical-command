@@ -31,10 +31,12 @@ const TrocaColeteModal = ({ colete, onClose, onSuccess }: Props) => {
   const [novoId, setNovoId] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [baixarColog, setBaixarColog] = useState(false);
 
   useEffect(() => {
     if (!colete) return;
     setNovoId('');
+    setBaixarColog(!!colete.vencimento && new Date(colete.vencimento) <= new Date());
     setCarregando(true);
     Promise.all([
       getDocs(query(collection(db, 'materiais_belicos'), where('categoria', '==', 'Colete Balístico'))),
@@ -71,7 +73,19 @@ const TrocaColeteModal = ({ colete, onClose, onSuccess }: Props) => {
       batch.update(doc(db, 'materiais_belicos', colete.id), {
         cautelado: false, disponivel: false, policialAssociadoId: '', policialAssociadoNome: '',
         devolvidoVencido: true, dataDevolucao: agora, substituidoPor: novo.id,
+        ...(baixarColog ? { baixado: true, dataBaixa: agora, motivoBaixa: 'Vencimento', destinoBaixa: 'COLOG' } : {}),
       });
+      if (baixarColog) {
+        batch.set(doc(collection(db, 'baixas_materiais')), {
+          materialId: colete.id, nome: colete.nome || 'Colete Balístico', numeroSerie: colete.numeroSerie || '',
+          categoria: 'Colete Balístico', fabricante: colete.fabricante || '', modelo: colete.modelo || '',
+          vencimento: colete.vencimento || '', sexo: colete.sexo || '', tamanhoColete: colete.tamanhoColete || '',
+          motivoBaixa: 'Vencimento', destino: 'COLOG',
+          observacoes: `Baixa na troca de colete; substituído por ${novo.numeroSerie || novo.id}`,
+          policialCauteladoNome: policialNome, policialCauteladoMatricula: cautela.data.policialMatricula || '',
+          policialCauteladoId: policialId, dataBaixa: agora, criadoPor: '',
+        });
+      }
       batch.update(doc(db, 'materiais_belicos', novo.id), {
         cautelado: true, disponivel: false, policialAssociadoId: policialId, policialAssociadoNome: policialNome,
         substituiu: colete.id,
@@ -85,6 +99,11 @@ const TrocaColeteModal = ({ colete, onClose, onSuccess }: Props) => {
         policialNome, policialId, tipo: 'devolvido', data: new Date(),
         observacoes: `Troca de colete: devolvido vencido ao estoque, substituído por ${novo.numeroSerie || novo.id}`,
       });
+      if (baixarColog) batch.set(doc(hist), {
+        materialId: colete.id, materialNome: 'Colete Balístico', numeroSerie: colete.numeroSerie || '',
+        policialNome, policialId, tipo: 'baixa', data: new Date(),
+        observacoes: 'Baixa: Vencimento - Destino: COLOG (troca de colete)',
+      });
       batch.set(doc(hist), {
         materialId: novo.id, materialNome: 'Colete Balístico', numeroSerie: novo.numeroSerie || '',
         policialNome, policialId, tipo: 'cautelado', data: new Date(),
@@ -96,6 +115,11 @@ const TrocaColeteModal = ({ colete, onClose, onSuccess }: Props) => {
         tipo: 'colete_troca', origem: 'TrocaColeteModal', policialId, policialNome,
         materialId: novo.id, numeroSerie: novo.numeroSerie,
         descricao: `Troca de colete: ${colete.numeroSerie || colete.id} (vencido, ao estoque) por ${novo.numeroSerie || novo.id}`,
+      });
+      if (baixarColog) registrarEvento({
+        tipo: 'material_baixa', origem: 'TrocaColeteModal', policialId, policialNome,
+        materialId: colete.id, numeroSerie: colete.numeroSerie,
+        descricao: 'Baixa: Vencimento - Destino: COLOG (troca de colete)',
       });
       toast.success('Colete trocado com sucesso');
       onSuccess();
@@ -130,7 +154,14 @@ const TrocaColeteModal = ({ colete, onClose, onSuccess }: Props) => {
                 </select>
               </label>
             )}
-            <p className="text-muted-foreground">O colete atual volta ao estoque como vencido. A troca fica no histórico dos dois coletes.</p>
+            <label className="flex items-start gap-2 rounded border p-2 cursor-pointer">
+              <input type="checkbox" className="mt-1" checked={baixarColog} onChange={e => setBaixarColog(e.target.checked)} />
+              <span><b>Colete vencido: dar baixa e enviar para Saiu da Carga</b><br />
+                <span className="text-muted-foreground">Destino COLOG, motivo Vencimento.</span></span>
+            </label>
+            <p className="text-muted-foreground">{baixarColog
+              ? 'O colete atual sai da carga (baixa para COLOG). Todo o histórico dele fica guardado.'
+              : 'O colete atual volta ao estoque como vencido. A troca fica no histórico dos dois coletes.'}</p>
           </div>
         )}
         <DialogFooter>
