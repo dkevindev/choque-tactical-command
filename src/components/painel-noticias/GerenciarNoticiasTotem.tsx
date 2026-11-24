@@ -1,3 +1,4 @@
+import { nomeExibicao } from '@/lib/q5';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -821,7 +822,7 @@ const GerenciarNoticiasTotem = ({ origemPainel }: Props) => {
             <div className="space-y-3">
               {editTarget && (
                 <div className="rounded-lg bg-muted/50 p-3 text-sm">
-                  <div className="font-semibold">{editTarget['Post/Grad']} {editTarget['NOME DE GUERRA1'] || editTarget['NOME DE GUERRA']}</div>
+                  <div className="font-semibold">{nomeExibicao({ ...editTarget, 'NOME DE GUERRA1': editTarget['NOME DE GUERRA1'] || editTarget['NOME DE GUERRA'] })}</div>
                   <div className="text-xs text-muted-foreground">{editTarget.NOME} · Mat. {editTarget.MATRICULA || editTarget.matricula}</div>
                 </div>
               )}

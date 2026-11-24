@@ -15,7 +15,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { AlertTriangle, Download, FileText, Settings, RefreshCw, Info } from 'lucide-react';
-import { Q5_POSTOS, Q5_CATEGORIAS_PADRAO, calcularQ5, Q5Categoria, Q5Policial, Q5Atestado, Q5Registro, Q5Posto, Q5_UNIDADES, normalizarUnidade, lerUnidadeBruta } from '@/lib/q5';
+import { Q5_POSTOS, Q5_CATEGORIAS_PADRAO, calcularQ5, Q5Categoria, Q5Policial, Q5Atestado, Q5Registro, Q5Posto, Q5_UNIDADES, normalizarUnidade, lerUnidadeBruta, nomeExibicao, Q5Inconsistencia } from '@/lib/q5';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ABAS_UNIDADE: { id: string; label: string; unidades: string[] | null }[] = [
@@ -76,10 +76,42 @@ const Q5Tab: React.FC = () => {
   }, [resTotal, abaAtual, policiais, atestados, ref, cats]);
   const res = { ...resUni, inconsistencias: [...resTotal.inconsistencias.filter(i => i.tipo === 'unidade'), ...resUni.inconsistencias.filter(i => i.tipo !== 'unidade')] };
   const nomeArq = abaAtual.label.replace(/[^A-Z0-9]+/gi, '_');
-  const corrigirUnidade = async (id: string) => {
-    const u = correcao[id]; if (!u) return;
-    try { await setDoc(doc(db, 'policiais', id), { 'UNIDADE"RPMONT"': u }, { merge: true }); toast({ title: `Unidade corrigida para ${u}` }); }
-    catch (e: any) { toast({ title: 'Erro ao corrigir unidade', description: e?.message, variant: 'destructive' }); }
+  const chave = (x: Q5Inconsistencia) => `${x.policial.id}_${x.tipo}`;
+  const gravar = async (p: Q5Policial, dados: Record<string, any>, descricao: string, extra: Record<string, any> = {}) => {
+    try {
+      const limpo = Object.fromEntries(Object.entries(dados).filter(([, v]) => v !== undefined));
+      await setDoc(doc(db, 'policiais', p.id), limpo, { merge: true });
+      await addDoc(collection(db, 'assentamentos'), { policialId: p.id, tipo: 'Correção Q5', data: format(new Date(), 'yyyy-MM-dd'), descricao, ...extra, criadoEm: new Date().toISOString() });
+      toast({ title: 'Corrigido', description: descricao });
+    } catch (e: any) { toast({ title: 'Erro ao corrigir', description: e?.message, variant: 'destructive' }); }
+  };
+  const ligarSituacao = (sit: string, catId: string) => {
+    const c = cats.find(x => x.id === catId); if (!c || !sit) return;
+    if (!c.situacoes.includes(sit)) toggle(c, 'situacoes', sit);
+    toast({ title: 'Situação ligada', description: `"${sit}" agora conta em ${c.titulo}` });
+  };
+  const Solucao = ({ x }: { x: Q5Inconsistencia }) => {
+    const k = chave(x); const v = correcao[k] || ''; const v2 = correcao[k + '_2'] || ''; const v3 = correcao[k + '_3'] || '';
+    const set = (suf: string, val: string) => setCorrecao(c => ({ ...c, [k + suf]: val }));
+    const p = x.policial;
+    if (x.tipo === 'unidade') return <div className="flex flex-wrap items-center gap-2">
+      <Select value={v || undefined} onValueChange={val => set('', val)}><SelectTrigger className="h-8 w-36"><SelectValue placeholder="Unidade" /></SelectTrigger><SelectContent>{Q5_UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select>
+      <Button size="sm" disabled={!v} onClick={() => gravar(p, { 'UNIDADE"RPMONT"': v }, `Unidade corrigida de "${lerUnidadeBruta(p) || 'vazia'}" para ${v}`)}>Corrigir</Button></div>;
+    if (x.tipo === 'posto') return <div className="flex flex-wrap items-center gap-2">
+      <Select value={v || undefined} onValueChange={val => set('', val)}><SelectTrigger className="h-8 w-36"><SelectValue placeholder="Posto" /></SelectTrigger><SelectContent>{Q5_POSTOS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select>
+      <Button size="sm" disabled={!v} onClick={() => gravar(p, { 'Post/Grad': v.replace(/ PM$/, '') }, `Posto corrigido de "${p['Post/Grad'] || 'vazio'}" para ${v}`)}>Corrigir</Button></div>;
+    if (x.tipo === 'semInicio') return <div className="flex flex-wrap items-center gap-2">
+      <Input type="date" className="h-8 w-40" value={v} onChange={e => set('', e.target.value)} />
+      <Button size="sm" disabled={!v} onClick={() => gravar(p, { inicioSituacao: v }, `Data de início da situação ${p.SITUAÇÃO} definida em ${fmt(v)}`)}>Salvar data</Button></div>;
+    if (x.tipo === 'fimVencido') { const nova = v || 'EM ATIVIDADE'; return <div className="flex flex-wrap items-center gap-2">
+      <Select value={nova} onValueChange={val => set('', val)}><SelectTrigger className="h-8 w-48"><SelectValue /></SelectTrigger><SelectContent>{[...new Set(['EM ATIVIDADE', ...opSit])].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select>
+      {nova !== 'EM ATIVIDADE' && <><Input type="date" title="Início" className="h-8 w-36" value={v2} onChange={e => set('_2', e.target.value)} /><Input type="date" title="Fim" className="h-8 w-36" value={v3} onChange={e => set('_3', e.target.value)} /></>}
+      <Button size="sm" onClick={() => gravar(p, { SITUAÇÃO: nova, inicioSituacao: nova === 'EM ATIVIDADE' ? null : (v2 || null), fimSituacao: nova === 'EM ATIVIDADE' ? null : (v3 || null) }, `Retirado de ${p.SITUAÇÃO}. Nova situação: ${nova}`, { situacaoAnterior: p.SITUAÇÃO || '', novaSituacao: nova })}>Retirar da situação</Button></div>; }
+    if (x.tipo === 'feriasVencidas') return <Button size="sm" onClick={() => gravar(p, { SITUAÇÃO: 'EM ATIVIDADE', inicioFerias: null, fimFerias: null, inicioSituacao: null, fimSituacao: null }, `Retirado de FÉRIAS. Nova situação: EM ATIVIDADE`, { situacaoAnterior: p.SITUAÇÃO || '', novaSituacao: 'EM ATIVIDADE' })}>Retirar de férias</Button>;
+    if (x.tipo === 'naoLigada') return <div className="flex flex-wrap items-center gap-2">
+      <Select value={v || undefined} onValueChange={val => set('', val)}><SelectTrigger className="h-8 w-56"><SelectValue placeholder="Contar em qual categoria?" /></SelectTrigger><SelectContent>{cats.filter(c => c.tipo === 'afastamento').map(c => <SelectItem key={c.id} value={c.id}>{c.titulo}</SelectItem>)}</SelectContent></Select>
+      <Button size="sm" disabled={!v} onClick={() => ligarSituacao(String(p.SITUAÇÃO || '').trim(), v)}>Ligar</Button></div>;
+    return null;
   };
   const passado = ref < format(new Date(), 'yyyy-MM-dd');
   const postos = postoFiltro === '__all__' ? [...Q5_POSTOS] : [postoFiltro as Q5Posto];
@@ -208,7 +240,7 @@ const Q5Tab: React.FC = () => {
             {detalhe?.regs.length === 0 && <p className="text-sm text-muted-foreground">Nenhum policial nesta contagem.</p>}
             {detalhe?.regs.map((r, i) => (
               <div key={r.policial.id + i} className="rounded-md border p-3 text-sm">
-                <div className="font-semibold">{r.posto} {r.policial['NOME DE GUERRA1'] || ''} <span className="font-normal text-muted-foreground">– {r.policial.NOME}</span></div>
+                <div className="font-semibold">{nomeExibicao(r.policial)} <span className="font-normal text-muted-foreground">– {r.policial.NOME}</span></div>
                 <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                   <span>Matrícula: <b>{mat(r.policial) || '—'}</b></span>
                   <span>Situação: <b>{r.policial.SITUAÇÃO || '—'}</b></span>
@@ -226,16 +258,11 @@ const Q5Tab: React.FC = () => {
       </Sheet>
 
       <Dialog open={showInc} onOpenChange={setShowInc}>
-        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[80vh] max-w-4xl overflow-y-auto">
           <DialogHeader><DialogTitle>Inconsistências ({res.inconsistencias.length})</DialogTitle></DialogHeader>
-          {res.inconsistencias.map((x, i) => <div key={i} className="border-b py-2 text-sm"><b>{x.policial['Post/Grad']} {x.policial['NOME DE GUERRA1'] || x.policial.NOME}</b> ({mat(x.policial) || 's/ matr.'})<div className="text-muted-foreground">{x.motivo}</div>
-            {x.tipo === 'unidade' && <div className="mt-1 flex items-center gap-2">
-              <Select value={correcao[x.policial.id]} onValueChange={v => setCorrecao(c => ({ ...c, [x.policial.id]: v }))}>
-                <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Escolher unidade" /></SelectTrigger>
-                <SelectContent>{Q5_UNIDADES.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
-              </Select>
-              <Button size="sm" disabled={!correcao[x.policial.id]} onClick={() => corrigirUnidade(x.policial.id)}>Corrigir</Button>
-            </div>}
+          {res.inconsistencias.map((x, i) => <div key={i} className="flex flex-wrap items-start justify-between gap-2 border-b py-2 text-sm"><div className="min-w-[220px] flex-1"><b>{nomeExibicao(x.policial)}</b> ({mat(x.policial) || 's/ matr.'})<div className="text-muted-foreground">{x.motivo}</div>
+            </div>
+            <Solucao x={x} />
           </div>)}
           {!res.inconsistencias.length && <p className="text-sm text-muted-foreground">Nenhuma inconsistência encontrada.</p>}
         </DialogContent>

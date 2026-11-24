@@ -69,7 +69,7 @@ export interface Q5Registro {
   policial: Q5Policial; posto: Q5Posto; categoriaId: string; origem: string;
   inicio?: string | null; fim?: string | null; dias?: number | null; detalhe?: string;
 }
-export interface Q5Inconsistencia { policial: Q5Policial; motivo: string; tipo?: 'unidade'; }
+export interface Q5Inconsistencia { policial: Q5Policial; motivo: string; tipo?: 'unidade' | 'posto' | 'semInicio' | 'fimVencido' | 'feriasVencidas' | 'naoLigada' | 'simultanea'; }
 export interface Q5Resultado {
   efetivo: Q5Registro[]; porCategoria: Record<string, Q5Registro[]>; inconsistencias: Q5Inconsistencia[];
 }
@@ -93,7 +93,7 @@ export function calcularQ5(policiais: Q5Policial[], atestados: Q5Atestado[], ref
   for (const p of policiais) {
     if (p.aDisposicao) continue;
     const posto = normalizarPosto(p['Post/Grad']);
-    if (!posto) { inconsistencias.push({ policial: p, motivo: `Posto/graduação não reconhecido: "${p['Post/Grad'] || 'vazio'}"` }); continue; }
+    if (!posto) { inconsistencias.push({ policial: p, tipo: 'posto', motivo: `Posto/graduação não reconhecido: "${p['Post/Grad'] || 'vazio'}"` }); continue; }
     if (!normalizarUnidade(lerUnidadeBruta(p))) inconsistencias.push({ policial: p, tipo: 'unidade', motivo: `Unidade não reconhecida: "${lerUnidadeBruta(p) || 'vazia'}"` });
     const base = { policial: p, posto };
     efetivo.push({ ...base, categoriaId: 'efetivo', origem: 'Cadastro de policiais' });
@@ -126,16 +126,27 @@ export function calcularQ5(policiais: Q5Policial[], atestados: Q5Atestado[], ref
     if (candidatos.length) {
       porCategoria[candidatos[0].categoriaId].push(candidatos[0]);
       const outras = [...new Set(candidatos.slice(1).map(c => c.categoriaId))].filter(id => id !== candidatos[0].categoriaId);
-      if (outras.length) inconsistencias.push({ policial: p, motivo: `Situações simultâneas: contado em ${cats.find(c => c.id === candidatos[0].categoriaId)?.titulo}; também se encaixa em ${outras.map(id => cats.find(c => c.id === id)?.titulo).join(', ')}` });
+      if (outras.length) inconsistencias.push({ policial: p, tipo: 'simultanea', motivo: `Situações simultâneas: contado em ${cats.find(c => c.id === candidatos[0].categoriaId)?.titulo}; também se encaixa em ${outras.map(id => cats.find(c => c.id === id)?.titulo).join(', ')}` });
     } else {
       const f = funcs.find(c => c.funcoes.map(norm).includes(fun));
       if (f) porCategoria[f.id].push({ ...base, categoriaId: f.id, origem: `Função: ${p['FUNÇÃO']}${ehAtual ? '' : ' (cadastro atual)'}` });
     }
 
-    if (sit && sit !== 'MONTADO' && sit !== 'EM ATIVIDADE' && !sit.startsWith('MONTADO') && !todasSit.has(sit) && !sit.includes('DISPOSI')) inconsistencias.push({ policial: p, motivo: `Situação "${p.SITUAÇÃO}" não está ligada a nenhuma categoria do Q5` });
-    if (sit && todasSit.has(sit) && !p.inicioSituacao && !sit.includes('FERIAS')) inconsistencias.push({ policial: p, motivo: `Situação "${p.SITUAÇÃO}" sem data de início` });
-    if (sit.includes('FERIAS') && p.fimFerias && d(p.fimFerias) < hoje) inconsistencias.push({ policial: p, motivo: `Férias terminaram em ${d(p.fimFerias)} mas a situação continua FÉRIAS` });
-    if (p.fimSituacao && d(p.fimSituacao) < hoje && sit && sit !== 'MONTADO' && sit !== 'EM ATIVIDADE') inconsistencias.push({ policial: p, motivo: `Situação "${p.SITUAÇÃO}" com fim em ${d(p.fimSituacao)} ainda não retirada` });
+    if (sit && sit !== 'MONTADO' && sit !== 'EM ATIVIDADE' && !sit.startsWith('MONTADO') && !todasSit.has(sit) && !sit.includes('DISPOSI')) inconsistencias.push({ policial: p, tipo: 'naoLigada', motivo: `Situação "${p.SITUAÇÃO}" não está ligada a nenhuma categoria do Q5` });
+    if (sit && todasSit.has(sit) && !p.inicioSituacao && !sit.includes('FERIAS')) inconsistencias.push({ policial: p, tipo: 'semInicio', motivo: `Situação "${p.SITUAÇÃO}" sem data de início` });
+    if (sit.includes('FERIAS') && p.fimFerias && d(p.fimFerias) < hoje) inconsistencias.push({ policial: p, tipo: 'feriasVencidas', motivo: `Férias terminaram em ${d(p.fimFerias)} mas a situação continua FÉRIAS` });
+    if (p.fimSituacao && d(p.fimSituacao) < hoje && sit && sit !== 'MONTADO' && sit !== 'EM ATIVIDADE') inconsistencias.push({ policial: p, tipo: 'fimVencido', motivo: `Situação "${p.SITUAÇÃO}" com fim em ${d(p.fimSituacao)} ainda não retirada` });
   }
   return { efetivo, porCategoria, inconsistencias };
+}
+
+/** Nome de guerra sem o posto repetido (ex.: posto "CB" + "CB GALDINO" -> "CB GALDINO"). */
+export function nomeExibicao(p: Q5Policial): string {
+  const posto = String(p['Post/Grad'] || '').trim();
+  const nome = String(p['NOME DE GUERRA1'] || p.NOME || '').trim();
+  const base = posto.replace(/\s*PM$/i, '').trim();
+  if (!posto) return nome;
+  const nu = norm(nome).replace(/[º°ª.]/g, ''); const bu = norm(base).replace(/[º°ª.]/g, '');
+  if (bu && (nu === bu || nu.startsWith(bu + ' '))) return nome;
+  return `${posto} ${nome}`;
 }
