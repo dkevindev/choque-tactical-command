@@ -438,9 +438,9 @@ const GestãoPessoas: React.FC = () => {
 
           {/* Alertas */}
           {proximosFimFerias.length > 0 && (
-            <Card className="border-orange-200 bg-orange-50">
+            <Card className="border-orange-500/40 bg-orange-500/15">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-800">
+                <CardTitle className="flex items-center gap-2 text-orange-300">
                   <AlertTriangle className="h-5 w-5" />
                   Alertas - Fim de Férias
                 </CardTitle>

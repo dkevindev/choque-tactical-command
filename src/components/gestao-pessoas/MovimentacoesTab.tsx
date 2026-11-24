@@ -351,12 +351,12 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
             )}
           </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="bg-yellow-500/15 border border-yellow-500/40 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
               <div>
-                <h4 className="font-medium text-yellow-800">Atenção - Ação Irreversível</h4>
-                <p className="text-sm text-yellow-700 mt-1">
+                <h4 className="font-medium text-yellow-300">Atenção - Ação Irreversível</h4>
+                <p className="text-sm text-yellow-300 mt-1">
                   Ao transferir um policial, ele será removido da coleção atual e movido para 
                   a coleção "policiais_transferidos". Esta ação não pode ser desfeita através 
                   do sistema.
@@ -735,12 +735,12 @@ const MovimentacoesTab: React.FC<MovimentacoesTabProps> = ({ policiais, onUpdate
                 </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-blue-500/15 border border-blue-500/40 rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <UserPlus className="h-5 w-5 text-blue-600 mt-0.5" />
                   <div>
-                    <h4 className="font-medium text-blue-800">Alerta de Chegada</h4>
-                    <p className="text-sm text-blue-700 mt-1">
+                    <h4 className="font-medium text-blue-300">Alerta de Chegada</h4>
+                    <p className="text-sm text-blue-300 mt-1">
                       Ao registrar a chegada, será criado um alerta no Sistema de Gestão para que 
                       você possa adicionar os materiais bélicos que o policial trouxe (arma, colete, etc.). 
                       O alerta permanecerá até que seja marcado como "sem alteração".

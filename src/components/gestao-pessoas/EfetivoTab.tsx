@@ -265,7 +265,7 @@ const EfetivoTab: React.FC<EfetivoTabProps> = ({ policiais, onUpdate }) => {
               </TableHeader>
               <TableBody>
                 {filteredPoliciais.map((policial) => (
-                  <TableRow key={policial.id} className={policial.origemExterna ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
+                  <TableRow key={policial.id} className={policial.origemExterna ? 'bg-blue-500/10' : ''}>
                     <TableCell>{policial.NUMERAL || policial.numeral || '-'}</TableCell>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-1.5">

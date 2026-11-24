@@ -665,7 +665,7 @@ const AtestadosMedicosTab: React.FC<AtestadosMedicosTabProps> = ({ policiais, on
                   </div>
 
                   {Number(dias) > 3 && (
-                    <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm">
+                    <div className="flex items-center gap-2 p-2 bg-amber-500/15 border border-amber-500/40 rounded text-amber-300 text-sm">
                       <AlertTriangle className="h-4 w-4" />
                       Atestado com mais de 3 dias — será encaminhado para perícia
                     </div>

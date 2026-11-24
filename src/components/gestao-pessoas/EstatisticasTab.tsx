@@ -63,16 +63,16 @@ const UNIDADES: { key: UnidadeKey; label: string; filter: (p: Policial) => boole
 ];
 
 const FUNCAO_COLORS = [
-  'bg-blue-100 text-blue-800 border-blue-200',
-  'bg-green-100 text-green-800 border-green-200',
-  'bg-purple-100 text-purple-800 border-purple-200',
-  'bg-orange-100 text-orange-800 border-orange-200',
-  'bg-pink-100 text-pink-800 border-pink-200',
-  'bg-teal-100 text-teal-800 border-teal-200',
-  'bg-indigo-100 text-indigo-800 border-indigo-200',
-  'bg-yellow-100 text-yellow-800 border-yellow-200',
-  'bg-red-100 text-red-800 border-red-200',
-  'bg-cyan-100 text-cyan-800 border-cyan-200',
+  'bg-blue-500/15 text-blue-300 border-blue-500/40',
+  'bg-green-500/15 text-green-300 border-green-500/40',
+  'bg-purple-500/15 text-purple-300 border-purple-500/40',
+  'bg-orange-500/15 text-orange-300 border-orange-500/40',
+  'bg-pink-500/15 text-pink-300 border-pink-500/40',
+  'bg-teal-500/15 text-teal-300 border-teal-500/40',
+  'bg-indigo-500/15 text-indigo-300 border-indigo-500/40',
+  'bg-yellow-500/15 text-yellow-300 border-yellow-500/40',
+  'bg-red-500/15 text-red-300 border-red-500/40',
+  'bg-cyan-500/15 text-cyan-300 border-cyan-500/40',
 ];
 
 const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
@@ -456,13 +456,13 @@ const EstatisticasTab: React.FC<EstatisticasTabProps> = ({ policiais }) => {
                         <div
                           key={item.id}
                           className={`flex items-center justify-between py-1.5 px-2 rounded text-sm ${
-                            idx < 3 ? 'bg-yellow-50 border border-yellow-200' : 
+                            idx < 3 ? 'bg-yellow-500/15 border border-yellow-500/40 text-yellow-100' : 
                             idx % 2 === 0 ? 'bg-muted/50' : ''
                           }`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <span className={`font-bold w-7 text-right shrink-0 ${
-                              idx === 0 ? 'text-yellow-600' : idx === 1 ? 'text-gray-500' : idx === 2 ? 'text-amber-700' : 'text-muted-foreground'
+                              idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-500' : 'text-muted-foreground'
                             }`}>
                               {idx + 1}º
                             </span>
