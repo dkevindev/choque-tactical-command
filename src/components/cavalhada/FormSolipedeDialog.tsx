@@ -23,7 +23,7 @@ interface Props {
 
 const vazio: DadosSolipede = {
   registro: '', nome: '', raca: 'MESTIÇO', sexo: 'MACHO', pelagem: '', anoNascimento: new Date().getFullYear(),
-  categoria: 'ADAPTACAO', local: 'RPMONT', situacaoCarga: 'PENDENTE', documentoCarga: '', observacoes: '', dataNascimento: '',
+  categoria: 'ADAPTACAO', local: 'RPMONT', situacaoCarga: 'PENDENTE', documentoCarga: '', observacoes: '', dataNascimento: '', dataObito: '',
 };
 
 const FormSolipedeDialog = ({ aberto, onFechar, onSalvo, animal }: Props) => {
@@ -47,12 +47,14 @@ const FormSolipedeDialog = ({ aberto, onFechar, onSalvo, animal }: Props) => {
     if (!f.nome.trim()) { toast.error('Informe o nome do animal.'); return; }
     if (!f.pelagem.trim()) { toast.error('Informe a pelagem.'); return; }
     const ano = f.dataNascimento ? Number(f.dataNascimento.slice(0, 4)) : Number(f.anoNascimento);
+    if (f.dataObito && f.dataObito < (f.dataNascimento || `${ano}-01-01`)) { toast.error('A data do óbito não pode ser antes do nascimento.'); return; }
     if (!ano || ano < 1980 || ano > new Date().getFullYear()) { toast.error('Ano de nascimento inválido.'); return; }
 
     const dados: DadosSolipede = {
       ...f, registro, nome: f.nome.trim().toUpperCase(), pelagem: f.pelagem.trim().toUpperCase(),
       raca: f.raca.trim().toUpperCase(), anoNascimento: ano,
       dataNascimento: f.dataNascimento || undefined,
+      dataObito: f.dataObito || undefined,
       documentoCarga: f.situacaoCarga === 'PENDENTE' ? undefined : f.documentoCarga?.trim() || undefined,
       observacoes: f.observacoes?.trim() || undefined,
     };
@@ -61,7 +63,8 @@ const FormSolipedeDialog = ({ aberto, onFechar, onSalvo, animal }: Props) => {
       if (animal) {
         await editarSolipede(animal, {
           nome: dados.nome, raca: dados.raca, sexo: dados.sexo, pelagem: dados.pelagem,
-          anoNascimento: dados.anoNascimento, dataNascimento: dados.dataNascimento, observacoes: dados.observacoes,
+          anoNascimento: dados.anoNascimento, dataNascimento: dados.dataNascimento, dataObito: dados.dataObito,
+          observacoes: dados.observacoes, documentoCarga: dados.documentoCarga,
         });
         toast.success('Dados atualizados.');
       } else {
@@ -85,7 +88,7 @@ const FormSolipedeDialog = ({ aberto, onFechar, onSalvo, animal }: Props) => {
           <DialogTitle>{edicao ? `Corrigir dados – ${animal?.registro}` : 'Novo animal'}</DialogTitle>
           <DialogDescription>
             {edicao
-              ? 'Corrija os dados de identificação. Para mudar categoria, local ou carga, use "Movimentar".'
+              ? 'Corrija os dados do animal. Para mudar categoria, local ou carga, use "Movimentar"; para tirar do efetivo, "Dar descarga".'
               : 'Cadastre um solípede que entrou no efetivo.'}
           </DialogDescription>
         </DialogHeader>
@@ -128,6 +131,16 @@ const FormSolipedeDialog = ({ aberto, onFechar, onSalvo, animal }: Props) => {
               <Input id="dn" type="date" value={f.dataNascimento ?? ''} onChange={(e) => set('dataNascimento', e.target.value)} />
             </div>
           </div>
+          <div className="space-y-1">
+            <Label htmlFor="dob">Data do óbito (se morreu)</Label>
+            <Input id="dob" type="date" value={f.dataObito ?? ''} onChange={(e) => set('dataObito', e.target.value)} />
+          </div>
+          {edicao && f.situacaoCarga !== 'PENDENTE' && (
+            <div className="space-y-1">
+              <Label htmlFor="edoc">Documento de carga</Label>
+              <Input id="edoc" value={f.documentoCarga ?? ''} onChange={(e) => set('documentoCarga', e.target.value.toUpperCase())} />
+            </div>
+          )}
 
           {!edicao && (
             <>
