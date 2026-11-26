@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Modelos .docx das functions ficam fora do Git (entregues à parte)
+functions/templates/
