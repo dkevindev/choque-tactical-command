@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { FileDown, Plus, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { collection, getDocs, query, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, query, updateDoc, doc, runTransaction } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { toast } from 'sonner';
 import { usePolicialResolver } from '@/hooks/usePolicialResolver';
@@ -44,9 +44,31 @@ interface Transferencia {
   }>;
 }
 
-const GerarTermoEntregaForm = () => {
+// Contador por ano: guarda o maior número já usado para sugerir o próximo
+const contadorRef = () => doc(db, 'contadores', `termoEntrega-${new Date().getFullYear()}`);
+
+const sugerirProximoNumero = async () => {
+  const snap = await getDoc(contadorRef());
+  return String((snap.data()?.ultimo ?? 0) + 1).padStart(3, '0');
+};
+
+const registrarNumeroUsado = (numero: string) => {
+  const n = parseInt(numero, 10);
+  if (Number.isNaN(n)) return;
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(contadorRef());
+    if (n > (snap.data()?.ultimo ?? 0)) tx.set(contadorRef(), { ultimo: n });
+  });
+};
+
+interface Props {
+  transferenciaIdInicial?: string;
+  onGerado?: () => void;
+}
+
+const GerarTermoEntregaForm = ({ transferenciaIdInicial = '', onGerado }: Props) => {
   const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
-  const [transferenciaId, setTransferenciaId] = useState('');
+  const [transferenciaId, setTransferenciaId] = useState(transferenciaIdInicial);
   const [numeroTermo, setNumeroTermo] = useState('');
   const [itensAdicionais, setItensAdicionais] = useState<ItemAdicional[]>([]);
   const [showModalItem, setShowModalItem] = useState(false);
@@ -57,6 +79,13 @@ const GerarTermoEntregaForm = () => {
   useEffect(() => {
     loadTransferencias();
   }, []);
+
+  useEffect(() => {
+    if (!transferenciaId) return;
+    sugerirProximoNumero()
+      .then(setNumeroTermo)
+      .catch((e) => console.error('Erro ao sugerir número:', e));
+  }, [transferenciaId]);
 
   const loadTransferencias = async () => {
     try {
@@ -249,33 +278,31 @@ const GerarTermoEntregaForm = () => {
           transferidoPara: transferencia.localDestino,
           publicacao: transferencia.publicacao,
           materiais,
-          itensAdicionais: itensAdicionaisStrings
+          itensAdicionais: itensAdicionaisStrings,
+          // Um só arquivo: Termo na 1ª página, Nada Consta (mesmo número) em seguida
+          incluirNadaConsta: true,
+          numeroNadaConsta: numeroTermo
         })
       });
 
       if (!response.ok) throw new Error('Erro ao gerar documento');
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = `Termo-Entrega-${transferencia.policialNome.replace(/\s+/g, '_')}.docx`;
+      link.href = window.URL.createObjectURL(await response.blob());
+      link.download = `Termo-Entrega-e-Nada-Consta-${transferencia.policialNome.replace(/\s+/g, '_')}.docx`;
       link.click();
 
-      // Atualizar registro
+      const dataGeracao = new Date();
       await updateDoc(doc(db, 'transferencias_policiais', transferenciaId), {
-        'documentosGerados.termoEntrega': {
-          gerado: true,
-          numeroTermo,
-          dataGeracao: new Date(),
-          itensAdicionais
-        }
+        'documentosGerados.termoEntrega': { gerado: true, numeroTermo, dataGeracao, itensAdicionais },
+        'documentosGerados.nadaConsta': { gerado: true, numeroNadaConsta: numeroTermo, dataGeracao }
       });
+      await registrarNumeroUsado(numeroTermo);
 
-      toast.success('Documento gerado com sucesso!');
-      setNumeroTermo('');
-      setTransferenciaId('');
+      toast.success('Termo de Entrega e Nada Consta gerados!');
       setItensAdicionais([]);
+      if (onGerado) return onGerado();
+      setTransferenciaId('');
       loadTransferencias();
     } catch (error) {
       console.error('Erro ao gerar documento:', error);
@@ -298,7 +325,7 @@ const GerarTermoEntregaForm = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Documento para registro de entrega de materiais por policial transferido
+            Documento para registro de entrega de materiais por policial transferido. O Nada Consta é gerado junto, com o mesmo número.
           </p>
 
           <div>
@@ -336,10 +363,10 @@ const GerarTermoEntregaForm = () => {
               </div>
 
               <div>
-                <Label htmlFor="numeroTermo">Número do Termo</Label>
+                <Label htmlFor="numeroTermo">Número do Termo e do Nada Consta (sugerido automaticamente)</Label>
                 <Input
                   id="numeroTermo"
-                  placeholder="Ex: 001/2024-CPCHOQUE"
+                  placeholder="Ex: 015"
                   value={numeroTermo}
                   onChange={(e) => setNumeroTermo(e.target.value)}
                 />
@@ -464,7 +491,7 @@ const GerarTermoEntregaForm = () => {
               </div>
 
               <Button onClick={handleGerar} disabled={loading} className="w-full">
-                {loading ? 'Gerando...' : 'Gerar Documento'}
+                {loading ? 'Gerando...' : 'Gerar Termo + Nada Consta'}
               </Button>
             </>
           )}

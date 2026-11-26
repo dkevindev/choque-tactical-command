@@ -12,6 +12,7 @@ import { collection, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestor
 import { db } from '@/firebase';
 import { Package, ArrowRight } from 'lucide-react';
 import { usePolicialResolver } from '@/hooks/usePolicialResolver';
+import GerarTermoEntregaForm from './documentos/GerarTermoEntregaForm';
 
 interface Material {
   materialId: string;
@@ -56,7 +57,25 @@ const TransferenciaPolicialModal = ({ cautela, open, onClose, onSuccess }: Props
   const [publicacao, setPublicacao] = useState('');
   const [materiaisStatus, setMateriaisStatus] = useState<Record<string, 'levado' | 'devolvido' | null>>({});
   const [loading, setLoading] = useState(false);
+  const [transferenciaSalvaId, setTransferenciaSalvaId] = useState('');
   const { resolverNome } = usePolicialResolver();
+
+  // Depois de salvar, o modal vira o passo de geração dos documentos
+  if (transferenciaSalvaId) {
+    return (
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Documentos da Transferência</DialogTitle>
+          </DialogHeader>
+          <GerarTermoEntregaForm transferenciaIdInicial={transferenciaSalvaId} onGerado={onClose} />
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>Gerar depois</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
   const handleMaterialToggle = (materialId: string, status: 'levado' | 'devolvido') => {
     setMateriaisStatus(prev => ({
       ...prev,
@@ -111,7 +130,7 @@ const TransferenciaPolicialModal = ({ cautela, open, onClose, onSuccess }: Props
         updatedAt: Timestamp.now()
       };
 
-      await addDoc(collection(db, 'transferencias_policiais'), transferencia);
+      const novaTransferencia = await addDoc(collection(db, 'transferencias_policiais'), transferencia);
 
       // Atualizar cautela original
       await updateDoc(doc(db, 'cautelas_permanentes', cautela.id), {
@@ -168,9 +187,9 @@ const TransferenciaPolicialModal = ({ cautela, open, onClose, onSuccess }: Props
         }
       }
 
-      toast.success('Transferência registrada com sucesso!');
+      toast.success('Transferência registrada! Agora gere o Termo de Entrega e o Nada Consta.');
       onSuccess();
-      onClose();
+      setTransferenciaSalvaId(novaTransferencia.id);
     } catch (error) {
       console.error('Erro ao processar transferência:', error);
       toast.error('Erro ao processar transferência');

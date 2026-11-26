@@ -397,12 +397,13 @@ appTermoEntrega.post('/', async (req, res) => {
             return res.status(400).send('Dados incompletos para termo de entrega.');
         }
 
-        const bucket = admin.storage().bucket();
-        const templatePath = 'templates/template-termo-entrega.docx';
-        tempFilePath = path.join('/tmp', `template-termo-entrega-${Date.now()}.docx`);
-        await bucket.file(templatePath).download({ destination: tempFilePath });
+        if (data.incluirNadaConsta && !data.numeroNadaConsta) {
+            return res.status(400).send('Dados incompletos para nada consta.');
+        }
 
-        const content = fs.readFileSync(tempFilePath, 'binary');
+        // Modelos versionados em functions/templates (publicados junto com a função)
+        const modelo = data.incluirNadaConsta ? 'template-transferencia-completa.docx' : 'template-termo-entrega.docx';
+        const content = fs.readFileSync(path.join(__dirname, 'templates', modelo), 'binary');
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
@@ -418,10 +419,7 @@ appTermoEntrega.post('/', async (req, res) => {
         const outrosMateriais = (data.itensAdicionais || []).map(item => {
             // Suportar tanto string direta quanto objeto { descricao: string }
             const descricaoRaw = typeof item === 'string' ? item : (item?.descricao || '');
-            return {
-                qtd: '01',
-                descricao: descricaoRaw.toUpperCase() || '-'
-            };
+            return { qtd: '01', descricao: descricaoRaw.toUpperCase() || '-' };
         });
 
         const templateData = {
@@ -432,6 +430,8 @@ appTermoEntrega.post('/', async (req, res) => {
             numerotermo: data.numeroTermo || '',
             transferidopara: data.transferidoPara || '',
             publicacao: data.publicacao || '',
+            ano: String(new Date().getFullYear()),
+            numerondconsta: data.numeroNadaConsta || '',
             materiais: materiaisFormatados,
             outrosmateriais: outrosMateriais
         };
@@ -439,7 +439,8 @@ appTermoEntrega.post('/', async (req, res) => {
         doc.render(templateData);
         const buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
 
-        const nomeArquivo = `Termo-Entrega-${data.policial.nome.replace(/\s+/g, '_')}.docx`;
+        const prefixo = data.incluirNadaConsta ? 'Termo-Entrega-e-Nada-Consta' : 'Termo-Entrega';
+        const nomeArquivo = `${prefixo}-${data.policial.nome.replace(/\s+/g, '_')}.docx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         res.setHeader('Content-Disposition', `attachment; filename="${nomeArquivo}"`);
         res.send(buffer);
@@ -468,12 +469,7 @@ appNadaConsta.post('/', async (req, res) => {
             return res.status(400).send('Dados incompletos para nada consta.');
         }
 
-        const bucket = admin.storage().bucket();
-        const templatePath = 'templates/template-nada-consta.docx';
-        tempFilePath = path.join('/tmp', `template-nada-consta-${Date.now()}.docx`);
-        await bucket.file(templatePath).download({ destination: tempFilePath });
-
-        const content = fs.readFileSync(tempFilePath, 'binary');
+        const content = fs.readFileSync(path.join(__dirname, 'templates', 'template-nada-consta.docx'), 'binary');
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
@@ -484,7 +480,8 @@ appNadaConsta.post('/', async (req, res) => {
             dataatual: data.dataatual || new Date().toLocaleDateString('pt-BR'),
             numerondconsta: data.numerondconsta || '',
             transferidopara: data.transferidopara || '',
-            publicacao: data.publicacao || ''
+            publicacao: data.publicacao || '',
+            ano: String(new Date().getFullYear())
         };
 
         console.log('Dados para o template Nada Consta:', templateData);
