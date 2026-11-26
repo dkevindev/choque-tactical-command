@@ -58,7 +58,7 @@ const CAVBot = () => {
   }>({ active: false });
 
   // UI de seleção de VTR
-  const [vtrStep, setVtrStep] = useState<'none' | 'root' | 'pesada' | 'leve-categoria' | 'leve-operacional' | 'leve-adm'>('none');
+  const [vtrStep, setVtrStep] = useState<'none' | 'root' | 'pesada' | 'leve'>('none');
   const [listaViaturas, setListaViaturas] = useState<ViaturaBasica[]>([]);
   const [loadingVtrs, setLoadingVtrs] = useState(false);
 
@@ -132,16 +132,6 @@ const CAVBot = () => {
   const [checklistDraft, setChecklistDraft] = useState<Partial<ChecklistViatura>>({});
   const [checklistStep, setChecklistStep] = useState<number>(0); // 0-9 steps
   const [showChecklist, setShowChecklist] = useState(false);
-
-  // Viatura operacional agora é determinada pelo campo `operacional` salvo no cadastro (coleção `frota`).
-  // Fallback: se ainda não foi marcada, usa a heurística antiga por cadastro para manter compatibilidade.
-  const allowedOperacionaisLegacy = ['05', '06', '08', '11', '12', '13'];
-  const isOperacional = (v: ViaturaBasica): boolean => {
-    if (typeof v.operacional === 'boolean') return v.operacional;
-    const c = String(v.CADASTRO || '');
-    const digits = (c.match(/\d+/g) || []).join('');
-    return allowedOperacionaisLegacy.some(n => digits.includes(n));
-  };
 
   const startVtrSelection = () => {
     setVtrStep('root');
@@ -377,7 +367,7 @@ const CAVBot = () => {
   const loadPesadas = async () => {
     setLoadingVtrs(true);
     try {
-      const arr = await buscarViaturasPesadas();
+      const arr = await buscarViaturasPesadas(true);
       setListaViaturas(arr);
       setVtrStep('pesada');
     } finally {
@@ -385,29 +375,12 @@ const CAVBot = () => {
     }
   };
 
-  const goLeveCategoria = () => {
-    setVtrStep('leve-categoria');
-  };
-
-  const loadLevesOperacional = async () => {
+  const loadLeves = async () => {
     setLoadingVtrs(true);
     try {
-      const leves = await buscarViaturasLeves();
-      const ops = leves.filter(isOperacional);
-      setListaViaturas(ops);
-      setVtrStep('leve-operacional');
-    } finally {
-      setLoadingVtrs(false);
-    }
-  };
-
-  const loadLevesAdministrativa = async () => {
-    setLoadingVtrs(true);
-    try {
-      const leves = await buscarViaturasLeves();
-      const outros = leves.filter(v => !isOperacional(v));
-      setListaViaturas(outros);
-      setVtrStep('leve-adm');
+      const leves = await buscarViaturasLeves(true);
+      setListaViaturas(leves);
+      setVtrStep('leve');
     } finally {
       setLoadingVtrs(false);
     }
@@ -417,17 +390,11 @@ const CAVBot = () => {
     const value = e.target.value;
     if (vtrStep === 'root') {
       if (value === 'pesada') return loadPesadas();
-      if (value === 'leve') return goLeveCategoria();
+      if (value === 'leve') return loadLeves();
       return;
     }
-    if (vtrStep === 'leve-categoria') {
-      if (value === 'operacional') return loadLevesOperacional();
-      if (value === 'adm') return loadLevesAdministrativa();
+    if (vtrStep === 'pesada' || vtrStep === 'leve') {
       if (value === 'back') return setVtrStep('root');
-      return;
-    }
-    if (vtrStep === 'pesada' || vtrStep === 'leve-operacional' || vtrStep === 'leve-adm') {
-      if (value === 'back') return setVtrStep(vtrStep === 'pesada' ? 'root' : 'leve-categoria');
       const v = listaViaturas.find(v => v.id === value);
       if (v) return handleSelectViatura(v);
     }
@@ -931,22 +898,14 @@ const CAVBot = () => {
               {vtrStep === 'root' && (
                 <div className="quick-buttons">
                   <button className="quick-button" onClick={loadPesadas}>🚚 Frota Pesada</button>
-                  <button className="quick-button" onClick={goLeveCategoria}>🚗 Frota Leve</button>
+                  <button className="quick-button" onClick={loadLeves}>🚗 Frota Leve</button>
                 </div>
               )}
 
-              {vtrStep === 'leve-categoria' && (
-                <div className="quick-buttons">
-                  <button className="quick-button" onClick={loadLevesOperacional}>🛡️ Operacional</button>
-                  <button className="quick-button" onClick={loadLevesAdministrativa}>🏢 Administrativa</button>
-                  <button className="quick-button" onClick={() => setVtrStep('root')}>⬅️ Voltar</button>
-                </div>
-              )}
-
-              {(vtrStep === 'pesada' || vtrStep === 'leve-operacional' || vtrStep === 'leve-adm') && (
+              {(vtrStep === 'pesada' || vtrStep === 'leve') && (
                 <div>
                   <div className="quick-buttons" style={{ gridTemplateColumns: 'repeat(1, 1fr)' }}>
-                    <button className="quick-button" onClick={() => setVtrStep(vtrStep === 'pesada' ? 'root' : 'leve-categoria')}>⬅️ Voltar</button>
+                    <button className="quick-button" onClick={() => setVtrStep('root')}>⬅️ Voltar</button>
                   </div>
                   {loadingVtrs ? (
                     <div className="quick-actions-header">Carregando...</div>

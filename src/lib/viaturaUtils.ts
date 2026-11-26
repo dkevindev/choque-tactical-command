@@ -1,6 +1,7 @@
 
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/firebase';
+import { filtrarViaturasPorTipo } from './viaturasServico';
 
 export interface ViaturaBasica {
   id: string;
@@ -17,11 +18,11 @@ let viaturasCache: ViaturaBasica[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
-export const buscarTodasViaturas = async (): Promise<ViaturaBasica[]> => {
+export const buscarTodasViaturas = async (atualizar = false): Promise<ViaturaBasica[]> => {
   const agora = Date.now();
   
   // Verificar se o cache ainda é válido
-  if (viaturasCache && (agora - cacheTimestamp) < CACHE_DURATION) {
+  if (!atualizar && viaturasCache && (agora - cacheTimestamp) < CACHE_DURATION) {
     return viaturasCache;
   }
 
@@ -43,14 +44,14 @@ export const buscarTodasViaturas = async (): Promise<ViaturaBasica[]> => {
   }
 };
 
-export const buscarViaturasLeves = async (): Promise<ViaturaBasica[]> => {
-  const todasViaturas = await buscarTodasViaturas();
-  return todasViaturas.filter(v => v.tipo === 'leve');
+export const buscarViaturasLeves = async (atualizar = false): Promise<ViaturaBasica[]> => {
+  const todasViaturas = await buscarTodasViaturas(atualizar);
+  return filtrarViaturasPorTipo(todasViaturas, 'leve');
 };
 
-export const buscarViaturasPesadas = async (): Promise<ViaturaBasica[]> => {
-  const todasViaturas = await buscarTodasViaturas();
-  return todasViaturas.filter(v => v.tipo === 'pesada');
+export const buscarViaturasPesadas = async (atualizar = false): Promise<ViaturaBasica[]> => {
+  const todasViaturas = await buscarTodasViaturas(atualizar);
+  return filtrarViaturasPorTipo(todasViaturas, 'pesada');
 };
 
 export const isFroteLeve = (viatura: ViaturaBasica): boolean => {

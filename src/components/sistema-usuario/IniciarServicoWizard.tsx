@@ -5,16 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Truck, Car, Shield, Building2 } from 'lucide-react';
+import { Truck, Car } from 'lucide-react';
 import { buscarViaturasLeves, buscarViaturasPesadas, type ViaturaBasica } from '@/lib/viaturaUtils';
-import { isViaturaOperacional, type PolicialAuth } from '@/lib/policialAuth';
+import { type PolicialAuth } from '@/lib/policialAuth';
 import { db } from '@/firebase';
 import { collection, addDoc, doc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
 type Tipo = 'leve' | 'pesada';
-type Categoria = 'operacional' | 'adm';
 type Angulo = 'frontal' | 'traseira' | 'esquerdo' | 'direito' | 'mecanico' | 'interno';
 
 const IniciarServicoWizard = () => {
@@ -23,7 +22,6 @@ const IniciarServicoWizard = () => {
   const [servicoDocId, setServicoDocId] = useState<string | null>(null);
   const [pol, setPol] = useState<PolicialAuth | null>(null);
   const [tipo, setTipo] = useState<Tipo | null>(null);
-  const [categoria, setCategoria] = useState<Categoria | null>(null);
   const [lista, setLista] = useState<ViaturaBasica[]>([]);
   const [viatura, setViatura] = useState<ViaturaBasica | null>(null);
   const [loadingVtr, setLoadingVtr] = useState(false);
@@ -48,7 +46,7 @@ const IniciarServicoWizard = () => {
   const [check, setCheck] = useState<any>({});
   const [checkStep, setCheckStep] = useState(0);
 
-  const totalSteps = 8;
+  const totalSteps = 7;
 
   // Carrega VTRs
   useEffect(() => {
@@ -56,11 +54,8 @@ const IniciarServicoWizard = () => {
     setLoadingVtr(true);
     (async () => {
       try {
-        const arr = tipo === 'pesada' ? await buscarViaturasPesadas() : await buscarViaturasLeves();
-        const filtrada = tipo === 'leve' && categoria
-          ? arr.filter(v => categoria === 'operacional' ? isViaturaOperacional(v) : !isViaturaOperacional(v))
-          : arr;
-        setLista(filtrada);
+        const arr = tipo === 'pesada' ? await buscarViaturasPesadas(true) : await buscarViaturasLeves(true);
+        setLista(arr);
         // Carrega serviços em aberto para bloquear VTRs
         try {
           const snap = await getDocs(query(collection(db, 'servicosDiarios'), where('status', '==', 'aberto')));
@@ -73,7 +68,7 @@ const IniciarServicoWizard = () => {
         } catch (e) { console.error('Erro ao carregar serviços abertos:', e); }
       } finally { setLoadingVtr(false); }
     })();
-  }, [step, tipo, categoria]);
+  }, [step, tipo]);
 
   // Carrega avarias da viatura
   useEffect(() => {
@@ -211,7 +206,7 @@ const IniciarServicoWizard = () => {
     }
   };
 
-  const stepLabels = ['Login', 'Tipo de Frota', 'Categoria', 'Selecionar VTR', 'Avarias', 'Serviço', 'Checklist', 'Concluído'];
+  const stepLabels = ['Login', 'Tipo de Frota', '', 'Selecionar VTR', 'Avarias', 'Serviço', 'Checklist', 'Concluído'];
 
   // STEP 0 — Login
   if (step === 0) {
@@ -228,7 +223,7 @@ const IniciarServicoWizard = () => {
       <StepWizard title="Tipo de Frota" step={1} totalSteps={totalSteps} stepLabel={stepLabels[1]}
         onBack={() => setStep(0)} hideNext>
         <div className="grid grid-cols-1 gap-4">
-          <button onClick={() => { setTipo('leve'); setStep(2); }}
+          <button onClick={() => { setTipo('leve'); setStep(3); }}
             className="flex items-center gap-4 p-6 rounded-2xl bg-sky-50 hover:bg-sky-100 border-2 border-sky-200">
             <Car className="h-10 w-10 text-sky-600" />
             <div className="text-left">
@@ -236,7 +231,7 @@ const IniciarServicoWizard = () => {
               <div className="text-sm text-slate-500">Veículos leves</div>
             </div>
           </button>
-          <button onClick={() => { setTipo('pesada'); setCategoria(null); setStep(3); }}
+          <button onClick={() => { setTipo('pesada'); setStep(3); }}
             className="flex items-center gap-4 p-6 rounded-2xl bg-amber-50 hover:bg-amber-100 border-2 border-amber-200">
             <Truck className="h-10 w-10 text-amber-600" />
             <div className="text-left">
@@ -249,38 +244,11 @@ const IniciarServicoWizard = () => {
     );
   }
 
-  // STEP 2 — Categoria (apenas leve)
-  if (step === 2) {
-    return (
-      <StepWizard title="Categoria" step={2} totalSteps={totalSteps} stepLabel={stepLabels[2]}
-        onBack={() => setStep(1)} hideNext>
-        <div className="grid grid-cols-1 gap-4">
-          <button onClick={() => { setCategoria('operacional'); setStep(3); }}
-            className="flex items-center gap-4 p-6 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200">
-            <Shield className="h-10 w-10 text-emerald-600" />
-            <div className="text-left">
-              <div className="text-lg font-bold">Operacional</div>
-              <div className="text-sm text-slate-500">VTRs de serviço</div>
-            </div>
-          </button>
-          <button onClick={() => { setCategoria('adm'); setStep(3); }}
-            className="flex items-center gap-4 p-6 rounded-2xl bg-slate-50 hover:bg-slate-100 border-2 border-slate-200">
-            <Building2 className="h-10 w-10 text-slate-600" />
-            <div className="text-left">
-              <div className="text-lg font-bold">Administrativa</div>
-              <div className="text-sm text-slate-500">VTRs administrativas</div>
-            </div>
-          </button>
-        </div>
-      </StepWizard>
-    );
-  }
-
   // STEP 3 — Selecionar VTR
   if (step === 3) {
     return (
-      <StepWizard title="Selecionar VTR" step={3} totalSteps={totalSteps} stepLabel={stepLabels[3]}
-        onBack={() => setStep(tipo === 'leve' ? 2 : 1)} hideNext>
+      <StepWizard title="Selecionar VTR" step={2} totalSteps={totalSteps} stepLabel={stepLabels[3]}
+        onBack={() => setStep(1)} hideNext>
         {loadingVtr ? (
           <div className="text-center text-slate-500 py-8">Carregando viaturas...</div>
         ) : (
@@ -349,7 +317,7 @@ const IniciarServicoWizard = () => {
     ];
     const isImg = (['frontal','traseira','esquerdo','direito'] as const).includes(angulo as any) && !!getImg();
     return (
-      <StepWizard title={`Avarias - ${viatura?.CADASTRO || viatura?.PLACA}`} step={4} totalSteps={totalSteps}
+      <StepWizard title={`Avarias - ${viatura?.CADASTRO || viatura?.PLACA}`} step={3} totalSteps={totalSteps}
         stepLabel={stepLabels[4]} onBack={() => setStep(3)} onNext={() => setStep(5)} nextLabel="Continuar para serviço">
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-2">
@@ -440,7 +408,7 @@ const IniciarServicoWizard = () => {
   // STEP 5 — KM/Área
   if (step === 5) {
     return (
-      <StepWizard title="Dados do Serviço" step={5} totalSteps={totalSteps} stepLabel={stepLabels[5]}
+      <StepWizard title="Dados do Serviço" step={4} totalSteps={totalSteps} stepLabel={stepLabels[5]}
         onBack={() => setStep(4)} onNext={iniciarServicoSalvar} nextLabel="Iniciar serviço"
         nextDisabled={!kmInicial || !area.trim()}>
         <div className="space-y-4">
@@ -489,7 +457,7 @@ const IniciarServicoWizard = () => {
       else salvarChecklistFinal();
     };
     return (
-      <StepWizard title="Checklist da VTR" step={6} totalSteps={totalSteps}
+      <StepWizard title="Checklist da VTR" step={5} totalSteps={totalSteps}
         stepLabel={`${checkStep + 1}/${opts.length} ${stepLabels[6]}`}
         onBack={() => { if (checkStep > 0) setCheckStep(checkStep - 1); else setStep(5); }}
         hideNext>
